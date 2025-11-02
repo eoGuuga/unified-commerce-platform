@@ -21,17 +21,15 @@ Resultado: Vende 15 brigadeiros mas só tinha 10 em estoque.
 
 ## Documentacao Completa
 
-**VER PRIMEIRO**: [`MEMORIA_ESTADO_ATUAL.md`](MEMORIA_ESTADO_ATUAL.md) - Contexto completo do projeto
-
 **DOCUMENTACAO EM**: [`docs/`](docs/)
 
 ### Principais Arquivos:
 
-- **`docs/README.md`** - Indice de navegacao
-- **`docs/04-DATABASE.md`** - Schema completo
+- **`docs/01-VISION.md`** - Visao e objetivos
+- **`docs/03-ARCHITECTURE.md`** - Arquitetura 4 camadas
+- **`docs/04-DATABASE.md`** - Schema SQL completo
 - **`docs/06-WORKFLOWS.md`** - Fluxos de venda
-- **`docs/08-ROADMAP.md`** - Timeline desenvolvimento
-- **`README_IMPLEMENTACAO.md`** - Como implementar agora
+- **`docs/10-SETUP.md`** - Setup inicial
 
 ---
 
@@ -65,24 +63,32 @@ docker exec -i ucm-postgres psql -U postgres -d ucm < scripts/migrations/001-ini
 - Criar projeto em supabase.com
 - Executar migration SQL no SQL Editor
 
-### 2. Setup Backend
+### 2. Setup Automatico (PowerShell)
 
-```bash
-cd backend
-npm install
-cp ENV_SETUP.md .env  # Preencher com credenciais
-npm run start:dev
-# Health: http://localhost:3001/api/v1/health
+```powershell
+.\setup.ps1
 ```
 
-### 3. Setup Frontend
+O script configura tudo automaticamente.
 
-```bash
+### 3. Rodar Backend
+
+```powershell
+cd backend
+npm run start:dev
+```
+
+### 4. Rodar Frontend
+
+```powershell
 cd frontend
-npm install
-cp ENV_SETUP.md .env.local  # Preencher com credenciais
 npm run dev
-# App: http://localhost:3000
+```
+
+### 5. Testar
+
+```powershell
+.\test-backend.ps1
 ```
 
 ---
@@ -94,20 +100,8 @@ npm run dev
 - **Estrutura**: Backend + Frontend  
 - **Docker**: PostgreSQL + Redis + UIs  
 - **Configuracoes**: TypeScript, ESLint, Jest  
-
----
-
-## O Que Falta (Proximos Passos)
-
-### AGORA: Implementar Módulos
-
-1. **Configurar TypeORM** no NestJS
-2. **Criar Entities** (Produto, Pedido, Estoque, etc)
-3. **Implementar Módulo Products** (CRUD)
-4. **Implementar Autenticação** (JWT, Guards)
-5. **Implementar Módulo Orders** (com FOR UPDATE lock)
-
-**DETALHES**: Ver [`README_IMPLEMENTACAO.md`](README_IMPLEMENTACAO.md)
+- **Modulos**: Auth, Products, Orders, WhatsApp
+- **Scripts**: setup.ps1 e test-backend.ps1
 
 ---
 
@@ -139,17 +133,18 @@ ucm/
 │   └── migrations/
 │       └── 001-initial-schema.sql  # SCHEMA COMPLETO
 ├── docker-compose.yml       # PostgreSQL + Redis
-├── MEMORIA_ESTADO_ATUAL.md  # CONTEXTO COMPLETO (LER ISSO!)
-└── README_IMPLEMENTACAO.md  # COMO COMEÇAR
+├── setup.ps1                # SETUP AUTOMATICO
+└── test-backend.ps1         # TESTES AUTOMATIZADOS
 ```
 
 ---
 
 ## Comece Por Aqui
 
-1. **Leia**: [`MEMORIA_ESTADO_ATUAL.md`](MEMORIA_ESTADO_ATUAL.md)
-2. **Veja**: [`docs/04-DATABASE.md`](docs/04-DATABASE.md) (Schema)
-3. **Implemente**: Seguindo [`README_IMPLEMENTACAO.md`](README_IMPLEMENTACAO.md)
+1. **Instale Node.js**: https://nodejs.org/ (versao LTS)
+2. **Execute**: `.\setup.ps1`
+3. **Rode**: `cd backend && npm run start:dev` e `cd frontend && npm run dev`
+4. **Teste**: `.\test-backend.ps1`
 
 ---
 
@@ -159,5 +154,5 @@ MIT License
 
 ---
 
-**Status:** Estrutura completa | Implementacao de modulos pendente  
-**Proximo:** Implementar modulo Products seguindo README_IMPLEMENTACAO.md
+**Status:** MVP implementado | Pronto para testes  
+**Proximo:** Instalar Node.js e rodar os servidores
