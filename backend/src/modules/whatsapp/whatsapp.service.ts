@@ -34,7 +34,7 @@ export class WhatsappService {
       this.logger.log(`Response: ${response}`);
       // await this.sendMessage(message.from, response);
     } catch (error) {
-      this.logger.error(`Error processing message: ${error.message}`);
+      this.logger.error(`Error processing message: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

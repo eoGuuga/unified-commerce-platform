@@ -4,6 +4,15 @@ Write-Host "Setup UCM Platform" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 
+# Adicionar Node.js ao PATH se necessario
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    $nodePath = "C:\Program Files\nodejs"
+    if (Test-Path $nodePath) {
+        $env:Path = "$nodePath;$env:Path"
+        Write-Host "Node.js adicionado ao PATH temporariamente" -ForegroundColor Yellow
+    }
+}
+
 # 1. Verificar Docker
 Write-Host "[1/5] Verificando Docker..." -ForegroundColor Yellow
 if (Get-Command docker -ErrorAction SilentlyContinue) {

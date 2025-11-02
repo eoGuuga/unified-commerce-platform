@@ -24,7 +24,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Registro de novo usuario' })
   @ApiResponse({ status: 201, description: 'Usuario criado com sucesso' })
   @ApiResponse({ status: 401, description: 'Email ja cadastrado' })
-  async register(@Body() registerDto: RegisterDto, @Request() req): Promise<LoginResponse> {
+  async register(@Body() registerDto: RegisterDto, @Request() req: any): Promise<LoginResponse> {
     // Por enquanto, usar tenant_id fixo. Depois podemos extrair do JWT se necessario
     const tenantId = req.headers['x-tenant-id'] || '00000000-0000-0000-0000-000000000000';
     return this.authService.register(registerDto, tenantId);

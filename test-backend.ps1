@@ -95,7 +95,8 @@ if ($productId) {
 if ($productId) {
     Write-Host "[6/6] Testando criacao de pedido..." -ForegroundColor Yellow
     Write-Host "AVISO: Para criar pedido, precisa cadastrar estoque primeiro no banco" -ForegroundColor Yellow
-    Write-Host "Execute: docker exec -i ucm-postgres psql -U postgres -d ucm -c \"INSERT INTO movimentacoes_estoque (tenant_id, produto_id, current_stock) VALUES ('$tenantId', '$productId', 100) ON CONFLICT DO NOTHING;\"" -ForegroundColor Gray
+    $sqlCmd = "docker exec -i ucm-postgres psql -U postgres -d ucm -c `"INSERT INTO movimentacoes_estoque (tenant_id, produto_id, current_stock) VALUES ('$tenantId', '$productId', 100) ON CONFLICT DO NOTHING;`""
+    Write-Host "Execute: $sqlCmd" -ForegroundColor Gray
 } else {
     Write-Host "[6/6] Pulando teste de pedido (produto nao criado)" -ForegroundColor Yellow
 }
