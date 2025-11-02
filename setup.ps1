@@ -24,7 +24,7 @@ $attempt = 0
 
 while (-not $postgresReady -and $attempt -lt $maxAttempts) {
     try {
-        $result = docker exec ucm-postgres pg_isready -U postgres 2>&1
+        docker exec ucm-postgres pg_isready -U postgres 2>&1 | Out-Null
         if ($LASTEXITCODE -eq 0) {
             $postgresReady = $true
             Write-Host "PostgreSQL pronto!" -ForegroundColor Green
@@ -76,9 +76,6 @@ if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "Node.js/npm encontrado!" -ForegroundColor Green
-
-# Salvar diretorio atual
-$originalLocation = Get-Location
 
 # Backend
 if (Test-Path backend/node_modules) {
