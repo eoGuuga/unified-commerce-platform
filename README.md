@@ -154,5 +154,5 @@ MIT License
 
 ---
 
-**Status:** MVP implementado | Pronto para testes  
-**Proximo:** Instalar Node.js e rodar os servidores
+**Status:** MVP implementado | Backend funcionando | Frontend pendente  
+**Proximo:** Rodar frontend e continuar desenvolvimento
