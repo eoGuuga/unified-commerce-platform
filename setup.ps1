@@ -68,18 +68,26 @@ FRONTEND_URL=http://localhost:3000
 # 5. Instalar dependencias
 Write-Host "[5/5] Instalando dependencias..." -ForegroundColor Yellow
 
+# Verificar Node.js/npm
+if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+    Write-Host "ERRO: Node.js/npm nao encontrado!" -ForegroundColor Red
+    Write-Host "     Instale Node.js de: https://nodejs.org/" -ForegroundColor Yellow
+    exit 1
+}
+
+Write-Host "Node.js/npm encontrado!" -ForegroundColor Green
+
+# Salvar diretorio atual
+$originalLocation = Get-Location
+
 # Backend
 if (Test-Path backend/node_modules) {
     Write-Host "Dependencias do backend ja instaladas" -ForegroundColor Gray
 } else {
     Write-Host "Instalando dependencias do backend..." -ForegroundColor Yellow
-    Set-Location backend
-    if (Get-Command npm -ErrorAction SilentlyContinue) {
-        npm install
-        Set-Location ..
-    } else {
-        Write-Host "AVISO: npm nao encontrado. Execute manualmente: cd backend && npm install" -ForegroundColor Yellow
-    }
+    Push-Location backend
+    npm install
+    Pop-Location
 }
 
 # Frontend
@@ -87,13 +95,9 @@ if (Test-Path frontend/node_modules) {
     Write-Host "Dependencias do frontend ja instaladas" -ForegroundColor Gray
 } else {
     Write-Host "Instalando dependencias do frontend..." -ForegroundColor Yellow
-    Set-Location frontend
-    if (Get-Command npm -ErrorAction SilentlyContinue) {
-        npm install
-        Set-Location ..
-    } else {
-        Write-Host "AVISO: npm nao encontrado. Execute manualmente: cd frontend && npm install" -ForegroundColor Yellow
-    }
+    Push-Location frontend
+    npm install
+    Pop-Location
 }
 
 Write-Host ""
