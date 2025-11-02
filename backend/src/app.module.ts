@@ -7,6 +7,7 @@ import { databaseConfig } from './config/database.config';
 import { ProductsModule } from './modules/products/products.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AuthModule } from './modules/auth/auth.module';
     ProductsModule,
     OrdersModule,
     AuthModule,
+    WhatsappModule,
   ],
   controllers: [AppController],
   providers: [AppService],
