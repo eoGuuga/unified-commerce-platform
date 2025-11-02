@@ -1,0 +1,3 @@
+-- Seed de dados iniciais
+-- Será populada durante desenvolvimento
+-- Dados de teste para desenvolvimento local
