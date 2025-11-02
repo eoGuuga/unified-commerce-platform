@@ -13,8 +13,10 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Products')
+@ApiBearerAuth()
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
@@ -38,12 +40,14 @@ export class ProductsController {
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Criar novo produto' })
   create(@Body() createProductDto: CreateProductDto, @Query('tenantId') tenantId: string) {
     return this.productsService.create(createProductDto, tenantId || '00000000-0000-0000-0000-000000000000');
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Atualizar produto' })
   update(
     @Param('id') id: string,
@@ -54,6 +58,7 @@ export class ProductsController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Desativar produto (soft delete)' })
   remove(@Param('id') id: string, @Query('tenantId') tenantId: string) {
     return this.productsService.remove(id, tenantId || '00000000-0000-0000-0000-000000000000');

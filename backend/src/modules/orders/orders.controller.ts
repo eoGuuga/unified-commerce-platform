@@ -11,14 +11,17 @@ import {
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PedidoStatus } from '../../database/entities/Pedido.entity';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Orders')
+@ApiBearerAuth()
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Criar novo pedido com verificação de estoque' })
   @ApiResponse({
     status: 201,
@@ -36,12 +39,14 @@ export class OrdersController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Listar todos os pedidos' })
   findAll(@Query('tenantId') tenantId: string) {
     return this.ordersService.findAll(tenantId || '00000000-0000-0000-0000-000000000000');
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Buscar pedido por ID' })
   findOne(@Param('id') id: string, @Query('tenantId') tenantId: string) {
     return this.ordersService.findOne(
@@ -51,6 +56,7 @@ export class OrdersController {
   }
 
   @Patch(':id/status')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Atualizar status do pedido' })
   updateStatus(
     @Param('id') id: string,
