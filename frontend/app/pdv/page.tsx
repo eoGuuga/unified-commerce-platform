@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api-client';
 
 interface CartItem {
@@ -21,6 +22,7 @@ interface Product {
 const TENANT_ID = '00000000-0000-0000-0000-000000000000';
 
 export default function PDVPage() {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -30,6 +32,11 @@ export default function PDVPage() {
   useEffect(() => {
     loadProducts();
   }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    router.push('/login');
+  };
 
   const loadProducts = async () => {
     try {
@@ -106,7 +113,15 @@ export default function PDVPage() {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-6 mb-4">
-          <h1 className="text-2xl font-bold mb-4">PDV - Loja Chocola Velha</h1>
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold">PDV - Loja Chocola Velha</h1>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            >
+              Sair
+            </button>
+          </div>
           
           <div className="mb-4">
             <input
