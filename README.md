@@ -142,10 +142,25 @@ ucm/
 
 ## Comece Por Aqui
 
-1. **Instale Node.js**: https://nodejs.org/ (versao LTS)
-2. **Execute**: `.\setup.ps1`
-3. **Rode**: `cd backend && npm run start:dev` e `cd frontend && npm run dev`
-4. **Teste**: `.\test-backend.ps1`
+### Sistema ja esta rodando!
+
+**Acesse as URLs:**
+- Frontend: http://localhost:3000
+- Backend: http://localhost:3001/api/v1
+- Admin: http://localhost:3000/admin
+- PDV: http://localhost:3000/pdv
+- Loja: http://localhost:3000/loja
+
+**Credenciais de teste:**
+- Email: teste@exemplo.com
+- Senha: senha123
+
+### Para reiniciar:
+
+1. Instale Node.js: https://nodejs.org/ (versao LTS)
+2. Execute: `.\setup.ps1`
+3. Rode: `cd backend && npm run start:dev` e `cd frontend && npm run dev`
+4. Teste: `.\test-backend.ps1`
 
 ---
 
