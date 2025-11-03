@@ -21,19 +21,19 @@
     "baseUrl": ".",
     "paths": {
       "@/*": [
-        "./src/*"
+        "./*"
       ],
       "@components/*": [
-        "./src/components/*"
+        "./components/*"
       ],
       "@lib/*": [
-        "./src/lib/*"
+        "./lib/*"
       ],
       "@hooks/*": [
-        "./src/hooks/*"
+        "./hooks/*"
       ],
       "@types/*": [
-        "./src/types/*"
+        "./types/*"
       ]
     },
     "allowJs": true,
