@@ -17,6 +17,8 @@ interface Product {
   price: string;
   description?: string;
   is_active: boolean;
+  stock?: number;
+  min_stock?: number;
 }
 
 const TENANT_ID = '00000000-0000-0000-0000-000000000000';
@@ -151,7 +153,20 @@ export default function PDVPage() {
                     >
                       <div>
                         <p className="font-medium">{product.name}</p>
-                        <p className="text-sm text-gray-600">R$ {parseFloat(product.price).toFixed(2)}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-gray-600">R$ {parseFloat(product.price).toFixed(2)}</p>
+                          {product.stock !== undefined && (
+                            <span className={`text-xs px-2 py-1 rounded ${
+                              product.stock === 0
+                                ? 'bg-red-100 text-red-700'
+                                : product.stock <= (product.min_stock || 0)
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-green-100 text-green-700'
+                            }`}>
+                              Est: {product.stock}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <button
                         onClick={() => handleAddToCart({
@@ -159,9 +174,10 @@ export default function PDVPage() {
                           name: product.name,
                           price: parseFloat(product.price),
                         })}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        disabled={product.stock !== undefined && product.stock === 0}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                       >
-                        Adicionar
+                        {product.stock === 0 ? 'Sem estoque' : 'Adicionar'}
                       </button>
                     </div>
                   ))}

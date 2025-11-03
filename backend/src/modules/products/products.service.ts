@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Produto } from '../../database/entities/Produto.entity';
+import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 
@@ -10,14 +11,33 @@ export class ProductsService {
   constructor(
     @InjectRepository(Produto)
     private produtosRepository: Repository<Produto>,
+    @InjectRepository(MovimentacaoEstoque)
+    private estoqueRepository: Repository<MovimentacaoEstoque>,
   ) {}
 
-  async findAll(tenantId: string): Promise<Produto[]> {
-    return this.produtosRepository.find({
+  async findAll(tenantId: string): Promise<any[]> {
+    const produtos = await this.produtosRepository.find({
       where: { tenant_id: tenantId, is_active: true },
       relations: ['categoria'],
       order: { name: 'ASC' },
     });
+
+    // Buscar estoque para cada produto
+    const produtosComEstoque = await Promise.all(
+      produtos.map(async (produto) => {
+        const estoque = await this.estoqueRepository.findOne({
+          where: { tenant_id: tenantId, produto_id: produto.id },
+        });
+
+        return {
+          ...produto,
+          stock: estoque?.current_stock || 0,
+          min_stock: estoque?.min_stock || 0,
+        };
+      })
+    );
+
+    return produtosComEstoque;
   }
 
   async findOne(id: string, tenantId: string): Promise<Produto> {
