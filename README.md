@@ -154,5 +154,5 @@ MIT License
 
 ---
 
-**Status:** MVP implementado | Backend funcionando | Frontend pendente  
-**Proximo:** Rodar frontend e continuar desenvolvimento
+**Status:** MVP implementado | Backend funcionando | Frontend funcionando | Sistema completo  
+**Proximo:** Implementar UI completa e continuar desenvolvimento
