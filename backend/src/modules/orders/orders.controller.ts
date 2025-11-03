@@ -45,6 +45,13 @@ export class OrdersController {
     return this.ordersService.findAll(tenantId || '00000000-0000-0000-0000-000000000000');
   }
 
+  @Get('reports/sales')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Relatorio de vendas' })
+  getSalesReport(@Query('tenantId') tenantId: string) {
+    return this.ordersService.getSalesReport(tenantId || '00000000-0000-0000-0000-000000000000');
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Buscar pedido por ID' })

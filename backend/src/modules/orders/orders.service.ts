@@ -158,4 +158,34 @@ export class OrdersService {
     const seq = String(count + 1).padStart(3, '0');
     return `PED-${today}-${seq}`;
   }
+
+  async getSalesReport(tenantId: string): Promise<any> {
+    const orders = await this.findAll(tenantId);
+    
+    const totalSales = orders.reduce((sum, order) => sum + parseFloat(order.total_amount), 0);
+    const totalOrders = orders.length;
+    const avgTicket = totalOrders > 0 ? totalSales / totalOrders : 0;
+
+    // Sales by channel
+    const salesByChannel = orders.reduce((acc, order) => {
+      const channel = order.channel || 'unknown';
+      acc[channel] = (acc[channel] || 0) + parseFloat(order.total_amount);
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Orders by status
+    const ordersByStatus = orders.reduce((acc, order) => {
+      acc[order.status] = (acc[order.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      totalSales,
+      totalOrders,
+      avgTicket,
+      salesByChannel,
+      ordersByStatus,
+      recentOrders: orders.slice(0, 10),
+    };
+  }
 }

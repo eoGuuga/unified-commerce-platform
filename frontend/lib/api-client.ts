@@ -113,6 +113,10 @@ class ApiClient {
       body: JSON.stringify({ status }),
     });
   }
+
+  async getSalesReport(tenantId: string) {
+    return this.request('/orders/reports/sales', { params: { tenantId } });
+  }
 }
 
 export const api = new ApiClient(API_BASE_URL);
