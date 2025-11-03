@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import api from '@/lib/api-client';
 
 interface CartItem {
   id: string;
@@ -9,9 +10,38 @@ interface CartItem {
   quantity: number;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  price: string;
+  description?: string;
+  is_active: boolean;
+}
+
+const TENANT_ID = '00000000-0000-0000-0000-000000000000';
+
 export default function PDVPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const loadProducts = async () => {
+    try {
+      const data = await api.getProducts(TENANT_ID);
+      setProducts(data);
+      setLoading(false);
+    } catch (err) {
+      setError('Erro ao carregar produtos');
+      setLoading(false);
+      console.error(err);
+    }
+  };
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
@@ -59,36 +89,16 @@ export default function PDVPage() {
     };
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/v1/orders?tenantId=00000000-0000-0000-0000-000000000000', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : '',
-        },
-        body: JSON.stringify(order),
-      });
-
-      if (response.ok) {
-        setCart([]);
-        alert('Venda realizada com sucesso!');
-      } else {
-        const error = await response.json();
-        alert(`Erro: ${error.message || 'Nao foi possivel realizar a venda'}`);
-      }
-    } catch (error) {
-      alert('Erro ao conectar com servidor');
+      await api.createOrder(order, TENANT_ID);
+      setCart([]);
+      alert('Venda realizada com sucesso!');
+      await loadProducts(); // Recarregar produtos para atualizar estoque
+    } catch (error: any) {
+      alert(`Erro: ${error.message || 'Nao foi possivel realizar a venda'}`);
     }
   };
 
-  // Mock products para demonstracao
-  const mockProducts = [
-    { id: '1', name: 'Brigadeiro Gourmet', price: 10.50 },
-    { id: '2', name: 'Trufa de Chocolate', price: 12.00 },
-    { id: '3', name: 'Bolo de Chocolate', price: 35.00 },
-  ];
-
-  const filteredProducts = mockProducts.filter(product =>
+  const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -111,25 +121,37 @@ export default function PDVPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <h2 className="text-lg font-semibold mb-3">Produtos Disponiveis</h2>
-              <div className="space-y-2">
-                {filteredProducts.map(product => (
-                  <div
-                    key={product.id}
-                    className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
-                  >
-                    <div>
-                      <p className="font-medium">{product.name}</p>
-                      <p className="text-sm text-gray-600">R$ {product.price.toFixed(2)}</p>
-                    </div>
-                    <button
-                      onClick={() => handleAddToCart(product)}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              {loading ? (
+                <p className="text-gray-500">Carregando produtos...</p>
+              ) : error ? (
+                <p className="text-red-500">{error}</p>
+              ) : filteredProducts.length === 0 ? (
+                <p className="text-gray-500">Nenhum produto encontrado</p>
+              ) : (
+                <div className="space-y-2">
+                  {filteredProducts.map(product => (
+                    <div
+                      key={product.id}
+                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
                     >
-                      Adicionar
-                    </button>
-                  </div>
-                ))}
-              </div>
+                      <div>
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-sm text-gray-600">R$ {parseFloat(product.price).toFixed(2)}</p>
+                      </div>
+                      <button
+                        onClick={() => handleAddToCart({
+                          id: product.id,
+                          name: product.name,
+                          price: parseFloat(product.price),
+                        })}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      >
+                        Adicionar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>
