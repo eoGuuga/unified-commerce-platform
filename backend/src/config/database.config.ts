@@ -7,6 +7,11 @@ import { Pedido } from '../database/entities/Pedido.entity';
 import { ItemPedido } from '../database/entities/ItemPedido.entity';
 import { MovimentacaoEstoque } from '../database/entities/MovimentacaoEstoque.entity';
 import { Categoria } from '../database/entities/Categoria.entity';
+import { UsageLog } from '../database/entities/UsageLog.entity';
+import { IdempotencyKey } from '../database/entities/IdempotencyKey.entity';
+import { WebhookEvent } from '../database/entities/WebhookEvent.entity';
+import { WhatsappConversation } from '../database/entities/WhatsappConversation.entity';
+import { WhatsappMessage } from '../database/entities/WhatsappMessage.entity';
 
 export const databaseConfig: TypeOrmModuleAsyncOptions = {
   inject: [ConfigService],
@@ -21,6 +26,11 @@ export const databaseConfig: TypeOrmModuleAsyncOptions = {
       MovimentacaoEstoque,
       Pedido,
       ItemPedido,
+      UsageLog,
+      IdempotencyKey,
+      WebhookEvent,
+      WhatsappConversation,
+      WhatsappMessage,
     ],
     synchronize: config.get('NODE_ENV') === 'development',
     logging: config.get('NODE_ENV') === 'development',
