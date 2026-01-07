@@ -1,4 +1,6 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+import { API_BASE_URL, getDevCredentials, hasDevCredentials } from './config';
+
+// ⚠️ REMOVIDO: Credenciais hardcoded - devem vir do contexto JWT ou variáveis de ambiente
 
 interface ApiOptions extends RequestInit {
   params?: Record<string, string>;
@@ -119,17 +121,9 @@ class ApiClient {
       return await this.request('/orders/reports/sales', { params: { tenantId } });
     } catch (error: any) {
       if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
-        try {
-          const response: any = await this.login('admin@loja.com', 'senha123');
-          if (response.access_token) {
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('token', response.access_token);
-            }
-            return await this.request('/orders/reports/sales', { params: { tenantId } });
-          }
-        } catch (loginError) {
-          throw new Error('Erro de autenticação. Por favor, recarregue a página.');
-        }
+        // ⚠️ REMOVIDO: Login automático com credenciais hardcoded
+        // Em produção, redirecionar para página de login
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
       }
       throw error;
     }
@@ -144,25 +138,10 @@ class ApiClient {
         body: JSON.stringify({ quantity }),
       });
     } catch (error: any) {
-      // Se for erro de autenticação, tentar fazer login novamente
+      // Se for erro de autenticação, não fazer login automático
       if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
-        // Tentar fazer login automático
-        try {
-          const response: any = await this.login('admin@loja.com', 'senha123');
-          if (response.access_token) {
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('token', response.access_token);
-            }
-            // Tentar novamente após login
-            return await this.request(`/products/${productId}/reserve`, {
-              method: 'POST',
-              params: { tenantId },
-              body: JSON.stringify({ quantity }),
-            });
-          }
-        } catch (loginError) {
-          throw new Error('Erro de autenticação. Por favor, recarregue a página.');
-        }
+        // ⚠️ REMOVIDO: Login automático com credenciais hardcoded
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
       }
       throw error;
     }
