@@ -91,8 +91,9 @@ export default function PDVPage() {
   const debouncedSearch = useDebounce(searchTerm, 300);
 
   // SWR para produtos - configurado para evitar "piscar" de dados
+  const swrKey = mounted ? `products-${TENANT_ID}` : null; // Key única para forçar busca
   const { data: products = [], error, isLoading, mutate } = useSWR<Product[]>(
-    mounted ? TENANT_ID : null, // Só buscar quando montado
+    swrKey ? TENANT_ID : null, // Só buscar quando montado
     productsFetcher,
     {
       refreshInterval: 10000, // Aumentado para 10s para reduzir atualizações
@@ -102,12 +103,14 @@ export default function PDVPage() {
       dedupingInterval: 2000, // Evitar requisições duplicadas
       onError: (err) => {
         console.error('❌ Erro ao carregar produtos:', err);
-        // Não mostrar toast a cada erro para não poluir
+        toast.error('Erro ao carregar produtos. Verifique o console (F12).');
       },
       onSuccess: (data) => {
         console.log('✅ Produtos carregados com sucesso:', data?.length || 0, 'produtos');
         if (data && data.length > 0) {
           console.log('📦 Primeiros produtos:', data.slice(0, 3).map(p => p.name));
+        } else {
+          console.warn('⚠️ Nenhum produto retornado do backend');
         }
       },
     }
