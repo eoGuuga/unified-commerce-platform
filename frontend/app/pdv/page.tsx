@@ -165,12 +165,27 @@ export default function PDVPage() {
 
     // Liberar ao fechar página/aba
     const handleBeforeUnload = () => {
+      if (typeof window === 'undefined' || cart.length === 0) return;
+      
       // Usar sendBeacon para garantir que a requisição seja enviada
+      const token = localStorage.getItem('token');
       cart.forEach(item => {
-        navigator.sendBeacon(
-          `${API_BASE_URL}/products/${item.id}/release?tenantId=${TENANT_ID}`,
-          JSON.stringify({ quantity: item.quantity })
-        );
+        const url = `${API_BASE_URL}/products/${item.id}/release?tenantId=${TENANT_ID}`;
+        const blob = new Blob([JSON.stringify({ quantity: item.quantity })], {
+          type: 'application/json',
+        });
+        
+        // Tentar usar fetch com keepalive, senão sendBeacon
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(url, blob);
+        } else {
+          fetch(url, {
+            method: 'POST',
+            body: blob,
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            keepalive: true,
+          }).catch(() => {});
+        }
       });
     };
 
@@ -332,40 +347,55 @@ export default function PDVPage() {
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const handleAddToCart = useCallback((product: Product) => {
-    if (product.stock === 0) {
-      toast.error('Produto sem estoque!');
+  const handleAddToCart = useCallback(async (product: Product) => {
+    // Usar available_stock se disponível, senão usar stock
+    const availableStock = (product as any).available_stock ?? product.stock ?? 0;
+    
+    if (availableStock === 0) {
+      toast.error('Produto sem estoque disponível!');
       return;
     }
 
     const existingItem = cart.find(item => item.id === product.id);
     const quantityToAdd = existingItem ? existingItem.quantity + 1 : 1;
 
-    if (quantityToAdd > (product.stock || 0)) {
-      toast.error(`Estoque insuficiente! Disponível: ${product.stock} unidades.`);
+    // Validação crítica: verificar se tem estoque suficiente
+    if (quantityToAdd > availableStock) {
+      toast.error(`Estoque insuficiente! Disponível: ${availableStock} unidades.`);
       return;
     }
 
-    if (existingItem) {
-      setCart(cart.map(item =>
-        item.id === product.id
-          ? { ...item, quantity: item.quantity + 1, stock: product.stock }
-          : item
-      ));
-    } else {
-      setCart([...cart, { 
-        id: product.id, 
-        name: product.name, 
-        price: parseFloat(product.price), 
-        quantity: 1,
-        stock: product.stock
-      }]);
-    }
+    try {
+      // Reservar estoque no backend
+      await api.reserveStock(product.id, 1, TENANT_ID);
+      
+      // Adicionar ao carrinho com informação de estoque
+      if (existingItem) {
+        setCart(cart.map(item =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + 1, stock: availableStock - 1 }
+            : item
+        ));
+      } else {
+        setCart([...cart, { 
+          id: product.id, 
+          name: product.name, 
+          price: parseFloat(product.price), 
+          quantity: 1,
+          stock: availableStock - 1
+        }]);
+      }
 
-    toast.success(`${product.name} adicionado ao carrinho!`, {
-      icon: '✅',
-    });
-  }, [cart]);
+      // Atualizar produtos para refletir nova reserva
+      await mutate();
+
+      toast.success(`${product.name} adicionado ao carrinho!`, {
+        icon: '✅',
+      });
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao reservar estoque');
+    }
+  }, [cart, mutate]);
 
   const handleRemoveFromCart = async (id: string) => {
     const item = cart.find(item => item.id === id);
@@ -387,9 +417,9 @@ export default function PDVPage() {
     }
   };
 
-  const handleUpdateQuantity = (id: string, quantity: number) => {
+  const handleUpdateQuantity = async (id: string, quantity: number) => {
     if (quantity <= 0) {
-      handleRemoveFromCart(id);
+      await handleRemoveFromCart(id);
       return;
     }
 
@@ -398,14 +428,35 @@ export default function PDVPage() {
 
     if (!cartItem || !product) return;
 
-    if (quantity > (product.stock || 0)) {
-      toast.error(`Estoque insuficiente! Disponível: ${product.stock} unidades.`);
+    const availableStock = (product as any).available_stock ?? product.stock ?? 0;
+
+    // Validação crítica: não permitir quantidade > estoque disponível
+    if (quantity > availableStock) {
+      toast.error(`Estoque insuficiente! Disponível: ${availableStock} unidades.`);
       return;
     }
 
-    setCart(cart.map(item =>
-      item.id === id ? { ...item, quantity, stock: product.stock } : item
-    ));
+    const quantityDiff = quantity - cartItem.quantity;
+
+    try {
+      if (quantityDiff > 0) {
+        // Aumentar quantidade: reservar mais estoque
+        await api.reserveStock(id, quantityDiff, TENANT_ID);
+      } else if (quantityDiff < 0) {
+        // Diminuir quantidade: liberar estoque
+        await api.releaseStock(id, Math.abs(quantityDiff), TENANT_ID);
+      }
+
+      // Atualizar quantidade no carrinho
+      setCart(cart.map(item =>
+        item.id === id ? { ...item, quantity, stock: availableStock - quantity } : item
+      ));
+
+      // Atualizar produtos
+      await mutate();
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao atualizar estoque');
+    }
   };
 
   const handleSell = async () => {
@@ -421,8 +472,9 @@ export default function PDVPage() {
         invalidItems.push(item.name);
         continue;
       }
-      if (item.quantity > (product.stock || 0)) {
-        invalidItems.push(`${item.name} (disponível: ${product.stock})`);
+      const availableStock = (product as any).available_stock ?? product.stock ?? 0;
+      if (item.quantity > availableStock) {
+        invalidItems.push(`${item.name} (disponível: ${availableStock})`);
       }
     }
 
