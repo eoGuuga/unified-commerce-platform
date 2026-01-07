@@ -29,7 +29,15 @@ const TENANT_ID = '00000000-0000-0000-0000-000000000000';
 
   // Produtos REAIS da Loucas por Brigadeiro
   // Extraído de: https://loucasporbrigadeiro.my.canva.site/loucas-por-brigadeiro
-const PRODUTOS = [
+  // 
+  // IMPORTANTE: Separado em duas categorias:
+  // 1. PRODUTOS DE ENCOMENDA: estoque = 0 (sempre encomenda)
+  // 2. PRODUTOS NORMAIS: têm estoque (vendidos imediatamente)
+  
+  // ============================================
+  // PRODUTOS DE ENCOMENDA (estoque = 0)
+  // ============================================
+const PRODUTOS_ENCOMENDA = [
   // BOLOS DE FESTA
   {
     name: 'Mini Bolo Casadinho',
