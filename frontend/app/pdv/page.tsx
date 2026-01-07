@@ -36,11 +36,16 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/a
 // Fetchers para SWR
 const productsFetcher = async (tenantId: string) => {
   try {
+    console.log('🔄 Buscando produtos para tenant:', tenantId);
     const products = await api.getProducts(tenantId);
-    console.log('Fetcher retornou produtos:', products?.length || 0);
-    return products || [];
-  } catch (error) {
-    console.error('Erro no fetcher de produtos:', error);
+    console.log('✅ Fetcher retornou:', products?.length || 0, 'produtos');
+    if (products && products.length > 0) {
+      console.log('📦 Exemplos:', products.slice(0, 3).map((p: any) => ({ name: p.name, stock: p.stock })));
+    }
+    return Array.isArray(products) ? products : [];
+  } catch (error: any) {
+    console.error('❌ Erro no fetcher de produtos:', error);
+    console.error('Detalhes:', error.message, error.stack);
     throw error;
   }
 };
@@ -96,11 +101,14 @@ export default function PDVPage() {
       keepPreviousData: true, // Manter dados anteriores durante atualização
       dedupingInterval: 2000, // Evitar requisições duplicadas
       onError: (err) => {
-        console.error('Erro ao carregar produtos:', err);
-        toast.error('Erro ao carregar produtos. Verifique o console.');
+        console.error('❌ Erro ao carregar produtos:', err);
+        // Não mostrar toast a cada erro para não poluir
       },
       onSuccess: (data) => {
-        console.log('Produtos carregados:', data?.length || 0);
+        console.log('✅ Produtos carregados com sucesso:', data?.length || 0, 'produtos');
+        if (data && data.length > 0) {
+          console.log('📦 Primeiros produtos:', data.slice(0, 3).map(p => p.name));
+        }
       },
     }
   );
@@ -163,11 +171,13 @@ export default function PDVPage() {
   // Debug: Log quando produtos mudarem
   useEffect(() => {
     if (mounted) {
-      console.log('Produtos atualizados:', {
+      console.log('📊 Estado dos produtos:', {
         count: products?.length || 0,
         isLoading,
-        error: error?.message,
-        products: products?.slice(0, 3).map(p => p.name),
+        hasError: !!error,
+        errorMessage: error?.message,
+        isArray: Array.isArray(products),
+        firstProducts: products?.slice(0, 3).map((p: any) => p.name) || [],
       });
     }
   }, [products, isLoading, error, mounted]);
