@@ -12,7 +12,7 @@ import {
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Products')
@@ -97,6 +97,8 @@ export class ProductsController {
   @Get('stock-summary')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Obter resumo completo de estoque (para página de gestão)' })
+  @ApiResponse({ status: 200, description: 'Resumo de estoque retornado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
   getStockSummary(@Query('tenantId') tenantId: string) {
     return this.productsService.getStockSummary(tenantId || '00000000-0000-0000-0000-000000000000');
   }
@@ -104,6 +106,10 @@ export class ProductsController {
   @Post(':id/adjust-stock')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Ajustar estoque (adicionar ou remover quantidade)' })
+  @ApiResponse({ status: 200, description: 'Estoque ajustado com sucesso' })
+  @ApiResponse({ status: 400, description: 'Quantidade inválida ou estoque insuficiente' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Produto não encontrado' })
   adjustStock(
     @Param('id') id: string,
     @Body() adjustStockDto: { quantity: number; reason?: string },
@@ -120,6 +126,9 @@ export class ProductsController {
   @Patch(':id/min-stock')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Definir estoque mínimo (alerta)' })
+  @ApiResponse({ status: 200, description: 'Estoque mínimo definido com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Produto não encontrado' })
   setMinStock(
     @Param('id') id: string,
     @Body('min_stock') minStock: number,
