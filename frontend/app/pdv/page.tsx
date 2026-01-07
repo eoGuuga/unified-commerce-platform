@@ -552,8 +552,8 @@ export default function PDVPage() {
         item.id === id ? { ...item, quantity, stock: availableStock - quantity } : item
       ));
 
-      // Atualizar produtos (sem revalidação completa)
-      await mutate(undefined, { revalidate: false });
+      // Forçar atualização imediata dos produtos para refletir mudança na reserva
+      await mutate(); // Revalidar imediatamente
     } catch (error: any) {
       const errorMsg = error.message || 'Erro ao atualizar estoque';
       if (errorMsg.includes('Unauthorized') || errorMsg.includes('autenticação')) {
