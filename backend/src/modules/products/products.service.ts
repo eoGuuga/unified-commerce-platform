@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Produto } from '../../database/entities/Produto.entity';
@@ -29,9 +29,16 @@ export class ProductsService {
           where: { tenant_id: tenantId, produto_id: produto.id },
         });
 
+        // Estoque disponível = current_stock - reserved_stock
+        const availableStock = estoque 
+          ? Math.max(0, estoque.current_stock - estoque.reserved_stock)
+          : 0;
+
         return {
           ...produto,
           stock: estoque?.current_stock || 0,
+          available_stock: availableStock,
+          reserved_stock: estoque?.reserved_stock || 0,
           min_stock: estoque?.min_stock || 0,
         };
       })
@@ -92,5 +99,75 @@ export class ProductsService {
       .orderBy('produto.name', 'ASC')
       .limit(50)
       .getMany();
+  }
+
+  /**
+   * Reservar estoque (quando adiciona ao carrinho)
+   */
+  async reserveStock(
+    produtoId: string,
+    quantity: number,
+    tenantId: string,
+  ): Promise<{ success: boolean; available_stock: number }> {
+    const estoque = await this.estoqueRepository.findOne({
+      where: { tenant_id: tenantId, produto_id: produtoId },
+    });
+
+    if (!estoque) {
+      throw new NotFoundException(`Estoque não encontrado para produto ${produtoId}`);
+    }
+
+    const availableStock = estoque.current_stock - estoque.reserved_stock;
+
+    if (availableStock < quantity) {
+      throw new BadRequestException(
+        `Estoque insuficiente: disponível ${availableStock}, solicitado ${quantity}`,
+      );
+    }
+
+    estoque.reserved_stock += quantity;
+    await this.estoqueRepository.save(estoque);
+
+    return {
+      success: true,
+      available_stock: estoque.current_stock - estoque.reserved_stock,
+    };
+  }
+
+  /**
+   * Liberar estoque reservado (quando remove do carrinho)
+   */
+  async releaseStock(
+    produtoId: string,
+    quantity: number,
+    tenantId: string,
+  ): Promise<{ success: boolean; available_stock: number }> {
+    const estoque = await this.estoqueRepository.findOne({
+      where: { tenant_id: tenantId, produto_id: produtoId },
+    });
+
+    if (!estoque) {
+      throw new NotFoundException(`Estoque não encontrado para produto ${produtoId}`);
+    }
+
+    estoque.reserved_stock = Math.max(0, estoque.reserved_stock - quantity);
+    await this.estoqueRepository.save(estoque);
+
+    return {
+      success: true,
+      available_stock: estoque.current_stock - estoque.reserved_stock,
+    };
+  }
+
+  /**
+   * Liberar todas as reservas de uma lista de produtos (limpar carrinho)
+   */
+  async releaseMultipleStocks(
+    items: Array<{ produto_id: string; quantity: number }>,
+    tenantId: string,
+  ): Promise<void> {
+    for (const item of items) {
+      await this.releaseStock(item.produto_id, item.quantity, tenantId);
+    }
   }
 }

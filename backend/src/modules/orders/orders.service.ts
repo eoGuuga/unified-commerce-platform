@@ -49,23 +49,25 @@ export class OrdersService {
         }
       }
 
-      // 3. Validar estoque disponível
+      // 3. Validar estoque disponível (considerando reservas)
       for (const item of createOrderDto.items) {
         const estoque = produtosMap.get(item.produto_id)!;
-        if (estoque.current_stock < item.quantity) {
+        const availableStock = estoque.current_stock - estoque.reserved_stock;
+        if (availableStock < item.quantity) {
           throw new BadRequestException(
-            `Estoque insuficiente para produto ${item.produto_id}: necessário ${item.quantity}, disponível ${estoque.current_stock}`,
+            `Estoque insuficiente para produto ${item.produto_id}: necessário ${item.quantity}, disponível ${availableStock}`,
           );
         }
       }
 
-      // 4. Abater estoque (dentro da transação)
+      // 4. Abater estoque e liberar reserva (dentro da transação)
       for (const item of createOrderDto.items) {
         await manager
           .createQueryBuilder()
           .update(MovimentacaoEstoque)
           .set({
             current_stock: () => `current_stock - ${item.quantity}`,
+            reserved_stock: () => `GREATEST(0, reserved_stock - ${item.quantity})`, // Libera a reserva
             last_updated: () => 'NOW()',
           })
           .where('tenant_id = :tenantId', { tenantId })

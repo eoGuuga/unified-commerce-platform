@@ -117,6 +117,23 @@ class ApiClient {
   async getSalesReport(tenantId: string) {
     return this.request('/orders/reports/sales', { params: { tenantId } });
   }
+
+  // Stock reservation endpoints
+  async reserveStock(productId: string, quantity: number, tenantId: string) {
+    return this.request(`/products/${productId}/reserve`, {
+      method: 'POST',
+      params: { tenantId },
+      body: JSON.stringify({ quantity }),
+    });
+  }
+
+  async releaseStock(productId: string, quantity: number, tenantId: string) {
+    return this.request(`/products/${productId}/release`, {
+      method: 'POST',
+      params: { tenantId },
+      body: JSON.stringify({ quantity }),
+    });
+  }
 }
 
 export const api = new ApiClient(API_BASE_URL);

@@ -63,4 +63,34 @@ export class ProductsController {
   remove(@Param('id') id: string, @Query('tenantId') tenantId: string) {
     return this.productsService.remove(id, tenantId || '00000000-0000-0000-0000-000000000000');
   }
+
+  @Post(':id/reserve')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Reservar estoque (adicionar ao carrinho)' })
+  reserveStock(
+    @Param('id') id: string,
+    @Body('quantity') quantity: number,
+    @Query('tenantId') tenantId: string,
+  ) {
+    return this.productsService.reserveStock(
+      id,
+      quantity || 1,
+      tenantId || '00000000-0000-0000-0000-000000000000',
+    );
+  }
+
+  @Post(':id/release')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Liberar estoque reservado (remover do carrinho)' })
+  releaseStock(
+    @Param('id') id: string,
+    @Body('quantity') quantity: number,
+    @Query('tenantId') tenantId: string,
+  ) {
+    return this.productsService.releaseStock(
+      id,
+      quantity || 1,
+      tenantId || '00000000-0000-0000-0000-000000000000',
+    );
+  }
 }

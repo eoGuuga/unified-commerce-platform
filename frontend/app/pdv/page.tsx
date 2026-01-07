@@ -31,6 +31,7 @@ interface Order {
 }
 
 const TENANT_ID = '00000000-0000-0000-0000-000000000000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
 // Fetchers para SWR
 const productsFetcher = async (tenantId: string) => {
@@ -145,6 +146,44 @@ export default function PDVPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Liberar todas as reservas ao desmontar componente (fechar página)
+  useEffect(() => {
+    if (!mounted) return;
+
+    const releaseAllReservations = async () => {
+      if (cart.length === 0) return;
+      
+      try {
+        for (const item of cart) {
+          await api.releaseStock(item.id, item.quantity, TENANT_ID);
+        }
+      } catch (error) {
+        console.error('Erro ao liberar reservas:', error);
+      }
+    };
+
+    // Liberar ao fechar página/aba
+    const handleBeforeUnload = () => {
+      // Usar sendBeacon para garantir que a requisição seja enviada
+      cart.forEach(item => {
+        navigator.sendBeacon(
+          `${API_BASE_URL}/products/${item.id}/release?tenantId=${TENANT_ID}`,
+          JSON.stringify({ quantity: item.quantity })
+        );
+      });
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Liberar reservas ao desmontar
+      if (cart.length > 0) {
+        releaseAllReservations();
+      }
+    };
+  }, [mounted, cart]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -328,11 +367,23 @@ export default function PDVPage() {
     });
   }, [cart]);
 
-  const handleRemoveFromCart = (id: string) => {
+  const handleRemoveFromCart = async (id: string) => {
     const item = cart.find(item => item.id === id);
-    setCart(cart.filter(item => item.id !== id));
-    if (item) {
+    if (!item) return;
+
+    try {
+      // Liberar estoque reservado no backend
+      await api.releaseStock(id, item.quantity, TENANT_ID);
+      
+      // Remover do carrinho
+      setCart(cart.filter(cartItem => cartItem.id !== id));
+      
+      // Atualizar produtos para refletir liberação
+      await mutate();
+
       toast.success(`${item.name} removido do carrinho`);
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao liberar estoque');
     }
   };
 
@@ -399,8 +450,12 @@ export default function PDVPage() {
       toast.success('🎉 Venda realizada com sucesso!', {
         duration: 3000,
       });
+      
+      // Limpar carrinho (as reservas já foram convertidas em venda pelo backend)
       setCart([]);
       setSearchTerm('');
+      
+      // Atualizar produtos para refletir novo estoque
       await mutate();
     } catch (error: any) {
       toast.error(error.message || 'Não foi possível realizar a venda');
@@ -676,25 +731,35 @@ export default function PDVPage() {
                         <p className="font-medium">{product.name}</p>
                         <div className="flex items-center gap-2">
                           <p className="text-sm text-gray-600">R$ {parseFloat(product.price).toFixed(2)}</p>
-                          {product.stock !== undefined && (
-                            <span className={`text-xs px-2 py-1 rounded transition-colors ${
-                              product.stock === 0
-                                ? 'bg-red-100 text-red-700'
-                                : product.stock <= (product.min_stock || 0)
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-green-100 text-green-700'
-                            }`}>
-                              Est: {product.stock}
-                            </span>
-                          )}
+                          {(() => {
+                            const availableStock = (product as any).available_stock ?? product.stock ?? 0;
+                            const totalStock = product.stock ?? 0;
+                            return (
+                              <span className={`text-xs px-2 py-1 rounded transition-colors ${
+                                availableStock === 0
+                                  ? 'bg-red-100 text-red-700'
+                                  : availableStock <= (product.min_stock || 0)
+                                  ? 'bg-yellow-100 text-yellow-700'
+                                  : 'bg-green-100 text-green-700'
+                              }`} title={`Total: ${totalStock} | Disponível: ${availableStock}`}>
+                                Est: {availableStock}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
                       <button
                         onClick={() => handleAddToCart(product)}
-                        disabled={(product.stock !== undefined && product.stock === 0) || isSelling}
+                        disabled={(() => {
+                          const availableStock = (product as any).available_stock ?? product.stock ?? 0;
+                          return availableStock === 0 || isSelling;
+                        })() || isSelling}
                         className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 shadow-md"
                       >
-                        {product.stock === 0 ? '❌ Sem estoque' : '➕ Adicionar'}
+                        {(() => {
+                          const availableStock = (product as any).available_stock ?? product.stock ?? 0;
+                          return availableStock === 0 ? '❌ Sem estoque' : '➕ Adicionar';
+                        })()}
                       </button>
                     </div>
                   ))}
@@ -814,7 +879,8 @@ export default function PDVPage() {
                     isSelling ||
                     cart.some(item => {
                       const product = products.find(p => p.id === item.id);
-                      return item.quantity > (product?.stock || 0);
+                      const availableStock = product ? ((product as any).available_stock ?? product.stock ?? 0) : 0;
+                      return item.quantity > availableStock;
                     })
                   }
                   className="w-full px-6 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold text-lg rounded-xl hover:from-green-700 hover:to-green-800 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3 shadow-xl"
