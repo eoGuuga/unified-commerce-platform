@@ -8,12 +8,16 @@ import {
   Delete,
   Query,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentTenant } from '../../common/decorators/tenant.decorator';
+import { CurrentUser } from '../auth/decorators/user.decorator';
+import { Usuario } from '../../database/entities/Usuario.entity';
 
 @ApiTags('Products')
 @ApiBearerAuth()
@@ -22,28 +26,42 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Listar todos os produtos' })
-  findAll(@Query('tenantId') tenantId: string) {
-    return this.productsService.findAll(tenantId || '00000000-0000-0000-0000-000000000000');
+  findAll(@CurrentTenant() tenantId: string) {
+    return this.productsService.findAll(tenantId);
   }
 
   @Get('search')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Buscar produtos por nome/descrição' })
-  search(@Query('q') query: string, @Query('tenantId') tenantId: string) {
-    return this.productsService.search(tenantId || '00000000-0000-0000-0000-000000000000', query);
+  search(@Query('q') query: string, @CurrentTenant() tenantId: string) {
+    return this.productsService.search(tenantId, query);
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Buscar produto por ID' })
-  findOne(@Param('id') id: string, @Query('tenantId') tenantId: string) {
-    return this.productsService.findOne(id, tenantId || '00000000-0000-0000-0000-000000000000');
+  findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    return this.productsService.findOne(id, tenantId);
   }
 
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Criar novo produto' })
-  create(@Body() createProductDto: CreateProductDto, @Query('tenantId') tenantId: string) {
-    return this.productsService.create(createProductDto, tenantId || '00000000-0000-0000-0000-000000000000');
+  create(
+    @Body() createProductDto: CreateProductDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: Usuario,
+    @Request() req: any,
+  ) {
+    return this.productsService.create(
+      createProductDto,
+      tenantId,
+      user?.id,
+      req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress,
+      req.headers['user-agent'],
+    );
   }
 
   @Patch(':id')
@@ -52,16 +70,36 @@ export class ProductsController {
   update(
     @Param('id') id: string,
     @Body() updateProductDto: UpdateProductDto,
-    @Query('tenantId') tenantId: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: Usuario,
+    @Request() req: any,
   ) {
-    return this.productsService.update(id, updateProductDto, tenantId || '00000000-0000-0000-0000-000000000000');
+    return this.productsService.update(
+      id,
+      updateProductDto,
+      tenantId,
+      user?.id,
+      req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress,
+      req.headers['user-agent'],
+    );
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Desativar produto (soft delete)' })
-  remove(@Param('id') id: string, @Query('tenantId') tenantId: string) {
-    return this.productsService.remove(id, tenantId || '00000000-0000-0000-0000-000000000000');
+  remove(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: Usuario,
+    @Request() req: any,
+  ) {
+    return this.productsService.remove(
+      id,
+      tenantId,
+      user?.id,
+      req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress,
+      req.headers['user-agent'],
+    );
   }
 
   @Post(':id/reserve')
@@ -70,13 +108,9 @@ export class ProductsController {
   reserveStock(
     @Param('id') id: string,
     @Body('quantity') quantity: number,
-    @Query('tenantId') tenantId: string,
+    @CurrentTenant() tenantId: string,
   ) {
-    return this.productsService.reserveStock(
-      id,
-      quantity || 1,
-      tenantId || '00000000-0000-0000-0000-000000000000',
-    );
+    return this.productsService.reserveStock(id, quantity || 1, tenantId);
   }
 
   @Post(':id/release')
@@ -85,13 +119,9 @@ export class ProductsController {
   releaseStock(
     @Param('id') id: string,
     @Body('quantity') quantity: number,
-    @Query('tenantId') tenantId: string,
+    @CurrentTenant() tenantId: string,
   ) {
-    return this.productsService.releaseStock(
-      id,
-      quantity || 1,
-      tenantId || '00000000-0000-0000-0000-000000000000',
-    );
+    return this.productsService.releaseStock(id, quantity || 1, tenantId);
   }
 
   @Get('stock-summary')
@@ -99,8 +129,8 @@ export class ProductsController {
   @ApiOperation({ summary: 'Obter resumo completo de estoque (para página de gestão)' })
   @ApiResponse({ status: 200, description: 'Resumo de estoque retornado com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
-  getStockSummary(@Query('tenantId') tenantId: string) {
-    return this.productsService.getStockSummary(tenantId || '00000000-0000-0000-0000-000000000000');
+  getStockSummary(@CurrentTenant() tenantId: string) {
+    return this.productsService.getStockSummary(tenantId);
   }
 
   @Post(':id/adjust-stock')
@@ -113,13 +143,18 @@ export class ProductsController {
   adjustStock(
     @Param('id') id: string,
     @Body() adjustStockDto: { quantity: number; reason?: string },
-    @Query('tenantId') tenantId: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+    @Request() req: any,
   ) {
     return this.productsService.adjustStock(
       id,
       adjustStockDto.quantity,
-      tenantId || '00000000-0000-0000-0000-000000000000',
+      tenantId,
       adjustStockDto.reason,
+      user?.id,
+      req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress,
+      req.headers['user-agent'],
     );
   }
 
@@ -132,8 +167,8 @@ export class ProductsController {
   setMinStock(
     @Param('id') id: string,
     @Body('min_stock') minStock: number,
-    @Query('tenantId') tenantId: string,
+    @CurrentTenant() tenantId: string,
   ) {
-    return this.productsService.setMinStock(id, minStock, tenantId || '00000000-0000-0000-0000-000000000000');
+    return this.productsService.setMinStock(id, minStock, tenantId);
   }
 }

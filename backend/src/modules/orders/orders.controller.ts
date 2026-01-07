@@ -7,12 +7,17 @@ import {
   Patch,
   Query,
   UseGuards,
+  Request,
+  Headers,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PedidoStatus } from '../../database/entities/Pedido.entity';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/user.decorator';
+import { CurrentTenant } from '../../common/decorators/tenant.decorator';
+import { Usuario } from '../../database/entities/Usuario.entity';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
@@ -31,35 +36,46 @@ export class OrdersController {
     status: 400,
     description: 'Estoque insuficiente ou dados inválidos',
   })
-  create(@Body() createOrderDto: CreateOrderDto, @Query('tenantId') tenantId: string) {
+  @ApiResponse({
+    status: 409,
+    description: 'Pedido duplicado (idempotência)',
+  })
+  create(
+    @Body() createOrderDto: CreateOrderDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: Usuario,
+    @Request() req: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
     return this.ordersService.create(
       createOrderDto,
-      tenantId || '00000000-0000-0000-0000-000000000000',
+      tenantId,
+      user.id,
+      idempotencyKey,
+      req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress,
+      req.headers['user-agent'],
     );
   }
 
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Listar todos os pedidos' })
-  findAll(@Query('tenantId') tenantId: string) {
-    return this.ordersService.findAll(tenantId || '00000000-0000-0000-0000-000000000000');
+  findAll(@CurrentTenant() tenantId: string) {
+    return this.ordersService.findAll(tenantId);
   }
 
   @Get('reports/sales')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Relatorio de vendas' })
-  getSalesReport(@Query('tenantId') tenantId: string) {
-    return this.ordersService.getSalesReport(tenantId || '00000000-0000-0000-0000-000000000000');
+  getSalesReport(@CurrentTenant() tenantId: string) {
+    return this.ordersService.getSalesReport(tenantId);
   }
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Buscar pedido por ID' })
-  findOne(@Param('id') id: string, @Query('tenantId') tenantId: string) {
-    return this.ordersService.findOne(
-      id,
-      tenantId || '00000000-0000-0000-0000-000000000000',
-    );
+  findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    return this.ordersService.findOne(id, tenantId);
   }
 
   @Patch(':id/status')
@@ -68,12 +84,8 @@ export class OrdersController {
   updateStatus(
     @Param('id') id: string,
     @Body('status') status: PedidoStatus,
-    @Query('tenantId') tenantId: string,
+    @CurrentTenant() tenantId: string,
   ) {
-    return this.ordersService.updateStatus(
-      id,
-      status,
-      tenantId || '00000000-0000-0000-0000-000000000000',
-    );
+    return this.ordersService.updateStatus(id, status, tenantId);
   }
 }

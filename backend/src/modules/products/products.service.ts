@@ -6,6 +6,8 @@ import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
+import { CacheService } from '../common/services/cache.service';
+import { AuditLogService } from '../common/services/audit-log.service';
 
 @Injectable()
 export class ProductsService {
@@ -14,36 +16,65 @@ export class ProductsService {
     private produtosRepository: Repository<Produto>,
     @InjectRepository(MovimentacaoEstoque)
     private estoqueRepository: Repository<MovimentacaoEstoque>,
+    private cacheService: CacheService,
+    private auditLogService: AuditLogService,
   ) {}
 
   async findAll(tenantId: string): Promise<any[]> {
-    const produtos = await this.produtosRepository.find({
-      where: { tenant_id: tenantId, is_active: true },
-      relations: ['categoria'],
-      order: { name: 'ASC' },
+    // ✅ CACHE: Tentar buscar do cache primeiro
+    const cacheKey = `products:${tenantId}`;
+    const cached = await this.cacheService.getCachedProducts(tenantId);
+    if (cached) {
+      return cached;
+    }
+
+    // ✅ CORRIGIDO: Query otimizada sem N+1
+    // Buscar produtos com estoque em uma única query usando JOIN
+    const produtos = await this.produtosRepository
+      .createQueryBuilder('produto')
+      .leftJoinAndSelect('produto.categoria', 'categoria')
+      .leftJoin(
+        'movimentacoes_estoque',
+        'estoque',
+        'estoque.produto_id = produto.id AND estoque.tenant_id = :tenantId',
+        { tenantId },
+      )
+      .where('produto.tenant_id = :tenantId', { tenantId })
+      .andWhere('produto.is_active = :isActive', { isActive: true })
+      .orderBy('produto.name', 'ASC')
+      .getMany();
+
+    // Buscar todos os estoques de uma vez (evita N+1)
+    const produtoIds = produtos.map((p) => p.id);
+    const estoques = produtoIds.length > 0
+      ? await this.estoqueRepository.find({
+          where: { tenant_id: tenantId, produto_id: produtoIds as any },
+        })
+      : [];
+
+    // Criar mapa de estoques por produto_id
+    const estoqueMap = new Map(estoques.map((e) => [e.produto_id, e]));
+
+    // Mapear produtos com estoque
+    const produtosComEstoque = produtos.map((produto) => {
+      const estoque = estoqueMap.get(produto.id);
+
+      // Estoque disponível = current_stock - reserved_stock
+      const availableStock = estoque
+        ? Math.max(0, estoque.current_stock - estoque.reserved_stock)
+        : 0;
+
+      return {
+        ...produto,
+        stock: estoque?.current_stock || 0,
+        available_stock: availableStock,
+        reserved_stock: estoque?.reserved_stock || 0,
+        min_stock: estoque?.min_stock || 0,
+      };
     });
 
-    // Buscar estoque para cada produto
-    const produtosComEstoque = await Promise.all(
-      produtos.map(async (produto) => {
-        const estoque = await this.estoqueRepository.findOne({
-          where: { tenant_id: tenantId, produto_id: produto.id },
-        });
-
-        // Estoque disponível = current_stock - reserved_stock
-        const availableStock = estoque 
-          ? Math.max(0, estoque.current_stock - estoque.reserved_stock)
-          : 0;
-
-        return {
-          ...produto,
-          stock: estoque?.current_stock || 0,
-          available_stock: availableStock,
-          reserved_stock: estoque?.reserved_stock || 0,
-          min_stock: estoque?.min_stock || 0,
-        };
-      })
-    );
+    // ✅ CACHE: Salvar no cache (TTL: 5 minutos)
+    await this.cacheService.cacheProducts(tenantId, produtosComEstoque, 300);
 
     return produtosComEstoque;
   }
@@ -61,31 +92,125 @@ export class ProductsService {
     return produto;
   }
 
-  async create(createProductDto: CreateProductDto, tenantId: string): Promise<Produto> {
+  async create(
+    createProductDto: CreateProductDto,
+    tenantId: string,
+    userId?: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<Produto> {
     const produto = this.produtosRepository.create({
       ...createProductDto,
       tenant_id: tenantId,
     });
 
-    return this.produtosRepository.save(produto);
+    const savedProduto = await this.produtosRepository.save(produto);
+
+    // ✅ AUDIT LOG: Registrar criação de produto
+    try {
+      await this.auditLogService.log({
+        tenantId,
+        userId,
+        action: 'CREATE',
+        tableName: 'produtos',
+        recordId: savedProduto.id,
+        newData: {
+          name: savedProduto.name,
+          price: savedProduto.price,
+          is_active: savedProduto.is_active,
+        },
+        ipAddress,
+        userAgent,
+      });
+    } catch (error) {
+      console.error('Erro ao registrar audit log:', error);
+    }
+
+    // ✅ CACHE: Invalidar cache de produtos
+    await this.cacheService.invalidateProductsCache(tenantId);
+
+    return savedProduto;
   }
 
   async update(
     id: string,
     updateProductDto: UpdateProductDto,
     tenantId: string,
+    userId?: string,
+    ipAddress?: string,
+    userAgent?: string,
   ): Promise<Produto> {
     const produto = await this.findOne(id, tenantId);
+    const oldData = { ...produto };
 
     Object.assign(produto, updateProductDto);
 
-    return this.produtosRepository.save(produto);
+    const savedProduto = await this.produtosRepository.save(produto);
+
+    // ✅ AUDIT LOG: Registrar atualização de produto
+    try {
+      await this.auditLogService.log({
+        tenantId,
+        userId,
+        action: 'UPDATE',
+        tableName: 'produtos',
+        recordId: savedProduto.id,
+        oldData: {
+          name: oldData.name,
+          price: oldData.price,
+          is_active: oldData.is_active,
+        },
+        newData: {
+          name: savedProduto.name,
+          price: savedProduto.price,
+          is_active: savedProduto.is_active,
+        },
+        ipAddress,
+        userAgent,
+      });
+    } catch (error) {
+      console.error('Erro ao registrar audit log:', error);
+    }
+
+    // ✅ CACHE: Invalidar cache de produtos
+    await this.cacheService.invalidateProductsCache(tenantId);
+
+    return savedProduto;
   }
 
-  async remove(id: string, tenantId: string): Promise<void> {
+  async remove(
+    id: string,
+    tenantId: string,
+    userId?: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<void> {
     const produto = await this.findOne(id, tenantId);
+    const oldData = { ...produto };
+
     produto.is_active = false;
     await this.produtosRepository.save(produto);
+
+    // ✅ AUDIT LOG: Registrar desativação de produto
+    try {
+      await this.auditLogService.log({
+        tenantId,
+        userId,
+        action: 'UPDATE', // Soft delete = UPDATE is_active
+        tableName: 'produtos',
+        recordId: produto.id,
+        oldData: { is_active: oldData.is_active },
+        newData: { is_active: false },
+        ipAddress,
+        userAgent,
+        metadata: { action: 'soft_delete' },
+      });
+    } catch (error) {
+      console.error('Erro ao registrar audit log:', error);
+    }
+
+    // ✅ CACHE: Invalidar cache de produtos
+    await this.cacheService.invalidateProductsCache(tenantId);
   }
 
   async search(tenantId: string, query: string): Promise<Produto[]> {
@@ -243,6 +368,9 @@ export class ProductsService {
     quantity: number,
     tenantId: string,
     reason?: string,
+    userId?: string,
+    ipAddress?: string,
+    userAgent?: string,
   ): Promise<MovimentacaoEstoque> {
     // Verificar se produto existe
     await this.findOne(produtoId, tenantId);
@@ -251,6 +379,8 @@ export class ProductsService {
     let estoque = await this.estoqueRepository.findOne({
       where: { tenant_id: tenantId, produto_id: produtoId },
     });
+
+    const oldStock = estoque?.current_stock || 0;
 
     if (!estoque) {
       // Criar estoque se não existir
@@ -275,18 +405,31 @@ export class ProductsService {
     estoque.current_stock = newStock;
     estoque.last_updated = new Date();
 
-    // TODO: Registrar no audit_log quando implementado
-    // await this.auditLogService.log({
-    //   tenant_id: tenantId,
-    //   action: 'UPDATE',
-    //   table_name: 'movimentacoes_estoque',
-    //   record_id: estoque.id,
-    //   old_data: { current_stock: estoque.current_stock - quantity },
-    //   new_data: { current_stock: estoque.current_stock },
-    //   metadata: { reason },
-    // });
+    const savedEstoque = await this.estoqueRepository.save(estoque);
 
-    return this.estoqueRepository.save(estoque);
+    // ✅ AUDIT LOG: Registrar ajuste de estoque
+    try {
+      await this.auditLogService.log({
+        tenantId,
+        userId,
+        action: 'UPDATE',
+        tableName: 'movimentacoes_estoque',
+        recordId: savedEstoque.id,
+        oldData: { current_stock: oldStock },
+        newData: { current_stock: newStock },
+        ipAddress,
+        userAgent,
+        metadata: { reason, quantity, produto_id: produtoId },
+      });
+    } catch (error) {
+      console.error('Erro ao registrar audit log:', error);
+    }
+
+    // ✅ CACHE: Invalidar cache de produtos
+    await this.cacheService.invalidateProductsCache(tenantId);
+    await this.cacheService.invalidateStockCache(tenantId, produtoId);
+
+    return savedEstoque;
   }
 
   /**
