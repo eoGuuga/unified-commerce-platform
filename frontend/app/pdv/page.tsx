@@ -116,27 +116,25 @@ export default function PDVPage() {
 
   const debouncedSearch = useDebounce(searchTerm, 300);
 
-  // SWR para produtos - configurado para evitar "piscar" de dados
+  // SWR para produtos - configurado para atualização quase em tempo real
   const swrKey = mounted ? `products-${TENANT_ID}` : null; // Key única para forçar busca
   const { data: products = [], error, isLoading, mutate } = useSWR<Product[]>(
     swrKey ? TENANT_ID : null, // Só buscar quando montado
     productsFetcher,
     {
-      refreshInterval: 10000, // Aumentado para 10s para reduzir atualizações
-      revalidateOnFocus: false, // Desabilitado para evitar revalidação ao focar
+      refreshInterval: 3000, // Atualiza a cada 3 segundos para quase tempo real
+      revalidateOnFocus: true, // Revalidar ao focar para garantir dados atualizados
       revalidateOnReconnect: true,
       keepPreviousData: true, // Manter dados anteriores durante atualização
-      dedupingInterval: 2000, // Evitar requisições duplicadas
+      dedupingInterval: 1000, // Evitar requisições duplicadas em 1s
       onError: (err) => {
         console.error('❌ Erro ao carregar produtos:', err);
         toast.error('Erro ao carregar produtos. Verifique o console (F12).');
       },
       onSuccess: (data) => {
-        console.log('✅ Produtos carregados com sucesso:', data?.length || 0, 'produtos');
-        if (data && data.length > 0) {
-          console.log('📦 Primeiros produtos:', data.slice(0, 3).map(p => p.name));
-        } else {
-          console.warn('⚠️ Nenhum produto retornado do backend');
+        // Log apenas em desenvolvimento e quando necessário
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ Produtos atualizados:', data?.length || 0, 'produtos');
         }
       },
     }
@@ -503,8 +501,8 @@ export default function PDVPage() {
       // Remover do carrinho
       setCart(cart.filter(cartItem => cartItem.id !== id));
       
-      // Atualizar produtos para refletir liberação (sem revalidação completa)
-      await mutate(undefined, { revalidate: false });
+      // Forçar atualização imediata dos produtos para refletir liberação
+      await mutate(); // Revalidar imediatamente
 
       toast.success(`${item.name} removido do carrinho`);
     } catch (error: any) {
