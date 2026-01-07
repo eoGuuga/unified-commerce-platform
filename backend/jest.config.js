@@ -1,13 +1,14 @@
 module.exports = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: 'src',
-  testRegex: '.*\\.spec\\.ts$',
+  testRegex: '.*\\.(spec|integration)\\.ts$',
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
   collectCoverageFrom: [
     '**/*.(t|j)s',
     '!**/*.spec.ts',
+    '!**/*.integration.spec.ts',
     '!**/*.module.ts',
     '!main.ts',
   ],
@@ -20,4 +21,5 @@ module.exports = {
     '^@config/(.*)$': '<rootDir>/config/$1',
     '^@database/(.*)$': '<rootDir>/database/$1',
   },
+  testTimeout: 30000, // 30 segundos para testes de integração
 };
