@@ -1,0 +1,72 @@
+﻿[
+    {
+        "Esperado":  "sucesso",
+        "Status":  "OK",
+        "Resposta":  "✅ *PEDIDO CRIADO COM SUCESSO!*\n\n📦 *Brigadeiro Branco*\nQuantidade: 5 unidades\nPreço unitário: R$ 2,50\nTotal: R$ 12,50\n\n🆔 Código do pedido: *PED-20260107-011*\n📊 Status: ✅ Confirmado\n\n💬 Aguarde a confirmação do pagamento!",
+        "Real":  "sucesso",
+        "Mensagem":  "quero 5 brigadeiros"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "OK",
+        "Resposta":  "✅ *PEDIDO CRIADO COM SUCESSO!*\n\n📦 *Brigadeiro Branco*\nQuantidade: 10 unidades\nPreço unitário: R$ 2,50\nTotal: R$ 25,00\n\n🆔 Código do pedido: *PED-20260107-012*\n📊 Status: ✅ Confirmado\n\n💬 Aguarde a confirmação do pagamento!",
+        "Real":  "sucesso",
+        "Mensagem":  "preciso de 10 brigadeiros"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Bolo de Cenoura*\nSolicitado: 3 unidades\nDisponível: 2 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "vou querer 3 bolos de chocolate"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "OK",
+        "Resposta":  "✅ *PEDIDO CRIADO COM SUCESSO!*\n\n📦 *Bolo de Cenoura*\nQuantidade: 2 unidades\nPreço unitário: R$ 40,00\nTotal: R$ 80,00\n\n🆔 Código do pedido: *PED-20260107-013*\n📊 Status: ✅ Confirmado\n\n💬 Aguarde a confirmação do pagamento!",
+        "Real":  "sucesso",
+        "Mensagem":  "gostaria de 2 bolos de cenoura"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "👋 Olá! Bem-vindo(a) à nossa loja!\n\nComo posso ajudar você hoje?\n\n💬 Digite *ajuda* para ver os comandos disponíveis.",
+        "Real":  "erro",
+        "Mensagem":  "desejo 1 bolo de chocolate"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "me manda 5 brigadeiros"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "manda 10 brigadeiros"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "👋 Olá! Bem-vindo(a) à nossa loja!\n\nComo posso ajudar você hoje?\n\n💬 Digite *ajuda* para ver os comandos disponíveis.",
+        "Real":  "erro",
+        "Mensagem":  "pode ser 3 bolos de chocolate?"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "faz 1 bolo de cenoura pra mim"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "👋 Olá! Bem-vindo(a) à nossa loja!\n\nComo posso ajudar você hoje?\n\n💬 Digite *ajuda* para ver os comandos disponíveis.",
+        "Real":  "erro",
+        "Mensagem":  "me faz 2 bolos de chocolate"
+    }
+]

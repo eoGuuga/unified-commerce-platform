@@ -128,63 +128,102 @@ export class WhatsappService {
 
       // Buscar produto
       const produtos = await this.productsService.findAll(tenantId);
-      const produto = this.findProductByName(produtos, productName);
+      const resultadoBusca = this.findProductByName(produtos, productName);
       
-      this.logger.debug(`Product search: found=${!!produto}, searched="${productName}"`);
+      this.logger.debug(`Product search: found=${!!resultadoBusca.produto}, searched="${productName}", suggestions=${resultadoBusca.sugestoes?.length || 0}`);
 
-      if (!produto) {
+      // Se não encontrou produto exato, mas tem sugestões
+      if (!resultadoBusca.produto && resultadoBusca.sugestoes && resultadoBusca.sugestoes.length > 0) {
+        if (resultadoBusca.sugestoes.length === 1) {
+          // Só uma sugestão - usar ela
+          const produto = resultadoBusca.sugestoes[0];
+          this.logger.debug(`Using single suggestion: ${produto.name}`);
+          // Continuar com o produto sugerido
+          return await this.createOrderWithProduct(produto, quantity, tenantId);
+        } else {
+          // Múltiplas sugestões - perguntar qual
+          let mensagem = `❓ Não encontrei exatamente "${productName}", mas você quis dizer:\n\n`;
+          resultadoBusca.sugestoes.forEach((p, index) => {
+            mensagem += `${index + 1}. *${p.name}*\n`;
+          });
+          mensagem += '\n💬 Digite o número ou o nome completo do produto que você quer.';
+          return mensagem;
+        }
+      }
+
+      // Se não encontrou e não tem sugestões
+      if (!resultadoBusca.produto) {
+        // Tentar buscar produtos similares para sugerir
+        const produtosSimilares = this.findSimilarProducts(produtos, productName);
+        
+        if (produtosSimilares.length > 0) {
+          let mensagem = `❓ Não encontrei "${productName}". Você quis dizer:\n\n`;
+          produtosSimilares.slice(0, 5).forEach((p, index) => {
+            mensagem += `${index + 1}. *${p.name}*\n`;
+          });
+          mensagem += '\n💬 Digite o número ou o nome completo do produto.';
+          mensagem += '\n💡 Ou digite *"cardápio"* para ver todos os produtos.';
+          return mensagem;
+        }
+        
         return `❌ Não encontrei o produto "${productName}".\n\n` +
                '💬 Digite *"cardápio"* para ver nossos produtos disponíveis.';
       }
 
-      // Validar estoque
-      if (produto.available_stock < quantity) {
-        return `❌ Estoque insuficiente!\n\n` +
-               `*${produto.name}*\n` +
-               `Solicitado: ${quantity} unidades\n` +
-               `Disponível: ${produto.available_stock} unidades\n\n` +
-               `💬 Quer fazer pedido com a quantidade disponível?`;
-      }
+      const produto = resultadoBusca.produto;
 
-      // Criar pedido
-      try {
-        const pedido = await this.ordersService.create({
-          channel: CanalVenda.WHATSAPP,
-          customer_phone: 'whatsapp', // Será atualizado quando tiver número real
-          items: [{
-            produto_id: produto.id,
-            quantity: quantity,
-            unit_price: Number(produto.price),
-          }],
-          discount_amount: 0,
-          shipping_amount: 0,
-        }, tenantId);
-
-        const total = Number(produto.price) * quantity;
-        
-        return `✅ *PEDIDO CRIADO COM SUCESSO!*\n\n` +
-               `📦 *${produto.name}*\n` +
-               `Quantidade: ${quantity} unidades\n` +
-               `Preço unitário: R$ ${Number(produto.price).toFixed(2).replace('.', ',')}\n` +
-               `Total: R$ ${total.toFixed(2).replace('.', ',')}\n\n` +
-               `🆔 Código do pedido: *${pedido.order_no}*\n` +
-               `📊 Status: ${this.formatStatus(pedido.status)}\n\n` +
-               `💬 Aguarde a confirmação do pagamento!`;
-      } catch (error) {
-        this.logger.error(`Error creating order: ${error}`);
-        
-        if (error instanceof BadRequestException) {
-          return `❌ ${error.message}\n\n` +
-                 `💬 Verifique o estoque e tente novamente.`;
-        }
-        
-        return '❌ Ocorreu um erro ao criar seu pedido.\n\n' +
-               '💬 Tente novamente em alguns instantes.';
-      }
+      return await this.createOrderWithProduct(produto, quantity, tenantId);
     } catch (error) {
       this.logger.error(`Error processing order: ${error}`);
       return '❌ Ocorreu um erro ao processar seu pedido.\n\n' +
              '💬 Tente novamente ou digite *"ajuda"* para ver os comandos.';
+    }
+  }
+
+  private async createOrderWithProduct(produto: any, quantity: number, tenantId: string): Promise<string> {
+    // Validar estoque
+    if (produto.available_stock < quantity) {
+      return `❌ Estoque insuficiente!\n\n` +
+             `*${produto.name}*\n` +
+             `Solicitado: ${quantity} unidades\n` +
+             `Disponível: ${produto.available_stock} unidades\n\n` +
+             `💬 Quer fazer pedido com a quantidade disponível?`;
+    }
+
+    // Criar pedido
+    try {
+      const pedido = await this.ordersService.create({
+        channel: CanalVenda.WHATSAPP,
+        customer_phone: 'whatsapp', // Será atualizado quando tiver número real
+        items: [{
+          produto_id: produto.id,
+          quantity: quantity,
+          unit_price: Number(produto.price),
+        }],
+        discount_amount: 0,
+        shipping_amount: 0,
+      }, tenantId);
+
+      const total = Number(produto.price) * quantity;
+      
+      return `✅ *PEDIDO CRIADO COM SUCESSO!*\n\n` +
+             `📦 *${produto.name}*\n` +
+             `Quantidade: ${quantity} unidades\n` +
+             `Preço unitário: R$ ${Number(produto.price).toFixed(2).replace('.', ',')}\n` +
+             `Total: R$ ${total.toFixed(2).replace('.', ',')}\n\n` +
+             `🆔 Código do pedido: *${pedido.order_no}*\n` +
+             `📊 Status: ${this.formatStatus(pedido.status)}\n\n` +
+             `💬 Aguarde a confirmação do pagamento!`;
+    } catch (error) {
+      this.logger.error(`Error creating order: ${error}`);
+      
+      if (error instanceof BadRequestException) {
+        return `❌ ${error.message}\n\n` +
+               `💬 Verifique o estoque e tente novamente.`;
+      }
+      
+      return '❌ Ocorreu um erro ao criar seu pedido.\n\n' +
+             '💬 Tente novamente em alguns instantes.';
     }
   }
 
@@ -343,8 +382,8 @@ export class WhatsappService {
     };
   }
 
-  private findProductByName(produtos: any[], productName: string): any | null {
-    if (!productName) return null;
+  private findProductByName(produtos: any[], productName: string): { produto: any | null; sugestoes?: any[] } {
+    if (!productName) return { produto: null };
 
     // Normalizar: remover acentos para busca mais flexível
     const normalize = (str: string) => {
@@ -356,7 +395,7 @@ export class WhatsappService {
 
     const palavras = productName.toLowerCase().split(/\s+/).filter(p => p.length >= 2);
     
-    if (palavras.length === 0) return null;
+    if (palavras.length === 0) return { produto: null };
 
     // Estratégia 1: Buscar por nome exato (todas as palavras, sem acentos)
     let produto = produtos.find(p => {
@@ -436,7 +475,84 @@ export class WhatsappService {
       }
     }
 
-    return produto || null;
+    // Se encontrou produto, retornar
+    if (produto) {
+      return { produto };
+    }
+
+    // Se não encontrou, buscar produtos similares (para sugestões)
+    const sugestoes = this.findSimilarProducts(produtos, productName);
+    
+    return { produto: null, sugestoes: sugestoes.length > 0 ? sugestoes : undefined };
+  }
+
+  private findSimilarProducts(produtos: any[], productName: string, maxResults: number = 5): any[] {
+    if (!productName || productName.length < 2) return [];
+
+    const normalize = (str: string) => {
+      return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+    };
+
+    const queryNormalized = normalize(productName);
+    const palavras = queryNormalized.split(/\s+/).filter(p => p.length >= 2);
+    
+    if (palavras.length === 0) return [];
+
+    // Calcular similaridade para cada produto
+    const produtosComScore = produtos.map(p => {
+      const nomeNormalizado = normalize(p.name);
+      let score = 0;
+
+      // Score por palavras em comum
+      palavras.forEach(palavra => {
+        if (nomeNormalizado.includes(palavra)) {
+          score += 10;
+        }
+        // Score por similaridade de caracteres (Levenshtein simplificado)
+        if (palavra.length >= 3) {
+          const similaridade = this.calculateSimilarity(palavra, nomeNormalizado);
+          score += similaridade * 5;
+        }
+      });
+
+      // Score por começar com a palavra
+      palavras.forEach(palavra => {
+        if (nomeNormalizado.startsWith(palavra)) {
+          score += 5;
+        }
+      });
+
+      // Score por conter todas as palavras (ordem não importa)
+      if (palavras.every(palavra => nomeNormalizado.includes(palavra))) {
+        score += 20;
+      }
+
+      return { produto: p, score };
+    });
+
+    // Filtrar produtos com score > 0 e ordenar por score
+    return produtosComScore
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, maxResults)
+      .map(item => item.produto);
+  }
+
+  private calculateSimilarity(str1: string, str2: string): number {
+    // Similaridade simples baseada em caracteres em comum
+    const chars1 = new Set(str1.split(''));
+    const chars2 = new Set(str2.split(''));
+    
+    let common = 0;
+    chars1.forEach(char => {
+      if (chars2.has(char)) common++;
+    });
+
+    const total = Math.max(chars1.size, chars2.size);
+    return total > 0 ? common / total : 0;
   }
 
   private formatStatus(status: PedidoStatus): string {

@@ -1,4 +1,4 @@
-﻿# Script de Testes Automatizados - FASE 3.2 Melhorada
+# Script de Testes Automatizados - FASE 3.2 Melhorada
 # Testa diversos exemplos reais de pedidos brasileiros
 
 $baseUrl = "http://localhost:3001/api/v1/whatsapp/test"
@@ -6,7 +6,7 @@ $testResults = @()
 
 # Array de testes: [mensagem, esperado (sucesso/erro/pergunta)]
 $testes = @(
-    # Formas BÃ¡sicas
+    # Formas Básicas
     @("quero 5 brigadeiros", "sucesso"),
     @("preciso de 10 brigadeiros", "sucesso"),
     @("vou querer 3 bolos de chocolate", "sucesso"),
@@ -21,29 +21,29 @@ $testes = @(
     @("me faz 2 bolos de chocolate", "sucesso"),
     @("pode me enviar 5 brigadeiros?", "sucesso"),
     @("tem como me enviar 3 bolos?", "sucesso"),
-    @("dÃ¡ pra fazer 1 bolo de cenoura?", "sucesso"),
-    @("dÃ¡ pra me enviar 5 brigadeiros?", "sucesso"),
-    @("seria possÃ­vel 2 bolos?", "sucesso"),
+    @("dá pra fazer 1 bolo de cenoura?", "sucesso"),
+    @("dá pra me enviar 5 brigadeiros?", "sucesso"),
+    @("seria possível 2 bolos?", "sucesso"),
     @("poderia me enviar 10 brigadeiros?", "sucesso"),
     
     # Quantidades por Extenso
     @("quero um bolo de chocolate", "sucesso"),
     @("preciso de dois bolos de cenoura", "sucesso"),
-    @("me manda trÃªs brigadeiros", "sucesso"),
+    @("me manda três brigadeiros", "sucesso"),
     @("quero cinco brigadeiros", "sucesso"),
     @("preciso de dez bolos de chocolate", "sucesso"),
     
-    # ExpressÃµes de Quantidade
-    @("quero uma dÃºzia de brigadeiros", "sucesso"),
-    @("preciso de meia dÃºzia de brigadeiros", "sucesso"),
+    # Expressões de Quantidade
+    @("quero uma dúzia de brigadeiros", "sucesso"),
+    @("preciso de meia dúzia de brigadeiros", "sucesso"),
     @("me manda um quilo de brigadeiros", "sucesso"),
     
     # Quantidades Indefinidas
     @("quero uns brigadeiros", "sucesso"),
     @("preciso de algumas bolos", "sucesso"),
-    @("me manda vÃ¡rios brigadeiros", "sucesso"),
+    @("me manda vários brigadeiros", "sucesso"),
     
-    # VariaÃ§Ãµes de Produtos
+    # Variações de Produtos
     @("quero 5 brigadeiro", "sucesso"),
     @("preciso de 2 bolo", "sucesso"),
     @("me manda 3 bolos de chocolate", "sucesso"),
@@ -54,21 +54,21 @@ $testes = @(
     @("me manda 3 bolos, pf", "sucesso"),
     @("quero 2 bolos, pfv", "sucesso"),
     
-    # Com InterrogaÃ§Ãµes
+    # Com Interrogações
     @("quero 5 brigadeiros?", "sucesso"),
     @("pode ser 3 bolos?", "sucesso"),
     
-    # Erros Comuns de DigitaÃ§Ã£o (deve encontrar mesmo com erro)
+    # Erros Comuns de Digitação
     @("quero 5 brigadero", "sucesso"),
     @("preciso de 2 bolos de choclate", "sucesso"),
-    @("me manda 3 boli", "pergunta"),  # Erro muito grande - deve perguntar
-    @("quero 5 bol", "pergunta"),  # Erro muito grande - deve perguntar
-    @("preciso de 10 brigadero", "sucesso"),  # Erro pequeno - deve encontrar
-    @("me manda 2 bolos de cenora", "sucesso"),  # Erro de acento - deve encontrar
-    @("quero 3 bolos de choclate", "sucesso"),  # Erro de digitaÃ§Ã£o - deve encontrar
-    @("preciso de 1 bolo de cenoura", "sucesso"),  # Correto
-    @("me manda 5 brigadinho", "sucesso"),  # Diminutivo - deve encontrar
-    @("quero 2 bolinho", "pergunta"),  # Diminutivo muito genÃ©rico - deve perguntar qual bolo
+    @("me manda 3 boli", "pergunta"),
+    @("quero 5 bol", "pergunta"),
+    @("preciso de 10 brigadero", "sucesso"),
+    @("me manda 2 bolos de cenora", "sucesso"),
+    @("quero 3 bolos de choclate", "sucesso"),
+    @("preciso de 1 bolo de cenoura", "sucesso"),
+    @("me manda 5 brigadinho", "sucesso"),
+    @("quero 2 bolinho", "pergunta"),
     
     # Casos Especiais - Deve Perguntar
     @("quero brigadeiros", "pergunta"),
@@ -107,14 +107,14 @@ foreach ($teste in $testes) {
         $resultadoReal = "erro"
         if ($resposta -match "PEDIDO CRIADO COM SUCESSO") {
             $resultadoReal = "sucesso"
-        } elseif ($resposta -match "Quantos|Qual produto|NÃ£o consegui entender") {
+        } elseif ($resposta -match "Quantos|Qual produto|Nao consegui entender|Voce quis dizer") {
             $resultadoReal = "pergunta"
-        } elseif ($resposta -match "NÃ£o encontrei|Estoque insuficiente") {
+        } elseif ($resposta -match "Nao encontrei|Estoque insuficiente") {
             $resultadoReal = "erro"
         }
         
         # Verificar se corresponde ao esperado
-        $status = if ($resultadoReal -eq $esperado) { "âœ…" } else { "âŒ" }
+        $status = if ($resultadoReal -eq $esperado) { "OK" } else { "FALHOU" }
         
         if ($resultadoReal -eq $esperado) {
             switch ($esperado) {
@@ -126,7 +126,7 @@ foreach ($teste in $testes) {
             $falhou++
         }
         
-        Write-Host "$status [$resultadoReal] '$mensagem'" -ForegroundColor $(if ($status -eq "âœ…") { "Green" } else { "Red" })
+        Write-Host "$status [$resultadoReal] '$mensagem'" -ForegroundColor $(if ($status -eq "OK") { "Green" } else { "Red" })
         
         $testResults += @{
             Mensagem = $mensagem
@@ -136,25 +136,25 @@ foreach ($teste in $testes) {
             Resposta = $resposta
         }
         
-        Start-Sleep -Milliseconds 200  # Pequeno delay entre testes
+        Start-Sleep -Milliseconds 200
         
     } catch {
-        Write-Host "âŒ ERRO ao testar '$mensagem': $_" -ForegroundColor Red
+        Write-Host "ERRO ao testar '$mensagem': $_" -ForegroundColor Red
         $falhou++
     }
 }
 
 Write-Host ""
 Write-Host "=== RESUMO DOS TESTES ===" -ForegroundColor Cyan
-Write-Host "âœ… Sucessos: $sucesso" -ForegroundColor Green
-Write-Host "â“ Perguntas: $pergunta" -ForegroundColor Yellow
-Write-Host "âŒ Erros (esperados): $erro" -ForegroundColor Magenta
-Write-Host "âŒ Falhas (inesperadas): $falhou" -ForegroundColor Red
+Write-Host "Sucessos: $sucesso" -ForegroundColor Green
+Write-Host "Perguntas: $pergunta" -ForegroundColor Yellow
+Write-Host "Erros (esperados): $erro" -ForegroundColor Magenta
+Write-Host "Falhas (inesperadas): $falhou" -ForegroundColor Red
 Write-Host ""
 Write-Host "Total: $($testes.Count) | Passou: $($sucesso + $pergunta + $erro) | Falhou: $falhou" -ForegroundColor $(if ($falhou -eq 0) { "Green" } else { "Red" })
 
-# Exportar resultados para arquivo
+# Exportar resultados
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$testResults | ConvertTo-Json -Depth 3 | Out-File -FilePath "test-results-$timestamp.json" -Encoding UTF8
-Write-Host "Resultados exportados" -ForegroundColor Cyan
-
+$jsonFile = "test-results-$timestamp.json"
+$testResults | ConvertTo-Json -Depth 3 | Out-File -FilePath $jsonFile -Encoding UTF8
+Write-Host "Resultados exportados para: $jsonFile" -ForegroundColor Cyan
