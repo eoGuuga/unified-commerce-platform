@@ -7,10 +7,17 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Enable CORS
+  // Enable CORS - ✅ CORRIGIDO: Mais restritivo
+  const allowedOrigins: string[] = process.env.NODE_ENV === 'production'
+    ? (process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : [])
+    : ['http://localhost:3000', 'http://localhost:3001'];
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: allowedOrigins.length > 0 ? allowedOrigins : 'http://localhost:3000',
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'Idempotency-Key'],
+    exposedHeaders: ['X-Total-Count', 'X-Rate-Limit-Remaining'],
   });
 
   // Global exception filter

@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { AuditLogService } from '../common/services/audit-log.service';
 
 export interface JwtPayload {
   sub: string; // user id
@@ -30,6 +31,7 @@ export class AuthService {
     @InjectRepository(Usuario)
     private usuariosRepository: Repository<Usuario>,
     private jwtService: JwtService,
+    private auditLogService: AuditLogService,
   ) {}
 
   async login(loginDto: LoginDto): Promise<LoginResponse> {
@@ -64,6 +66,22 @@ export class AuthService {
       role: usuario.role,
       tenant_id: usuario.tenant_id,
     };
+
+    // ✅ AUDIT LOG: Registrar login
+    try {
+      await this.auditLogService.log({
+        tenantId: usuario.tenant_id,
+        userId: usuario.id,
+        action: 'LOGIN',
+        tableName: 'usuarios',
+        recordId: usuario.id,
+        newData: { last_login: usuario.last_login },
+        metadata: { email: usuario.email },
+      });
+    } catch (error) {
+      // Não falhar se audit log falhar
+      console.error('Erro ao registrar audit log de login:', error);
+    }
 
     return {
       access_token: this.jwtService.sign(payload),

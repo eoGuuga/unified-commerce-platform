@@ -8,6 +8,7 @@ import { AuthService } from './auth.service';
 import { Usuario } from '../../database/entities/Usuario.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { CommonModule } from '../common/common.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
         },
       }),
     }),
+    CommonModule, // Importar CommonModule para usar AuditLogService
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, JwtAuthGuard],

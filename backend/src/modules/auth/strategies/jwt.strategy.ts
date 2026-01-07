@@ -10,10 +10,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private authService: AuthService,
     config: ConfigService,
   ) {
+    const jwtSecret = config.get<string>('JWT_SECRET');
+    
+    if (!jwtSecret || jwtSecret === 'change-me-in-production') {
+      throw new Error(
+        'JWT_SECRET deve ser definido e seguro em .env. ' +
+        'Gere uma chave segura com: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+      );
+    }
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: config.get<string>('JWT_SECRET', 'change-me-in-production'),
+      secretOrKey: jwtSecret,
     });
   }
 
