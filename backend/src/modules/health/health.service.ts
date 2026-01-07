@@ -2,12 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import * as Redis from 'ioredis';
+import Redis from 'ioredis';
 
 @Injectable()
 export class HealthService {
   private readonly logger = new Logger(HealthService.name);
-  private redisClient: Redis.Redis;
+  private redisClient: Redis;
 
   constructor(
     @InjectDataSource()
@@ -18,7 +18,7 @@ export class HealthService {
     const redisUrl = this.configService.get<string>('REDIS_URL');
     if (redisUrl) {
       try {
-        this.redisClient = new Redis.Redis(redisUrl);
+        this.redisClient = new Redis(redisUrl);
       } catch (error) {
         this.logger.warn('Redis not configured, health checks will skip Redis');
       }
