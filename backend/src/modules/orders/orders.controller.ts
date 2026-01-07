@@ -12,12 +12,14 @@ import {
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { PaginationDto } from './dto/pagination.dto';
 import { PedidoStatus } from '../../database/entities/Pedido.entity';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import { CurrentTenant } from '../../common/decorators/tenant.decorator';
 import { Usuario } from '../../database/entities/Usuario.entity';
+import { TypedRequest, getClientIp, getUserAgent } from '../../common/types/request.types';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
@@ -44,7 +46,7 @@ export class OrdersController {
     @Body() createOrderDto: CreateOrderDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: Usuario,
-    @Request() req: any,
+    @Request() req: TypedRequest,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     return this.ordersService.create(
@@ -52,16 +54,22 @@ export class OrdersController {
       tenantId,
       user.id,
       idempotencyKey,
-      req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress,
-      req.headers['user-agent'],
+      getClientIp(req),
+      getUserAgent(req),
     );
   }
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Listar todos os pedidos' })
-  findAll(@CurrentTenant() tenantId: string) {
-    return this.ordersService.findAll(tenantId);
+  @ApiOperation({ 
+    summary: 'Listar pedidos',
+    description: 'Lista pedidos com paginação opcional. Sem parâmetros de paginação, retorna todos os pedidos (compatibilidade).',
+  })
+  findAll(
+    @CurrentTenant() tenantId: string,
+    @Query() pagination?: PaginationDto,
+  ) {
+    return this.ordersService.findAll(tenantId, pagination);
   }
 
   @Get('reports/sales')

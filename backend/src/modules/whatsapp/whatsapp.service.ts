@@ -5,7 +5,7 @@ import { ConversationService } from './services/conversation.service';
 import { ProductsService } from '../products/products.service';
 import { OrdersService } from '../orders/orders.service';
 import { PaymentsService, CreatePaymentDto } from '../payments/payments.service';
-import { CanalVenda, PedidoStatus } from '../../database/entities/Pedido.entity';
+import { CanalVenda, PedidoStatus, Pedido } from '../../database/entities/Pedido.entity';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
 import { TypedConversation, ProductWithStock, ProductSearchResult, toTypedConversation } from './types/whatsapp.types';
 
@@ -188,8 +188,9 @@ export class WhatsappService {
       const quantity = orderInfo.quantity;
       const productName = orderInfo.productName;
 
-      // Buscar produto
-      const produtos = await this.productsService.findAll(tenantId);
+      // Buscar produto (sem paginação para WhatsApp - retorna array)
+      const produtosResult = await this.productsService.findAll(tenantId);
+      const produtos = Array.isArray(produtosResult) ? produtosResult : produtosResult.data;
       const resultadoBusca = this.findProductByName(produtos, productName);
       
       this.logger.debug(`Product search: found=${!!resultadoBusca.produto}, searched="${productName}", suggestions=${resultadoBusca.sugestoes?.length || 0}`);
@@ -663,7 +664,8 @@ export class WhatsappService {
 
   private async getCardapio(tenantId: string): Promise<string> {
     try {
-      const produtos = await this.productsService.findAll(tenantId);
+      const produtosResult = await this.productsService.findAll(tenantId);
+      const produtos = Array.isArray(produtosResult) ? produtosResult : produtosResult.data;
       
       if (produtos.length === 0) {
         return '📋 *Cardápio*\n\nNão temos produtos cadastrados no momento.';
@@ -709,7 +711,8 @@ export class WhatsappService {
         .filter(p => p.length > 2);
 
       let produtoEncontrado = null;
-      const produtos = await this.productsService.findAll(tenantId);
+      const produtosResult = await this.productsService.findAll(tenantId);
+      const produtos = Array.isArray(produtosResult) ? produtosResult : produtosResult.data;
 
       // Se tem palavras-chave, buscar produto específico
       if (palavras.length > 0) {
@@ -779,7 +782,8 @@ export class WhatsappService {
         .filter(p => p.length > 2);
 
       let produtoEncontrado = null;
-      const produtos = await this.productsService.findAll(tenantId);
+      const produtosResult = await this.productsService.findAll(tenantId);
+      const produtos = Array.isArray(produtosResult) ? produtosResult : produtosResult.data;
 
       // Se tem palavras-chave, buscar produto específico
       if (palavras.length > 0) {
@@ -935,10 +939,11 @@ export class WhatsappService {
         pedidoId = conversation.context.pedido_id;
       } else {
         // Fallback: buscar último pedido pendente (para compatibilidade)
-        const pedidosPendentes = await this.ordersService.findAll(tenantId);
+        const pedidosResult = await this.ordersService.findAll(tenantId);
+        const pedidosPendentes = Array.isArray(pedidosResult) ? pedidosResult : pedidosResult.data;
         const pedidoPendente = pedidosPendentes
-          .filter(p => p.status === PedidoStatus.PENDENTE_PAGAMENTO)
-          .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())[0];
+          .filter((p: Pedido) => p.status === PedidoStatus.PENDENTE_PAGAMENTO)
+          .sort((a: Pedido, b: Pedido) => b.created_at.getTime() - a.created_at.getTime())[0];
 
         if (!pedidoPendente) {
           return '❌ Não encontrei um pedido pendente de pagamento.\n\n' +

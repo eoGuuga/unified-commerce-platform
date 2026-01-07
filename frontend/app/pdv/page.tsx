@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Toaster, toast } from 'react-hot-toast';
 import useSWR from 'swr';
 import api from '@/lib/api-client';
+import { useAuth } from '@/hooks/useAuth';
+import { getDevCredentials, hasDevCredentials } from '@/lib/config';
 
 interface CartItem {
   id: string;
@@ -30,41 +32,27 @@ interface Order {
   created_at: string;
 }
 
-const TENANT_ID = '00000000-0000-0000-0000-000000000000';
+// ⚠️ REMOVIDO: TENANT_ID hardcoded - deve vir do contexto JWT
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
 // Fetchers para SWR
 const productsFetcher = async (tenantId: string) => {
   try {
+    if (!tenantId) {
+      throw new Error('Tenant ID é obrigatório');
+    }
     console.log('🔄 Buscando produtos para tenant:', tenantId);
     const products = await api.getProducts(tenantId);
     console.log('✅ Fetcher retornou:', products?.length || 0, 'produtos');
     if (products && products.length > 0) {
-      console.log('📦 Exemplos:', products.slice(0, 3).map((p: any) => ({ name: p.name, stock: p.stock })));
+      console.log('📦 Exemplos:', products.slice(0, 3).map((p: Product) => ({ name: p.name, stock: p.stock })));
     } else {
       console.warn('⚠️ Nenhum produto retornado. Verifique se produtos foram cadastrados.');
     }
     return Array.isArray(products) ? products : [];
   } catch (error: any) {
     console.error('❌ Erro no fetcher de produtos:', error);
-    // Se for erro de autenticação, tentar fazer login e tentar novamente
-    if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
-      console.log('🔄 Token expirado, tentando fazer login...');
-      try {
-        const loginResponse: any = await api.login('admin@loja.com', 'senha123');
-        if (loginResponse.access_token && typeof window !== 'undefined') {
-          localStorage.setItem('token', loginResponse.access_token);
-          console.log('✅ Login realizado, tentando buscar produtos novamente...');
-          // Tentar novamente após login
-          const retryProducts = await api.getProducts(tenantId);
-          console.log('✅ Produtos carregados após login:', retryProducts?.length || 0);
-          return Array.isArray(retryProducts) ? retryProducts : [];
-        }
-      } catch (loginError) {
-        console.error('❌ Erro ao fazer login:', loginError);
-      }
-    }
-    // Se não for erro de auth ou se login falhou, retornar array vazio
+    // Não fazer login automático aqui - deixar o hook useAuth gerenciar
     console.warn('⚠️ Retornando array vazio devido ao erro');
     return [];
   }
@@ -103,6 +91,7 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export default function PDVPage() {
   const router = useRouter();
+  const { user, tenantId, isAuthenticated, isLoading: authLoading, login } = useAuth();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -117,9 +106,10 @@ export default function PDVPage() {
   const debouncedSearch = useDebounce(searchTerm, 300);
 
   // SWR para produtos - configurado para atualização quase em tempo real
-  const swrKey = mounted ? `products-${TENANT_ID}` : null; // Key única para forçar busca
+  // ⚠️ CRÍTICO: tenantId deve vir do contexto JWT, nunca hardcoded
+  const swrKey = mounted && tenantId ? `products-${tenantId}` : null;
   const { data: products = [], error, isLoading, mutate } = useSWR<Product[]>(
-    swrKey ? TENANT_ID : null, // Só buscar quando montado
+    swrKey ? tenantId : null, // Só buscar quando montado e tenantId disponível
     productsFetcher,
     {
       refreshInterval: 3000, // Atualiza a cada 3 segundos para quase tempo real
@@ -141,10 +131,10 @@ export default function PDVPage() {
   );
 
   // SWR para pedidos (estatísticas) - só buscar se montado e com token
-  const ordersKey = mounted ? `orders-${TENANT_ID}` : null;
+  const ordersKey = mounted && tenantId ? `orders-${tenantId}` : null;
   const { data: orders = [] } = useSWR<Order[]>(
     ordersKey,
-    () => ordersFetcher(TENANT_ID), // Passar TENANT_ID diretamente, não a key
+    () => ordersFetcher(tenantId!), // tenantId vem do contexto JWT
     {
       refreshInterval: 10000,
       revalidateOnFocus: false, // Desabilitado para evitar erros 401 constantes
@@ -218,14 +208,14 @@ export default function PDVPage() {
 
   // Liberar todas as reservas ao desmontar componente (fechar página)
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || !tenantId) return;
 
     const releaseAllReservations = async () => {
       if (cart.length === 0) return;
       
       try {
         for (const item of cart) {
-          await api.releaseStock(item.id, item.quantity, TENANT_ID);
+          await api.releaseStock(item.id, item.quantity, tenantId);
         }
       } catch (error) {
         console.error('Erro ao liberar reservas:', error);
@@ -239,7 +229,7 @@ export default function PDVPage() {
       // Usar sendBeacon para garantir que a requisição seja enviada
       const token = localStorage.getItem('token');
       cart.forEach(item => {
-        const url = `${API_BASE_URL}/products/${item.id}/release?tenantId=${TENANT_ID}`;
+        const url = `${API_BASE_URL}/products/${item.id}/release?tenantId=${tenantId}`;
         const blob = new Blob([JSON.stringify({ quantity: item.quantity })], {
           type: 'application/json',
         });
@@ -267,21 +257,26 @@ export default function PDVPage() {
         releaseAllReservations();
       }
     };
-  }, [mounted, cart]);
+  }, [mounted, cart, tenantId]);
 
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || authLoading) return;
     
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    if (!token) {
-      console.log('Token não encontrado, fazendo login automático...');
-      autoLogin();
+    // Se não está autenticado ou não tem tenantId, fazer login automático (desenvolvimento)
+    if (!isAuthenticated || !tenantId) {
+      if (process.env.NODE_ENV === 'development' && hasDevCredentials()) {
+        console.log('Não autenticado, fazendo login automático...');
+        autoLogin();
+      } else {
+        toast.error('Autenticação necessária. Faça login para continuar.');
+        router.push('/login');
+      }
     } else {
-      console.log('Token encontrado, forçando carregamento de produtos...');
+      console.log('Autenticado, forçando carregamento de produtos...');
       // Forçar revalidação após montar
       setTimeout(() => mutate(), 500);
     }
-  }, [mounted, mutate]);
+  }, [mounted, authLoading, isAuthenticated, tenantId, mutate, router]);
 
   // Atalhos de teclado (apenas no cliente)
   useEffect(() => {
@@ -399,19 +394,29 @@ export default function PDVPage() {
     
     setIsLoggingIn(true);
     try {
+      // ⚠️ CRÍTICO: Em desenvolvimento, usar credenciais apenas se configuradas via env
+      if (!hasDevCredentials()) {
+        toast.error('Credenciais de desenvolvimento não configuradas. Configure NEXT_PUBLIC_DEV_EMAIL, NEXT_PUBLIC_DEV_PASSWORD e NEXT_PUBLIC_DEV_TENANT_ID');
+        setIsLoggingIn(false);
+        return;
+      }
+
       console.log('Fazendo login automático...');
-      const response: any = await api.login('admin@loja.com', 'senha123');
-      if (response.access_token) {
-        localStorage.setItem('token', response.access_token);
+      const devCreds = getDevCredentials();
+      const result = await login(devCreds.email, devCreds.password, devCreds.tenantId);
+      
+      if (result.success) {
         console.log('Login realizado, carregando produtos...');
         // Aguardar um pouco antes de forçar revalidação
         setTimeout(() => {
           mutate();
         }, 300);
+      } else {
+        toast.error(result.error || 'Erro ao fazer login automático. Verifique as credenciais.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro no login automático:', err);
-      toast.error('Erro ao fazer login automático. Verifique se o usuário padrão foi criado.');
+      toast.error(err.message || 'Erro ao fazer login automático. Verifique se o usuário padrão foi criado.');
     } finally {
       setIsLoggingIn(false);
     }
@@ -427,6 +432,11 @@ export default function PDVPage() {
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   const handleAddToCart = useCallback(async (product: Product) => {
+    if (!tenantId) {
+      toast.error('Tenant ID não disponível. Faça login novamente.');
+      return;
+    }
+
     // Usar available_stock se disponível, senão usar stock
     const availableStock = (product as any).available_stock ?? product.stock ?? 0;
     
@@ -446,7 +456,7 @@ export default function PDVPage() {
 
     try {
       // Reservar estoque no backend
-      await api.reserveStock(product.id, 1, TENANT_ID);
+      await api.reserveStock(product.id, 1, tenantId);
       
       // Adicionar ao carrinho com informação de estoque
       if (existingItem) {
@@ -474,29 +484,26 @@ export default function PDVPage() {
     } catch (error: any) {
       const errorMsg = error.message || 'Erro ao reservar estoque';
       if (errorMsg.includes('Unauthorized') || errorMsg.includes('autenticação')) {
-        toast.error('Sessão expirada. Fazendo login novamente...');
-        // Tentar fazer login novamente
-        try {
-          const response: any = await api.login('admin@loja.com', 'senha123');
-          if (response.access_token && typeof window !== 'undefined') {
-            localStorage.setItem('token', response.access_token);
-            // Tentar adicionar novamente
-            setTimeout(() => handleAddToCart(product), 500);
-          }
-        } catch {}
+        toast.error('Sessão expirada. Redirecionando para login...');
+        router.push('/login');
       } else {
         toast.error(errorMsg);
       }
     }
-  }, [cart, mutate]);
+  }, [cart, mutate, tenantId, router]);
 
   const handleRemoveFromCart = async (id: string) => {
+    if (!tenantId) {
+      toast.error('Tenant ID não disponível.');
+      return;
+    }
+
     const item = cart.find(item => item.id === id);
     if (!item) return;
 
     try {
       // Liberar estoque reservado no backend
-      await api.releaseStock(id, item.quantity, TENANT_ID);
+      await api.releaseStock(id, item.quantity, tenantId);
       
       // Remover do carrinho
       setCart(cart.filter(cartItem => cartItem.id !== id));
@@ -511,6 +518,7 @@ export default function PDVPage() {
         // Se for erro de auth, apenas remover do carrinho localmente
         setCart(cart.filter(cartItem => cartItem.id !== id));
         toast.success(`${item.name} removido do carrinho`);
+        router.push('/login');
       } else {
         toast.error(errorMsg);
       }
@@ -518,6 +526,11 @@ export default function PDVPage() {
   };
 
   const handleUpdateQuantity = async (id: string, quantity: number) => {
+    if (!tenantId) {
+      toast.error('Tenant ID não disponível.');
+      return;
+    }
+
     if (quantity <= 0) {
       await handleRemoveFromCart(id);
       return;
@@ -541,10 +554,10 @@ export default function PDVPage() {
     try {
       if (quantityDiff > 0) {
         // Aumentar quantidade: reservar mais estoque
-        await api.reserveStock(id, quantityDiff, TENANT_ID);
+        await api.reserveStock(id, quantityDiff, tenantId);
       } else if (quantityDiff < 0) {
         // Diminuir quantidade: liberar estoque
-        await api.releaseStock(id, Math.abs(quantityDiff), TENANT_ID);
+        await api.releaseStock(id, Math.abs(quantityDiff), tenantId);
       }
 
       // Atualizar quantidade no carrinho
@@ -557,7 +570,8 @@ export default function PDVPage() {
     } catch (error: any) {
       const errorMsg = error.message || 'Erro ao atualizar estoque';
       if (errorMsg.includes('Unauthorized') || errorMsg.includes('autenticação')) {
-        toast.error('Sessão expirada. Recarregue a página.');
+        toast.error('Sessão expirada. Redirecionando para login...');
+        router.push('/login');
       } else {
         toast.error(errorMsg);
       }
@@ -565,6 +579,11 @@ export default function PDVPage() {
   };
 
   const handleSell = async () => {
+    if (!tenantId) {
+      toast.error('Tenant ID não disponível. Faça login novamente.');
+      return;
+    }
+
     if (cart.length === 0) {
       toast.error('Carrinho vazio!');
       return;
@@ -602,7 +621,7 @@ export default function PDVPage() {
     setIsSelling(true);
     try {
       const loadingToast = toast.loading('Processando venda...');
-      await api.createOrder(order, TENANT_ID);
+      await api.createOrder(order, tenantId);
       toast.dismiss(loadingToast);
       toast.success('🎉 Venda realizada com sucesso!', {
         duration: 3000,
@@ -641,13 +660,20 @@ export default function PDVPage() {
     </div>
   );
 
-  // Evitar renderização até montar no cliente
-  if (!mounted) {
+  // Evitar renderização até montar no cliente e ter tenantId
+  if (!mounted || authLoading || !tenantId) {
     return (
       <div className="min-h-screen bg-gray-50 p-4 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin text-4xl mb-4">🔄</div>
-          <p className="text-gray-600">Carregando PDV...</p>
+          <p className="text-gray-600">
+            {authLoading ? 'Carregando autenticação...' : !tenantId ? 'Aguardando tenant ID...' : 'Carregando PDV...'}
+          </p>
+          {!tenantId && !authLoading && (
+            <p className="text-sm text-red-500 mt-2">
+              Tenant ID não disponível. Verifique se está autenticado.
+            </p>
+          )}
         </div>
       </div>
     );

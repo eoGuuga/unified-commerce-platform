@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Get, Request } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Request, BadRequestException } from '@nestjs/common';
 import { AuthService, LoginResponse } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -6,6 +6,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/user.decorator';
 import { Usuario } from '../../database/entities/Usuario.entity';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { TypedRequest } from '../../common/types/request.types';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -21,12 +22,21 @@ export class AuthController {
   }
 
   @Post('register')
-  @ApiOperation({ summary: 'Registro de novo usuario' })
+  @ApiOperation({ 
+    summary: 'Registro de novo usuario',
+    description: '⚠️ CRÍTICO: tenantId é obrigatório via header x-tenant-id. Em produção, isso deve vir do contexto JWT.',
+  })
   @ApiResponse({ status: 201, description: 'Usuario criado com sucesso' })
+  @ApiResponse({ status: 400, description: 'Tenant ID obrigatório' })
   @ApiResponse({ status: 401, description: 'Email ja cadastrado' })
-  async register(@Body() registerDto: RegisterDto, @Request() req: any): Promise<LoginResponse> {
-    // Por enquanto, usar tenant_id fixo. Depois podemos extrair do JWT se necessario
-    const tenantId = req.headers['x-tenant-id'] || '00000000-0000-0000-0000-000000000000';
+  async register(@Body() registerDto: RegisterDto, @Request() req: TypedRequest): Promise<LoginResponse> {
+    // ⚠️ CRÍTICO: tenantId deve vir obrigatoriamente, nunca usar default hardcoded
+    const tenantId = req.headers['x-tenant-id'];
+    if (!tenantId) {
+      throw new BadRequestException(
+        'tenantId é obrigatório para registro. Forneça via header x-tenant-id ou implemente extração do contexto JWT.',
+      );
+    }
     return this.authService.register(registerDto, tenantId);
   }
 

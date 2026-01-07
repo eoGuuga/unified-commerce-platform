@@ -8,6 +8,8 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { CacheService } from '../common/services/cache.service';
 import { AuditLogService } from '../common/services/audit-log.service';
+import { PaginatedResult, createPaginatedResult } from '../common/types/pagination.types';
+import { PaginationDto } from './dto/pagination.dto';
 
 @Injectable()
 export class ProductsService {
@@ -22,17 +24,21 @@ export class ProductsService {
     private auditLogService: AuditLogService,
   ) {}
 
-  async findAll(tenantId: string): Promise<any[]> {
-    // ✅ CACHE: Tentar buscar do cache primeiro
-    const cacheKey = `products:${tenantId}`;
-    const cached = await this.cacheService.getCachedProducts(tenantId);
-    if (cached) {
-      return cached;
+  async findAll(tenantId: string, pagination?: PaginationDto): Promise<any[] | PaginatedResult<any>> {
+    const page = pagination?.page || 1;
+    const limit = pagination?.limit || 50;
+    const skip = (page - 1) * limit;
+
+    // ✅ CACHE: Tentar buscar do cache primeiro (apenas sem paginação)
+    if (!pagination) {
+      const cached = await this.cacheService.getCachedProducts(tenantId);
+      if (cached) {
+        return cached;
+      }
     }
 
-    // ✅ CORRIGIDO: Query otimizada sem N+1
-    // Buscar produtos com estoque em uma única query usando JOIN
-    const produtos = await this.produtosRepository
+    // ✅ CORRIGIDO: Query otimizada sem N+1 com paginação
+    const queryBuilder = this.produtosRepository
       .createQueryBuilder('produto')
       .leftJoinAndSelect('produto.categoria', 'categoria')
       .leftJoin(
@@ -43,8 +49,46 @@ export class ProductsService {
       )
       .where('produto.tenant_id = :tenantId', { tenantId })
       .andWhere('produto.is_active = :isActive', { isActive: true })
-      .orderBy('produto.name', 'ASC')
-      .getMany();
+      .orderBy('produto.name', 'ASC');
+
+    // Se paginação foi solicitada, aplicar skip/take e retornar resultado paginado
+    if (pagination) {
+      const [produtos, total] = await queryBuilder
+        .skip(skip)
+        .take(limit)
+        .getManyAndCount();
+      
+      // Buscar estoques para os produtos da página atual
+      const produtoIds = produtos.map((p) => p.id);
+      const estoques = produtoIds.length > 0
+        ? await this.estoqueRepository
+            .createQueryBuilder('estoque')
+            .where('estoque.tenant_id = :tenantId', { tenantId })
+            .andWhere('estoque.produto_id IN (:...produtoIds)', { produtoIds })
+            .getMany()
+        : [];
+
+      const estoqueMap = new Map(estoques.map((e) => [e.produto_id, e]));
+      const produtosComEstoque = produtos.map((produto) => {
+        const estoque = estoqueMap.get(produto.id);
+        const availableStock = estoque
+          ? Math.max(0, estoque.current_stock - estoque.reserved_stock)
+          : 0;
+
+        return {
+          ...produto,
+          stock: estoque?.current_stock || 0,
+          available_stock: availableStock,
+          reserved_stock: estoque?.reserved_stock || 0,
+          min_stock: estoque?.min_stock || 0,
+        };
+      });
+
+      return createPaginatedResult(produtosComEstoque, total, page, limit);
+    }
+
+    // Sem paginação: comportamento original (retorna todos)
+    const produtos = await queryBuilder.getMany();
 
     // Buscar todos os estoques de uma vez (evita N+1)
     const produtoIds = produtos.map((p) => p.id);

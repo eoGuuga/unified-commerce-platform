@@ -10,6 +10,8 @@ import { IdempotencyService } from '../common/services/idempotency.service';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { IdempotencyRecord, toIdempotencyRecord } from './types/orders.types';
+import { PaginatedResult, createPaginatedResult } from '../common/types/pagination.types';
+import { PaginationDto } from './dto/pagination.dto';
 
 @Injectable()
 export class OrdersService {
@@ -210,7 +212,25 @@ export class OrdersService {
     return pedido;
   }
 
-  async findAll(tenantId: string): Promise<Pedido[]> {
+  async findAll(tenantId: string, pagination?: PaginationDto): Promise<Pedido[] | PaginatedResult<Pedido>> {
+    const page = pagination?.page || 1;
+    const limit = pagination?.limit || 50;
+    const skip = (page - 1) * limit;
+
+    // Se paginação foi solicitada, retornar resultado paginado
+    if (pagination) {
+      const [data, total] = await this.pedidosRepository.findAndCount({
+        where: { tenant_id: tenantId },
+        relations: ['itens', 'itens.produto', 'seller'],
+        order: { created_at: 'DESC' },
+        skip,
+        take: limit,
+      });
+
+      return createPaginatedResult(data, total, page, limit);
+    }
+
+    // Sem paginação: comportamento original (retorna todos)
     return this.pedidosRepository.find({
       where: { tenant_id: tenantId },
       relations: ['itens', 'itens.produto', 'seller'],
@@ -276,7 +296,9 @@ export class OrdersService {
   }
 
   async getSalesReport(tenantId: string): Promise<any> {
-    const orders = await this.findAll(tenantId);
+    // Para relatório, precisamos de todos os pedidos (sem paginação)
+    const ordersResult = await this.findAll(tenantId);
+    const orders = Array.isArray(ordersResult) ? ordersResult : ordersResult.data;
     
     const totalSales = orders.reduce((sum, order) => sum + Number(order.total_amount), 0);
     const totalOrders = orders.length;

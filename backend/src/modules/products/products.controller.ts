@@ -13,11 +13,13 @@ import {
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { PaginationDto } from './dto/pagination.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../common/decorators/tenant.decorator';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import { Usuario } from '../../database/entities/Usuario.entity';
+import { TypedRequest, getClientIp, getUserAgent } from '../../common/types/request.types';
 
 @ApiTags('Products')
 @ApiBearerAuth()
@@ -27,9 +29,15 @@ export class ProductsController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Listar todos os produtos' })
-  findAll(@CurrentTenant() tenantId: string) {
-    return this.productsService.findAll(tenantId);
+  @ApiOperation({ 
+    summary: 'Listar produtos',
+    description: 'Lista produtos com paginação opcional. Sem parâmetros de paginação, retorna todos os produtos (compatibilidade).',
+  })
+  findAll(
+    @CurrentTenant() tenantId: string,
+    @Query() pagination?: PaginationDto,
+  ) {
+    return this.productsService.findAll(tenantId, pagination);
   }
 
   @Get('search')
@@ -53,14 +61,14 @@ export class ProductsController {
     @Body() createProductDto: CreateProductDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: Usuario,
-    @Request() req: any,
+    @Request() req: TypedRequest,
   ) {
     return this.productsService.create(
       createProductDto,
       tenantId,
       user?.id,
-      req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress,
-      req.headers['user-agent'],
+      getClientIp(req),
+      getUserAgent(req),
     );
   }
 
@@ -72,15 +80,15 @@ export class ProductsController {
     @Body() updateProductDto: UpdateProductDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: Usuario,
-    @Request() req: any,
+    @Request() req: TypedRequest,
   ) {
     return this.productsService.update(
       id,
       updateProductDto,
       tenantId,
       user?.id,
-      req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress,
-      req.headers['user-agent'],
+      getClientIp(req),
+      getUserAgent(req),
     );
   }
 
@@ -91,14 +99,14 @@ export class ProductsController {
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: Usuario,
-    @Request() req: any,
+    @Request() req: TypedRequest,
   ) {
     return this.productsService.remove(
       id,
       tenantId,
       user?.id,
-      req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress,
-      req.headers['user-agent'],
+      getClientIp(req),
+      getUserAgent(req),
     );
   }
 
@@ -144,8 +152,8 @@ export class ProductsController {
     @Param('id') id: string,
     @Body() adjustStockDto: { quantity: number; reason?: string },
     @CurrentTenant() tenantId: string,
-    @CurrentUser() user: any,
-    @Request() req: any,
+    @CurrentUser() user: Usuario,
+    @Request() req: TypedRequest,
   ) {
     return this.productsService.adjustStock(
       id,
@@ -153,8 +161,8 @@ export class ProductsController {
       tenantId,
       adjustStockDto.reason,
       user?.id,
-      req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress,
-      req.headers['user-agent'],
+      getClientIp(req),
+      getUserAgent(req),
     );
   }
 
