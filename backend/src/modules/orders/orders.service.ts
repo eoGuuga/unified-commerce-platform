@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException, Inject, forwardRef, Logger } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, DataSource, QueryRunner } from 'typeorm';
-import { Pedido, PedidoStatus } from '../../database/entities/Pedido.entity';
+import { Pedido, PedidoStatus, CanalVenda } from '../../database/entities/Pedido.entity';
 import { ItemPedido } from '../../database/entities/ItemPedido.entity';
 import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque.entity';
 import { Produto } from '../../database/entities/Produto.entity';
@@ -115,8 +115,17 @@ export class OrdersService {
 
       // 5. Criar pedido
       const orderNo = await this.generateOrderNumber(tenantId);
-      const initialStatus: PedidoStatus =
-        createOrderDto.channel === 'pdv' ? PedidoStatus.ENTREGUE : PedidoStatus.CONFIRMADO;
+      // PDV = ENTREGUE (pagamento no ato)
+      // WHATSAPP = PENDENTE_PAGAMENTO (aguarda confirmação)
+      // ECOMMERCE = CONFIRMADO (pagamento online já processado)
+      let initialStatus: PedidoStatus;
+      if (createOrderDto.channel === CanalVenda.PDV) {
+        initialStatus = PedidoStatus.ENTREGUE;
+      } else if (createOrderDto.channel === CanalVenda.WHATSAPP) {
+        initialStatus = PedidoStatus.PENDENTE_PAGAMENTO;
+      } else {
+        initialStatus = PedidoStatus.CONFIRMADO;
+      }
 
       const pedido = manager.create(Pedido, {
         tenant_id: tenantId,
