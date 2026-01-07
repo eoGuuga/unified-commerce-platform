@@ -1,7 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OpenAIService } from './services/openai.service';
 import { ProductsService } from '../products/products.service';
+import { OrdersService } from '../orders/orders.service';
+import { CanalVenda, PedidoStatus } from '../../database/entities/Pedido.entity';
 
 export interface WhatsappMessage {
   from: string;
@@ -26,6 +28,7 @@ export class WhatsappService {
     private config: ConfigService,
     private openAIService: OpenAIService,
     private productsService: ProductsService,
+    private ordersService: OrdersService,
   ) {}
 
   async processIncomingMessage(message: WhatsappMessage): Promise<string> {
@@ -77,8 +80,166 @@ export class WhatsappService {
       return this.getSaudacao();
     }
 
+    // Comando: Fazer Pedido
+    if (lowerMessage.includes('quero') || lowerMessage.includes('preciso') || 
+        lowerMessage.includes('comprar') || lowerMessage.includes('pedir') ||
+        lowerMessage.includes('vou querer')) {
+      return await this.processOrder(message, tenantId);
+    }
+
     // Resposta padrão
     return this.getRespostaPadrao();
+  }
+
+  private async processOrder(message: string, tenantId: string): Promise<string> {
+    try {
+      // Extrair quantidade e produto da mensagem
+      const orderInfo = this.extractOrderInfo(message);
+      
+      if (!orderInfo.quantity || !orderInfo.productName) {
+        return '❌ Não consegui entender seu pedido.\n\n' +
+               '💬 Por favor, digite no formato:\n' +
+               '*"Quero X [nome do produto]"*\n\n' +
+               'Exemplo: "Quero 10 brigadeiros"';
+      }
+
+      // Buscar produto
+      const produtos = await this.productsService.findAll(tenantId);
+      const produto = this.findProductByName(produtos, orderInfo.productName);
+
+      if (!produto) {
+        return `❌ Não encontrei o produto "${orderInfo.productName}".\n\n` +
+               '💬 Digite *"cardápio"* para ver nossos produtos disponíveis.';
+      }
+
+      // Validar estoque
+      if (produto.available_stock < orderInfo.quantity) {
+        return `❌ Estoque insuficiente!\n\n` +
+               `*${produto.name}*\n` +
+               `Solicitado: ${orderInfo.quantity} unidades\n` +
+               `Disponível: ${produto.available_stock} unidades\n\n` +
+               `💬 Quer fazer pedido com a quantidade disponível?`;
+      }
+
+      // Criar pedido
+      try {
+        const pedido = await this.ordersService.create({
+          channel: CanalVenda.WHATSAPP,
+          customer_phone: 'whatsapp', // Será atualizado quando tiver número real
+          items: [{
+            produto_id: produto.id,
+            quantity: orderInfo.quantity,
+            unit_price: Number(produto.price),
+          }],
+          discount_amount: 0,
+          shipping_amount: 0,
+        }, tenantId);
+
+        const total = Number(produto.price) * orderInfo.quantity;
+        
+        return `✅ *PEDIDO CRIADO COM SUCESSO!*\n\n` +
+               `📦 *${produto.name}*\n` +
+               `Quantidade: ${orderInfo.quantity} unidades\n` +
+               `Preço unitário: R$ ${Number(produto.price).toFixed(2).replace('.', ',')}\n` +
+               `Total: R$ ${total.toFixed(2).replace('.', ',')}\n\n` +
+               `🆔 Código do pedido: *${pedido.order_no}*\n` +
+               `📊 Status: ${this.formatStatus(pedido.status)}\n\n` +
+               `💬 Aguarde a confirmação do pagamento!`;
+      } catch (error) {
+        this.logger.error(`Error creating order: ${error}`);
+        
+        if (error instanceof BadRequestException) {
+          return `❌ ${error.message}\n\n` +
+                 `💬 Verifique o estoque e tente novamente.`;
+        }
+        
+        return '❌ Ocorreu um erro ao criar seu pedido.\n\n' +
+               '💬 Tente novamente em alguns instantes.';
+      }
+    } catch (error) {
+      this.logger.error(`Error processing order: ${error}`);
+      return '❌ Ocorreu um erro ao processar seu pedido.\n\n' +
+             '💬 Tente novamente ou digite *"ajuda"* para ver os comandos.';
+    }
+  }
+
+  private extractOrderInfo(message: string): { quantity: number | null; productName: string | null } {
+    const lowerMessage = message.toLowerCase();
+    
+    // Extrair número (quantidade) - pode estar no início ou meio
+    const quantityMatch = lowerMessage.match(/(\d+)/);
+    const quantity = quantityMatch ? parseInt(quantityMatch[1]) : null;
+
+    // Extrair nome do produto
+    // Estratégia: remover palavras de ação e números, manter o resto
+    let productName = lowerMessage
+      // Remover palavras de ação
+      .replace(/\b(quero|preciso|comprar|pedir|vou querer|gostaria de|desejo|vou comprar|preciso de)\b/gi, '')
+      // Remover números
+      .replace(/\d+/g, '')
+      // Remover unidades
+      .replace(/\b(unidades?|unidade|un|peças?|peça|pç|kg|kilo|gramas?|g)\b/gi, '')
+      // Remover artigos e preposições (mas manter se for parte do nome, ex: "Bolo de Chocolate")
+      .replace(/\b(de|do|da|dos|das)\b/gi, ' ')
+      // Remover artigos no início/fim
+      .replace(/^\s*(o|a|os|as|um|uma)\s+/gi, '')
+      .replace(/\s+(o|a|os|as|um|uma)\s*$/gi, '')
+      .trim()
+      // Limpar espaços múltiplos
+      .replace(/\s+/g, ' ');
+
+    // Se não sobrou nada útil, tentar buscar produto após número
+    if (!productName || productName.length < 3) {
+      if (quantityMatch) {
+        // Pegar tudo após o número
+        const afterNumber = lowerMessage.substring(quantityMatch.index! + quantityMatch[0].length);
+        productName = afterNumber
+          .replace(/\b(quero|preciso|comprar|pedir|vou querer|gostaria de|desejo|de|do|da|dos|das|o|a|os|as|unidades?|unidade|un|peças?|peça|pç)\b/gi, ' ')
+          .trim()
+          .replace(/\s+/g, ' ');
+      }
+    }
+
+    return {
+      quantity,
+      productName: productName && productName.length >= 3 ? productName : null,
+    };
+  }
+
+  private findProductByName(produtos: any[], productName: string): any | null {
+    if (!productName) return null;
+
+    const palavras = productName.toLowerCase().split(/\s+/).filter(p => p.length > 2);
+    
+    if (palavras.length === 0) return null;
+
+    // Estratégia 1: Buscar por nome exato (todas as palavras)
+    let produto = produtos.find(p => {
+      const nomeLower = p.name.toLowerCase();
+      return palavras.every(palavra => nomeLower.includes(palavra));
+    });
+
+    // Estratégia 2: Buscar por qualquer palavra (se não encontrou)
+    if (!produto) {
+      produto = produtos.find(p => 
+        palavras.some(palavra => p.name.toLowerCase().includes(palavra))
+      );
+    }
+
+    return produto || null;
+  }
+
+  private formatStatus(status: PedidoStatus): string {
+    const statusMap: Record<PedidoStatus, string> = {
+      [PedidoStatus.PENDENTE_PAGAMENTO]: '⏳ Aguardando Pagamento',
+      [PedidoStatus.CONFIRMADO]: '✅ Confirmado',
+      [PedidoStatus.EM_PRODUCAO]: '👨‍🍳 Em Produção',
+      [PedidoStatus.PRONTO]: '🎉 Pronto',
+      [PedidoStatus.EM_TRANSITO]: '🚚 Em Trânsito',
+      [PedidoStatus.ENTREGUE]: '✅ Entregue',
+      [PedidoStatus.CANCELADO]: '❌ Cancelado',
+    };
+    return statusMap[status] || status;
   }
 
   private async getCardapio(tenantId: string): Promise<string> {
