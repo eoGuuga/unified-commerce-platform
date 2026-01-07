@@ -1,9 +1,12 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OpenAIService } from './services/openai.service';
+import { ConversationService } from './services/conversation.service';
 import { ProductsService } from '../products/products.service';
 import { OrdersService } from '../orders/orders.service';
+import { PaymentsService, CreatePaymentDto } from '../payments/payments.service';
 import { CanalVenda, PedidoStatus } from '../../database/entities/Pedido.entity';
+import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
 
 export interface WhatsappMessage {
   from: string;
@@ -27,8 +30,10 @@ export class WhatsappService {
   constructor(
     private config: ConfigService,
     private openAIService: OpenAIService,
+    private conversationService: ConversationService,
     private productsService: ProductsService,
     private ordersService: OrdersService,
+    private paymentsService: PaymentsService,
   ) {}
 
   async processIncomingMessage(message: WhatsappMessage): Promise<string> {
@@ -36,8 +41,34 @@ export class WhatsappService {
 
     try {
       const tenantId = message.tenantId || this.DEFAULT_TENANT_ID;
-      const response = await this.generateResponse(message.body, tenantId);
       
+      // Buscar ou criar conversa
+      const conversation = await this.conversationService.getOrCreateConversation(
+        tenantId,
+        message.from,
+      );
+
+      // Salvar mensagem recebida
+      await this.conversationService.saveMessage(
+        conversation.id,
+        'inbound',
+        message.body,
+      );
+
+      // Gerar resposta
+      const response = await this.generateResponse(
+        message.body,
+        tenantId,
+        conversation,
+      );
+
+      // Salvar mensagem enviada
+      await this.conversationService.saveMessage(
+        conversation.id,
+        'outbound',
+        response,
+      );
+
       this.logger.log(`Response: ${response}`);
       return response;
     } catch (error) {
@@ -46,10 +77,19 @@ export class WhatsappService {
     }
   }
 
-  private async generateResponse(message: string, tenantId: string): Promise<string> {
+  private async generateResponse(
+    message: string,
+    tenantId: string,
+    conversation?: any,
+  ): Promise<string> {
     const lowerMessage = message.toLowerCase().trim();
 
-    // IMPORTANTE: Verificar pedidos PRIMEIRO (antes de outras respostas)
+    // IMPORTANTE: Verificar seleção de método de pagamento PRIMEIRO
+    if (this.isPaymentMethodSelection(message)) {
+      return await this.processPaymentSelection(message, tenantId, conversation);
+    }
+
+    // IMPORTANTE: Verificar pedidos (antes de outras respostas)
     // Comando: Fazer Pedido (todas as variações)
     const palavrasPedido = [
       'quero', 'preciso', 'comprar', 'pedir', 'vou querer', 'gostaria de',
@@ -65,7 +105,7 @@ export class WhatsappService {
     ];
     
     if (palavrasPedido.some(palavra => lowerMessage.includes(palavra))) {
-      return await this.processOrder(message, tenantId);
+      return await this.processOrder(message, tenantId, conversation);
     }
 
     // Comando: Cardápio / Menu
@@ -103,7 +143,11 @@ export class WhatsappService {
     return this.getRespostaPadrao();
   }
 
-  private async processOrder(message: string, tenantId: string): Promise<string> {
+  private async processOrder(
+    message: string,
+    tenantId: string,
+    conversation?: any,
+  ): Promise<string> {
     try {
       // Extrair quantidade e produto da mensagem
       const orderInfo = this.extractOrderInfo(message);
@@ -191,7 +235,12 @@ export class WhatsappService {
     }
   }
 
-  private async createOrderWithProduct(produto: any, quantity: number, tenantId: string): Promise<string> {
+  private async createOrderWithProduct(
+    produto: any,
+    quantity: number,
+    tenantId: string,
+    conversation?: any,
+  ): Promise<string> {
     // Validar estoque
     if (produto.available_stock < quantity) {
       return `❌ Estoque insuficiente!\n\n` +
@@ -217,14 +266,24 @@ export class WhatsappService {
 
       const total = Number(produto.price) * quantity;
       
+      // Salvar pedido_id no contexto da conversa
+      if (conversation) {
+        await this.conversationService.setPedidoId(conversation.id, pedido.id);
+      }
+      
       return `✅ *PEDIDO CRIADO COM SUCESSO!*\n\n` +
              `📦 *${produto.name}*\n` +
              `Quantidade: ${quantity} unidades\n` +
              `Preço unitário: R$ ${Number(produto.price).toFixed(2).replace('.', ',')}\n` +
              `Total: R$ ${total.toFixed(2).replace('.', ',')}\n\n` +
-             `🆔 Código do pedido: *${pedido.order_no}*\n` +
-             `📊 Status: ${this.formatStatus(pedido.status)}\n\n` +
-             `💬 Aguarde a confirmação do pagamento!`;
+             `🆔 Código do pedido: *${pedido.order_no}*\n\n` +
+             `💳 *ESCOLHA A FORMA DE PAGAMENTO:*\n\n` +
+             `1️⃣ *PIX* - Desconto de 5% (R$ ${(total * 0.95).toFixed(2).replace('.', ',')})\n` +
+             `2️⃣ *Cartão de Crédito*\n` +
+             `3️⃣ *Cartão de Débito*\n` +
+             `4️⃣ *Dinheiro* (retirada)\n\n` +
+             `💬 Digite o número ou o nome do método de pagamento.\n` +
+             `Exemplo: "1", "pix", "cartão de crédito"`;
     } catch (error) {
       this.logger.error(`Error creating order: ${error}`);
       
@@ -802,6 +861,131 @@ export class WhatsappService {
   private getRespostaPadrao(): string {
     return 'Desculpe, não entendi sua mensagem. 😅\n\n' +
            '💬 Digite *ajuda* para ver como posso ajudar você!';
+  }
+
+  /**
+   * Verifica se a mensagem é uma seleção de método de pagamento
+   */
+  private isPaymentMethodSelection(message: string): boolean {
+    const lowerMessage = message.toLowerCase().trim();
+    
+    // Verificar números (1, 2, 3, 4)
+    if (/^[1-4]$/.test(lowerMessage)) {
+      return true;
+    }
+
+    // Verificar palavras-chave de métodos de pagamento
+    const metodos = [
+      'pix', 'cartão', 'cartao', 'credito', 'crédito', 'debito', 'débito',
+      'dinheiro', 'dinheiro', 'boleto'
+    ];
+
+    return metodos.some(metodo => lowerMessage.includes(metodo));
+  }
+
+  /**
+   * Processa a seleção de método de pagamento
+   */
+  private async processPaymentSelection(
+    message: string,
+    tenantId: string,
+    conversation?: any,
+  ): Promise<string> {
+    try {
+      const lowerMessage = message.toLowerCase().trim();
+      
+      // Extrair método de pagamento
+      let metodo: MetodoPagamento | null = null;
+
+      // Por número
+      if (lowerMessage === '1' || lowerMessage.includes('pix')) {
+        metodo = MetodoPagamento.PIX;
+      } else if (lowerMessage === '2' || lowerMessage.includes('credito') || lowerMessage.includes('crédito')) {
+        metodo = MetodoPagamento.CREDITO;
+      } else if (lowerMessage === '3' || lowerMessage.includes('debito') || lowerMessage.includes('débito')) {
+        metodo = MetodoPagamento.DEBITO;
+      } else if (lowerMessage === '4' || lowerMessage.includes('dinheiro')) {
+        metodo = MetodoPagamento.DINHEIRO;
+      } else if (lowerMessage.includes('boleto')) {
+        metodo = MetodoPagamento.BOLETO;
+      }
+
+      if (!metodo) {
+        return '❌ Método de pagamento não reconhecido.\n\n' +
+               '💬 Digite:\n' +
+               '*1* ou *PIX*\n' +
+               '*2* ou *Cartão de Crédito*\n' +
+               '*3* ou *Cartão de Débito*\n' +
+               '*4* ou *Dinheiro*';
+      }
+
+      // Buscar pedido_id do contexto da conversa
+      let pedidoId: string | null = null;
+
+      if (conversation?.pedido_id) {
+        pedidoId = conversation.pedido_id;
+      } else if (conversation?.context?.pedido_id) {
+        pedidoId = conversation.context.pedido_id;
+      } else {
+        // Fallback: buscar último pedido pendente (para compatibilidade)
+        const pedidosPendentes = await this.ordersService.findAll(tenantId);
+        const pedidoPendente = pedidosPendentes
+          .filter(p => p.status === PedidoStatus.PENDENTE_PAGAMENTO)
+          .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())[0];
+
+        if (!pedidoPendente) {
+          return '❌ Não encontrei um pedido pendente de pagamento.\n\n' +
+                 '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
+        }
+
+        pedidoId = pedidoPendente.id;
+      }
+
+      if (!pedidoId) {
+        return '❌ Não encontrei um pedido pendente de pagamento.\n\n' +
+               '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
+      }
+
+      // Buscar pedido
+      const pedidoPendente = await this.ordersService.findOne(pedidoId, tenantId);
+
+      if (!pedidoPendente || pedidoPendente.status !== PedidoStatus.PENDENTE_PAGAMENTO) {
+        return '❌ Pedido não está pendente de pagamento.\n\n' +
+               '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
+      }
+
+      // Criar pagamento
+      const createPaymentDto: CreatePaymentDto = {
+        pedido_id: pedidoPendente.id,
+        method: metodo,
+        amount: pedidoPendente.total_amount,
+      };
+
+      const paymentResult = await this.paymentsService.createPayment(tenantId, createPaymentDto);
+
+      // Retornar mensagem com QR Code se for Pix
+      if (metodo === MetodoPagamento.PIX && paymentResult.qr_code) {
+        // Em produção, enviar imagem do QR Code via WhatsApp
+        // Por enquanto, retornar mensagem com instruções
+        return paymentResult.message || 'Pagamento Pix processado';
+      }
+
+      return paymentResult.message || 'Pagamento processado com sucesso!';
+    } catch (error) {
+      this.logger.error(`Error processing payment selection: ${error}`);
+      
+      if (error instanceof NotFoundException) {
+        return '❌ Pedido não encontrado.\n\n' +
+               '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
+      }
+      
+      if (error instanceof BadRequestException) {
+        return `❌ ${error.message}`;
+      }
+
+      return '❌ Ocorreu um erro ao processar o pagamento.\n\n' +
+             '💬 Tente novamente ou digite *"ajuda"* para ver os comandos.';
+    }
   }
 
   async sendMessage(to: string, message: string): Promise<void> {
