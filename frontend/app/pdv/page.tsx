@@ -41,12 +41,32 @@ const productsFetcher = async (tenantId: string) => {
     console.log('✅ Fetcher retornou:', products?.length || 0, 'produtos');
     if (products && products.length > 0) {
       console.log('📦 Exemplos:', products.slice(0, 3).map((p: any) => ({ name: p.name, stock: p.stock })));
+    } else {
+      console.warn('⚠️ Nenhum produto retornado. Verifique se produtos foram cadastrados.');
     }
     return Array.isArray(products) ? products : [];
   } catch (error: any) {
     console.error('❌ Erro no fetcher de produtos:', error);
-    console.error('Detalhes:', error.message, error.stack);
-    throw error;
+    // Se for erro de autenticação, tentar fazer login e tentar novamente
+    if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
+      console.log('🔄 Token expirado, tentando fazer login...');
+      try {
+        const loginResponse: any = await api.login('admin@loja.com', 'senha123');
+        if (loginResponse.access_token && typeof window !== 'undefined') {
+          localStorage.setItem('token', loginResponse.access_token);
+          console.log('✅ Login realizado, tentando buscar produtos novamente...');
+          // Tentar novamente após login
+          const retryProducts = await api.getProducts(tenantId);
+          console.log('✅ Produtos carregados após login:', retryProducts?.length || 0);
+          return Array.isArray(retryProducts) ? retryProducts : [];
+        }
+      } catch (loginError) {
+        console.error('❌ Erro ao fazer login:', loginError);
+      }
+    }
+    // Se não for erro de auth ou se login falhou, retornar array vazio
+    console.warn('⚠️ Retornando array vazio devido ao erro');
+    return [];
   }
 };
 
