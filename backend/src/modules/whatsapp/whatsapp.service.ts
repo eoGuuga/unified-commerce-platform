@@ -123,31 +123,39 @@ export class WhatsappService {
     try {
       // Extrair palavras-chave da mensagem (remover "preço", "valor", "quanto custa")
       const palavras = message.toLowerCase()
-        .replace(/preco|preço|valor|quanto|custa|de|o|a|os|as/gi, '')
+        .replace(/preco|preço|valor|quanto|custa|de|o|a|os|as|do|da|dos|das/gi, '')
         .trim()
         .split(/\s+/)
         .filter(p => p.length > 2);
 
       let produtoEncontrado = null;
+      const produtos = await this.productsService.findAll(tenantId);
 
       // Se tem palavras-chave, buscar produto específico
       if (palavras.length > 0) {
-        const query = palavras.join(' ');
-        const produtosBuscados = await this.productsService.search(tenantId, query);
-        
-        if (produtosBuscados.length > 0) {
-          // Buscar estoque para o primeiro resultado
-          const produtos = await this.productsService.findAll(tenantId);
-          produtoEncontrado = produtos.find(p => p.id === produtosBuscados[0].id);
-        }
-      }
+        // Primeiro: buscar por nome exato ou parcial
+        produtoEncontrado = produtos.find(p => {
+          const nomeLower = p.name.toLowerCase();
+          return palavras.every(palavra => nomeLower.includes(palavra)) ||
+                 nomeLower.includes(palavras.join(' '));
+        });
 
-      // Se não encontrou, buscar em todos os produtos
-      if (!produtoEncontrado) {
-        const produtos = await this.productsService.findAll(tenantId);
-        produtoEncontrado = produtos.find(p => 
-          palavras.some(palavra => p.name.toLowerCase().includes(palavra))
-        );
+        // Se não encontrou, usar busca do service
+        if (!produtoEncontrado) {
+          const query = palavras.join(' ');
+          const produtosBuscados = await this.productsService.search(tenantId, query);
+          
+          if (produtosBuscados.length > 0) {
+            produtoEncontrado = produtos.find(p => p.id === produtosBuscados[0].id);
+          }
+        }
+
+        // Se ainda não encontrou, buscar por qualquer palavra
+        if (!produtoEncontrado) {
+          produtoEncontrado = produtos.find(p => 
+            palavras.some(palavra => p.name.toLowerCase().includes(palavra))
+          );
+        }
       }
 
       if (produtoEncontrado) {
@@ -158,7 +166,6 @@ export class WhatsappService {
       }
 
       // Se não encontrou produto específico, mostrar alguns produtos
-      const produtos = await this.productsService.findAll(tenantId);
       if (produtos.length > 0) {
         let mensagem = '💰 *PREÇOS*\n\n';
         produtos.slice(0, 5).forEach(produto => {
@@ -179,31 +186,39 @@ export class WhatsappService {
     try {
       // Extrair palavras-chave da mensagem (remover "estoque", "tem", "disponivel")
       const palavras = message.toLowerCase()
-        .replace(/estoque|tem|disponivel|disponível|de|o|a|os|as/gi, '')
+        .replace(/estoque|tem|disponivel|disponível|de|o|a|os|as|do|da|dos|das/gi, '')
         .trim()
         .split(/\s+/)
         .filter(p => p.length > 2);
 
       let produtoEncontrado = null;
+      const produtos = await this.productsService.findAll(tenantId);
 
       // Se tem palavras-chave, buscar produto específico
       if (palavras.length > 0) {
-        const query = palavras.join(' ');
-        const produtosBuscados = await this.productsService.search(tenantId, query);
-        
-        if (produtosBuscados.length > 0) {
-          // Buscar estoque para o primeiro resultado
-          const produtos = await this.productsService.findAll(tenantId);
-          produtoEncontrado = produtos.find(p => p.id === produtosBuscados[0].id);
-        }
-      }
+        // Primeiro: buscar por nome exato ou parcial
+        produtoEncontrado = produtos.find(p => {
+          const nomeLower = p.name.toLowerCase();
+          return palavras.every(palavra => nomeLower.includes(palavra)) ||
+                 nomeLower.includes(palavras.join(' '));
+        });
 
-      // Se não encontrou, buscar em todos os produtos
-      if (!produtoEncontrado) {
-        const produtos = await this.productsService.findAll(tenantId);
-        produtoEncontrado = produtos.find(p => 
-          palavras.length > 0 && palavras.some(palavra => p.name.toLowerCase().includes(palavra))
-        );
+        // Se não encontrou, usar busca do service
+        if (!produtoEncontrado) {
+          const query = palavras.join(' ');
+          const produtosBuscados = await this.productsService.search(tenantId, query);
+          
+          if (produtosBuscados.length > 0) {
+            produtoEncontrado = produtos.find(p => p.id === produtosBuscados[0].id);
+          }
+        }
+
+        // Se ainda não encontrou, buscar por qualquer palavra
+        if (!produtoEncontrado) {
+          produtoEncontrado = produtos.find(p => 
+            palavras.some(palavra => p.name.toLowerCase().includes(palavra))
+          );
+        }
       }
 
       if (produtoEncontrado) {
@@ -217,7 +232,6 @@ export class WhatsappService {
       }
 
       // Se não encontrou produto específico, mostrar produtos com estoque baixo
-      const produtos = await this.productsService.findAll(tenantId);
       const produtosBaixoEstoque = produtos.filter(p => p.available_stock > 0 && p.available_stock <= (p.min_stock || 5));
       
       if (produtosBaixoEstoque.length > 0) {
