@@ -194,7 +194,7 @@ export class WhatsappService {
           const produto = resultadoBusca.sugestoes[0];
           this.logger.debug(`Using single suggestion: ${produto.name}`);
           // Continuar com o produto sugerido
-          return await this.createOrderWithProduct(produto, quantity, tenantId);
+          return await this.createOrderWithProduct(produto, quantity, tenantId, conversation);
         } else {
           // Múltiplas sugestões - perguntar qual
           let mensagem = `❓ Não encontrei exatamente "${productName}", mas você quis dizer:\n\n`;
@@ -227,7 +227,7 @@ export class WhatsappService {
 
       const produto = resultadoBusca.produto;
 
-      return await this.createOrderWithProduct(produto, quantity, tenantId);
+      return await this.createOrderWithProduct(produto, quantity, tenantId, conversation);
     } catch (error) {
       this.logger.error(`Error processing order: ${error}`);
       return '❌ Ocorreu um erro ao processar seu pedido.\n\n' +
