@@ -12,15 +12,21 @@ export class UsageLogService {
 
   async logUsage(
     tenantId: string,
-    service: string,
-    action: string,
+    serviceType: string,
+    quantity: number,
+    costEstimated = 0,
     metadata?: Record<string, any>,
+    referenceId?: string,
+    referenceType?: string,
   ): Promise<UsageLog> {
     const log = this.usageLogRepository.create({
       tenant_id: tenantId,
-      service,
-      action,
+      service_type: serviceType,
+      quantity,
+      cost_estimated: costEstimated,
       metadata: metadata || {},
+      reference_id: referenceId,
+      reference_type: referenceType,
     });
 
     return this.usageLogRepository.save(log);
@@ -36,11 +42,11 @@ export class UsageLogService {
 
   async getUsageByService(
     tenantId: string,
-    service: string,
+    serviceType: string,
     limit = 100,
   ): Promise<UsageLog[]> {
     return this.usageLogRepository.find({
-      where: { tenant_id: tenantId, service },
+      where: { tenant_id: tenantId, service_type: serviceType },
       order: { created_at: 'DESC' },
       take: limit,
     });
