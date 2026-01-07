@@ -15,7 +15,9 @@
     "migration:generate": "typeorm migration:generate",
     "migration:run": "typeorm migration:run",
     "migration:revert": "typeorm migration:revert",
-    "seed": "ts-node src/database/seeds/run-seeds.ts"
+    "seed": "ts-node src/database/seeds/run-seeds.ts",
+    "test:acid": "ts-node ../scripts/test-acid-transactions.ts",
+    "seed:mae": "ts-node ../scripts/seed-produtos-mae.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
