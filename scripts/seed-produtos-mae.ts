@@ -9,7 +9,7 @@
  * Execute: npx ts-node scripts/seed-produtos-mae.ts
  */
 
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { config } from 'dotenv';
 import * as path from 'path';
 

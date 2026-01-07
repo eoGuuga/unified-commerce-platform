@@ -9,7 +9,7 @@
  * Execute: npx ts-node scripts/test-acid-transactions.ts
  */
 
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { config } from 'dotenv';
 import * as path from 'path';
 
@@ -89,7 +89,7 @@ async function testACIDTransactions() {
     const pedidoRepo = dataSource.getRepository(Pedido);
     const itensRepo = dataSource.getRepository(ItemPedido);
 
-    await dataSource.transaction(async (manager) => {
+    await dataSource.transaction(async (manager: EntityManager) => {
       // FOR UPDATE lock
       const estoqueLocked = await manager
         .createQueryBuilder(MovimentacaoEstoque, 'e')
@@ -158,7 +158,7 @@ async function testACIDTransactions() {
     // TESTE 3: Tentar overselling (deve falhar)
     console.log('🚫 TESTE 3: Tentando overselling (deve falhar)...');
     try {
-      await dataSource.transaction(async (manager) => {
+      await dataSource.transaction(async (manager: EntityManager) => {
         const estoqueLocked = await manager
           .createQueryBuilder(MovimentacaoEstoque, 'e')
           .where('e.tenant_id = :tenantId', { tenantId: TENANT_ID })
