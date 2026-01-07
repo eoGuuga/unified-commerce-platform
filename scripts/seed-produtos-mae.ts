@@ -18,18 +18,21 @@ config({ path: path.join(__dirname, '../backend/.env') });
 
 // Importar entities
 import { Tenant } from '../backend/src/database/entities/Tenant.entity';
+import { Usuario } from '../backend/src/database/entities/Usuario.entity';
 import { Categoria } from '../backend/src/database/entities/Categoria.entity';
 import { Produto } from '../backend/src/database/entities/Produto.entity';
 import { MovimentacaoEstoque } from '../backend/src/database/entities/MovimentacaoEstoque.entity';
+import { Pedido } from '../backend/src/database/entities/Pedido.entity';
+import { ItemPedido } from '../backend/src/database/entities/ItemPedido.entity';
 
 const TENANT_ID = '00000000-0000-0000-0000-000000000000';
 
-// Produtos típicos de confeitaria artesanal
+  // Produtos típicos de confeitaria artesanal
 const PRODUTOS = [
   // BOLOS
   {
     name: 'Bolo de Chocolate',
-    price: '45.00',
+    price: 45.00,
     description: 'Bolo de chocolate caseiro, 1kg',
     unit: 'unidade',
     categoria: 'Bolos',
@@ -38,7 +41,7 @@ const PRODUTOS = [
   },
   {
     name: 'Bolo de Cenoura',
-    price: '40.00',
+    price: 40.00,
     description: 'Bolo de cenoura com cobertura de chocolate, 1kg',
     unit: 'unidade',
     categoria: 'Bolos',
@@ -47,7 +50,7 @@ const PRODUTOS = [
   },
   {
     name: 'Bolo Personalizado',
-    price: '80.00',
+    price: 80.00,
     description: 'Bolo personalizado (encomenda)',
     unit: 'unidade',
     categoria: 'Bolos',
@@ -58,7 +61,7 @@ const PRODUTOS = [
   // DOCES
   {
     name: 'Brigadeiro Gourmet',
-    price: '2.50',
+    price: 2.50,
     description: 'Brigadeiro feito com chocolate premium',
     unit: 'unidade',
     categoria: 'Doces',
@@ -67,7 +70,7 @@ const PRODUTOS = [
   },
   {
     name: 'Beijinho',
-    price: '2.50',
+    price: 2.50,
     description: 'Beijinho tradicional',
     unit: 'unidade',
     categoria: 'Doces',
@@ -76,7 +79,7 @@ const PRODUTOS = [
   },
   {
     name: 'Brigadeiro de Leite Ninho',
-    price: '3.00',
+    price: 3.00,
     description: 'Brigadeiro com leite ninho',
     unit: 'unidade',
     categoria: 'Doces',
@@ -85,7 +88,7 @@ const PRODUTOS = [
   },
   {
     name: 'Brigadeiro de Maracujá',
-    price: '3.00',
+    price: 3.00,
     description: 'Brigadeiro com recheio de maracujá',
     unit: 'unidade',
     categoria: 'Doces',
@@ -94,7 +97,7 @@ const PRODUTOS = [
   },
   {
     name: 'Cajuzinho',
-    price: '2.50',
+    price: 2.50,
     description: 'Cajuzinho tradicional',
     unit: 'unidade',
     categoria: 'Doces',
@@ -103,7 +106,7 @@ const PRODUTOS = [
   },
   {
     name: 'Brigadeiro Branco',
-    price: '2.50',
+    price: 2.50,
     description: 'Brigadeiro branco',
     unit: 'unidade',
     categoria: 'Doces',
@@ -114,7 +117,7 @@ const PRODUTOS = [
   // SALGADOS
   {
     name: 'Coxinha',
-    price: '4.50',
+    price: 4.50,
     description: 'Coxinha de frango',
     unit: 'unidade',
     categoria: 'Salgados',
@@ -123,7 +126,7 @@ const PRODUTOS = [
   },
   {
     name: 'Risole',
-    price: '4.00',
+    price: 4.00,
     description: 'Risole de presunto e queijo',
     unit: 'unidade',
     categoria: 'Salgados',
@@ -132,7 +135,7 @@ const PRODUTOS = [
   },
   {
     name: 'Pastel Assado',
-    price: '5.00',
+    price: 5.00,
     description: 'Pastel assado recheado',
     unit: 'unidade',
     categoria: 'Salgados',
@@ -141,7 +144,7 @@ const PRODUTOS = [
   },
   {
     name: 'Enroladinho de Salsicha',
-    price: '4.50',
+    price: 4.50,
     description: 'Enroladinho de salsicha',
     unit: 'unidade',
     categoria: 'Salgados',
@@ -157,7 +160,7 @@ async function seedProdutosMae() {
   const dataSource = new DataSource({
     type: 'postgres',
     url: process.env.DATABASE_URL,
-    entities: [Tenant, Categoria, Produto, MovimentacaoEstoque],
+    entities: [Tenant, Usuario, Categoria, Produto, MovimentacaoEstoque, Pedido, ItemPedido],
     synchronize: false,
     logging: false,
   });
@@ -198,7 +201,6 @@ async function seedProdutosMae() {
           tenant_id: TENANT_ID,
           name: nomeCategoria,
           description: `Categoria: ${nomeCategoria}`,
-          is_active: true,
         });
         categoria = await categoriaRepo.save(categoria);
         console.log(`✅ Categoria criada: ${nomeCategoria}`);
