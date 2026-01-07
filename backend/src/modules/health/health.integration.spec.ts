@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import * as request from 'supertest';
+import { ConfigModule } from '@nestjs/config';
+import request from 'supertest';
 import { HealthModule } from './health.module';
 import { databaseConfig } from '../../config/database.config';
 
@@ -11,6 +12,7 @@ describe('Health Integration Tests (e2e)', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
+        ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
         TypeOrmModule.forRootAsync(databaseConfig),
         HealthModule,
       ],

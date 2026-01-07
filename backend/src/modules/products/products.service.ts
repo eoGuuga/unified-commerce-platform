@@ -47,9 +47,11 @@ export class ProductsService {
     // Buscar todos os estoques de uma vez (evita N+1)
     const produtoIds = produtos.map((p) => p.id);
     const estoques = produtoIds.length > 0
-      ? await this.estoqueRepository.find({
-          where: { tenant_id: tenantId, produto_id: produtoIds as any },
-        })
+      ? await this.estoqueRepository
+          .createQueryBuilder('estoque')
+          .where('estoque.tenant_id = :tenantId', { tenantId })
+          .andWhere('estoque.produto_id IN (:...produtoIds)', { produtoIds })
+          .getMany()
       : [];
 
     // Criar mapa de estoques por produto_id

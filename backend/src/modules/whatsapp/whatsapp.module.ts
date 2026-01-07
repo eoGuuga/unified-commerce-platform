@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappController } from './whatsapp.controller';
 import { WhatsappService } from './whatsapp.service';
@@ -14,11 +14,11 @@ import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity'
   imports: [
     TypeOrmModule.forFeature([WhatsappConversation, WhatsappMessage]),
     ProductsModule,
-    OrdersModule,
-    PaymentsModule,
+    forwardRef(() => OrdersModule), // forwardRef para evitar dependência circular
+    forwardRef(() => PaymentsModule), // forwardRef para evitar dependência circular
   ],
   controllers: [WhatsappController],
   providers: [WhatsappService, OpenAIService, ConversationService],
-  exports: [WhatsappService],
+  exports: [WhatsappService, ConversationService],
 })
 export class WhatsappModule {}

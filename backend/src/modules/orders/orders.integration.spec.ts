@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import * as request from 'supertest';
+import request from 'supertest';
 import { OrdersModule } from './orders.module';
 import { ProductsModule } from '../products/products.module';
 import { AuthModule } from '../auth/auth.module';

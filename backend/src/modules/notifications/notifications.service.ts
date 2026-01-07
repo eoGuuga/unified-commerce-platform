@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappConversation } from '../../database/entities/WhatsappConversation.entity';
+import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity';
 import { Pedido, PedidoStatus } from '../../database/entities/Pedido.entity';
 import { Pagamento, PagamentoStatus } from '../../database/entities/Pagamento.entity';
 import { ConversationService } from '../whatsapp/services/conversation.service';
@@ -20,6 +21,9 @@ export class NotificationsService {
   constructor(
     @InjectRepository(WhatsappConversation)
     private conversationRepository: Repository<WhatsappConversation>,
+    @InjectRepository(WhatsappMessage)
+    private messageRepository: Repository<WhatsappMessage>,
+    @Inject(forwardRef(() => ConversationService))
     private conversationService: ConversationService,
   ) {}
 
@@ -49,11 +53,13 @@ export class NotificationsService {
     const message = this.generatePaymentConfirmedMessage(pedido, pagamento);
 
     // Salvar mensagem na conversa
-    await this.conversationService.saveMessage(
-      conversation.id,
-      'outbound',
-      message,
-    );
+    const whatsappMessage = this.messageRepository.create({
+      conversation_id: conversation.id,
+      direction: 'outbound',
+      body: message,
+      message_type: 'text',
+    });
+    await this.messageRepository.save(whatsappMessage);
 
     // Enviar via WhatsApp (mock para desenvolvimento)
     await this.sendWhatsAppMessage({
@@ -102,11 +108,13 @@ export class NotificationsService {
     const message = this.generateOrderStatusChangeMessage(pedido, oldStatus, newStatus);
 
     // Salvar mensagem na conversa
-    await this.conversationService.saveMessage(
-      conversation.id,
-      'outbound',
-      message,
-    );
+    const whatsappMessage = this.messageRepository.create({
+      conversation_id: conversation.id,
+      direction: 'outbound',
+      body: message,
+      message_type: 'text',
+    });
+    await this.messageRepository.save(whatsappMessage);
 
     // Enviar via WhatsApp
     await this.sendWhatsAppMessage({
@@ -154,7 +162,13 @@ export class NotificationsService {
       message = this.generatePaymentReminderMessage(pedido, pagamento);
     }
 
-    await this.conversationService.saveMessage(conversation.id, 'outbound', message);
+    const whatsappMessage = this.messageRepository.create({
+      conversation_id: conversation.id,
+      direction: 'outbound',
+      body: message,
+      message_type: 'text',
+    });
+    await this.messageRepository.save(whatsappMessage);
 
     await this.sendWhatsAppMessage({
       to: conversation.customer_phone,
