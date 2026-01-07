@@ -62,13 +62,14 @@ export class PaymentsService {
       );
     }
 
-    // Validar valor
-    if (createPaymentDto.amount !== pedido.total_amount) {
+    // Validar valor (converter para número para garantir comparação correta)
+    const totalAmount = Number(pedido.total_amount);
+    if (createPaymentDto.amount !== totalAmount) {
       // Permitir pequena diferença de arredondamento (0.01)
-      const diff = Math.abs(createPaymentDto.amount - pedido.total_amount);
+      const diff = Math.abs(createPaymentDto.amount - totalAmount);
       if (diff > 0.01) {
         throw new BadRequestException(
-          `Valor do pagamento (R$ ${createPaymentDto.amount.toFixed(2)}) não confere com o total do pedido (R$ ${pedido.total_amount.toFixed(2)})`,
+          `Valor do pagamento (R$ ${createPaymentDto.amount.toFixed(2)}) não confere com o total do pedido (R$ ${totalAmount.toFixed(2)})`,
         );
       }
     }
@@ -177,7 +178,7 @@ export class PaymentsService {
   private generatePixData(pedido: Pedido, pagamento: Pagamento): string {
     // Mock: Em produção, usar API real (GerenciaNet, Stripe, etc)
     const chavePix = this.configService.get<string>('PIX_KEY') || 'mock-chave-pix-123456789';
-    const valor = pagamento.amount.toFixed(2);
+    const valor = Number(pagamento.amount).toFixed(2);
     const descricao = `Pedido ${pedido.order_no}`;
     const merchantName = this.configService.get<string>('MERCHANT_NAME') || 'Loja';
 
@@ -211,12 +212,14 @@ export class PaymentsService {
     pagamento: Pagamento,
     pixData: string,
   ): string {
-    const desconto = pedido.total_amount - pagamento.amount;
+    const totalAmount = Number(pedido.total_amount);
+    const paymentAmount = Number(pagamento.amount);
+    const desconto = totalAmount - paymentAmount;
     const mensagem = `💳 *PAGAMENTO PIX*\n\n` +
       `📦 Pedido: *${pedido.order_no}*\n` +
-      `💰 Valor original: R$ ${pedido.total_amount.toFixed(2).replace('.', ',')}\n` +
+      `💰 Valor original: R$ ${totalAmount.toFixed(2).replace('.', ',')}\n` +
       (desconto > 0 ? `🎁 Desconto Pix (5%): R$ ${desconto.toFixed(2).replace('.', ',')}\n` : '') +
-      `💵 *Valor a pagar: R$ ${pagamento.amount.toFixed(2).replace('.', ',')}*\n\n` +
+      `💵 *Valor a pagar: R$ ${paymentAmount.toFixed(2).replace('.', ',')}*\n\n` +
       `📱 *Escaneie o QR Code acima ou copie a chave Pix:*\n\n` +
       `\`\`\`${pixData}\`\`\`\n\n` +
       `⏰ Após o pagamento, seu pedido será confirmado automaticamente!`;
@@ -245,7 +248,7 @@ export class PaymentsService {
       pagamento,
       message: `💵 *PAGAMENTO EM DINHEIRO*\n\n` +
         `📦 Pedido: *${pedido.order_no}*\n` +
-        `💰 Valor: R$ ${pagamento.amount.toFixed(2).replace('.', ',')}\n\n` +
+        `💰 Valor: R$ ${Number(pagamento.amount).toFixed(2).replace('.', ',')}\n\n` +
         `⏳ Aguarde a confirmação do pagamento pela loja.\n` +
         `Você receberá uma notificação quando o pagamento for confirmado.`,
     };
@@ -282,7 +285,7 @@ export class PaymentsService {
         pagamento,
         message: `💳 *PAGAMENTO COM CARTÃO*\n\n` +
           `📦 Pedido: *${pedido.order_no}*\n` +
-          `💰 Valor: R$ ${pagamento.amount.toFixed(2).replace('.', ',')}\n` +
+          `💰 Valor: R$ ${Number(pagamento.amount).toFixed(2).replace('.', ',')}\n` +
           `💳 Método: ${pagamento.method === MetodoPagamento.CREDITO ? 'Crédito' : 'Débito'}\n\n` +
           `⏳ Processando pagamento...\n` +
           `Você receberá uma notificação quando o pagamento for confirmado.`,
@@ -317,7 +320,7 @@ export class PaymentsService {
       pagamento,
       message: `📄 *BOLETO BANCÁRIO*\n\n` +
         `📦 Pedido: *${pedido.order_no}*\n` +
-        `💰 Valor: R$ ${pagamento.amount.toFixed(2).replace('.', ',')}\n\n` +
+        `💰 Valor: R$ ${Number(pagamento.amount).toFixed(2).replace('.', ',')}\n\n` +
         `📄 Código de barras:\n` +
         `\`\`\`${boletoBarcode}\`\`\`\n\n` +
         `🔗 Acesse o link para imprimir o boleto:\n` +

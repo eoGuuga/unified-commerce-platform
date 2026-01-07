@@ -200,7 +200,7 @@ export class NotificationsService {
     return `✅ *PAGAMENTO CONFIRMADO!*\n\n` +
       `📦 Pedido: *${pedido.order_no}*\n` +
       `💳 Método: ${metodoPagamento}\n` +
-      `💰 Valor: R$ ${pagamento.amount.toFixed(2).replace('.', ',')}\n\n` +
+      `💰 Valor: R$ ${Number(pagamento.amount).toFixed(2).replace('.', ',')}\n\n` +
       `🎉 Seu pedido foi confirmado e está sendo preparado!\n\n` +
       `Você receberá atualizações sobre o status do seu pedido.`;
   }
@@ -273,7 +273,7 @@ export class NotificationsService {
   ): string {
     return `⏰ *LEMBRETE: PAGAMENTO PENDENTE*\n\n` +
       `📦 Pedido: *${pedido.order_no}*\n` +
-      `💵 Valor: R$ ${pagamento.amount.toFixed(2).replace('.', ',')}\n\n` +
+      `💵 Valor: R$ ${Number(pagamento.amount).toFixed(2).replace('.', ',')}\n\n` +
       `📱 *Escaneie o QR Code acima ou copie a chave Pix:*\n\n` +
       `\`\`\`${pagamento.metadata?.pix_copy_paste || ''}\`\`\`\n\n` +
       `⏰ Após o pagamento, seu pedido será confirmado automaticamente!`;
@@ -296,7 +296,7 @@ export class NotificationsService {
 
     return `⏰ *LEMBRETE: PAGAMENTO PENDENTE*\n\n` +
       `📦 Pedido: *${pedido.order_no}*\n` +
-      `💵 Valor: R$ ${pagamento.amount.toFixed(2).replace('.', ',')}\n` +
+      `💵 Valor: R$ ${Number(pagamento.amount).toFixed(2).replace('.', ',')}\n` +
       `💳 Método: ${metodoPagamento}\n\n` +
       `⏰ Aguardando confirmação do pagamento...`;
   }
