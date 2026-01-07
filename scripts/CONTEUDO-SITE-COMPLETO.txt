@@ -1,0 +1,24 @@
+===========================================
+COLE AQUI TODO O CONTEÚDO DO SITE
+===========================================
+
+Cole abaixo todo o texto/conteúdo que você copiar do site:
+https://loucasporbrigadeiro.my.canva.site/loucas-por-brigadeiro
+
+Pode colar tudo de uma vez, não precisa organizar.
+Eu vou processar e extrair automaticamente:
+- Nomes dos produtos
+- Preços
+- Descrições
+- Categorias
+
+===========================================
+INÍCIO DO CONTEÚDO
+===========================================
+
+
+
+
+===========================================
+FIM DO CONTEÚDO
+===========================================
