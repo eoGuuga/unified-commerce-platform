@@ -16,8 +16,8 @@
     "migration:run": "typeorm migration:run",
     "migration:revert": "typeorm migration:revert",
     "seed": "ts-node src/database/seeds/run-seeds.ts",
-    "test:acid": "cross-env NODE_PATH=./node_modules ts-node --project ../scripts/tsconfig.json ../scripts/test-acid-transactions.ts",
-    "seed:mae": "cross-env NODE_PATH=./node_modules ts-node --project ../scripts/tsconfig.json ../scripts/seed-produtos-mae.ts"
+    "test:acid": "node -r ts-node/register -r dotenv/config ../scripts/test-acid-transactions.ts dotenv_config_path=.env",
+    "seed:mae": "node -r ts-node/register -r dotenv/config ../scripts/seed-produtos-mae.ts dotenv_config_path=.env"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
