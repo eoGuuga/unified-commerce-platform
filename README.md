@@ -21,15 +21,30 @@ Resultado: Vende 15 brigadeiros mas só tinha 10 em estoque.
 
 ## Documentacao Completa
 
-**DOCUMENTACAO EM**: [`docs/`](docs/)
+**DOCUMENTACAO EM**: [`docs/`](docs/) - **24 documentos organizados e 100% completos**
 
 ### Principais Arquivos:
 
-- **`docs/01-VISION.md`** - Visao e objetivos
-- **`docs/03-ARCHITECTURE.md`** - Arquitetura 4 camadas
-- **`docs/04-DATABASE.md`** - Schema SQL completo
-- **`docs/06-WORKFLOWS.md`** - Fluxos de venda
-- **`docs/10-SETUP.md`** - Setup inicial
+**Documentacao do Projeto:**
+- **`docs/01-projeto/01-VISION.md`** - Problema, solucao, objetivos
+- **`docs/01-projeto/02-PERSONAS.md`** - Perfis de usuarios
+- **`docs/01-projeto/09-BUSINESS-MODEL.md`** - Modelo de negocio e precificacao
+
+**Documentacao Tecnica:**
+- **`docs/02-tecnico/03-ARCHITECTURE.md`** - Arquitetura 4 camadas
+- **`docs/02-tecnico/04-DATABASE.md`** - Schema SQL completo
+- **`docs/02-tecnico/06-WORKFLOWS.md`** - Fluxos de venda
+- **`docs/02-tecnico/07-SECURITY.md`** - Seguranca e compliance
+- **`docs/02-tecnico/10-SETUP.md`** - Setup inicial
+
+**Planos de Implementacao:**
+- **`docs/03-implementacao/PLANO_IMPLEMENTACAO.md`** - Plano geral
+- **`docs/03-implementacao/PLANO_COMPLETO_PARTE_1.md`** até **PARTE_8.md** - Guias passo a passo
+
+**Documentacao Comercial:**
+- **`docs/04-comercial/DOCUMENTACAO_COMPLETA_PARA_VENDAS.md`** - Estrutura para vendas
+
+📚 **Ver [`docs/README.md`](docs/README.md) para estrutura completa**
 
 ---
 
