@@ -143,9 +143,10 @@ export default function PDVPage() {
   );
 
   // SWR para pedidos (estatísticas) - só buscar se montado e com token
+  const ordersKey = mounted ? `orders-${TENANT_ID}` : null;
   const { data: orders = [] } = useSWR<Order[]>(
-    mounted ? `orders-${TENANT_ID}` : null,
-    ordersFetcher,
+    ordersKey,
+    () => ordersFetcher(TENANT_ID), // Passar TENANT_ID diretamente, não a key
     {
       refreshInterval: 10000,
       revalidateOnFocus: false, // Desabilitado para evitar erros 401 constantes
