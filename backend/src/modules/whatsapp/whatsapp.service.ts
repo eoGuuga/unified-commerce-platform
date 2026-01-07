@@ -49,6 +49,14 @@ export class WhatsappService {
   private async generateResponse(message: string, tenantId: string): Promise<string> {
     const lowerMessage = message.toLowerCase().trim();
 
+    // IMPORTANTE: Verificar pedidos PRIMEIRO (antes de outras respostas)
+    // Comando: Fazer Pedido
+    if (lowerMessage.includes('quero') || lowerMessage.includes('preciso') || 
+        lowerMessage.includes('comprar') || lowerMessage.includes('pedir') ||
+        lowerMessage.includes('vou querer') || lowerMessage.includes('gostaria de')) {
+      return await this.processOrder(message, tenantId);
+    }
+
     // Comando: Cardápio / Menu
     if (lowerMessage.includes('cardapio') || lowerMessage.includes('menu') || lowerMessage.includes('produtos')) {
       return await this.getCardapio(tenantId);
@@ -80,13 +88,6 @@ export class WhatsappService {
       return this.getSaudacao();
     }
 
-    // Comando: Fazer Pedido
-    if (lowerMessage.includes('quero') || lowerMessage.includes('preciso') || 
-        lowerMessage.includes('comprar') || lowerMessage.includes('pedir') ||
-        lowerMessage.includes('vou querer')) {
-      return await this.processOrder(message, tenantId);
-    }
-
     // Resposta padrão
     return this.getRespostaPadrao();
   }
@@ -95,6 +96,8 @@ export class WhatsappService {
     try {
       // Extrair quantidade e produto da mensagem
       const orderInfo = this.extractOrderInfo(message);
+      
+      this.logger.debug(`Order extraction: quantity=${orderInfo.quantity}, productName="${orderInfo.productName}"`);
       
       if (!orderInfo.quantity || !orderInfo.productName) {
         return '❌ Não consegui entender seu pedido.\n\n' +
@@ -106,6 +109,8 @@ export class WhatsappService {
       // Buscar produto
       const produtos = await this.productsService.findAll(tenantId);
       const produto = this.findProductByName(produtos, orderInfo.productName);
+      
+      this.logger.debug(`Product search: found=${!!produto}, searched="${orderInfo.productName}"`);
 
       if (!produto) {
         return `❌ Não encontrei o produto "${orderInfo.productName}".\n\n` +
@@ -171,34 +176,33 @@ export class WhatsappService {
     const quantity = quantityMatch ? parseInt(quantityMatch[1]) : null;
 
     // Extrair nome do produto
-    // Estratégia: remover palavras de ação e números, manter o resto
-    let productName = lowerMessage
-      // Remover palavras de ação
-      .replace(/\b(quero|preciso|comprar|pedir|vou querer|gostaria de|desejo|vou comprar|preciso de)\b/gi, '')
-      // Remover números
-      .replace(/\d+/g, '')
-      // Remover unidades
-      .replace(/\b(unidades?|unidade|un|peças?|peça|pç|kg|kilo|gramas?|g)\b/gi, '')
-      // Remover artigos e preposições (mas manter se for parte do nome, ex: "Bolo de Chocolate")
-      .replace(/\b(de|do|da|dos|das)\b/gi, ' ')
-      // Remover artigos no início/fim
-      .replace(/^\s*(o|a|os|as|um|uma)\s+/gi, '')
-      .replace(/\s+(o|a|os|as|um|uma)\s*$/gi, '')
-      .trim()
-      // Limpar espaços múltiplos
-      .replace(/\s+/g, ' ');
-
-    // Se não sobrou nada útil, tentar buscar produto após número
-    if (!productName || productName.length < 3) {
-      if (quantityMatch) {
-        // Pegar tudo após o número
-        const afterNumber = lowerMessage.substring(quantityMatch.index! + quantityMatch[0].length);
-        productName = afterNumber
-          .replace(/\b(quero|preciso|comprar|pedir|vou querer|gostaria de|desejo|de|do|da|dos|das|o|a|os|as|unidades?|unidade|un|peças?|peça|pç)\b/gi, ' ')
-          .trim()
-          .replace(/\s+/g, ' ');
-      }
+    // Estratégia: pegar tudo após a quantidade e palavras de ação
+    let productName = lowerMessage;
+    
+    // Remover palavras de ação no início
+    productName = productName.replace(/^(quero|preciso|comprar|pedir|vou querer|gostaria de|desejo|vou comprar|preciso de)\s*/i, '');
+    
+    // Se tem número, pegar tudo após o número (incluindo espaços)
+    if (quantityMatch) {
+      const afterNumber = productName.substring(quantityMatch.index! + quantityMatch[0].length);
+      productName = afterNumber.trim();
     }
+    
+    // Limpar: remover unidades e artigos comuns, mas MANTER "de" quando faz parte do nome
+    // Primeiro, remover unidades
+    productName = productName.replace(/\b(unidades?|unidade|un|peças?|peça|pç|kg|kilo|gramas?|g)\b/gi, '');
+    
+    // Remover artigos no início/fim (mas não "de" no meio)
+    productName = productName.replace(/^\s*(o|a|os|as|um|uma)\s+/gi, '');
+    productName = productName.replace(/\s+(o|a|os|as|um|uma)\s*$/gi, '');
+    
+    // Limpar espaços múltiplos, mas manter espaços ao redor de "de"
+    productName = productName.trim().replace(/\s+/g, ' ');
+
+    // NÃO remover plural - deixar a busca lidar com isso
+    // A busca já trata singular/plural automaticamente
+
+    this.logger.debug(`ExtractOrderInfo: original="${message}", quantity=${quantity}, productName="${productName}"`);
 
     return {
       quantity,
@@ -219,11 +223,36 @@ export class WhatsappService {
       return palavras.every(palavra => nomeLower.includes(palavra));
     });
 
-    // Estratégia 2: Buscar por qualquer palavra (se não encontrou)
+    // Estratégia 2: Buscar por nome completo (query completa)
+    if (!produto) {
+      const queryCompleta = palavras.join(' ');
+      produto = produtos.find(p => 
+        p.name.toLowerCase().includes(queryCompleta)
+      );
+    }
+
+    // Estratégia 3: Buscar por qualquer palavra (se não encontrou)
     if (!produto) {
       produto = produtos.find(p => 
         palavras.some(palavra => p.name.toLowerCase().includes(palavra))
       );
+    }
+
+    // Estratégia 4: Buscar por singular/plural (brigadeiro/brigadeiros, bolo/bolos)
+    if (!produto && palavras.length === 1) {
+      const palavra = palavras[0];
+      // Tentar com 's' no final (plural)
+      const plural = palavra + 's';
+      // Tentar sem 's' (singular)
+      const singular = palavra.endsWith('s') && palavra.length > 4 ? palavra.slice(0, -1) : palavra;
+      
+      produto = produtos.find(p => {
+        const nomeLower = p.name.toLowerCase();
+        // Buscar por palavra singular ou plural (incluindo no início do nome)
+        return nomeLower.includes(singular) || nomeLower.includes(plural) || 
+               nomeLower.startsWith(singular + ' ') || nomeLower.startsWith(plural + ' ') ||
+               nomeLower.startsWith(singular) || nomeLower.startsWith(plural);
+      });
     }
 
     return produto || null;
