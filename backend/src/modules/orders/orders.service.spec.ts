@@ -9,6 +9,9 @@ import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque
 import { Produto } from '../../database/entities/Produto.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CanalVenda } from '../../database/entities/Pedido.entity';
+import { IdempotencyService } from '../common/services/idempotency.service';
+import { AuditLogService } from '../common/services/audit-log.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('OrdersService', () => {
   let service: OrdersService;
@@ -46,6 +49,22 @@ describe('OrdersService', () => {
     transaction: jest.fn(),
   };
 
+  const mockIdempotencyService = {
+    checkAndSet: jest.fn().mockResolvedValue(null),
+    complete: jest.fn().mockResolvedValue(undefined),
+    fail: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockAuditLogService = {
+    log: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockNotificationsService = {
+    notifyOrderStatusChange: jest.fn().mockResolvedValue(undefined),
+    notifyPaymentConfirmed: jest.fn().mockResolvedValue(undefined),
+    notifyPaymentPending: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -65,6 +84,18 @@ describe('OrdersService', () => {
         {
           provide: getDataSourceToken(),
           useValue: mockDataSource,
+        },
+        {
+          provide: IdempotencyService,
+          useValue: mockIdempotencyService,
+        },
+        {
+          provide: AuditLogService,
+          useValue: mockAuditLogService,
+        },
+        {
+          provide: NotificationsService,
+          useValue: mockNotificationsService,
         },
       ],
     }).compile();
