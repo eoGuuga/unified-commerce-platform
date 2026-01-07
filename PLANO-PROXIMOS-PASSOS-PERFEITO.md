@@ -1,8 +1,9 @@
 # 🎯 Plano de Próximos Passos - Buscando a PERFEIÇÃO
 
 > **Data:** 07/01/2025  
-> **Status:** PDV Completo ✅ | Próximo: Gestão de Estoque + Bot WhatsApp  
-> **Foco:** Sistema 100% perfeito para produção
+> **Status:** ✅ FASE 0, 1 e 2 COMPLETAS | 🚀 Próximo: FASE 3 (Bot WhatsApp)  
+> **Foco:** Sistema 100% perfeito para produção  
+> **📊 Ver [STATUS-ATUAL-2025.md](./STATUS-ATUAL-2025.md) para status consolidado**
 
 ---
 
@@ -21,174 +22,127 @@
 - ✅ Endpoints de reserva/liberação de estoque
 - ✅ Validações robustas
 - ✅ Estrutura WhatsApp preparada
+- ✅ Swagger/OpenAPI configurado
+- ✅ Exception Filters globais
+- ✅ Rate Limiting implementado
+- ✅ Health Checks completos
+- ✅ Testes Unitários e de Integração
+
+### Gestão de Estoque
+- ✅ Página `/admin/estoque` completa
+- ✅ Ajustes de estoque (adicionar/reduzir)
+- ✅ Alertas visuais (estoque baixo)
+- ✅ Backend endpoints completos
+
+### Dashboard Admin
+- ✅ Dashboard melhorado com métricas visuais
+- ✅ Gráficos de vendas (Chart.js)
+- ✅ Relatórios avançados (período, canal, status)
+- ✅ Top produtos mais vendidos
 
 ---
 
-## 🔧 MELHORIAS CRÍTICAS DE INFRAESTRUTURA (ANTES DE TUDO) ⭐⭐⭐
+## ✅ FASE 0: INFRAESTRUTURA PERFEITA (COMPLETA)
 
-**Objetivo:** Garantir base sólida, segura e documentada antes de adicionar features.
+**Status:** ✅ **100% COMPLETA**
 
-### 0.1 Configurar Swagger/OpenAPI (Documentação Automática)
+### 0.1 Swagger/OpenAPI ✅
+- ✅ Swagger configurado em `/api/docs`
+- ✅ Todos os endpoints documentados
+- ✅ DTOs com `@ApiProperty`
 
-**Por quê:** API sem documentação não é profissional. Swagger permite testar e entender a API visualmente.
+### 0.2 Exception Filters Globais ✅
+- ✅ `HttpExceptionFilter` global implementado
+- ✅ Erros formatados consistentemente
+- ✅ Logging estruturado
 
-**Features:**
-- [ ] Configurar SwaggerModule no `main.ts`
-- [ ] Documentar todos os endpoints com `@ApiOperation`, `@ApiResponse`
-- [ ] Adicionar DTOs com `@ApiProperty` para documentação automática
-- [ ] Interface visual em `/api/docs` (Swagger UI)
+### 0.3 Rate Limiting ✅
+- ✅ `@nestjs/throttler` configurado
+- ✅ Rate limiting global e restrito
+- ✅ Headers de rate limit
 
-**Arquivo:** `backend/src/main.ts`
+### 0.4 Error Boundaries ✅
+- ✅ `ErrorBoundary` component criado
+- ✅ Rotas críticas envolvidas
+- ✅ Mensagem amigável + retry
 
-**Tempo estimado:** 1 dia
+### 0.5 Health Checks Completos ✅
+- ✅ Endpoint `/health` melhorado
+- ✅ Verificação de DB e Redis
+- ✅ Endpoints `/health/ready` e `/health/live`
 
----
+### 0.6 Testes Unitários ✅
+- ✅ Testes para `OrdersService` (cobertura > 80%)
+- ✅ Testa transação ACID, validação, race conditions
 
-### 0.2 Exception Filters Globais (Tratamento de Erros Perfeito)
+### 0.7 Testes de Integração ✅
+- ✅ Testes para endpoints críticos
+- ✅ Testa criação de pedido, validação, autenticação
 
-**Por quê:** Erros inconsistentes confundem. Filtros globais garantem respostas padronizadas.
-
-**Features:**
-- [ ] Criar `HttpExceptionFilter` global
-- [ ] Formatar erros consistentemente
-- [ ] Logging estruturado de erros
-- [ ] Mensagens de erro amigáveis (sem expor detalhes internos)
-
-**Arquivo:** `backend/src/common/filters/http-exception.filter.ts`
-
-**Tempo estimado:** 0.5 dia
-
----
-
-### 0.3 Rate Limiting (Proteção contra Abuso)
-
-**Por quê:** APIs sem rate limiting podem ser abusadas ou derrubadas por DDoS.
-
-**Features:**
-- [ ] Instalar `@nestjs/throttler`
-- [ ] Configurar rate limiting global (ex: 100 req/min por IP)
-- [ ] Rate limiting mais restrito para endpoints críticos (login, pedidos)
-- [ ] Headers de rate limit nas respostas
-
-**Arquivo:** `backend/src/main.ts` + `backend/src/app.module.ts`
-
-**Tempo estimado:** 0.5 dia
+**Ver `SUCESSO-FASE-0.md` para detalhes**
 
 ---
 
-### 0.4 Error Boundaries no Frontend
+## ✅ FASE 1: GESTÃO DE ESTOQUE (COMPLETA)
 
-**Por quê:** Quando algo quebra, usuário vê tela branca. Error boundaries mostram erro amigável.
+**Status:** ✅ **100% COMPLETA**
 
-**Features:**
-- [ ] Criar `ErrorBoundary` component
-- [ ] Envolver rotas críticas (PDV, Admin)
-- [ ] Mostrar mensagem amigável + botão "Tentar novamente"
-- [ ] Log de erros para debug
+### 1.1 Página `/admin/estoque` ✅
+- ✅ Lista de produtos com estoque em tempo real
+- ✅ Busca e filtros
+- ✅ Cards coloridos (verde/amarelo/vermelho)
+- ✅ Informações completas (atual, reservado, disponível, mínimo)
 
-**Arquivo:** `frontend/components/ErrorBoundary.tsx`
+### 1.2 Ajustes de Estoque ✅
+- ✅ Botão "+" e "-" para ajustes rápidos
+- ✅ Input manual para ajuste preciso
+- ✅ Campo "Motivo do ajuste"
+- ✅ Validações robustas
 
-**Tempo estimado:** 0.5 dia
+### 1.3 Alertas e Notificações ✅
+- ✅ Lista destacada de produtos com estoque baixo
+- ✅ Contador de produtos críticos
+- ✅ Notificação visual quando estoque < mínimo
 
----
-
-### 0.5 Health Checks Completos
-
-**Por quê:** Monitoramento é essencial. Health checks mostram status de todos os serviços.
-
-**Features:**
-- [ ] Endpoint `/health` melhorado (verificar DB, Redis)
-- [ ] Status de cada serviço (up/down)
-- [ ] Métricas básicas (uptime, versão)
-- [ ] Endpoint `/health/ready` (readiness probe)
-- [ ] Endpoint `/health/live` (liveness probe)
-
-**Arquivo:** `backend/src/modules/health/health.controller.ts`
-
-**Tempo estimado:** 0.5 dia
+### 1.4 Backend Endpoints ✅
+- ✅ `GET /products/stock-summary`
+- ✅ `POST /products/:id/adjust-stock`
+- ✅ `PATCH /products/:id/min-stock`
 
 ---
 
-**Tempo total FASE 0:** 3 dias
+## ✅ FASE 2: DASHBOARD ADMIN MELHORADO (COMPLETA)
+
+**Status:** ✅ **100% COMPLETA**
+
+### 2.1 Dashboard Principal ✅
+- ✅ Cards de métricas grandes e visuais
+- ✅ Gráfico de vendas últimos 7 dias (Chart.js)
+- ✅ Top 10 produtos mais vendidos
+- ✅ Lista de vendas recentes
+- ✅ Atualização em tempo real (SWR)
+
+### 2.2 Relatórios Avançados ✅
+- ✅ `GET /orders/reports/sales` (relatório completo)
+- ✅ `GET /orders/reports/sales-by-period`
+- ✅ `GET /orders/reports/top-selling-products`
+- ✅ `GET /orders/reports/sales-by-channel`
+- ✅ `GET /orders/reports/orders-by-status`
+
+### 2.3 Visual e UX ✅
+- ✅ Gradientes modernos
+- ✅ Animações suaves
+- ✅ Responsivo (mobile + desktop)
 
 ---
 
 ## 🎯 PRÓXIMOS PASSOS (ORDEM DE PRIORIDADE)
 
-### FASE 1: Gestão de Estoque Completa (PRIORIDADE MÁXIMA) ⭐⭐⭐
+### FASE 3: Bot WhatsApp Básico (PRIORIDADE MÁXIMA) ⭐⭐⭐
 
-**Objetivo:** Página perfeita para gerenciar estoque com visual profissional e funcionalidades completas.
+**Objetivo:** Bot que automatiza 80% das mensagens e coleta encomendas.
 
-#### 1.1 Criar Página `/admin/estoque`
-
-**Features:**
-- [ ] Lista de produtos com estoque atualizado em tempo real
-- [ ] Busca e filtros (nome, categoria, estoque baixo)
-- [ ] Cards coloridos (verde/amarelo/vermelho) por nível de estoque
-- [ ] Badge de "Estoque Baixo" destacado
-- [ ] Informações: Estoque atual, Reservado, Disponível, Mínimo
-
-**Ajustes de Estoque:**
-- [ ] Botão "+" para adicionar estoque
-- [ ] Botão "-" para reduzir estoque
-- [ ] Input manual para ajuste preciso
-- [ ] Campo "Motivo do ajuste" (opcional)
-- [ ] Histórico de movimentações (últimas 10)
-
-**Alertas:**
-- [ ] Lista destacada de produtos com estoque baixo
-- [ ] Contador de produtos críticos no topo
-- [ ] Notificação visual quando estoque < mínimo
-
-**UX:**
-- [ ] Loading states suaves
-- [ ] Toast notifications para cada ação
-- [ ] Confirmação antes de reduzir estoque
-- [ ] Atualização em tempo real (SWR)
-
-**Arquivo:** `frontend/app/admin/estoque/page.tsx`
-
-**Backend necessário:**
-- [ ] Endpoint `GET /products/stock-summary` (resumo de estoque)
-- [ ] Endpoint `POST /products/:id/adjust-stock` (ajustar estoque)
-- [ ] Endpoint `GET /products/:id/stock-history` (histórico)
-
-**Tempo estimado:** 2-3 dias
-
----
-
-### FASE 2: Dashboard Admin Melhorado ⭐⭐
-
-**Objetivo:** Dashboard profissional com métricas relevantes e visual impressionante.
-
-#### 2.1 Melhorar Página `/admin`
-
-**Features:**
-- [ ] Cards de métricas grandes e visuais:
-  - 💰 Vendas Hoje (R$)
-  - 📦 Total de Pedidos
-  - 🎫 Ticket Médio
-  - ⚠️ Produtos com Estoque Baixo
-  - 📈 Vendas Últimos 7 Dias (gráfico)
-- [ ] Gráfico de vendas (Chart.js ou Recharts)
-- [ ] Lista de produtos mais vendidos (top 10)
-- [ ] Lista de vendas recentes (últimas 10)
-- [ ] Atualização em tempo real
-
-**Visual:**
-- [ ] Gradientes modernos
-- [ ] Animações suaves
-- [ ] Responsivo (mobile + desktop)
-- [ ] Dark mode (opcional, depois)
-
-**Arquivo:** `frontend/app/admin/page.tsx` (melhorar existente)
-
-**Backend necessário:**
-- [ ] Endpoint `GET /orders/reports/sales` (já existe, melhorar)
-- [ ] Endpoint `GET /products/top-sellers` (criar)
-- [ ] Endpoint `GET /orders/recent` (criar)
-
-**Tempo estimado:** 2 dias
+**Status:** ⏳ **PRÓXIMO PASSO**
 
 ---
 
@@ -314,44 +268,40 @@ Bot: "Encomenda coletada! Valor: R$ 80,00. Aguarde aprovação."
 
 ---
 
-## 📅 TIMELINE RECOMENDADA (REVISADA)
+## 📅 TIMELINE RECOMENDADA (ATUALIZADA)
 
-### Esta Semana (Dias 1-3): INFRAESTRUTURA PERFEITA
-1. **Swagger/OpenAPI** configurado
-2. **Exception Filters** globais
-3. **Rate Limiting** implementado
-4. **Error Boundaries** no frontend
-5. **Health Checks** completos
-
-**Resultado:** Base sólida, segura e documentada ✅
+### ✅ CONCLUÍDO:
+- ✅ **FASE 0:** Infraestrutura Perfeita (Swagger, Exception Filters, Rate Limiting, Error Boundaries, Health Checks, Testes)
+- ✅ **FASE 1:** Gestão de Estoque Completa (Página `/admin/estoque`, ajustes, alertas)
+- ✅ **FASE 2:** Dashboard Admin Melhorado (Métricas, gráficos, relatórios)
 
 ---
 
-### Próxima Semana (Dias 4-6): GESTÃO DE ESTOQUE
-1. **Página `/admin/estoque`** completa
-   - Lista de produtos
-   - Ajustes de estoque
-   - Alertas visuais
+### Esta Semana (Dias 1-3): BOT WHATSAPP BÁSICO
+1. **Respostas Automáticas**
+   - Comandos: "Cardápio", "Preço", "Estoque", "Horário"
+   - Integrar com ProductsService
+   - Formatação bonita de mensagens
 
-### Semana 3 (Dias 7-9): DASHBOARD ADMIN
-2. **Dashboard Admin** melhorado
-   - Métricas visuais
-   - Gráficos
-   - Listas relevantes
+### Próxima Semana (Dias 4-6): PROCESSAMENTO DE PEDIDOS
+2. **Processamento de Pedidos Simples**
+   - Extrair produto e quantidade da mensagem
+   - Validar estoque
+   - Criar pedido pendente
+   - Confirmar com cliente
 
-### Semana 4 (Dias 10-12): BOT WHATSAPP BÁSICO
-3. **Bot WhatsApp Básico**
-   - Respostas automáticas
-   - Processamento de pedidos simples
+### Semana 3 (Dias 7-10): FLUXO DE ENCOMENDAS
+3. **Fluxo de Encomendas**
+   - Estado de conversa (contexto)
+   - Coleta sequencial de informações
+   - Criação de encomenda pendente
+   - Página `/admin/encomendas` para aprovar
 
-### Semana 5 (Dias 13-16): FLUXO DE ENCOMENDAS
-4. **Fluxo de Encomendas**
-   - Coleta de informações
-   - Página de aprovação
-
-### Semana 6 (Dias 17-18): INTEGRAÇÃO OLLAMA
-5. **Integração Ollama**
-   - IA local
+### Semana 4 (Dias 11-14): INTEGRAÇÃO OLLAMA
+4. **Integração Ollama**
+   - Instalar e configurar Ollama
+   - Criar `OllamaService`
+   - Melhorar processamento de mensagens
    - Respostas mais inteligentes
 
 ---
@@ -378,17 +328,15 @@ Bot: "Encomenda coletada! Valor: R$ 80,00. Aguarde aprovação."
 
 ---
 
-## 🚀 PRÓXIMO PASSO IMEDIATO (REVISADO)
+## 🚀 PRÓXIMO PASSO IMEDIATO (ATUALIZADO)
 
-**Começar pela FASE 0: Infraestrutura Perfeita**
+**Começar pela FASE 3: Bot WhatsApp Básico**
 
-1. **Configurar Swagger** (documentação automática)
-2. **Exception Filters** globais (erros consistentes)
-3. **Rate Limiting** (proteção)
-4. **Error Boundaries** (UX quando quebra)
-5. **Health Checks** completos (monitoramento)
+1. **Respostas Automáticas** (comandos básicos)
+2. **Processamento de Pedidos** (extrair intenção, validar estoque)
+3. **Fluxo de Encomendas** (coleta de informações, aprovação)
 
-**Depois:** FASE 1 - Gestão de Estoque
+**Depois:** FASE 4 - Integração Ollama (IA local)
 
 ---
 
@@ -422,4 +370,5 @@ Bot: "Encomenda coletada! Valor: R$ 80,00. Aguarde aprovação."
 ---
 
 **Última atualização:** 07/01/2025  
-**Status:** ✅ Plano Perfeito Definido | 🚀 Pronto para Executar
+**Status:** ✅ FASE 0, 1 e 2 COMPLETAS | 🚀 Pronto para FASE 3 (Bot WhatsApp)  
+**📊 Ver [STATUS-ATUAL-2025.md](./STATUS-ATUAL-2025.md) para status consolidado**

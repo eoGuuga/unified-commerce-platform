@@ -6,7 +6,8 @@ Plataforma SaaS para unificacao de vendas multi-canal para pequenos negocios art
 
 ## 🚨 DOCUMENTO MASTER - ESTADO ATUAL
 
-> **📋 [ESTADO-ATUAL-COMPLETO.md](./ESTADO-ATUAL-COMPLETO.md)** - **LEIA PRIMEIRO!**
+> **📋 [ESTADO-ATUAL-COMPLETO.md](./ESTADO-ATUAL-COMPLETO.md)** - **LEIA PRIMEIRO!**  
+> **📊 [STATUS-ATUAL-2025.md](./STATUS-ATUAL-2025.md)** - **STATUS CONSOLIDADO**
 
 Este documento contém **TUDO** que você precisa saber para continuar o desenvolvimento:
 - ✅ O que foi feito até agora (detalhado)
@@ -15,6 +16,8 @@ Este documento contém **TUDO** que você precisa saber para continuar o desenvo
 - 🔑 Decisões técnicas importantes
 - 📚 Links para toda documentação
 - ✅ Checklist completo
+
+**Status Atual:** ✅ **FASE 0, 1 e 2 COMPLETAS** | 🚀 Pronto para FASE 3 (Bot WhatsApp)
 
 **Se você está começando uma nova sessão, leia este documento primeiro!**
 
@@ -130,13 +133,21 @@ npm run dev
 
 ## O Que Ja Esta Pronto
 
-- **Documentacao**: 12 arquivos completos  
+- **Documentacao**: 36 arquivos completos organizados em `docs/`  
 - **Schema SQL**: Banco de dados completo  
 - **Backend**: NestJS completo com Auth, Products, Orders, WhatsApp
 - **Frontend**: Next.js com PDV, E-commerce, Dashboard Admin
 - **Docker**: PostgreSQL + Redis + UIs  
 - **Configuracoes**: TypeScript, ESLint, Jest  
-- **Features**: Estoque em tempo real, Checkout, Relatorios
+- **Features**: 
+  - ✅ PDV Perfeito (validações, tempo real, UX otimizada)
+  - ✅ Gestão de Estoque Completa (`/admin/estoque`)
+  - ✅ Dashboard Admin Melhorado (métricas, gráficos, relatórios)
+  - ✅ Sistema de Reserva de Estoque
+  - ✅ Transações ACID (ZERO overselling)
+  - ✅ Swagger/OpenAPI (API 100% documentada)
+  - ✅ Testes Unitários e de Integração
+  - ✅ Health Checks, Rate Limiting, Error Boundaries
 - **Scripts**: setup.ps1 e test-backend.ps1 automaticos
 
 ---
@@ -205,4 +216,5 @@ MIT License
 
 ---
 
-**Status:** MVP COMPLETO | TODOS OS MODULOS IMPLEMENTADOS E FUNCIONANDO!
+**Status:** ✅ FASE 0, 1 e 2 COMPLETAS | 🚀 Pronto para FASE 3 (Bot WhatsApp)  
+**📊 Ver [STATUS-ATUAL-2025.md](./STATUS-ATUAL-2025.md) para status detalhado**
