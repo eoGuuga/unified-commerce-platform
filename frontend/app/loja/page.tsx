@@ -18,9 +18,10 @@ interface CartItem {
   quantity: number;
 }
 
-const TENANT_ID = '00000000-0000-0000-0000-000000000000';
+// ⚠️ REMOVIDO: TENANT_ID hardcoded - deve vir do contexto JWT
 
 export default function LojaPage() {
+  const { tenantId, isAuthenticated, isLoading: authLoading, login } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
@@ -33,13 +34,33 @@ export default function LojaPage() {
     address: '',
   });
 
+  // Auto-login (apenas em desenvolvimento)
   useEffect(() => {
+    const autoLogin = async () => {
+      if (authLoading) return;
+      if (!isAuthenticated || !tenantId) {
+        if (process.env.NODE_ENV === 'development' && hasDevCredentials()) {
+          try {
+            const devCreds = getDevCredentials();
+            await login(devCreds.email, devCreds.password, devCreds.tenantId);
+          } catch (err) {
+            console.error('Erro no login automático:', err);
+          }
+        }
+      }
+    };
+    autoLogin();
+  }, [authLoading, isAuthenticated, tenantId, login]);
+
+  useEffect(() => {
+    if (!tenantId) return;
     loadProducts();
-  }, []);
+  }, [tenantId]);
 
   const loadProducts = async () => {
+    if (!tenantId) return;
     try {
-      const data = await api.getProducts(TENANT_ID);
+      const data = await api.getProducts(tenantId);
       setProducts(data);
       setLoading(false);
     } catch (error) {
