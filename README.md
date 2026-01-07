@@ -2,6 +2,24 @@
 
 Plataforma SaaS para unificacao de vendas multi-canal para pequenos negocios artesanais
 
+---
+
+## 🚨 DOCUMENTO MASTER - ESTADO ATUAL
+
+> **📋 [ESTADO-ATUAL-COMPLETO.md](./ESTADO-ATUAL-COMPLETO.md)** - **LEIA PRIMEIRO!**
+
+Este documento contém **TUDO** que você precisa saber para continuar o desenvolvimento:
+- ✅ O que foi feito até agora (detalhado)
+- ⚠️ O que precisa ser feito (com prioridades)
+- 📁 Estrutura completa do projeto
+- 🔑 Decisões técnicas importantes
+- 📚 Links para toda documentação
+- ✅ Checklist completo
+
+**Se você está começando uma nova sessão, leia este documento primeiro!**
+
+---
+
 ## Problema que Resolve
 
 **OVERSELLING**: Loja vende em múltiplos canais (PDV físico, e-commerce, WhatsApp) mas não sincroniza estoque.
