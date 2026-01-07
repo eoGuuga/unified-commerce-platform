@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Produto } from '../../database/entities/Produto.entity';
@@ -11,6 +11,8 @@ import { AuditLogService } from '../common/services/audit-log.service';
 
 @Injectable()
 export class ProductsService {
+  private readonly logger = new Logger(ProductsService.name);
+
   constructor(
     @InjectRepository(Produto)
     private produtosRepository: Repository<Produto>,
@@ -125,7 +127,11 @@ export class ProductsService {
         userAgent,
       });
     } catch (error) {
-      console.error('Erro ao registrar audit log:', error);
+      this.logger.error('Erro ao registrar audit log', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { tenantId, userId, produtoId: savedProduto.id, action: 'UPDATE' },
+      });
     }
 
     // ✅ CACHE: Invalidar cache de produtos
@@ -171,7 +177,11 @@ export class ProductsService {
         userAgent,
       });
     } catch (error) {
-      console.error('Erro ao registrar audit log:', error);
+      this.logger.error('Erro ao registrar audit log', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { tenantId, userId, produtoId: savedProduto.id, action: 'CREATE' },
+      });
     }
 
     // ✅ CACHE: Invalidar cache de produtos
@@ -208,7 +218,11 @@ export class ProductsService {
         metadata: { action: 'soft_delete' },
       });
     } catch (error) {
-      console.error('Erro ao registrar audit log:', error);
+      this.logger.error('Erro ao registrar audit log', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { tenantId, userId, produtoId: produto.id, action: 'UPDATE' },
+      });
     }
 
     // ✅ CACHE: Invalidar cache de produtos
@@ -424,7 +438,11 @@ export class ProductsService {
         metadata: { reason, quantity, produto_id: produtoId },
       });
     } catch (error) {
-      console.error('Erro ao registrar audit log:', error);
+      this.logger.error('Erro ao registrar audit log', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { tenantId, userId, produtoId, estoqueId: savedEstoque.id, action: 'UPDATE' },
+      });
     }
 
     // ✅ CACHE: Invalidar cache de produtos

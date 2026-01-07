@@ -9,6 +9,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { IdempotencyService } from '../common/services/idempotency.service';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { IdempotencyRecord, toIdempotencyRecord } from './types/orders.types';
 
 @Injectable()
 export class OrdersService {
@@ -37,27 +38,31 @@ export class OrdersService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<Pedido> {
-    let idempotencyRecord: any = null;
+    let idempotencyRecord: IdempotencyRecord | null = null;
 
-    // ✅ IDEMPOTÊNCIA: Verificar se operação já foi processada
-    if (idempotencyKey) {
-      idempotencyRecord = await this.idempotencyService.checkAndSet(
-        tenantId,
-        'create_order',
-        idempotencyKey,
-        3600, // 1 hora
-      );
-
-      if (idempotencyRecord && idempotencyRecord.status === 'completed') {
-        // Operação já foi processada, retornar resultado anterior
-        if (idempotencyRecord.result) {
-          return idempotencyRecord.result as Pedido;
-        }
-        throw new ConflictException(
-          `Pedido já foi criado com esta chave de idempotência. Key: ${idempotencyKey}`,
+      // ✅ IDEMPOTÊNCIA: Verificar se operação já foi processada
+      if (idempotencyKey) {
+        const idempotencyKeyEntity = await this.idempotencyService.checkAndSet(
+          tenantId,
+          'create_order',
+          idempotencyKey,
+          3600, // 1 hora
         );
+
+        if (idempotencyKeyEntity) {
+          idempotencyRecord = toIdempotencyRecord(idempotencyKeyEntity);
+          
+          if (idempotencyRecord.status === 'completed') {
+            // Operação já foi processada, retornar resultado anterior
+            if (idempotencyRecord.result) {
+              return idempotencyRecord.result as Pedido;
+            }
+            throw new ConflictException(
+              `Pedido já foi criado com esta chave de idempotência. Key: ${idempotencyKey}`,
+            );
+          }
+        }
       }
-    }
 
     // Cálculo de subtotal
     const subtotal = createOrderDto.items.reduce(
@@ -180,7 +185,11 @@ export class OrdersService {
       });
     } catch (error) {
       // Não falhar se audit log falhar (logging não deve quebrar operação)
-      console.error('Erro ao registrar audit log:', error);
+      this.logger.error('Erro ao registrar audit log', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { tenantId, userId, pedidoId: pedido.id, action: 'CREATE' },
+      });
     }
 
     // ✅ IDEMPOTÊNCIA: Marcar como completado
@@ -188,8 +197,13 @@ export class OrdersService {
       try {
         await this.idempotencyService.markCompleted(idempotencyRecord.id, pedido);
       } catch (error) {
-        // Não falhar se idempotência falhar
-        console.error('Erro ao marcar idempotência como completada:', error);
+        // Não falhar se idempotência falhar, mas logar adequadamente
+        this.logger.error('Erro ao marcar idempotência como completada', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          idempotencyRecordId: idempotencyRecord.id,
+          pedidoId: pedido.id,
+        });
       }
     }
 

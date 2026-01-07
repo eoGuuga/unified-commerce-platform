@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -27,6 +27,8 @@ export interface LoginResponse {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(Usuario)
     private usuariosRepository: Repository<Usuario>,
@@ -80,7 +82,11 @@ export class AuthService {
       });
     } catch (error) {
       // Não falhar se audit log falhar
-      console.error('Erro ao registrar audit log de login:', error);
+      this.logger.error('Erro ao registrar audit log de login', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { tenantId: usuario.tenant_id, userId: usuario.id, action: 'LOGIN', email: usuario.email },
+      });
     }
 
     return {

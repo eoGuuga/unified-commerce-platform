@@ -7,6 +7,7 @@ import { OrdersService } from '../orders/orders.service';
 import { PaymentsService, CreatePaymentDto } from '../payments/payments.service';
 import { CanalVenda, PedidoStatus } from '../../database/entities/Pedido.entity';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
+import { TypedConversation, ProductWithStock, ProductSearchResult, toTypedConversation } from './types/whatsapp.types';
 
 export interface WhatsappMessage {
   from: string;
@@ -24,7 +25,7 @@ export interface ProductInfo {
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
-  private readonly DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000000';
+  // ⚠️ REMOVIDO: DEFAULT_TENANT_ID hardcoded - deve vir do JWT ou contexto
   private readonly HORARIO_FUNCIONAMENTO = 'Segunda a Sábado: 8h às 18h\nDomingo: 9h às 13h';
 
   constructor(
@@ -40,7 +41,12 @@ export class WhatsappService {
     this.logger.log(`Processing message from ${message.from}: ${message.body}`);
 
     try {
-      const tenantId = message.tenantId || this.DEFAULT_TENANT_ID;
+      // ⚠️ CRÍTICO: tenantId deve vir obrigatoriamente, nunca usar default hardcoded
+      if (!message.tenantId) {
+        this.logger.error('Tenant ID missing from WhatsApp message', { from: message.from });
+        throw new BadRequestException('Tenant ID é obrigatório para processar mensagens WhatsApp');
+      }
+      const tenantId = message.tenantId;
       
       // Buscar ou criar conversa
       const conversation = await this.conversationService.getOrCreateConversation(
@@ -56,10 +62,11 @@ export class WhatsappService {
       );
 
       // Gerar resposta
+      const typedConversation = toTypedConversation(conversation);
       const response = await this.generateResponse(
         message.body,
         tenantId,
-        conversation,
+        typedConversation,
       );
 
       // Salvar mensagem enviada
@@ -80,7 +87,7 @@ export class WhatsappService {
   private async generateResponse(
     message: string,
     tenantId: string,
-    conversation?: any,
+    conversation?: TypedConversation,
   ): Promise<string> {
     const lowerMessage = message.toLowerCase().trim();
 
@@ -236,10 +243,10 @@ export class WhatsappService {
   }
 
   private async createOrderWithProduct(
-    produto: any,
+    produto: ProductWithStock,
     quantity: number,
     tenantId: string,
-    conversation?: any,
+    conversation?: TypedConversation,
   ): Promise<string> {
     // Validar estoque
     if (produto.available_stock < quantity) {
@@ -468,7 +475,7 @@ export class WhatsappService {
     };
   }
 
-  private findProductByName(produtos: any[], productName: string): { produto: any | null; sugestoes?: any[] } {
+  private findProductByName(produtos: ProductWithStock[], productName: string): ProductSearchResult {
     if (!productName) return { produto: null };
 
     // Normalizar: remover acentos para busca mais flexível
@@ -572,7 +579,7 @@ export class WhatsappService {
     return { produto: null, sugestoes: sugestoes.length > 0 ? sugestoes : undefined };
   }
 
-  private findSimilarProducts(produtos: any[], productName: string, maxResults: number = 5): any[] {
+  private findSimilarProducts(produtos: ProductWithStock[], productName: string, maxResults: number = 5): ProductWithStock[] {
     if (!productName || productName.length < 2) return [];
 
     const normalize = (str: string) => {
@@ -889,7 +896,7 @@ export class WhatsappService {
   private async processPaymentSelection(
     message: string,
     tenantId: string,
-    conversation?: any,
+    conversation?: TypedConversation,
   ): Promise<string> {
     try {
       const lowerMessage = message.toLowerCase().trim();
