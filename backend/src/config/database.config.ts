@@ -12,6 +12,8 @@ import { IdempotencyKey } from '../database/entities/IdempotencyKey.entity';
 import { WebhookEvent } from '../database/entities/WebhookEvent.entity';
 import { WhatsappConversation } from '../database/entities/WhatsappConversation.entity';
 import { WhatsappMessage } from '../database/entities/WhatsappMessage.entity';
+import { AuditLog } from '../database/entities/AuditLog.entity';
+import { Pagamento } from '../database/entities/Pagamento.entity';
 
 export const databaseConfig: TypeOrmModuleAsyncOptions = {
   inject: [ConfigService],
@@ -31,9 +33,15 @@ export const databaseConfig: TypeOrmModuleAsyncOptions = {
       WebhookEvent,
       WhatsappConversation,
       WhatsappMessage,
+      AuditLog,
+      Pagamento,
     ],
     synchronize: false, // Desabilitado - usar migrations
     logging: config.get('NODE_ENV') === 'development',
     ssl: config.get('DATABASE_URL')?.includes('supabase') ? { rejectUnauthorized: false } : false,
+    extra: {
+      statement_timeout: 30000, // 30 segundos
+      query_timeout: 30000,
+    },
   }),
 };

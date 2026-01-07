@@ -10,6 +10,8 @@ import { ProductsModule } from './modules/products/products.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -35,6 +37,8 @@ import { HealthModule } from './modules/health/health.module';
     OrdersModule,
     AuthModule,
     WhatsappModule,
+    PaymentsModule,
+    NotificationsModule,
     HealthModule,
   ],
   controllers: [AppController],
