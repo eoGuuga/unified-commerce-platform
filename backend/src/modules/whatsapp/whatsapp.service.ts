@@ -360,7 +360,8 @@ export class WhatsappService {
     }
     
     // Remover números escritos por extenso
-    for (const [palavra] of Object.entries(numerosExtenso)) {
+    const numerosExtensoList = ['um', 'uma', 'dois', 'duas', 'três', 'tres', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove', 'dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'cem'];
+    for (const palavra of numerosExtensoList) {
       const regex = new RegExp(`\\b${palavra}\\b`, 'gi');
       productName = productName.replace(regex, '');
     }
