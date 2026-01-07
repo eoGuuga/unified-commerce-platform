@@ -1,0 +1,82 @@
+Olá! Você está assumindo o desenvolvimento do Unified Commerce Platform (UCM), uma plataforma SaaS para unificação de vendas multi-canal para pequenos negócios artesanais.
+
+🚨 LEIA PRIMEIRO (ORDEM OBRIGATÓRIA):
+1. 00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md - LEIA ESTE PRIMEIRO! Contém TUDO que você precisa saber
+2. BACKEND-OPERACIONAL.md - Status atual do backend e endpoints
+3. RESUMO-FINAL-CORRECOES.md - Correções de segurança implementadas
+4. FASE-3-2-IMPLEMENTADA.md - O que foi feito no bot WhatsApp
+
+📊 ESTADO ATUAL DO PROJETO:
+
+✅ O QUE ESTÁ PRONTO:
+- Backend NestJS operacional (http://localhost:3001/api/v1)
+- PostgreSQL com RLS habilitado + índices criados
+- Redis para cache funcionando
+- Frontend Next.js com PDV completo
+- Bot WhatsApp: FASE 3.1 e 3.2 COMPLETAS
+- 16 correções críticas de segurança implementadas
+- Audit Log, Idempotência, Cache, Queries otimizadas
+
+🎯 ONDE PARAMOS:
+- Última sessão: 08/01/2025
+- Implementamos todas as correções críticas de segurança
+- Migration 002 executada (RLS + índices)
+- Backend rodando com sucesso
+- Bot WhatsApp FASE 3.2 completa (processamento de pedidos simples)
+
+🚀 PRÓXIMO PASSO PRIORITÁRIO:
+- FASE 3.3 do Bot WhatsApp - Confirmação de pedidos, integração com pagamento, notificações
+
+📁 ESTRUTURA DO PROJETO:
+unified-commerce-platform/
+├── 00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md  ← LEIA PRIMEIRO
+├── INDICE-DOCUMENTACAO.md                 ← Índice completo
+├── backend/                                ← NestJS + TypeScript
+├── frontend/                               ← Next.js 16 + React 19
+├── docs/                                   ← Documentação organizada
+└── scripts/                                ← Scripts e migrations
+
+🔧 STACK TECNOLÓGICA:
+- Backend: NestJS + Node.js 20 + TypeScript
+- Frontend: Next.js 16 + React 19 + Tailwind CSS
+- Database: PostgreSQL 15 (Docker local)
+- Cache: Redis (Docker local)
+- IA: Ollama (local, gratuito)
+- ORM: TypeORM
+- Auth: JWT
+
+⚠️ IMPORTANTE:
+1. Sempre use @CurrentTenant() nos controllers (não query params)
+2. Audit Log deve ser usado em todas operações críticas
+3. Idempotência em pedidos (header Idempotency-Key)
+4. Cache em queries frequentes (TTL: 5 minutos)
+5. RLS habilitado no banco - dados isolados por tenant
+
+🎯 SUA TAREFA AGORA:
+Continuar desenvolvimento do Bot WhatsApp - FASE 3.3:
+1. Implementar confirmação de pedidos
+2. Integração com pagamento
+3. Notificações ao cliente
+4. Melhorar fluxo de conversa
+
+OU seguir os próximos passos documentados em 00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md seção "PRÓXIMOS PASSOS PRIORIZADOS".
+
+📚 DOCUMENTAÇÃO COMPLETA:
+- 90+ arquivos .md organizados em docs/
+- Documento mestre com tudo explicado
+- Índice completo para buscar rapidamente
+
+✅ CHECKLIST ANTES DE COMEÇAR:
+- [ ] Li 00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md
+- [ ] Entendi onde paramos
+- [ ] Entendi o próximo passo
+- [ ] Verifiquei que backend está rodando
+- [ ] Verifiquei estrutura de código
+
+🚀 COMEÇAR:
+Leia o documento mestre primeiro, depois me diga:
+1. O que você entendeu do estado atual
+2. Qual o próximo passo que você vai implementar
+3. Se tem alguma dúvida
+
+Vamos continuar de onde paramos!

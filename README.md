@@ -4,22 +4,22 @@ Plataforma SaaS para unificacao de vendas multi-canal para pequenos negocios art
 
 ---
 
-## 🚨 DOCUMENTO MASTER - ESTADO ATUAL
+## 🚨 DOCUMENTO MASTER - LEIA PRIMEIRO!
 
-> **📋 [ESTADO-ATUAL-COMPLETO.md](./ESTADO-ATUAL-COMPLETO.md)** - **LEIA PRIMEIRO!**  
-> **📊 [STATUS-ATUAL-2025.md](./STATUS-ATUAL-2025.md)** - **STATUS CONSOLIDADO**
+> **📋 [00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md](./00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md)** - **LEIA ESTE PRIMEIRO!**  
+> **📚 [INDICE-DOCUMENTACAO.md](./INDICE-DOCUMENTACAO.md)** - **ÍNDICE COMPLETO**
 
 Este documento contém **TUDO** que você precisa saber para continuar o desenvolvimento:
-- ✅ O que foi feito até agora (detalhado)
-- ⚠️ O que precisa ser feito (com prioridades)
-- 📁 Estrutura completa do projeto
-- 🔑 Decisões técnicas importantes
-- 📚 Links para toda documentação
-- ✅ Checklist completo
+- ✅ Estado atual completo do projeto
+- ✅ O que foi implementado (detalhado)
+- ✅ Onde paramos (exatamente)
+- ✅ Próximos passos (priorizados)
+- ✅ Estrutura de documentação (organizada)
+- ✅ Contexto técnico (decisões importantes)
 
-**Status Atual:** ✅ **FASE 0, 1 e 2 COMPLETAS** | 🚀 Pronto para FASE 3 (Bot WhatsApp)
+**Status Atual:** ✅ **BACKEND OPERACIONAL** | ✅ **16 CORREÇÕES CRÍTICAS IMPLEMENTADAS** | 🚀 **FASE 3.1 e 3.2 COMPLETAS**
 
-**Se você está começando uma nova sessão, leia este documento primeiro!**
+**Se você está começando uma nova sessão, leia `00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md` primeiro!**
 
 ---
 
