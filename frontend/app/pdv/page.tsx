@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Toaster, toast } from 'react-hot-toast';
+import useSWR from 'swr';
 import api from '@/lib/api-client';
 
 interface CartItem {
@@ -25,54 +26,60 @@ interface Product {
 
 const TENANT_ID = '00000000-0000-0000-0000-000000000000';
 
+// Fetcher para SWR
+const fetcher = async (tenantId: string) => {
+  return api.getProducts(tenantId);
+};
+
 export default function PDVPage() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isSelling, setIsSelling] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // SWR para produtos com atualização automática
+  const { data: products = [], error, isLoading, mutate } = useSWR<Product[]>(
+    TENANT_ID,
+    fetcher,
+    {
+      refreshInterval: 5000, // Atualiza a cada 5 segundos
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      onError: (err) => {
+        console.error('Erro ao carregar produtos:', err);
+        toast.error('Erro ao carregar produtos');
+      },
+    }
+  );
 
   useEffect(() => {
     // Login automático se não houver token
     const token = localStorage.getItem('token');
     if (!token) {
       autoLogin();
-    } else {
-      loadProducts();
     }
   }, []);
 
   const autoLogin = async () => {
+    setIsLoggingIn(true);
     try {
       const response: any = await api.login('admin@loja.com', 'senha123');
       if (response.access_token) {
         localStorage.setItem('token', response.access_token);
-        await loadProducts();
+        await mutate(); // Recarregar produtos após login
       }
     } catch (err) {
       console.error('Erro no login automático:', err);
-      setError('Erro ao fazer login automático. Verifique se o usuário padrão foi criado.');
-      setLoading(false);
+      toast.error('Erro ao fazer login automático. Verifique se o usuário padrão foi criado.');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     router.push('/login');
-  };
-
-  const loadProducts = async () => {
-    try {
-      const data = await api.getProducts(TENANT_ID);
-      setProducts(data);
-      setLoading(false);
-    } catch (err) {
-      setError('Erro ao carregar produtos');
-      setLoading(false);
-      toast.error('Erro ao carregar produtos');
-      console.error(err);
-    }
   };
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -180,20 +187,36 @@ export default function PDVPage() {
       shipping_amount: 0,
     };
 
+    setIsSelling(true);
     try {
       const loadingToast = toast.loading('Processando venda...');
       await api.createOrder(order, TENANT_ID);
       toast.dismiss(loadingToast);
       toast.success('Venda realizada com sucesso!');
       setCart([]);
-      await loadProducts(); // Recarregar produtos para atualizar estoque
+      
+      // Atualizar estoque imediatamente após venda
+      await mutate();
     } catch (error: any) {
       toast.error(error.message || 'Não foi possível realizar a venda');
+    } finally {
+      setIsSelling(false);
     }
   };
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Skeleton loading component
+  const ProductSkeleton = () => (
+    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg animate-pulse">
+      <div className="flex-1">
+        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+        <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+      </div>
+      <div className="h-8 bg-gray-200 rounded w-20"></div>
+    </div>
   );
 
   return (
@@ -225,10 +248,19 @@ export default function PDVPage() {
       <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-6 mb-4">
           <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold">PDV - Loja Chocola Velha</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold">PDV - Loja Chocola Velha</h1>
+              {isLoading && (
+                <span className="text-xs text-gray-500 flex items-center gap-1">
+                  <span className="animate-spin">🔄</span>
+                  Atualizando...
+                </span>
+              )}
+            </div>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              disabled={isSelling}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
             >
               Sair
             </button>
@@ -240,17 +272,28 @@ export default function PDVPage() {
               placeholder="Buscar produto..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading || isLoggingIn}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <h2 className="text-lg font-semibold mb-3">Produtos Disponiveis</h2>
-              {loading ? (
-                <p className="text-gray-500">Carregando produtos...</p>
+              {isLoggingIn ? (
+                <div className="space-y-2">
+                  <ProductSkeleton />
+                  <ProductSkeleton />
+                  <ProductSkeleton />
+                </div>
+              ) : isLoading && products.length === 0 ? (
+                <div className="space-y-2">
+                  <ProductSkeleton />
+                  <ProductSkeleton />
+                  <ProductSkeleton />
+                </div>
               ) : error ? (
-                <p className="text-red-500">{error}</p>
+                <p className="text-red-500">Erro ao carregar produtos</p>
               ) : filteredProducts.length === 0 ? (
                 <p className="text-gray-500">Nenhum produto encontrado</p>
               ) : (
@@ -258,14 +301,14 @@ export default function PDVPage() {
                   {filteredProducts.map(product => (
                     <div
                       key={product.id}
-                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
+                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       <div>
                         <p className="font-medium">{product.name}</p>
                         <div className="flex items-center gap-2">
                           <p className="text-sm text-gray-600">R$ {parseFloat(product.price).toFixed(2)}</p>
                           {product.stock !== undefined && (
-                            <span className={`text-xs px-2 py-1 rounded ${
+                            <span className={`text-xs px-2 py-1 rounded transition-colors ${
                               product.stock === 0
                                 ? 'bg-red-100 text-red-700'
                                 : product.stock <= (product.min_stock || 0)
@@ -279,7 +322,7 @@ export default function PDVPage() {
                       </div>
                       <button
                         onClick={() => handleAddToCart(product)}
-                        disabled={product.stock !== undefined && product.stock === 0}
+                        disabled={(product.stock !== undefined && product.stock === 0) || isSelling}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                       >
                         {product.stock === 0 ? 'Sem estoque' : 'Adicionar'}
@@ -304,7 +347,7 @@ export default function PDVPage() {
                     return (
                       <div
                         key={item.id}
-                        className={`flex items-center justify-between p-3 border rounded-lg ${
+                        className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
                           isStockLow 
                             ? 'border-red-300 bg-red-50' 
                             : 'border-gray-200 bg-white'
@@ -317,7 +360,7 @@ export default function PDVPage() {
                               R$ {item.price.toFixed(2)} x {item.quantity}
                             </p>
                             {availableStock !== undefined && (
-                              <span className={`text-xs px-2 py-1 rounded ${
+                              <span className={`text-xs px-2 py-1 rounded transition-colors ${
                                 availableStock === 0
                                   ? 'bg-red-100 text-red-700'
                                   : availableStock < item.quantity
@@ -337,24 +380,23 @@ export default function PDVPage() {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                            className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
+                            disabled={isSelling}
+                            className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
                           >
                             -
                           </button>
                           <span className="w-8 text-center font-medium">{item.quantity}</span>
                           <button
                             onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                            disabled={item.quantity >= availableStock}
+                            disabled={item.quantity >= availableStock || isSelling}
                             className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
                           >
                             +
                           </button>
                           <button
-                            onClick={() => {
-                              handleRemoveFromCart(item.id);
-                              toast.success(`${item.name} removido do carrinho`);
-                            }}
-                            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                            onClick={() => handleRemoveFromCart(item.id)}
+                            disabled={isSelling}
+                            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                           >
                             Remover
                           </button>
@@ -371,13 +413,24 @@ export default function PDVPage() {
                 </p>
                 <button
                   onClick={handleSell}
-                  disabled={cart.length === 0 || cart.some(item => {
-                    const product = products.find(p => p.id === item.id);
-                    return item.quantity > (product?.stock || 0);
-                  })}
-                  className="w-full px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  disabled={
+                    cart.length === 0 || 
+                    isSelling ||
+                    cart.some(item => {
+                      const product = products.find(p => p.id === item.id);
+                      return item.quantity > (product?.stock || 0);
+                    })
+                  }
+                  className="w-full px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                 >
-                  VENDER
+                  {isSelling ? (
+                    <>
+                      <span className="animate-spin">🔄</span>
+                      Processando...
+                    </>
+                  ) : (
+                    'VENDER'
+                  )}
                 </button>
               </div>
             </div>
