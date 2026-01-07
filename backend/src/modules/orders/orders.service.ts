@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ConflictException, Inject, forwardRef, Logger } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, DataSource, QueryRunner } from 'typeorm';
 import { Pedido, PedidoStatus } from '../../database/entities/Pedido.entity';
@@ -6,9 +6,14 @@ import { ItemPedido } from '../../database/entities/ItemPedido.entity';
 import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque.entity';
 import { Produto } from '../../database/entities/Produto.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { IdempotencyService } from '../common/services/idempotency.service';
+import { AuditLogService } from '../common/services/audit-log.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     @InjectRepository(Pedido)
     private pedidosRepository: Repository<Pedido>,
@@ -18,9 +23,42 @@ export class OrdersService {
     private produtosRepository: Repository<Produto>,
     @InjectDataSource()
     private dataSource: DataSource,
+    private idempotencyService: IdempotencyService,
+    private auditLogService: AuditLogService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
   ) {}
 
-  async create(createOrderDto: CreateOrderDto, tenantId: string): Promise<Pedido> {
+  async create(
+    createOrderDto: CreateOrderDto,
+    tenantId: string,
+    userId?: string,
+    idempotencyKey?: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<Pedido> {
+    let idempotencyRecord: any = null;
+
+    // ✅ IDEMPOTÊNCIA: Verificar se operação já foi processada
+    if (idempotencyKey) {
+      idempotencyRecord = await this.idempotencyService.checkAndSet(
+        tenantId,
+        'create_order',
+        idempotencyKey,
+        3600, // 1 hora
+      );
+
+      if (idempotencyRecord && idempotencyRecord.status === 'completed') {
+        // Operação já foi processada, retornar resultado anterior
+        if (idempotencyRecord.result) {
+          return idempotencyRecord.result as Pedido;
+        }
+        throw new ConflictException(
+          `Pedido já foi criado com esta chave de idempotência. Key: ${idempotencyKey}`,
+        );
+      }
+    }
+
     // Cálculo de subtotal
     const subtotal = createOrderDto.items.reduce(
       (sum, item) => sum + item.unit_price * item.quantity,
@@ -31,7 +69,7 @@ export class OrdersService {
     const total = subtotal - discount + shipping;
 
     // Inicia transação CRÍTICA
-    return await this.dataSource.transaction(async (manager) => {
+    const pedido = await this.dataSource.transaction(async (manager) => {
       // 1. FOR UPDATE lock - Bloqueia linhas de estoque
       const produtoIds = createOrderDto.items.map((item) => item.produto_id);
       const estoques = await manager
@@ -112,6 +150,41 @@ export class OrdersService {
       // 7. COMMIT (ou ROLLBACK se houver erro)
       return savedPedido;
     });
+
+    // ✅ AUDIT LOG: Registrar criação de pedido
+    try {
+      await this.auditLogService.log({
+        tenantId,
+        userId,
+        action: 'CREATE',
+        tableName: 'pedidos',
+        recordId: pedido.id,
+        newData: {
+          order_no: pedido.order_no,
+          status: pedido.status,
+          channel: pedido.channel,
+          total_amount: pedido.total_amount,
+          items_count: createOrderDto.items.length,
+        },
+        ipAddress,
+        userAgent,
+      });
+    } catch (error) {
+      // Não falhar se audit log falhar (logging não deve quebrar operação)
+      console.error('Erro ao registrar audit log:', error);
+    }
+
+    // ✅ IDEMPOTÊNCIA: Marcar como completado
+    if (idempotencyKey && idempotencyRecord) {
+      try {
+        await this.idempotencyService.markCompleted(idempotencyRecord.id, pedido);
+      } catch (error) {
+        // Não falhar se idempotência falhar
+        console.error('Erro ao marcar idempotência como completada:', error);
+      }
+    }
+
+    return pedido;
   }
 
   async findAll(tenantId: string): Promise<Pedido[]> {
@@ -141,8 +214,26 @@ export class OrdersService {
     tenantId: string,
   ): Promise<Pedido> {
     const pedido = await this.findOne(id, tenantId);
+    const oldStatus = pedido.status;
     pedido.status = status;
-    return this.pedidosRepository.save(pedido);
+    const updatedPedido = await this.pedidosRepository.save(pedido);
+
+    // Notificar cliente sobre mudança de status
+    if (oldStatus !== status) {
+      try {
+        await this.notificationsService.notifyOrderStatusChange(
+          tenantId,
+          updatedPedido,
+          oldStatus,
+          status,
+        );
+      } catch (error) {
+        // Não falhar a atualização se a notificação falhar
+        this.logger.error(`Error sending order status notification: ${error}`);
+      }
+    }
+
+    return updatedPedido;
   }
 
   private async generateOrderNumber(tenantId: string): Promise<string> {
