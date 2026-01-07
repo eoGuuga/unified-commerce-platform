@@ -99,29 +99,49 @@ export class WhatsappService {
       
       this.logger.debug(`Order extraction: quantity=${orderInfo.quantity}, productName="${orderInfo.productName}"`);
       
+      // Se não tem quantidade, perguntar ao usuário
+      if (!orderInfo.quantity && orderInfo.productName) {
+        return `❓ Quantos *${orderInfo.productName}* você gostaria?\n\n` +
+               '💬 Digite a quantidade, por exemplo:\n' +
+               '*"5 brigadeiros"* ou *"uma dúzia"*';
+      }
+      
+      // Se não tem produto, mas tem quantidade, perguntar qual produto
+      if (orderInfo.quantity && !orderInfo.productName) {
+        return `❓ Qual produto você gostaria de ${orderInfo.quantity} unidades?\n\n` +
+               '💬 Digite *"cardápio"* para ver nossos produtos disponíveis.';
+      }
+      
+      // Se não tem nem quantidade nem produto
       if (!orderInfo.quantity || !orderInfo.productName) {
         return '❌ Não consegui entender seu pedido.\n\n' +
                '💬 Por favor, digite no formato:\n' +
-               '*"Quero X [nome do produto]"*\n\n' +
-               'Exemplo: "Quero 10 brigadeiros"';
+               '*"Quero 10 brigadeiros"*\n' +
+               '*"Me manda 5 bolos de chocolate"*\n' +
+               '*"Preciso de uma dúzia de brigadeiros"*\n\n' +
+               '💡 Ou digite *"ajuda"* para ver mais exemplos.';
       }
+
+      // A partir daqui, temos certeza que quantity e productName não são null
+      const quantity = orderInfo.quantity;
+      const productName = orderInfo.productName;
 
       // Buscar produto
       const produtos = await this.productsService.findAll(tenantId);
-      const produto = this.findProductByName(produtos, orderInfo.productName);
+      const produto = this.findProductByName(produtos, productName);
       
-      this.logger.debug(`Product search: found=${!!produto}, searched="${orderInfo.productName}"`);
+      this.logger.debug(`Product search: found=${!!produto}, searched="${productName}"`);
 
       if (!produto) {
-        return `❌ Não encontrei o produto "${orderInfo.productName}".\n\n` +
+        return `❌ Não encontrei o produto "${productName}".\n\n` +
                '💬 Digite *"cardápio"* para ver nossos produtos disponíveis.';
       }
 
       // Validar estoque
-      if (produto.available_stock < orderInfo.quantity) {
+      if (produto.available_stock < quantity) {
         return `❌ Estoque insuficiente!\n\n` +
                `*${produto.name}*\n` +
-               `Solicitado: ${orderInfo.quantity} unidades\n` +
+               `Solicitado: ${quantity} unidades\n` +
                `Disponível: ${produto.available_stock} unidades\n\n` +
                `💬 Quer fazer pedido com a quantidade disponível?`;
       }
@@ -133,18 +153,18 @@ export class WhatsappService {
           customer_phone: 'whatsapp', // Será atualizado quando tiver número real
           items: [{
             produto_id: produto.id,
-            quantity: orderInfo.quantity,
+            quantity: quantity,
             unit_price: Number(produto.price),
           }],
           discount_amount: 0,
           shipping_amount: 0,
         }, tenantId);
 
-        const total = Number(produto.price) * orderInfo.quantity;
+        const total = Number(produto.price) * quantity;
         
         return `✅ *PEDIDO CRIADO COM SUCESSO!*\n\n` +
                `📦 *${produto.name}*\n` +
-               `Quantidade: ${orderInfo.quantity} unidades\n` +
+               `Quantidade: ${quantity} unidades\n` +
                `Preço unitário: R$ ${Number(produto.price).toFixed(2).replace('.', ',')}\n` +
                `Total: R$ ${total.toFixed(2).replace('.', ',')}\n\n` +
                `🆔 Código do pedido: *${pedido.order_no}*\n` +
@@ -169,90 +189,251 @@ export class WhatsappService {
   }
 
   private extractOrderInfo(message: string): { quantity: number | null; productName: string | null } {
-    const lowerMessage = message.toLowerCase();
+    const lowerMessage = message.toLowerCase().trim();
     
-    // Extrair número (quantidade) - pode estar no início ou meio
-    const quantityMatch = lowerMessage.match(/(\d+)/);
-    const quantity = quantityMatch ? parseInt(quantityMatch[1]) : null;
-
-    // Extrair nome do produto
-    // Estratégia: pegar tudo após a quantidade e palavras de ação
-    let productName = lowerMessage;
+    // ============================================
+    // ETAPA 1: EXTRAIR QUANTIDADE (múltiplas formas)
+    // ============================================
+    let quantity: number | null = null;
     
-    // Remover palavras de ação no início
-    productName = productName.replace(/^(quero|preciso|comprar|pedir|vou querer|gostaria de|desejo|vou comprar|preciso de)\s*/i, '');
+    // 1.1. Números escritos por extenso (um, dois, três, etc.)
+    const numerosExtenso: Record<string, number> = {
+      'um': 1, 'uma': 1, 'dois': 2, 'duas': 2, 'três': 3, 'tres': 3,
+      'quatro': 4, 'cinco': 5, 'seis': 6, 'sete': 7, 'oito': 8,
+      'nove': 9, 'dez': 10, 'onze': 11, 'doze': 12, 'treze': 13,
+      'quatorze': 14, 'quinze': 15, 'dezesseis': 16, 'dezessete': 17,
+      'dezoito': 18, 'dezenove': 19, 'vinte': 20, 'trinta': 30,
+      'quarenta': 40, 'cinquenta': 50, 'cem': 100
+    };
     
-    // Se tem número, pegar tudo após o número (incluindo espaços)
-    if (quantityMatch) {
-      const afterNumber = productName.substring(quantityMatch.index! + quantityMatch[0].length);
-      productName = afterNumber.trim();
+    for (const [palavra, valor] of Object.entries(numerosExtenso)) {
+      const regex = new RegExp(`\\b${palavra}\\b`, 'i');
+      if (regex.test(lowerMessage)) {
+        quantity = valor;
+        break;
+      }
     }
     
-    // Limpar: remover unidades e artigos comuns, mas MANTER "de" quando faz parte do nome
-    // Primeiro, remover unidades
-    productName = productName.replace(/\b(unidades?|unidade|un|peças?|peça|pç|kg|kilo|gramas?|g)\b/gi, '');
+    // 1.2. Números digitais (5, 10, 100, etc.)
+    if (!quantity) {
+      const quantityMatch = lowerMessage.match(/(\d+)/);
+      if (quantityMatch) {
+        quantity = parseInt(quantityMatch[1]);
+      }
+    }
     
-    // Remover artigos no início/fim (mas não "de" no meio)
-    productName = productName.replace(/^\s*(o|a|os|as|um|uma)\s+/gi, '');
-    productName = productName.replace(/\s+(o|a|os|as|um|uma)\s*$/gi, '');
+    // 1.3. Expressões de quantidade (dúzia, meia dúzia, quilo, etc.)
+    if (!quantity) {
+      if (lowerMessage.includes('duzia') || lowerMessage.includes('dúzia')) {
+        quantity = 12;
+      } else if (lowerMessage.includes('meia duzia') || lowerMessage.includes('meia dúzia')) {
+        quantity = 6;
+      } else if (lowerMessage.includes('quilo') || lowerMessage.includes('kg') || lowerMessage.includes('kilo')) {
+        // Assumir 1 quilo (pode ser ajustado depois)
+        quantity = 1;
+      } else if (lowerMessage.match(/\d+\s*(g|gramas?)/)) {
+        // Quantidade em gramas (ex: "500g de brigadeiros")
+        const gramasMatch = lowerMessage.match(/(\d+)\s*(g|gramas?)/);
+        if (gramasMatch) {
+          // Converter gramas para quantidade aproximada (ex: 500g ≈ 20 brigadeiros)
+          // Por enquanto, usar o número direto
+          quantity = parseInt(gramasMatch[1]);
+        }
+      }
+    }
     
-    // Limpar espaços múltiplos, mas manter espaços ao redor de "de"
+    // 1.4. Quantidades indefinidas (uns, algumas, vários, etc.)
+    // Se não encontrou quantidade específica, mas tem palavras de quantidade indefinida
+    if (!quantity) {
+      const indefinidas = ['uns', 'umas', 'alguns', 'algumas', 'vários', 'várias', 'um monte', 'muitos', 'muitas'];
+      const temIndefinida = indefinidas.some(palavra => lowerMessage.includes(palavra));
+      if (temIndefinida) {
+        // Quantidade padrão para indefinidos (pode perguntar depois)
+        quantity = 5; // Quantidade padrão
+      }
+    }
+    
+    // ============================================
+    // ETAPA 2: REMOVER PALAVRAS DE AÇÃO (múltiplas variações)
+    // ============================================
+    let productName = lowerMessage;
+    
+    // Lista completa de palavras/frases de ação
+    const acoes = [
+      'quero', 'preciso', 'comprar', 'pedir', 'vou querer', 'gostaria de',
+      'desejo', 'vou comprar', 'preciso de', 'queria', 'ia querer',
+      'me manda', 'manda', 'pode ser', 'faz', 'me faz', 'faz pra mim',
+      'pode me enviar', 'tem como', 'dá pra', 'dá pra fazer', 'dá pra me enviar',
+      'seria possível', 'poderia', 'pode me mandar', 'me envia', 'envia',
+      'vou pedir', 'vou comprar', 'quero comprar', 'preciso comprar',
+      'quero pedir', 'preciso pedir', 'quero encomendar', 'preciso encomendar',
+      'quero encomendar', 'preciso encomendar', 'quero fazer pedido',
+      'preciso fazer pedido', 'quero fazer um pedido', 'preciso fazer um pedido',
+      'quero fazer uma encomenda', 'preciso fazer uma encomenda',
+      'quero fazer encomenda', 'preciso fazer encomenda',
+      'quero fazer', 'preciso fazer', 'quero', 'preciso'
+    ];
+    
+    // Remover palavras de ação (ordem importa - remover as mais longas primeiro)
+    acoes.sort((a, b) => b.length - a.length);
+    for (const acao of acoes) {
+      const regex = new RegExp(`^${acao}\\s+`, 'i');
+      productName = productName.replace(regex, '');
+    }
+    
+    // Remover interjeições e palavras de cortesia
+    productName = productName.replace(/^(por favor|pf|pfv|obrigado|obrigada|obg|vlw|valeu|tks|thanks)\s*/i, '');
+    productName = productName.replace(/\s+(por favor|pf|pfv|obrigado|obrigada|obg|vlw|valeu|tks|thanks)\s*$/i, '');
+    
+    // ============================================
+    // ETAPA 3: REMOVER QUANTIDADE DA STRING DO PRODUTO
+    // ============================================
+    
+    // Remover número se ainda estiver na string
+    if (quantity) {
+      productName = productName.replace(new RegExp(`\\b${quantity}\\b`, 'g'), '');
+    }
+    
+    // Remover números escritos por extenso
+    for (const [palavra] of Object.entries(numerosExtenso)) {
+      const regex = new RegExp(`\\b${palavra}\\b`, 'gi');
+      productName = productName.replace(regex, '');
+    }
+    
+    // Remover expressões de quantidade
+    productName = productName.replace(/\b(duzia|dúzia|meia duzia|meia dúzia|quilo|kg|kilo|gramas?|g)\b/gi, '');
+    productName = productName.replace(/\b(unidades?|unidade|un|peças?|peça|pç)\b/gi, '');
+    
+    // Remover palavras de quantidade indefinida
+    productName = productName.replace(/\b(uns|umas|alguns|algumas|vários|várias|um monte|muitos|muitas)\b/gi, '');
+    
+    // ============================================
+    // ETAPA 4: LIMPAR E NORMALIZAR NOME DO PRODUTO
+    // ============================================
+    
+    // Remover artigos no início/fim (mas manter "de" no meio)
+    productName = productName.replace(/^\s*(o|a|os|as|um|uma|d[eo]|d[ao]s|d[ae]s)\s+/gi, '');
+    productName = productName.replace(/\s+(o|a|os|as|um|uma|d[eo]|d[ao]s|d[ae]s)\s*$/gi, '');
+    
+    // Remover preposições soltas (mas manter "de" quando faz parte do nome)
+    productName = productName.replace(/\b(para|pra|com|sem|em|na|no|nas|nos)\b/gi, '');
+    
+    // Remover palavras de questionamento
+    productName = productName.replace(/\b(qual|quais|que|quem|onde|quando|como|porque|por que)\b/gi, '');
+    
+    // Remover interrogações e exclamações
+    productName = productName.replace(/[?!.,;:]+/g, '');
+    
+    // Limpar espaços múltiplos e normalizar
     productName = productName.trim().replace(/\s+/g, ' ');
-
-    // NÃO remover plural - deixar a busca lidar com isso
-    // A busca já trata singular/plural automaticamente
-
+    
+    // Remover "de" solto no início/fim (mas manter no meio)
+    productName = productName.replace(/^\s*de\s+/gi, '');
+    productName = productName.replace(/\s+de\s*$/gi, '');
+    
+    // Normalizar diminutivos comuns (brigadinho → brigadeiro, bolinho → bolo)
+    productName = productName.replace(/inho\b/gi, '');
+    productName = productName.replace(/inha\b/gi, '');
+    
     this.logger.debug(`ExtractOrderInfo: original="${message}", quantity=${quantity}, productName="${productName}"`);
 
     return {
       quantity,
-      productName: productName && productName.length >= 3 ? productName : null,
+      productName: productName && productName.length >= 2 ? productName : null,
     };
   }
 
   private findProductByName(produtos: any[], productName: string): any | null {
     if (!productName) return null;
 
-    const palavras = productName.toLowerCase().split(/\s+/).filter(p => p.length > 2);
+    // Normalizar: remover acentos para busca mais flexível
+    const normalize = (str: string) => {
+      return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+    };
+
+    const palavras = productName.toLowerCase().split(/\s+/).filter(p => p.length >= 2);
     
     if (palavras.length === 0) return null;
 
-    // Estratégia 1: Buscar por nome exato (todas as palavras)
+    // Estratégia 1: Buscar por nome exato (todas as palavras, sem acentos)
     let produto = produtos.find(p => {
-      const nomeLower = p.name.toLowerCase();
-      return palavras.every(palavra => nomeLower.includes(palavra));
+      const nomeNormalizado = normalize(p.name);
+      return palavras.every(palavra => {
+        const palavraNormalizada = normalize(palavra);
+        return nomeNormalizado.includes(palavraNormalizada);
+      });
     });
 
     // Estratégia 2: Buscar por nome completo (query completa)
     if (!produto) {
       const queryCompleta = palavras.join(' ');
-      produto = produtos.find(p => 
-        p.name.toLowerCase().includes(queryCompleta)
-      );
+      produto = produtos.find(p => {
+        const nomeNormalizado = normalize(p.name);
+        return nomeNormalizado.includes(normalize(queryCompleta));
+      });
     }
 
     // Estratégia 3: Buscar por qualquer palavra (se não encontrou)
     if (!produto) {
-      produto = produtos.find(p => 
-        palavras.some(palavra => p.name.toLowerCase().includes(palavra))
-      );
+      produto = produtos.find(p => {
+        const nomeNormalizado = normalize(p.name);
+        return palavras.some(palavra => {
+          const palavraNormalizada = normalize(palavra);
+          return nomeNormalizado.includes(palavraNormalizada);
+        });
+      });
     }
 
     // Estratégia 4: Buscar por singular/plural (brigadeiro/brigadeiros, bolo/bolos)
     if (!produto && palavras.length === 1) {
       const palavra = palavras[0];
+      const palavraNormalizada = normalize(palavra);
+      
       // Tentar com 's' no final (plural)
-      const plural = palavra + 's';
+      const plural = palavraNormalizada + 's';
       // Tentar sem 's' (singular)
-      const singular = palavra.endsWith('s') && palavra.length > 4 ? palavra.slice(0, -1) : palavra;
+      const singular = palavraNormalizada.endsWith('s') && palavraNormalizada.length > 4 
+        ? palavraNormalizada.slice(0, -1) 
+        : palavraNormalizada;
       
       produto = produtos.find(p => {
-        const nomeLower = p.name.toLowerCase();
+        const nomeNormalizado = normalize(p.name);
         // Buscar por palavra singular ou plural (incluindo no início do nome)
-        return nomeLower.includes(singular) || nomeLower.includes(plural) || 
-               nomeLower.startsWith(singular + ' ') || nomeLower.startsWith(plural + ' ') ||
-               nomeLower.startsWith(singular) || nomeLower.startsWith(plural);
+        return nomeNormalizado.includes(singular) || nomeNormalizado.includes(plural) || 
+               nomeNormalizado.startsWith(singular + ' ') || nomeNormalizado.startsWith(plural + ' ') ||
+               nomeNormalizado.startsWith(singular) || nomeNormalizado.startsWith(plural);
       });
+    }
+
+    // Estratégia 5: Busca por similaridade (erros de digitação comuns)
+    if (!produto) {
+      // Mapeamento de erros comuns de digitação
+      const correcoes: Record<string, string[]> = {
+        'brigadeiro': ['brigadeiro', 'brigadeiros', 'brigadinho', 'brigadinha'],
+        'bolo': ['bolo', 'bolos', 'bolinho', 'bolinha'],
+        'cenoura': ['cenoura', 'cenora', 'cenora'],
+        'chocolate': ['chocolate', 'chocolat', 'chocolat'],
+        'leite': ['leite', 'leite'],
+        'ninho': ['ninho', 'nino'],
+        'maracuja': ['maracuja', 'maracujá', 'maracuja'],
+        'beijinho': ['beijinho', 'beijinho', 'beijinho'],
+        'cajuzinho': ['cajuzinho', 'cajuzinho'],
+        'coxinha': ['coxinha', 'coxinha'],
+      };
+
+      // Tentar correções
+      for (const [original, variacoes] of Object.entries(correcoes)) {
+        if (palavras.some(p => variacoes.some(v => normalize(p).includes(normalize(v))))) {
+          produto = produtos.find(p => {
+            const nomeNormalizado = normalize(p.name);
+            return variacoes.some(v => nomeNormalizado.includes(normalize(v)));
+          });
+          if (produto) break;
+        }
+      }
     }
 
     return produto || null;
