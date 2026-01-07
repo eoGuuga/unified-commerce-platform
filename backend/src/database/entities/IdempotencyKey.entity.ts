@@ -12,7 +12,7 @@ import { Tenant } from './Tenant.entity';
 @Entity('idempotency_keys')
 @Index(['key_hash'], { unique: true })
 @Index(['tenant_id', 'operation_type', 'created_at'])
-@Index(['expires_at'], { where: 'expires_at < NOW()' })
+@Index(['expires_at'])
 export class IdempotencyKey {
   @PrimaryGeneratedColumn('uuid')
   id: string;

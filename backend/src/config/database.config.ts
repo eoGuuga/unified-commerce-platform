@@ -32,7 +32,7 @@ export const databaseConfig: TypeOrmModuleAsyncOptions = {
       WhatsappConversation,
       WhatsappMessage,
     ],
-    synchronize: config.get('NODE_ENV') === 'development',
+    synchronize: false, // Desabilitado - usar migrations
     logging: config.get('NODE_ENV') === 'development',
     ssl: config.get('DATABASE_URL')?.includes('supabase') ? { rejectUnauthorized: false } : false,
   }),
