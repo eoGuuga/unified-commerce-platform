@@ -79,9 +79,10 @@ export class HealthService {
       };
     } catch (error) {
       this.logger.error('Database health check failed', error);
+      const errorMessage = error instanceof Error ? error.message : 'Database connection failed';
       return {
         status: 'error',
-        message: error.message || 'Database connection failed',
+        message: errorMessage,
       };
     }
   }
@@ -106,9 +107,10 @@ export class HealthService {
       };
     } catch (error) {
       this.logger.warn('Redis health check failed', error);
+      const errorMessage = error instanceof Error ? error.message : 'Redis connection failed';
       return {
         status: 'error',
-        message: error.message || 'Redis connection failed',
+        message: errorMessage,
       };
     }
   }
