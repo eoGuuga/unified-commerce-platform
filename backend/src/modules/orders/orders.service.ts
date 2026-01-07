@@ -162,14 +162,14 @@ export class OrdersService {
   async getSalesReport(tenantId: string): Promise<any> {
     const orders = await this.findAll(tenantId);
     
-    const totalSales = orders.reduce((sum, order) => sum + parseFloat(order.total_amount), 0);
+    const totalSales = orders.reduce((sum, order) => sum + Number(order.total_amount), 0);
     const totalOrders = orders.length;
     const avgTicket = totalOrders > 0 ? totalSales / totalOrders : 0;
 
     // Sales by channel
     const salesByChannel = orders.reduce((acc, order) => {
       const channel = order.channel || 'unknown';
-      acc[channel] = (acc[channel] || 0) + parseFloat(order.total_amount);
+      acc[channel] = (acc[channel] || 0) + Number(order.total_amount);
       return acc;
     }, {} as Record<string, number>);
 
