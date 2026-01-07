@@ -73,6 +73,7 @@ export default function PDVPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [mounted, setMounted] = useState(false);
 
   const debouncedSearch = useDebounce(searchTerm, 300);
 
@@ -133,15 +134,24 @@ export default function PDVPage() {
     return filteredProducts.slice(0, 5);
   }, [filteredProducts, debouncedSearch]);
 
+  // Garantir que só execute no cliente
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     if (!token) {
       autoLogin();
     }
-  }, []);
+  }, [mounted]);
 
-  // Atalhos de teclado
+  // Atalhos de teclado (apenas no cliente)
   useEffect(() => {
+    if (!mounted) return;
+    
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl+K ou Cmd+K: Focar busca
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -220,30 +230,38 @@ export default function PDVPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart, isSelling, suggestions, selectedProductIndex, showHelp]);
+  }, [mounted, cart, isSelling, suggestions, selectedProductIndex, showHelp]);
 
   // Salvar buscas recentes
   useEffect(() => {
+    if (!mounted) return;
+    
     if (debouncedSearch && debouncedSearch.length >= 2) {
       setRecentSearches(prev => {
         const updated = [debouncedSearch, ...prev.filter(s => s !== debouncedSearch)].slice(0, 5);
-        localStorage.setItem('pdv_recent_searches', JSON.stringify(updated));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('pdv_recent_searches', JSON.stringify(updated));
+        }
         return updated;
       });
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, mounted]);
 
   // Carregar buscas recentes
   useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return;
+    
     const saved = localStorage.getItem('pdv_recent_searches');
     if (saved) {
       try {
         setRecentSearches(JSON.parse(saved));
       } catch {}
     }
-  }, []);
+  }, [mounted]);
 
   const autoLogin = async () => {
+    if (typeof window === 'undefined') return;
+    
     setIsLoggingIn(true);
     try {
       const response: any = await api.login('admin@loja.com', 'senha123');
@@ -260,7 +278,9 @@ export default function PDVPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token');
+    }
     router.push('/login');
   };
 
@@ -401,6 +421,18 @@ export default function PDVPage() {
       <div className="h-8 bg-gray-200 rounded w-20"></div>
     </div>
   );
+
+  // Evitar renderização até montar no cliente
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin text-4xl mb-4">🔄</div>
+          <p className="text-gray-600">Carregando PDV...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
