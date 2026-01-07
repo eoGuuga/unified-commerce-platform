@@ -53,7 +53,13 @@ const productsFetcher = async (tenantId: string) => {
 const ordersFetcher = async (tenantId: string) => {
   try {
     return await api.getOrders(tenantId);
-  } catch {
+  } catch (error: any) {
+    // Se for erro de autenticação, retornar array vazio silenciosamente
+    if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
+      console.warn('⚠️ Erro de autenticação ao buscar pedidos (normal se token expirou)');
+      return [];
+    }
+    console.error('Erro ao buscar pedidos:', error);
     return [];
   }
 };
@@ -116,13 +122,19 @@ export default function PDVPage() {
     }
   );
 
-  // SWR para pedidos (estatísticas)
+  // SWR para pedidos (estatísticas) - só buscar se montado e com token
   const { data: orders = [] } = useSWR<Order[]>(
-    TENANT_ID,
+    mounted ? `orders-${TENANT_ID}` : null,
     ordersFetcher,
     {
       refreshInterval: 10000,
-      revalidateOnFocus: true,
+      revalidateOnFocus: false, // Desabilitado para evitar erros 401 constantes
+      onError: (err) => {
+        // Silenciar erros 401 de pedidos (não crítico para PDV)
+        if (!err.message?.includes('401') && !err.message?.includes('Unauthorized')) {
+          console.error('Erro ao buscar pedidos:', err);
+        }
+      },
     }
   );
 
@@ -700,7 +712,7 @@ export default function PDVPage() {
                   PDV - Loja Chocola Velha
                 </h1>
                 <p className="text-sm text-gray-500 mt-1">
-                  Sistema de Vendas • {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  Sistema de Vendas • {mounted ? new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Carregando...'}
                 </p>
               </div>
               {isLoading && (
