@@ -20,7 +20,11 @@ export class HealthService {
       try {
         this.redisClient = new Redis(redisUrl);
       } catch (error) {
-        this.logger.warn('Redis not configured, health checks will skip Redis');
+        this.logger.warn('Redis initialization failed, health checks will skip Redis', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          context: { redisUrl: redisUrl ? 'configured' : 'not configured' },
+        });
       }
     }
   }
@@ -78,7 +82,11 @@ export class HealthService {
         responseTime,
       };
     } catch (error) {
-      this.logger.error('Database health check failed', error);
+      this.logger.error('Database health check failed', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { checkType: 'database' },
+      });
       const errorMessage = error instanceof Error ? error.message : 'Database connection failed';
       return {
         status: 'error',
@@ -106,7 +114,11 @@ export class HealthService {
         responseTime,
       };
     } catch (error) {
-      this.logger.warn('Redis health check failed', error);
+      this.logger.warn('Redis health check failed', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { checkType: 'redis' },
+      });
       const errorMessage = error instanceof Error ? error.message : 'Redis connection failed';
       return {
         status: 'error',

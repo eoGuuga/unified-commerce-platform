@@ -272,7 +272,16 @@ export class OrdersService {
         );
       } catch (error) {
         // Não falhar a atualização se a notificação falhar
-        this.logger.error(`Error sending order status notification: ${error}`);
+        this.logger.error('Error sending order status notification', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          context: {
+            tenantId,
+            pedidoId: id,
+            oldStatus,
+            newStatus: status,
+          },
+        });
       }
     }
 

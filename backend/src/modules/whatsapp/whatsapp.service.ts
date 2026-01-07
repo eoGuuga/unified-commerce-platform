@@ -80,7 +80,15 @@ export class WhatsappService {
       this.logger.log(`Response: ${response}`);
       return response;
     } catch (error) {
-      this.logger.error(`Error processing message: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      this.logger.error('Error processing WhatsApp message', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: {
+          from: message.from,
+          tenantId: message.tenantId,
+          messageBody: message.body?.substring(0, 100), // Limitar tamanho para logs
+        },
+      });
       return 'Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente em alguns instantes.';
     }
   }
@@ -238,7 +246,15 @@ export class WhatsappService {
 
       return await this.createOrderWithProduct(produto, quantity, tenantId, conversation);
     } catch (error) {
-      this.logger.error(`Error processing order: ${error}`);
+      this.logger.error('Error processing WhatsApp order', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: {
+          tenantId,
+          customerPhone: conversation?.customer_phone,
+          messageQuery: message?.substring(0, 100),
+        },
+      });
       return '❌ Ocorreu um erro ao processar seu pedido.\n\n' +
              '💬 Tente novamente ou digite *"ajuda"* para ver os comandos.';
     }
@@ -294,7 +310,17 @@ export class WhatsappService {
              `💬 Digite o número ou o nome do método de pagamento.\n` +
              `Exemplo: "1", "pix", "cartão de crédito"`;
     } catch (error) {
-      this.logger.error(`Error creating order: ${error}`);
+      this.logger.error('Error creating WhatsApp order', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: {
+          tenantId,
+          customerPhone: conversation?.customer_phone,
+          productId: produto?.id,
+          productName: produto?.name?.substring(0, 50),
+          quantity,
+        },
+      });
       
       if (error instanceof BadRequestException) {
         return `❌ ${error.message}\n\n` +
@@ -697,7 +723,11 @@ export class WhatsappService {
       
       return mensagem;
     } catch (error) {
-      this.logger.error(`Error getting cardapio: ${error}`);
+      this.logger.error('Error getting WhatsApp cardapio', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { tenantId },
+      });
       return 'Desculpe, não consegui buscar o cardápio no momento. Tente novamente.';
     }
   }
@@ -768,7 +798,14 @@ export class WhatsappService {
 
       return 'Não encontrei produtos. Digite "cardápio" para ver nossa lista completa.';
     } catch (error) {
-      this.logger.error(`Error getting preco: ${error}`);
+      this.logger.error('Error getting WhatsApp preco', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: {
+          tenantId,
+          messageQuery: message?.substring(0, 50),
+        },
+      });
       return 'Desculpe, não consegui buscar o preço no momento.';
     }
   }
@@ -843,7 +880,14 @@ export class WhatsappService {
 
       return 'Digite o nome do produto para verificar o estoque. Exemplo: "Estoque de brigadeiro"';
     } catch (error) {
-      this.logger.error(`Error getting estoque: ${error}`);
+      this.logger.error('Error getting WhatsApp estoque', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: {
+          tenantId,
+          messageQuery: message?.substring(0, 50),
+        },
+      });
       return 'Desculpe, não consegui verificar o estoque no momento.';
     }
   }
@@ -985,7 +1029,16 @@ export class WhatsappService {
 
       return paymentResult.message || 'Pagamento processado com sucesso!';
     } catch (error) {
-      this.logger.error(`Error processing payment selection: ${error}`);
+      this.logger.error('Error processing WhatsApp payment selection', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: {
+          tenantId,
+          customerPhone: conversation?.customer_phone,
+          pedidoId: conversation?.pedido_id || conversation?.context?.pedido_id,
+          paymentMessage: message?.substring(0, 50),
+        },
+      });
       
       if (error instanceof NotFoundException) {
         return '❌ Pedido não encontrado.\n\n' +

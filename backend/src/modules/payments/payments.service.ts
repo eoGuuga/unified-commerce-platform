@@ -150,7 +150,16 @@ export class PaymentsService {
         width: 300,
       });
     } catch (error) {
-      this.logger.error(`Error generating QR Code: ${error}`);
+      this.logger.error('Error generating QR Code for Pix payment', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: {
+          tenantId: pagamento?.tenant_id,
+          pedidoId: pagamento?.pedido_id,
+          pagamentoId: pagamento?.id,
+          method: pagamento?.method,
+        },
+      });
     }
 
     // Atualizar metadata do pagamento
@@ -369,7 +378,16 @@ export class PaymentsService {
           pedido,
         );
       } catch (error) {
-        this.logger.error(`Error sending payment confirmation notification: ${error}`);
+        this.logger.error('Error sending payment confirmation notification', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          context: {
+            tenantId: pagamento.tenant_id,
+            pagamentoId: pagamento.id,
+            pedidoId: pagamento.pedido_id,
+            status: pagamento.status,
+          },
+        });
         // Não falhar a confirmação se a notificação falhar
       }
     }
