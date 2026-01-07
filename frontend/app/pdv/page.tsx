@@ -35,7 +35,14 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/a
 
 // Fetchers para SWR
 const productsFetcher = async (tenantId: string) => {
-  return api.getProducts(tenantId);
+  try {
+    const products = await api.getProducts(tenantId);
+    console.log('Fetcher retornou produtos:', products?.length || 0);
+    return products || [];
+  } catch (error) {
+    console.error('Erro no fetcher de produtos:', error);
+    throw error;
+  }
 };
 
 const ordersFetcher = async (tenantId: string) => {
@@ -90,7 +97,10 @@ export default function PDVPage() {
       dedupingInterval: 2000, // Evitar requisições duplicadas
       onError: (err) => {
         console.error('Erro ao carregar produtos:', err);
-        // Não mostrar toast a cada erro para não poluir
+        toast.error('Erro ao carregar produtos. Verifique o console.');
+      },
+      onSuccess: (data) => {
+        console.log('Produtos carregados:', data?.length || 0);
       },
     }
   );
@@ -149,6 +159,18 @@ export default function PDVPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Debug: Log quando produtos mudarem
+  useEffect(() => {
+    if (mounted) {
+      console.log('Produtos atualizados:', {
+        count: products?.length || 0,
+        isLoading,
+        error: error?.message,
+        products: products?.slice(0, 3).map(p => p.name),
+      });
+    }
+  }, [products, isLoading, error, mounted]);
 
   // Liberar todas as reservas ao desmontar componente (fechar página)
   useEffect(() => {
@@ -791,7 +813,7 @@ export default function PDVPage() {
                   <ProductSkeleton />
                   <ProductSkeleton />
                 </div>
-              ) : isLoading && (!products || products.length === 0) ? (
+              ) : isLoading ? (
                 <div className="space-y-2">
                   <ProductSkeleton />
                   <ProductSkeleton />
@@ -800,6 +822,7 @@ export default function PDVPage() {
               ) : error ? (
                 <div className="text-center py-8">
                   <p className="text-red-500 mb-2">Erro ao carregar produtos</p>
+                  <p className="text-xs text-gray-500 mb-4">{error.message || 'Erro desconhecido'}</p>
                   <button
                     onClick={() => mutate()}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -808,8 +831,13 @@ export default function PDVPage() {
                   </button>
                 </div>
               ) : !products || products.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">Nenhum produto cadastrado</p>
-              ) : filteredProducts.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-4">Nenhum produto cadastrado</p>
+                  <p className="text-xs text-gray-400">
+                    Execute: <code className="bg-gray-100 px-2 py-1 rounded">npm.cmd run seed:mae</code> no backend
+                  </p>
+                </div>
+              ) : filteredProducts.length === 0 && searchTerm ? (
                 <p className="text-gray-500 text-center py-8">Nenhum produto encontrado para "{searchTerm}"</p>
               ) : (
                 <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
