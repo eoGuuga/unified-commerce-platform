@@ -823,9 +823,19 @@ export default function PDVPage() {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-800">📦 Produtos Disponíveis</h2>
-                <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
-                  {filteredProducts.length} {filteredProducts.length === 1 ? 'produto' : 'produtos'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => mutate()}
+                    disabled={isLoading}
+                    className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed transition-colors"
+                    title="Recarregar produtos"
+                  >
+                    {isLoading ? '🔄' : '↻'}
+                  </button>
+                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
+                    {filteredProducts.length} {filteredProducts.length === 1 ? 'produto' : 'produtos'}
+                  </span>
+                </div>
               </div>
               {isLoggingIn ? (
                 <div className="space-y-2">
@@ -852,10 +862,18 @@ export default function PDVPage() {
                 </div>
               ) : !products || products.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-500 mb-4">Nenhum produto cadastrado</p>
-                  <p className="text-xs text-gray-400">
-                    Execute: <code className="bg-gray-100 px-2 py-1 rounded">npm.cmd run seed:mae</code> no backend
-                  </p>
+                  <p className="text-gray-500 mb-4">Nenhum produto encontrado</p>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => mutate()}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      🔄 Recarregar Produtos
+                    </button>
+                    <p className="text-xs text-gray-400 mt-4">
+                      Se persistir, execute: <code className="bg-gray-100 px-2 py-1 rounded">npm.cmd run seed:mae</code> no backend
+                    </p>
+                  </div>
                 </div>
               ) : filteredProducts.length === 0 && searchTerm ? (
                 <p className="text-gray-500 text-center py-8">Nenhum produto encontrado para "{searchTerm}"</p>
