@@ -32,8 +32,28 @@ export default function PDVPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadProducts();
+    // Login automático se não houver token
+    const token = localStorage.getItem('token');
+    if (!token) {
+      autoLogin();
+    } else {
+      loadProducts();
+    }
   }, []);
+
+  const autoLogin = async () => {
+    try {
+      const response: any = await api.login('admin@loja.com', 'senha123');
+      if (response.access_token) {
+        localStorage.setItem('token', response.access_token);
+        await loadProducts();
+      }
+    } catch (err) {
+      console.error('Erro no login automático:', err);
+      setError('Erro ao fazer login automático. Verifique se o usuário padrão foi criado.');
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');

@@ -16,8 +16,9 @@
     "migration:run": "typeorm migration:run",
     "migration:revert": "typeorm migration:revert",
     "seed": "ts-node src/database/seeds/run-seeds.ts",
-    "test:acid": "node -r ts-node/register -r dotenv/config ../scripts/test-acid-transactions.ts dotenv_config_path=.env",
-    "seed:mae": "node -r ts-node/register -r dotenv/config ../scripts/seed-produtos-mae.ts dotenv_config_path=.env"
+    "test:acid": "node scripts/test-acid-wrapper.js",
+    "seed:mae": "node scripts/seed-mae-wrapper.js",
+    "seed:usuario": "node scripts/seed-usuario-wrapper.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
