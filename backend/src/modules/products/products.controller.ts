@@ -93,4 +93,38 @@ export class ProductsController {
       tenantId || '00000000-0000-0000-0000-000000000000',
     );
   }
+
+  @Get('stock-summary')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Obter resumo completo de estoque (para página de gestão)' })
+  getStockSummary(@Query('tenantId') tenantId: string) {
+    return this.productsService.getStockSummary(tenantId || '00000000-0000-0000-0000-000000000000');
+  }
+
+  @Post(':id/adjust-stock')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Ajustar estoque (adicionar ou remover quantidade)' })
+  adjustStock(
+    @Param('id') id: string,
+    @Body() adjustStockDto: { quantity: number; reason?: string },
+    @Query('tenantId') tenantId: string,
+  ) {
+    return this.productsService.adjustStock(
+      id,
+      adjustStockDto.quantity,
+      tenantId || '00000000-0000-0000-0000-000000000000',
+      adjustStockDto.reason,
+    );
+  }
+
+  @Patch(':id/min-stock')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Definir estoque mínimo (alerta)' })
+  setMinStock(
+    @Param('id') id: string,
+    @Body('min_stock') minStock: number,
+    @Query('tenantId') tenantId: string,
+  ) {
+    return this.productsService.setMinStock(id, minStock, tenantId || '00000000-0000-0000-0000-000000000000');
+  }
 }

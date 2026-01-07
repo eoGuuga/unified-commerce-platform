@@ -180,6 +180,27 @@ class ApiClient {
       throw error;
     }
   }
+
+  // Stock management endpoints
+  async getStockSummary(tenantId: string) {
+    return this.request('/products/stock-summary', { params: { tenantId } });
+  }
+
+  async adjustStock(productId: string, quantity: number, tenantId: string, reason?: string) {
+    return this.request(`/products/${productId}/adjust-stock`, {
+      method: 'POST',
+      params: { tenantId },
+      body: JSON.stringify({ quantity, reason }),
+    });
+  }
+
+  async setMinStock(productId: string, minStock: number, tenantId: string) {
+    return this.request(`/products/${productId}/min-stock`, {
+      method: 'PATCH',
+      params: { tenantId },
+      body: JSON.stringify({ min_stock: minStock }),
+    });
+  }
 }
 
 export const api = new ApiClient(API_BASE_URL);
