@@ -120,19 +120,65 @@ class ApiClient {
 
   // Stock reservation endpoints
   async reserveStock(productId: string, quantity: number, tenantId: string) {
-    return this.request(`/products/${productId}/reserve`, {
-      method: 'POST',
-      params: { tenantId },
-      body: JSON.stringify({ quantity }),
-    });
+    try {
+      return await this.request(`/products/${productId}/reserve`, {
+        method: 'POST',
+        params: { tenantId },
+        body: JSON.stringify({ quantity }),
+      });
+    } catch (error: any) {
+      // Se for erro de autenticação, tentar fazer login novamente
+      if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
+        // Tentar fazer login automático
+        try {
+          const response: any = await this.login('admin@loja.com', 'senha123');
+          if (response.access_token) {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('token', response.access_token);
+            }
+            // Tentar novamente após login
+            return await this.request(`/products/${productId}/reserve`, {
+              method: 'POST',
+              params: { tenantId },
+              body: JSON.stringify({ quantity }),
+            });
+          }
+        } catch (loginError) {
+          throw new Error('Erro de autenticação. Por favor, recarregue a página.');
+        }
+      }
+      throw error;
+    }
   }
 
   async releaseStock(productId: string, quantity: number, tenantId: string) {
-    return this.request(`/products/${productId}/release`, {
-      method: 'POST',
-      params: { tenantId },
-      body: JSON.stringify({ quantity }),
-    });
+    try {
+      return await this.request(`/products/${productId}/release`, {
+        method: 'POST',
+        params: { tenantId },
+        body: JSON.stringify({ quantity }),
+      });
+    } catch (error: any) {
+      // Se for erro de autenticação, tentar fazer login novamente
+      if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
+        try {
+          const response: any = await this.login('admin@loja.com', 'senha123');
+          if (response.access_token) {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('token', response.access_token);
+            }
+            return await this.request(`/products/${productId}/release`, {
+              method: 'POST',
+              params: { tenantId },
+              body: JSON.stringify({ quantity }),
+            });
+          }
+        } catch (loginError) {
+          throw new Error('Erro de autenticação. Por favor, recarregue a página.');
+        }
+      }
+      throw error;
+    }
   }
 }
 

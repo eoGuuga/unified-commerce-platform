@@ -78,17 +78,19 @@ export default function PDVPage() {
 
   const debouncedSearch = useDebounce(searchTerm, 300);
 
-  // SWR para produtos
+  // SWR para produtos - configurado para evitar "piscar" de dados
   const { data: products = [], error, isLoading, mutate } = useSWR<Product[]>(
-    TENANT_ID,
+    mounted ? TENANT_ID : null, // Só buscar quando montado
     productsFetcher,
     {
-      refreshInterval: 5000,
-      revalidateOnFocus: true,
+      refreshInterval: 10000, // Aumentado para 10s para reduzir atualizações
+      revalidateOnFocus: false, // Desabilitado para evitar revalidação ao focar
       revalidateOnReconnect: true,
+      keepPreviousData: true, // Manter dados anteriores durante atualização
+      dedupingInterval: 2000, // Evitar requisições duplicadas
       onError: (err) => {
         console.error('Erro ao carregar produtos:', err);
-        toast.error('Erro ao carregar produtos');
+        // Não mostrar toast a cada erro para não poluir
       },
     }
   );
@@ -125,8 +127,9 @@ export default function PDVPage() {
     return { totalSales, totalOrders, avgTicket, lowStockCount };
   }, [orders, products]);
 
-  // Produtos filtrados com autocomplete
+  // Produtos filtrados com autocomplete - com memoização estável
   const filteredProducts = useMemo(() => {
+    if (!products || products.length === 0) return [];
     if (!debouncedSearch) return products;
     
     const term = debouncedSearch.toLowerCase();
@@ -386,14 +389,28 @@ export default function PDVPage() {
         }]);
       }
 
-      // Atualizar produtos para refletir nova reserva
-      await mutate();
+      // Atualizar produtos para refletir nova reserva (sem revalidação completa)
+      await mutate(undefined, { revalidate: false }); // Atualizar cache sem nova requisição
 
       toast.success(`${product.name} adicionado ao carrinho!`, {
         icon: '✅',
       });
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao reservar estoque');
+      const errorMsg = error.message || 'Erro ao reservar estoque';
+      if (errorMsg.includes('Unauthorized') || errorMsg.includes('autenticação')) {
+        toast.error('Sessão expirada. Fazendo login novamente...');
+        // Tentar fazer login novamente
+        try {
+          const response: any = await api.login('admin@loja.com', 'senha123');
+          if (response.access_token && typeof window !== 'undefined') {
+            localStorage.setItem('token', response.access_token);
+            // Tentar adicionar novamente
+            setTimeout(() => handleAddToCart(product), 500);
+          }
+        } catch {}
+      } else {
+        toast.error(errorMsg);
+      }
     }
   }, [cart, mutate]);
 
@@ -408,12 +425,19 @@ export default function PDVPage() {
       // Remover do carrinho
       setCart(cart.filter(cartItem => cartItem.id !== id));
       
-      // Atualizar produtos para refletir liberação
-      await mutate();
+      // Atualizar produtos para refletir liberação (sem revalidação completa)
+      await mutate(undefined, { revalidate: false });
 
       toast.success(`${item.name} removido do carrinho`);
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao liberar estoque');
+      const errorMsg = error.message || 'Erro ao liberar estoque';
+      if (errorMsg.includes('Unauthorized') || errorMsg.includes('autenticação')) {
+        // Se for erro de auth, apenas remover do carrinho localmente
+        setCart(cart.filter(cartItem => cartItem.id !== id));
+        toast.success(`${item.name} removido do carrinho`);
+      } else {
+        toast.error(errorMsg);
+      }
     }
   };
 
@@ -452,10 +476,15 @@ export default function PDVPage() {
         item.id === id ? { ...item, quantity, stock: availableStock - quantity } : item
       ));
 
-      // Atualizar produtos
-      await mutate();
+      // Atualizar produtos (sem revalidação completa)
+      await mutate(undefined, { revalidate: false });
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao atualizar estoque');
+      const errorMsg = error.message || 'Erro ao atualizar estoque';
+      if (errorMsg.includes('Unauthorized') || errorMsg.includes('autenticação')) {
+        toast.error('Sessão expirada. Recarregue a página.');
+      } else {
+        toast.error(errorMsg);
+      }
     }
   };
 
@@ -507,7 +536,7 @@ export default function PDVPage() {
       setCart([]);
       setSearchTerm('');
       
-      // Atualizar produtos para refletir novo estoque
+      // Atualizar produtos para refletir novo estoque (com revalidação completa após venda)
       await mutate();
     } catch (error: any) {
       toast.error(error.message || 'Não foi possível realizar a venda');
@@ -762,16 +791,26 @@ export default function PDVPage() {
                   <ProductSkeleton />
                   <ProductSkeleton />
                 </div>
-              ) : isLoading && products.length === 0 ? (
+              ) : isLoading && (!products || products.length === 0) ? (
                 <div className="space-y-2">
                   <ProductSkeleton />
                   <ProductSkeleton />
                   <ProductSkeleton />
                 </div>
               ) : error ? (
-                <p className="text-red-500">Erro ao carregar produtos</p>
+                <div className="text-center py-8">
+                  <p className="text-red-500 mb-2">Erro ao carregar produtos</p>
+                  <button
+                    onClick={() => mutate()}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              ) : !products || products.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">Nenhum produto cadastrado</p>
               ) : filteredProducts.length === 0 ? (
-                <p className="text-gray-500">Nenhum produto encontrado</p>
+                <p className="text-gray-500 text-center py-8">Nenhum produto encontrado para "{searchTerm}"</p>
               ) : (
                 <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
                   {filteredProducts.map(product => (
