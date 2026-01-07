@@ -40,7 +40,7 @@
 | - Unitários | ⚠️ Incompletos | Alto | ALTA |
 | - Integração | ⚠️ Básicos | Alto | ALTA |
 | - E2E | ❌ Faltando | Crítico | ALTA |
-| **Rate Limiting** | ⚠️ Instalado mas não ativado | Médio | MÉDIA |
+| **Rate Limiting** | ✅ Configurado e ativo | ✅ | ✅ |
 | **Documentação** | ⚠️ Swagger incompleto | Médio | MÉDIA |
 | **DevOps** | ❌ Sem CI/CD | Alto | ALTA |
 | **Docker** | ⚠️ Sem Dockerfile | Médio | MÉDIA |
