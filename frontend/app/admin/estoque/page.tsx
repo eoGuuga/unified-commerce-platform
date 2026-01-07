@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Toaster, toast } from 'react-hot-toast';
 import useSWR from 'swr';
 import api from '@/lib/api-client';
-
-const TENANT_ID = '00000000-0000-0000-0000-000000000000';
+import { useAuth } from '@/hooks/useAuth';
+import { getDevCredentials, hasDevCredentials } from '@/lib/config';
 
 interface StockProduct {
   id: string;
@@ -27,36 +27,41 @@ interface StockSummary {
 
 export default function EstoquePage() {
   const router = useRouter();
+  const { tenantId, isAuthenticated, isLoading: authLoading, login } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'ok' | 'low' | 'out'>('all');
   const [adjustingProduct, setAdjustingProduct] = useState<string | null>(null);
   const [adjustQuantity, setAdjustQuantity] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
 
-  // Auto-login se necessário
+  // Auto-login (apenas em desenvolvimento)
   useEffect(() => {
     const autoLogin = async () => {
-      if (typeof window === 'undefined') return;
-      const token = localStorage.getItem('token');
-      if (!token) {
-        try {
-          const response: any = await api.login('admin@loja.com', 'senha123');
-          if (response.access_token) {
-            localStorage.setItem('token', response.access_token);
+      if (typeof window === 'undefined' || authLoading) return;
+      if (!isAuthenticated || !tenantId) {
+        if (process.env.NODE_ENV === 'development' && hasDevCredentials()) {
+          try {
+            const devCreds = getDevCredentials();
+            await login(devCreds.email, devCreds.password, devCreds.tenantId);
+          } catch (err) {
+            console.error('Erro no login automático:', err);
+            toast.error('Erro ao fazer login automático. Verifique as credenciais.');
           }
-        } catch (err) {
-          console.error('Erro no login automático:', err);
+        } else {
+          toast.error('Autenticação necessária. Redirecionando para login...');
+          router.push('/login');
         }
       }
     };
     autoLogin();
-  }, []);
+  }, [authLoading, isAuthenticated, tenantId, login, router]);
 
   // SWR para dados de estoque
   const { data: stockSummary, error, isLoading, mutate } = useSWR<StockSummary>(
-    typeof window !== 'undefined' ? `stock-summary-${TENANT_ID}` : null,
+    tenantId ? `stock-summary-${tenantId}` : null,
     async () => {
-      return api.getStockSummary(TENANT_ID);
+      if (!tenantId) return null;
+      return api.getStockSummary(tenantId);
     },
     {
       refreshInterval: 5000, // Atualiza a cada 5 segundos
@@ -78,8 +83,12 @@ export default function EstoquePage() {
   }) || [];
 
   const handleAdjustStock = async (productId: string, quantity: number, reason?: string) => {
+    if (!tenantId) {
+      toast.error('Tenant ID não disponível.');
+      return;
+    }
     try {
-      await api.adjustStock(productId, quantity, TENANT_ID, reason);
+      await api.adjustStock(productId, quantity, tenantId, reason);
       toast.success(`Estoque ajustado com sucesso!`);
       setAdjustingProduct(null);
       setAdjustQuantity('');
@@ -91,8 +100,12 @@ export default function EstoquePage() {
   };
 
   const handleQuickAdjust = async (productId: string, delta: number) => {
+    if (!tenantId) {
+      toast.error('Tenant ID não disponível.');
+      return;
+    }
     try {
-      await api.adjustStock(productId, delta, TENANT_ID, `Ajuste rápido: ${delta > 0 ? '+' : ''}${delta}`);
+      await api.adjustStock(productId, delta, tenantId, `Ajuste rápido: ${delta > 0 ? '+' : ''}${delta}`);
       toast.success(`Estoque ajustado!`);
       await mutate();
     } catch (error: any) {

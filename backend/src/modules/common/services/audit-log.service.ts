@@ -1,20 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, FindOptionsWhere } from 'typeorm';
 import { AuditLog } from '../../../database/entities/AuditLog.entity';
-
-export interface AuditLogParams {
-  tenantId: string;
-  userId?: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT';
-  tableName: string;
-  recordId?: string;
-  oldData?: any;
-  newData?: any;
-  ipAddress?: string;
-  userAgent?: string;
-  metadata?: Record<string, any>;
-}
+import { AuditLogParams, AuditLogFilters } from '../types/audit.types';
 
 @Injectable()
 export class AuditLogService {
@@ -30,11 +18,11 @@ export class AuditLogService {
       action: params.action,
       table_name: params.tableName,
       record_id: params.recordId,
-      old_data: params.oldData || null,
-      new_data: params.newData || null,
+      old_data: (params.oldData || null) as any, // TypeORM JSONB requer 'any'
+      new_data: (params.newData || null) as any, // TypeORM JSONB requer 'any'
       ip_address: params.ipAddress,
       user_agent: params.userAgent,
-      metadata: params.metadata || {},
+      metadata: (params.metadata || {}) as Record<string, any>, // TypeORM JSONB requer 'any'
     });
 
     return this.auditLogRepository.save(auditLog);
@@ -60,7 +48,7 @@ export class AuditLogService {
     tableName: string,
     recordId?: string,
   ): Promise<AuditLog[]> {
-    const where: any = {
+    const where: FindOptionsWhere<AuditLog> = {
       tenant_id: tenantId,
       table_name: tableName,
     };

@@ -7,7 +7,8 @@ import { OrdersService } from '../orders/orders.service';
 import { PaymentsService, CreatePaymentDto } from '../payments/payments.service';
 import { CanalVenda, PedidoStatus, Pedido } from '../../database/entities/Pedido.entity';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
-import { TypedConversation, ProductWithStock, ProductSearchResult, toTypedConversation } from './types/whatsapp.types';
+import { TypedConversation, ProductSearchResult, toTypedConversation } from './types/whatsapp.types';
+import { ProductWithStock } from '../products/types/product.types';
 
 export interface WhatsappMessage {
   from: string;

@@ -3,11 +3,9 @@
  */
 
 /**
- * Interface para dados de auditoria (old/new)
+ * Interface para dados de auditoria (old/new) - permite JSON válido
  */
-export interface AuditData {
-  [key: string]: any;
-}
+export type AuditData = Record<string, unknown> | unknown[] | string | number | boolean | null;
 
 /**
  * Interface para requisição HTTP tipada
@@ -31,7 +29,7 @@ export interface TypedRequest extends Request {
  * Interface para corpo de webhook genérico
  */
 export interface WebhookBody {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**

@@ -81,7 +81,7 @@ export class Pagamento {
     pix_copy_paste?: string; // Chave Pix para copiar e colar
     boleto_url?: string; // URL do boleto
     boleto_barcode?: string; // Código de barras do boleto
-    [key: string]: any; // Outros metadados específicos do provider
+    [key: string]: unknown; // Outros metadados específicos do provider
   };
 
   @CreateDateColumn()

@@ -1,15 +1,5 @@
 import { WhatsappConversation } from '../../../database/entities/WhatsappConversation.entity';
-import { Produto } from '../../../database/entities/Produto.entity';
-
-/**
- * Interface para produto com informações de estoque
- */
-export interface ProductWithStock extends Produto {
-  available_stock: number;
-  reserved_stock: number;
-  stock: number;
-  min_stock: number;
-}
+import { ProductWithStock } from '../../products/types/product.types';
 
 /**
  * Interface para resultado de busca de produto
@@ -25,7 +15,7 @@ export interface ProductSearchResult {
 export interface ConversationContext {
   pedido_id?: string;
   waiting_payment?: boolean;
-  [key: string]: any; // Para permitir extensibilidade
+  [key: string]: unknown; // Para permitir extensibilidade
 }
 
 /**
@@ -42,7 +32,7 @@ export interface TypedConversation {
   started_at: Date;
   last_message_at: Date;
   completed_at?: Date;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 /**

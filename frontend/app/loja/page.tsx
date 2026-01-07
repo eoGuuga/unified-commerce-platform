@@ -100,7 +100,11 @@ export default function LojaPage() {
         shipping_amount: 0,
       };
 
-      await api.createOrder(order, TENANT_ID);
+      if (!tenantId) {
+        toast.error('Tenant ID não disponível. Faça login novamente.');
+        return;
+      }
+      await api.createOrder(order, tenantId);
       alert('Pedido criado com sucesso! Entraremos em contato em breve.');
       setCart([]);
       setShowCheckout(false);

@@ -60,22 +60,22 @@ export class IdempotencyService {
     return this.idempotencyRepository.save(idempotencyKey);
   }
 
-  async markCompleted(
+  async markCompleted<T = unknown>(
     id: string,
-    result: any,
-    metadata?: Record<string, any>,
+    result: T,
+    metadata?: Record<string, unknown>,
   ): Promise<void> {
     await this.idempotencyRepository.update(id, {
       status: 'completed',
-      result,
-      metadata: metadata || {},
+      result: result as any, // TypeORM JSONB requer 'any'
+      metadata: (metadata || {}) as Record<string, any>, // TypeORM JSONB requer 'any'
     });
   }
 
-  async markFailed(id: string, metadata?: Record<string, any>): Promise<void> {
+  async markFailed(id: string, metadata?: Record<string, unknown>): Promise<void> {
     await this.idempotencyRepository.update(id, {
       status: 'failed',
-      metadata: metadata || {},
+      metadata: (metadata || {}) as Record<string, any>, // TypeORM JSONB requer 'any'
     });
   }
 

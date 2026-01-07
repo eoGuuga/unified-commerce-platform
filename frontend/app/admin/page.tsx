@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Toaster, toast } from 'react-hot-toast';
 import useSWR from 'swr';
 import api from '@/lib/api-client';
-
-const TENANT_ID = '00000000-0000-0000-0000-000000000000';
+import { useAuth } from '@/hooks/useAuth';
+import { getDevCredentials, hasDevCredentials } from '@/lib/config';
 
 interface Product {
   id: string;
@@ -43,6 +43,7 @@ interface SalesReport {
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const { tenantId, isAuthenticated, isLoading: authLoading, login } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProduct, setNewProduct] = useState({
@@ -51,36 +52,39 @@ export default function AdminDashboard() {
     description: '',
   });
 
-  // Auto-login
+  // Auto-login (apenas em desenvolvimento)
   useEffect(() => {
     const autoLogin = async () => {
-      if (typeof window === 'undefined') return;
-      const token = localStorage.getItem('token');
-      if (!token) {
-        try {
-          const response: any = await api.login('admin@loja.com', 'senha123');
-          if (response.access_token) {
-            localStorage.setItem('token', response.access_token);
+      if (typeof window === 'undefined' || authLoading) return;
+      if (!isAuthenticated || !tenantId) {
+        if (process.env.NODE_ENV === 'development' && hasDevCredentials()) {
+          try {
+            const devCreds = getDevCredentials();
+            await login(devCreds.email, devCreds.password, devCreds.tenantId);
+          } catch (err) {
+            console.error('Erro no login automático:', err);
+            toast.error('Erro ao fazer login automático. Verifique as credenciais.');
           }
-        } catch (err) {
-          console.error('Erro no login automático:', err);
+        } else {
+          toast.error('Autenticação necessária. Redirecionando para login...');
+          router.push('/login');
         }
       }
     };
     autoLogin();
-  }, []);
+  }, [authLoading, isAuthenticated, tenantId, login, router]);
 
   // SWR para produtos
   const { data: productsData, mutate: mutateProducts } = useSWR<Product[]>(
-    typeof window !== 'undefined' ? `products-${TENANT_ID}` : null,
-    () => api.getProducts(TENANT_ID),
+    tenantId ? `products-${tenantId}` : null,
+    () => tenantId ? api.getProducts(tenantId) : Promise.resolve([]),
     { refreshInterval: 10000, revalidateOnFocus: true },
   );
 
   // SWR para relatório de vendas
   const { data: salesReport, error, isLoading } = useSWR<SalesReport>(
-    typeof window !== 'undefined' ? `sales-report-${TENANT_ID}` : null,
-    () => api.getSalesReport(TENANT_ID),
+    tenantId ? `sales-report-${tenantId}` : null,
+    () => tenantId ? api.getSalesReport(tenantId) : Promise.resolve(null),
     { refreshInterval: 30000, revalidateOnFocus: true },
   );
 
@@ -98,7 +102,11 @@ export default function AdminDashboard() {
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.createProduct(newProduct, TENANT_ID);
+      if (!tenantId) {
+        toast.error('Tenant ID não disponível. Faça login novamente.');
+        return;
+      }
+      await api.createProduct(newProduct, tenantId);
       setNewProduct({ name: '', price: '', description: '' });
       setShowAddProduct(false);
       toast.success('Produto criado com sucesso!');

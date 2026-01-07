@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { ProductWithStock } from '../../products/types/product.types';
 
 @Injectable()
 export class CacheService implements OnModuleInit, OnModuleDestroy {
@@ -29,9 +30,9 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   /**
    * Salva resposta no cache
    */
-  async set(
+  async set<T = unknown>(
     key: string,
-    value: any,
+    value: T,
     ttlSeconds: number = 3600,
   ): Promise<void> {
     const serialized = JSON.stringify(value);
@@ -102,19 +103,19 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    */
   async cacheProducts(
     tenantId: string,
-    products: any[],
+    products: ProductWithStock[],
     ttlSeconds: number = 300, // 5 minutos
   ): Promise<void> {
     const key = `products:${tenantId}`;
-    await this.set(key, products, ttlSeconds);
+    await this.set<ProductWithStock[]>(key, products, ttlSeconds);
   }
 
   /**
    * Busca produtos em cache
    */
-  async getCachedProducts(tenantId: string): Promise<any[] | null> {
+  async getCachedProducts(tenantId: string): Promise<ProductWithStock[] | null> {
     const key = `products:${tenantId}`;
-    return this.get<any[]>(key);
+    return this.get<ProductWithStock[]>(key);
   }
 
   /**
