@@ -105,11 +105,18 @@ export default function PDVPage() {
   // Estatísticas em tempo real
   const stats = useMemo(() => {
     const today = new Date().toDateString();
-    const todayOrders = orders.filter((o: Order) => 
-      new Date(o.created_at).toDateString() === today
-    );
+    const todayOrders = (orders || []).filter((o: Order) => {
+      if (!o || !o.created_at) return false;
+      return new Date(o.created_at).toDateString() === today;
+    });
 
-    const totalSales = todayOrders.reduce((sum: number, o: Order) => sum + Number(o.total_amount), 0);
+    const totalSales = todayOrders.reduce((sum: number, o: Order) => {
+      const amount = o.total_amount;
+      if (amount === null || amount === undefined) return sum;
+      const numAmount = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
+      return sum + (isNaN(numAmount) ? 0 : numAmount);
+    }, 0);
+    
     const totalOrders = todayOrders.length;
     const avgTicket = totalOrders > 0 ? totalSales / totalOrders : 0;
     const lowStockCount = products.filter(p => (p.stock || 0) <= (p.min_stock || 0)).length;
@@ -461,56 +468,74 @@ export default function PDVPage() {
         }}
       />
       
-      {/* Dashboard de Estatísticas */}
+      {/* Dashboard de Estatísticas Melhorado */}
       <div className="max-w-7xl mx-auto mb-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
-            <p className="text-sm text-gray-600">Vendas Hoje</p>
-            <p className="text-2xl font-bold text-blue-600">R$ {stats.totalSales.toFixed(2)}</p>
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-100 text-sm font-medium mb-1">💰 Vendas Hoje</p>
+                <p className="text-3xl font-bold">R$ {stats.totalSales.toFixed(2)}</p>
+              </div>
+              <div className="text-4xl opacity-80">💵</div>
+            </div>
           </div>
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
-            <p className="text-sm text-gray-600">Pedidos</p>
-            <p className="text-2xl font-bold text-green-600">{stats.totalOrders}</p>
+          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-100 text-sm font-medium mb-1">📦 Pedidos</p>
+                <p className="text-3xl font-bold">{stats.totalOrders}</p>
+              </div>
+              <div className="text-4xl opacity-80">📊</div>
+            </div>
           </div>
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-purple-500">
-            <p className="text-sm text-gray-600">Ticket Médio</p>
-            <p className="text-2xl font-bold text-purple-600">R$ {stats.avgTicket.toFixed(2)}</p>
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-purple-100 text-sm font-medium mb-1">🎫 Ticket Médio</p>
+                <p className="text-3xl font-bold">R$ {stats.avgTicket.toFixed(2)}</p>
+              </div>
+              <div className="text-4xl opacity-80">📈</div>
+            </div>
           </div>
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-red-500">
-            <p className="text-sm text-gray-600">Estoque Baixo</p>
-            <p className="text-2xl font-bold text-red-600">{stats.lowStockCount}</p>
+          <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-red-100 text-sm font-medium mb-1">⚠️ Estoque Baixo</p>
+                <p className="text-3xl font-bold">{stats.lowStockCount}</p>
+              </div>
+              <div className="text-4xl opacity-80">⚠️</div>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-6 mb-4">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">PDV - Loja Chocola Velha</h1>
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  PDV - Loja Chocola Velha
+                </h1>
+                <p className="text-sm text-gray-500 mt-1">
+                  Sistema de Vendas • {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </p>
+              </div>
               {isLoading && (
-                <span className="text-xs text-gray-500 flex items-center gap-1">
+                <span className="text-xs text-blue-600 flex items-center gap-1 bg-blue-50 px-3 py-1 rounded-full">
                   <span className="animate-spin">🔄</span>
-                  Atualizando...
+                  Sincronizando...
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowHelp(!showHelp)}
-                className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                title="Ajuda (F1)"
-              >
-                ❓ Ajuda
-              </button>
-              <button
-                onClick={handleLogout}
-                disabled={isSelling}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-              >
-                Sair
-              </button>
-            </div>
+            <button
+              onClick={handleLogout}
+              disabled={isSelling}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all hover:shadow-lg"
+            >
+              Sair
+            </button>
           </div>
 
           {/* Modal de Ajuda */}
@@ -543,22 +568,35 @@ export default function PDVPage() {
             </div>
           )}
           
-          {/* Busca com Autocomplete */}
-          <div className="mb-4 relative">
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Buscar produto... (Ctrl+K para focar)"
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setShowSuggestions(true);
-                setSelectedProductIndex(-1);
-              }}
-              onFocus={() => setShowSuggestions(true)}
-              disabled={isLoading || isLoggingIn}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            />
+          {/* Busca com Autocomplete Melhorada */}
+          <div className="mb-6 relative">
+            <div className="relative">
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="🔍 Digite o nome do produto para buscar..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setShowSuggestions(true);
+                  setSelectedProductIndex(-1);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                disabled={isLoading || isLoggingIn}
+                className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setShowSuggestions(false);
+                  }}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
             
             {/* Sugestões de Autocomplete */}
             {showSuggestions && suggestions.length > 0 && searchTerm.length >= 2 && (
@@ -605,7 +643,12 @@ export default function PDVPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h2 className="text-lg font-semibold mb-3">Produtos Disponiveis ({filteredProducts.length})</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-800">📦 Produtos Disponíveis</h2>
+                <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
+                  {filteredProducts.length} {filteredProducts.length === 1 ? 'produto' : 'produtos'}
+                </span>
+              </div>
               {isLoggingIn ? (
                 <div className="space-y-2">
                   <ProductSkeleton />
@@ -623,11 +666,11 @@ export default function PDVPage() {
               ) : filteredProducts.length === 0 ? (
                 <p className="text-gray-500">Nenhum produto encontrado</p>
               ) : (
-                <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
                   {filteredProducts.map(product => (
                     <div
                       key={product.id}
-                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all hover:shadow-md"
+                      className="flex items-center justify-between p-4 border-2 border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all hover:shadow-lg bg-white"
                     >
                       <div>
                         <p className="font-medium">{product.name}</p>
@@ -649,9 +692,9 @@ export default function PDVPage() {
                       <button
                         onClick={() => handleAddToCart(product)}
                         disabled={(product.stock !== undefined && product.stock === 0) || isSelling}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95"
+                        className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 shadow-md"
                       >
-                        {product.stock === 0 ? 'Sem estoque' : 'Adicionar'}
+                        {product.stock === 0 ? '❌ Sem estoque' : '➕ Adicionar'}
                       </button>
                     </div>
                   ))}
@@ -660,12 +703,19 @@ export default function PDVPage() {
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold mb-3">Carrinho de Vendas ({cart.length})</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-800">🛒 Carrinho de Vendas</h2>
+                {cart.length > 0 && (
+                  <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+                    {cart.length} {cart.length === 1 ? 'item' : 'itens'}
+                  </span>
+                )}
+              </div>
               {cart.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <p className="text-4xl mb-2">🛒</p>
-                  <p>Carrinho vazio</p>
-                  <p className="text-xs mt-2">Use Ctrl+K para buscar produtos</p>
+                <div className="text-center py-16 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
+                  <p className="text-6xl mb-4">🛒</p>
+                  <p className="text-lg font-medium mb-2">Carrinho vazio</p>
+                  <p className="text-sm">Adicione produtos para começar uma venda</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
@@ -740,15 +790,21 @@ export default function PDVPage() {
                 </div>
               )}
 
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <div className="flex justify-between items-center mb-4">
-                  <p className="text-xl font-bold">
-                    Total: R$ {total.toFixed(2)}
-                  </p>
-                  {cart.length > 0 && (
-                    <p className="text-sm text-gray-500">
-                      {cart.reduce((sum, item) => sum + item.quantity, 0)} itens
+              <div className="mt-6 pt-6 border-t-2 border-gray-200 bg-gradient-to-br from-green-50 to-blue-50 rounded-xl p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Total da Venda</p>
+                    <p className="text-4xl font-bold text-green-600">
+                      R$ {total.toFixed(2)}
                     </p>
+                  </div>
+                  {cart.length > 0 && (
+                    <div className="text-right">
+                      <p className="text-sm text-gray-600 mb-1">Itens</p>
+                      <p className="text-2xl font-bold text-gray-800">
+                        {cart.reduce((sum, item) => sum + item.quantity, 0)}
+                      </p>
+                    </div>
                   )}
                 </div>
                 <button
@@ -761,16 +817,17 @@ export default function PDVPage() {
                       return item.quantity > (product?.stock || 0);
                     })
                   }
-                  className="w-full px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 shadow-lg"
+                  className="w-full px-6 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold text-lg rounded-xl hover:from-green-700 hover:to-green-800 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3 shadow-xl"
                 >
                   {isSelling ? (
                     <>
-                      <span className="animate-spin">🔄</span>
-                      Processando...
+                      <span className="animate-spin text-2xl">🔄</span>
+                      <span>Processando venda...</span>
                     </>
                   ) : (
                     <>
-                      💰 VENDER (Ctrl+Enter)
+                      <span className="text-2xl">💰</span>
+                      <span>FINALIZAR VENDA</span>
                     </>
                   )}
                 </button>
