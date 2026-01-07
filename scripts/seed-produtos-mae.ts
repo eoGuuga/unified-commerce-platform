@@ -375,6 +375,18 @@ const PRODUTOS_ENCOMENDA = [
   },
 ];
 
+  // ============================================
+  // PRODUTOS NORMAIS (com estoque - vendidos imediatamente)
+  // ============================================
+  // Estes produtos estão disponíveis na loja e podem ser vendidos imediatamente
+  // Aguardando lista do menu da loja...
+const PRODUTOS_NORMAIS = [
+  // Produtos normais serão adicionados aqui quando receber a lista do menu
+];
+
+  // Combinar todos os produtos
+const PRODUTOS = [...PRODUTOS_ENCOMENDA, ...PRODUTOS_NORMAIS];
+
 async function seedProdutosMae() {
   console.log('🌱 Iniciando cadastro de produtos da mãe...\n');
 
