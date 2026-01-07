@@ -50,17 +50,19 @@ Resultado: Vende 15 brigadeiros mas só tinha 10 em estoque.
 
 ## Stack Tecnologica
 
-| Componente | Tecnologia |
-|-----------|-----------|
-| **Backend** | NestJS + Node.js 20 + TypeScript |
-| **Frontend** | Next.js 16 + React 19 + Tailwind CSS |
-| **Database** | PostgreSQL 15 (Supabase) |
-| **Cache** | Redis (Upstash) |
-| **ORM** | TypeORM |
-| **Auth** | JWT + Supabase Auth |
-| **Payments** | Stripe |
-| **WhatsApp** | Twilio/360Dialog |
-| **IA** | OpenAI GPT-4 |
+| Componente | Tecnologia | Alternativa Gratuita |
+|-----------|-----------|---------------------|
+| **Backend** | NestJS + Node.js 20 + TypeScript | - |
+| **Frontend** | Next.js 16 + React 19 + Tailwind CSS | - |
+| **Database** | PostgreSQL 15 (Supabase) | ✅ **Docker Local** |
+| **Cache** | Redis (Upstash) | ✅ **Docker Local** |
+| **ORM** | TypeORM | - |
+| **Auth** | JWT + Supabase Auth | ✅ **JWT Local** |
+| **Payments** | Stripe | ✅ **Mock Provider** |
+| **WhatsApp** | Twilio/360Dialog | ✅ **Mock/Evolution API** |
+| **IA** | OpenAI GPT-4 | ✅ **Ollama (Local)** |
+
+💡 **Desenvolvimento 100% Gratuito:** Veja [`docs/02-tecnico/13-FREE-TIER-STRATEGY.md`](docs/02-tecnico/13-FREE-TIER-STRATEGY.md) para estratégia completa sem custos.
 
 ---
 
