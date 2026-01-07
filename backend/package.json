@@ -16,8 +16,8 @@
     "migration:run": "typeorm migration:run",
     "migration:revert": "typeorm migration:revert",
     "seed": "ts-node src/database/seeds/run-seeds.ts",
-    "test:acid": "cd .. && ts-node --project scripts/tsconfig.json -r dotenv/config scripts/test-acid-transactions.ts dotenv_config_path=backend/.env",
-    "seed:mae": "cd .. && ts-node --project scripts/tsconfig.json -r dotenv/config scripts/seed-produtos-mae.ts dotenv_config_path=backend/.env"
+    "test:acid": "cross-env NODE_PATH=./node_modules ts-node --project ../scripts/tsconfig.json ../scripts/test-acid-transactions.ts",
+    "seed:mae": "cross-env NODE_PATH=./node_modules ts-node --project ../scripts/tsconfig.json ../scripts/seed-produtos-mae.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -30,8 +30,8 @@
     "@nestjs/swagger": "^7.1.0",
     "@nestjs/typeorm": "^10.0.0",
     "bcrypt": "^5.1.0",
-    "class-validator": "^0.14.0",
     "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.0",
     "ioredis": "^5.3.0",
     "passport": "^0.6.0",
     "passport-jwt": "^4.0.1",
@@ -54,6 +54,7 @@
     "@types/uuid": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
+    "cross-env": "^10.1.0",
     "eslint": "^8.50.0",
     "jest": "^29.0.0",
     "source-map-support": "^0.5.21",
