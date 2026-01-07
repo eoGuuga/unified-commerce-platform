@@ -24,6 +24,95 @@
 
 ---
 
+## 🔧 MELHORIAS CRÍTICAS DE INFRAESTRUTURA (ANTES DE TUDO) ⭐⭐⭐
+
+**Objetivo:** Garantir base sólida, segura e documentada antes de adicionar features.
+
+### 0.1 Configurar Swagger/OpenAPI (Documentação Automática)
+
+**Por quê:** API sem documentação não é profissional. Swagger permite testar e entender a API visualmente.
+
+**Features:**
+- [ ] Configurar SwaggerModule no `main.ts`
+- [ ] Documentar todos os endpoints com `@ApiOperation`, `@ApiResponse`
+- [ ] Adicionar DTOs com `@ApiProperty` para documentação automática
+- [ ] Interface visual em `/api/docs` (Swagger UI)
+
+**Arquivo:** `backend/src/main.ts`
+
+**Tempo estimado:** 1 dia
+
+---
+
+### 0.2 Exception Filters Globais (Tratamento de Erros Perfeito)
+
+**Por quê:** Erros inconsistentes confundem. Filtros globais garantem respostas padronizadas.
+
+**Features:**
+- [ ] Criar `HttpExceptionFilter` global
+- [ ] Formatar erros consistentemente
+- [ ] Logging estruturado de erros
+- [ ] Mensagens de erro amigáveis (sem expor detalhes internos)
+
+**Arquivo:** `backend/src/common/filters/http-exception.filter.ts`
+
+**Tempo estimado:** 0.5 dia
+
+---
+
+### 0.3 Rate Limiting (Proteção contra Abuso)
+
+**Por quê:** APIs sem rate limiting podem ser abusadas ou derrubadas por DDoS.
+
+**Features:**
+- [ ] Instalar `@nestjs/throttler`
+- [ ] Configurar rate limiting global (ex: 100 req/min por IP)
+- [ ] Rate limiting mais restrito para endpoints críticos (login, pedidos)
+- [ ] Headers de rate limit nas respostas
+
+**Arquivo:** `backend/src/main.ts` + `backend/src/app.module.ts`
+
+**Tempo estimado:** 0.5 dia
+
+---
+
+### 0.4 Error Boundaries no Frontend
+
+**Por quê:** Quando algo quebra, usuário vê tela branca. Error boundaries mostram erro amigável.
+
+**Features:**
+- [ ] Criar `ErrorBoundary` component
+- [ ] Envolver rotas críticas (PDV, Admin)
+- [ ] Mostrar mensagem amigável + botão "Tentar novamente"
+- [ ] Log de erros para debug
+
+**Arquivo:** `frontend/components/ErrorBoundary.tsx`
+
+**Tempo estimado:** 0.5 dia
+
+---
+
+### 0.5 Health Checks Completos
+
+**Por quê:** Monitoramento é essencial. Health checks mostram status de todos os serviços.
+
+**Features:**
+- [ ] Endpoint `/health` melhorado (verificar DB, Redis)
+- [ ] Status de cada serviço (up/down)
+- [ ] Métricas básicas (uptime, versão)
+- [ ] Endpoint `/health/ready` (readiness probe)
+- [ ] Endpoint `/health/live` (liveness probe)
+
+**Arquivo:** `backend/src/modules/health/health.controller.ts`
+
+**Tempo estimado:** 0.5 dia
+
+---
+
+**Tempo total FASE 0:** 3 dias
+
+---
+
 ## 🎯 PRÓXIMOS PASSOS (ORDEM DE PRIORIDADE)
 
 ### FASE 1: Gestão de Estoque Completa (PRIORIDADE MÁXIMA) ⭐⭐⭐
@@ -225,31 +314,42 @@ Bot: "Encomenda coletada! Valor: R$ 80,00. Aguarde aprovação."
 
 ---
 
-## 📅 TIMELINE RECOMENDADA
+## 📅 TIMELINE RECOMENDADA (REVISADA)
 
-### Esta Semana (Dias 1-3):
+### Esta Semana (Dias 1-3): INFRAESTRUTURA PERFEITA
+1. **Swagger/OpenAPI** configurado
+2. **Exception Filters** globais
+3. **Rate Limiting** implementado
+4. **Error Boundaries** no frontend
+5. **Health Checks** completos
+
+**Resultado:** Base sólida, segura e documentada ✅
+
+---
+
+### Próxima Semana (Dias 4-6): GESTÃO DE ESTOQUE
 1. **Página `/admin/estoque`** completa
    - Lista de produtos
    - Ajustes de estoque
    - Alertas visuais
 
-### Próxima Semana (Dias 4-6):
+### Semana 3 (Dias 7-9): DASHBOARD ADMIN
 2. **Dashboard Admin** melhorado
    - Métricas visuais
    - Gráficos
    - Listas relevantes
 
-### Semana 3 (Dias 7-10):
+### Semana 4 (Dias 10-12): BOT WHATSAPP BÁSICO
 3. **Bot WhatsApp Básico**
    - Respostas automáticas
    - Processamento de pedidos simples
 
-### Semana 4 (Dias 11-14):
+### Semana 5 (Dias 13-16): FLUXO DE ENCOMENDAS
 4. **Fluxo de Encomendas**
    - Coleta de informações
    - Página de aprovação
 
-### Semana 5 (Dias 15-16):
+### Semana 6 (Dias 17-18): INTEGRAÇÃO OLLAMA
 5. **Integração Ollama**
    - IA local
    - Respostas mais inteligentes
@@ -278,17 +378,46 @@ Bot: "Encomenda coletada! Valor: R$ 80,00. Aguarde aprovação."
 
 ---
 
-## 🚀 PRÓXIMO PASSO IMEDIATO
+## 🚀 PRÓXIMO PASSO IMEDIATO (REVISADO)
 
-**Começar pela FASE 1: Página `/admin/estoque`**
+**Começar pela FASE 0: Infraestrutura Perfeita**
 
-1. Criar estrutura da página
-2. Implementar lista de produtos com estoque
-3. Adicionar ajustes de estoque
-4. Implementar alertas visuais
-5. Testar com dados reais
+1. **Configurar Swagger** (documentação automática)
+2. **Exception Filters** globais (erros consistentes)
+3. **Rate Limiting** (proteção)
+4. **Error Boundaries** (UX quando quebra)
+5. **Health Checks** completos (monitoramento)
 
-**Arquivo a criar:** `frontend/app/admin/estoque/page.tsx`
+**Depois:** FASE 1 - Gestão de Estoque
+
+---
+
+## ✅ CRITÉRIOS DE PERFEIÇÃO (ATUALIZADOS)
+
+### Infraestrutura:
+- ✅ API 100% documentada (Swagger)
+- ✅ Erros tratados consistentemente
+- ✅ Proteção contra abuso (rate limiting)
+- ✅ UX perfeita mesmo quando quebra (error boundaries)
+- ✅ Monitoramento completo (health checks)
+
+### Gestão de Estoque:
+- ✅ Visual profissional e intuitivo
+- ✅ Atualização em tempo real
+- ✅ Alertas automáticos
+- ✅ Histórico completo
+
+### Dashboard:
+- ✅ Métricas relevantes
+- ✅ Visual impressionante
+- ✅ Dados atualizados
+- ✅ Performance rápida
+
+### Bot WhatsApp:
+- ✅ 80% mensagens automatizadas
+- ✅ Respostas naturais
+- ✅ Encomendas coletadas automaticamente
+- ✅ Integração perfeita com sistema
 
 ---
 
