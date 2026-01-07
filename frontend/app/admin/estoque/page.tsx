@@ -33,22 +33,39 @@ export default function EstoquePage() {
   const [adjustQuantity, setAdjustQuantity] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
 
+  // Auto-login se necessário
+  useEffect(() => {
+    const autoLogin = async () => {
+      if (typeof window === 'undefined') return;
+      const token = localStorage.getItem('token');
+      if (!token) {
+        try {
+          const response: any = await api.login('admin@loja.com', 'senha123');
+          if (response.access_token) {
+            localStorage.setItem('token', response.access_token);
+          }
+        } catch (err) {
+          console.error('Erro no login automático:', err);
+        }
+      }
+    };
+    autoLogin();
+  }, []);
+
   // SWR para dados de estoque
   const { data: stockSummary, error, isLoading, mutate } = useSWR<StockSummary>(
-    `stock-summary-${TENANT_ID}`,
+    typeof window !== 'undefined' ? `stock-summary-${TENANT_ID}` : null,
     async () => {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      if (!token) {
-        await api.login('admin@loja.com', 'senha123');
-      }
       return api.getStockSummary(TENANT_ID);
     },
     {
       refreshInterval: 5000, // Atualiza a cada 5 segundos
       revalidateOnFocus: true,
-      onError: (err) => {
+      onError: (err: any) => {
         console.error('Erro ao carregar estoque:', err);
-        toast.error('Erro ao carregar estoque. Verifique o console (F12).');
+        if (!err.message?.includes('401')) {
+          toast.error('Erro ao carregar estoque. Verifique o console (F12).');
+        }
       },
     },
   );
