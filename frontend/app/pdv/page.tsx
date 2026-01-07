@@ -230,9 +230,14 @@ export default function PDVPage() {
     
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     if (!token) {
+      console.log('Token não encontrado, fazendo login automático...');
       autoLogin();
+    } else {
+      console.log('Token encontrado, forçando carregamento de produtos...');
+      // Forçar revalidação após montar
+      setTimeout(() => mutate(), 500);
     }
-  }, [mounted]);
+  }, [mounted, mutate]);
 
   // Atalhos de teclado (apenas no cliente)
   useEffect(() => {
@@ -350,10 +355,15 @@ export default function PDVPage() {
     
     setIsLoggingIn(true);
     try {
+      console.log('Fazendo login automático...');
       const response: any = await api.login('admin@loja.com', 'senha123');
       if (response.access_token) {
         localStorage.setItem('token', response.access_token);
-        await mutate();
+        console.log('Login realizado, carregando produtos...');
+        // Aguardar um pouco antes de forçar revalidação
+        setTimeout(() => {
+          mutate();
+        }, 300);
       }
     } catch (err) {
       console.error('Erro no login automático:', err);
