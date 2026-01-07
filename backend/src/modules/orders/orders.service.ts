@@ -181,12 +181,85 @@ export class OrdersService {
       return acc;
     }, {} as Record<string, number>);
 
+    // Top produtos mais vendidos
+    const productSales = new Map<string, { name: string; quantity: number; revenue: number }>();
+    
+    for (const order of orders) {
+      if (order.itens && Array.isArray(order.itens)) {
+        for (const item of order.itens) {
+          const produtoId = item.produto_id;
+          const produto = item.produto;
+          const produtoName = produto?.name || `Produto ${produtoId}`;
+          
+          if (!productSales.has(produtoId)) {
+            productSales.set(produtoId, { name: produtoName, quantity: 0, revenue: 0 });
+          }
+          
+          const productData = productSales.get(produtoId)!;
+          productData.quantity += item.quantity;
+          productData.revenue += Number(item.subtotal || item.unit_price * item.quantity);
+        }
+      }
+    }
+
+    const topProducts = Array.from(productSales.values())
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 10)
+      .map((p, index) => ({ ...p, rank: index + 1 }));
+
+    // Vendas por período (hoje, semana, mês)
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const monthAgo = new Date(today);
+    monthAgo.setMonth(monthAgo.getMonth() - 1);
+
+    const salesToday = orders
+      .filter((o) => new Date(o.created_at) >= today)
+      .reduce((sum, o) => sum + Number(o.total_amount), 0);
+    
+    const salesThisWeek = orders
+      .filter((o) => new Date(o.created_at) >= weekAgo)
+      .reduce((sum, o) => sum + Number(o.total_amount), 0);
+    
+    const salesThisMonth = orders
+      .filter((o) => new Date(o.created_at) >= monthAgo)
+      .reduce((sum, o) => sum + Number(o.total_amount), 0);
+
+    // Vendas por dia (últimos 7 dias) para gráfico
+    const salesByDay: Record<string, number> = {};
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      salesByDay[dateStr] = 0;
+    }
+
+    orders.forEach((order) => {
+      const orderDate = new Date(order.created_at);
+      const dateStr = orderDate.toISOString().split('T')[0];
+      if (salesByDay[dateStr] !== undefined) {
+        salesByDay[dateStr] += Number(order.total_amount);
+      }
+    });
+
     return {
       totalSales,
       totalOrders,
       avgTicket,
       salesByChannel,
       ordersByStatus,
+      topProducts,
+      salesByPeriod: {
+        today: salesToday,
+        thisWeek: salesThisWeek,
+        thisMonth: salesThisMonth,
+      },
+      salesByDay: Object.entries(salesByDay).map(([date, value]) => ({
+        date,
+        value,
+      })),
       recentOrders: orders.slice(0, 10),
     };
   }

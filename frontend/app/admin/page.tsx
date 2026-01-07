@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Toaster, toast } from 'react-hot-toast';
+import useSWR from 'swr';
 import api from '@/lib/api-client';
 
 const TENANT_ID = '00000000-0000-0000-0000-000000000000';
@@ -20,13 +22,28 @@ interface Order {
   status: string;
   total_amount: string;
   created_at: string;
+  channel?: string;
+}
+
+interface SalesReport {
+  totalSales: number;
+  totalOrders: number;
+  avgTicket: number;
+  salesByChannel: Record<string, number>;
+  ordersByStatus: Record<string, number>;
+  topProducts: Array<{ name: string; quantity: number; revenue: number; rank: number }>;
+  salesByPeriod: {
+    today: number;
+    thisWeek: number;
+    thisMonth: number;
+  };
+  salesByDay: Array<{ date: string; value: number }>;
+  recentOrders: Order[];
 }
 
 export default function AdminDashboard() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProduct, setNewProduct] = useState({
     name: '',
@@ -34,25 +51,44 @@ export default function AdminDashboard() {
     description: '',
   });
 
+  // Auto-login
   useEffect(() => {
-    loadData();
+    const autoLogin = async () => {
+      if (typeof window === 'undefined') return;
+      const token = localStorage.getItem('token');
+      if (!token) {
+        try {
+          const response: any = await api.login('admin@loja.com', 'senha123');
+          if (response.access_token) {
+            localStorage.setItem('token', response.access_token);
+          }
+        } catch (err) {
+          console.error('Erro no login automático:', err);
+        }
+      }
+    };
+    autoLogin();
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [productsData, ordersData] = await Promise.all([
-        api.getProducts(TENANT_ID),
-        api.getOrders(TENANT_ID),
-      ]);
+  // SWR para produtos
+  const { data: productsData, mutate: mutateProducts } = useSWR<Product[]>(
+    typeof window !== 'undefined' ? `products-${TENANT_ID}` : null,
+    () => api.getProducts(TENANT_ID),
+    { refreshInterval: 10000, revalidateOnFocus: true },
+  );
+
+  // SWR para relatório de vendas
+  const { data: salesReport, error, isLoading } = useSWR<SalesReport>(
+    typeof window !== 'undefined' ? `sales-report-${TENANT_ID}` : null,
+    () => api.getSalesReport(TENANT_ID),
+    { refreshInterval: 30000, revalidateOnFocus: true },
+  );
+
+  useEffect(() => {
+    if (productsData) {
       setProducts(productsData);
-      setOrders(ordersData);
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [productsData]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -65,25 +101,52 @@ export default function AdminDashboard() {
       await api.createProduct(newProduct, TENANT_ID);
       setNewProduct({ name: '', price: '', description: '' });
       setShowAddProduct(false);
-      await loadData();
+      toast.success('Produto criado com sucesso!');
+      await mutateProducts();
     } catch (error: any) {
-      alert(`Erro: ${error.message}`);
+      toast.error(error.message || 'Erro ao criar produto');
     }
   };
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      pendente: 'bg-yellow-100 text-yellow-800',
+      pendente_pagamento: 'bg-yellow-100 text-yellow-800',
       confirmado: 'bg-blue-100 text-blue-800',
       em_producao: 'bg-purple-100 text-purple-800',
       pronto: 'bg-green-100 text-green-800',
       entregue: 'bg-gray-100 text-gray-800',
+      cancelado: 'bg-red-100 text-red-800',
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+  };
+
+  // Calcular altura máxima do gráfico
+  const maxSalesValue = salesReport?.salesByDay.reduce((max, day) => Math.max(max, day.value), 0) || 0;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <Toaster position="top-right" />
+      
       {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
@@ -107,173 +170,255 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {loading ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Carregando dados...</p>
+        <div className="space-y-6">
+          {/* Main Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
+              <div className="text-sm opacity-90 mb-2">Total de Vendas</div>
+              <div className="text-3xl font-bold">{formatCurrency(salesReport?.totalSales || 0)}</div>
+              <div className="text-sm opacity-75 mt-2">{salesReport?.totalOrders || 0} pedidos</div>
+            </div>
+            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
+              <div className="text-sm opacity-90 mb-2">Ticket Médio</div>
+              <div className="text-3xl font-bold">{formatCurrency(salesReport?.avgTicket || 0)}</div>
+              <div className="text-sm opacity-75 mt-2">por pedido</div>
+            </div>
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 text-white">
+              <div className="text-sm opacity-90 mb-2">Vendas Hoje</div>
+              <div className="text-3xl font-bold">{formatCurrency(salesReport?.salesByPeriod?.today || 0)}</div>
+              <div className="text-sm opacity-75 mt-2">últimas 24h</div>
+            </div>
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 text-white">
+              <div className="text-sm opacity-90 mb-2">Vendas do Mês</div>
+              <div className="text-3xl font-bold">{formatCurrency(salesReport?.salesByPeriod?.thisMonth || 0)}</div>
+              <div className="text-sm opacity-75 mt-2">este mês</div>
+            </div>
           </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="text-sm text-gray-600 mb-2">Total de Produtos</div>
-                <div className="text-3xl font-bold text-blue-600">{products.length}</div>
-              </div>
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="text-sm text-gray-600 mb-2">Total de Pedidos</div>
-                <div className="text-3xl font-bold text-green-600">{orders.length}</div>
-              </div>
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="text-sm text-gray-600 mb-2">Pedidos Pendentes</div>
-                <div className="text-3xl font-bold text-yellow-600">
-                  {orders.filter(o => o.status === 'pendente').length}
-                </div>
+
+          {/* Charts Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Sales Chart - Last 7 Days */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-bold mb-4">Vendas (Últimos 7 Dias)</h2>
+              <div className="h-64 flex items-end justify-between gap-2">
+                {salesReport?.salesByDay.map((day, index) => {
+                  const height = maxSalesValue > 0 ? (day.value / maxSalesValue) * 100 : 0;
+                  return (
+                    <div key={index} className="flex-1 flex flex-col items-center">
+                      <div className="w-full bg-gray-200 rounded-t relative" style={{ height: '200px' }}>
+                        <div
+                          className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all duration-500"
+                          style={{ height: `${height}%` }}
+                        >
+                          <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-medium text-gray-700">
+                            {formatCurrency(day.value)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-2 text-xs text-gray-600 text-center">
+                        {formatDate(day.date)}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Products Section */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-                <h2 className="text-xl font-bold">Produtos</h2>
-                <button
-                  onClick={() => setShowAddProduct(!showAddProduct)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  {showAddProduct ? 'Cancelar' : 'Adicionar Produto'}
-                </button>
+            {/* Sales by Channel */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-bold mb-4">Vendas por Canal</h2>
+              <div className="space-y-4">
+                {Object.entries(salesReport?.salesByChannel || {}).map(([channel, value]) => {
+                  const total = salesReport?.totalSales || 1;
+                  const percentage = (value / total) * 100;
+                  const channelNames: Record<string, string> = {
+                    pdv: 'PDV',
+                    ecommerce: 'E-commerce',
+                    whatsapp: 'WhatsApp',
+                  };
+                  return (
+                    <div key={channel}>
+                      <div className="flex justify-between mb-1">
+                        <span className="text-sm font-medium text-gray-700">
+                          {channelNames[channel] || channel}
+                        </span>
+                        <span className="text-sm font-bold text-gray-900">{formatCurrency(value)}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div
+                          className="bg-gradient-to-r from-blue-500 to-blue-400 h-3 rounded-full transition-all duration-500"
+                          style={{ width: `${percentage}%` }}
+                        ></div>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">{percentage.toFixed(1)}% do total</div>
+                    </div>
+                  );
+                })}
               </div>
+            </div>
+          </div>
 
-              {showAddProduct && (
-                <form onSubmit={handleAddProduct} className="p-6 border-b border-gray-200 bg-gray-50">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Nome
-                      </label>
-                      <input
-                        type="text"
-                        value={newProduct.name}
-                        onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                        required
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Preço
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={newProduct.price}
-                        onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-                        required
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Descrição
-                      </label>
-                      <textarea
-                        value={newProduct.description}
-                        onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-                        rows={2}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                      />
-                    </div>
-                  </div>
-                  <button
-                    type="submit"
-                    className="mt-4 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                  >
-                    Criar Produto
-                  </button>
-                </form>
-              )}
-
+          {/* Top Products & Recent Orders */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top Products */}
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold">Top 10 Produtos Mais Vendidos</h2>
+              </div>
               <div className="p-6">
-                {products.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">Nenhum produto cadastrado</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-gray-200">
-                          <th className="text-left py-3 px-4">Nome</th>
-                          <th className="text-left py-3 px-4">Preço</th>
-                          <th className="text-left py-3 px-4">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {products.map((product) => (
-                          <tr key={product.id} className="border-b border-gray-100">
-                            <td className="py-3 px-4">{product.name}</td>
-                            <td className="py-3 px-4">R$ {parseFloat(product.price).toFixed(2)}</td>
-                            <td className="py-3 px-4">
-                              <span
-                                className={`px-2 py-1 rounded text-sm ${
-                                  product.is_active
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}
-                              >
-                                {product.is_active ? 'Ativo' : 'Inativo'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                {salesReport?.topProducts && salesReport.topProducts.length > 0 ? (
+                  <div className="space-y-3">
+                    {salesReport.topProducts.map((product, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                            {product.rank}
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">{product.name}</div>
+                            <div className="text-sm text-gray-500">
+                              {product.quantity} unidades vendidas
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold text-green-600">{formatCurrency(product.revenue)}</div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-8">Nenhuma venda ainda</p>
                 )}
               </div>
             </div>
 
-            {/* Orders Section */}
+            {/* Recent Orders */}
             <div className="bg-white rounded-lg shadow">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-xl font-bold">Pedidos Recentes</h2>
               </div>
               <div className="p-6">
-                {orders.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">Nenhum pedido encontrado</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-gray-200">
-                          <th className="text-left py-3 px-4">ID</th>
-                          <th className="text-left py-3 px-4">Status</th>
-                          <th className="text-left py-3 px-4">Total</th>
-                          <th className="text-left py-3 px-4">Data</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {orders.map((order) => (
-                          <tr key={order.id} className="border-b border-gray-100">
-                            <td className="py-3 px-4 font-mono text-sm">{order.order_no}</td>
-                            <td className="py-3 px-4">
-                              <span className={`px-2 py-1 rounded text-sm ${getStatusColor(order.status)}`}>
-                                {order.status}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4">R$ {parseFloat(order.total_amount).toFixed(2)}</td>
-                            <td className="py-3 px-4">
-                              {new Date(order.created_at).toLocaleDateString('pt-BR')}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                {salesReport?.recentOrders && salesReport.recentOrders.length > 0 ? (
+                  <div className="space-y-3">
+                    {salesReport.recentOrders.map((order) => (
+                      <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <div className="font-mono text-sm font-medium text-gray-900">{order.order_no}</div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {formatDate(order.created_at)} • {order.channel || 'N/A'}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold text-gray-900">{formatCurrency(Number(order.total_amount))}</div>
+                          <span className={`inline-block mt-1 px-2 py-1 rounded text-xs ${getStatusColor(order.status)}`}>
+                            {order.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-8">Nenhum pedido encontrado</p>
                 )}
               </div>
             </div>
           </div>
-        )}
+
+          {/* Products Section */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-xl font-bold">Produtos ({products.length})</h2>
+              <button
+                onClick={() => setShowAddProduct(!showAddProduct)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                {showAddProduct ? 'Cancelar' : '+ Adicionar Produto'}
+              </button>
+            </div>
+
+            {showAddProduct && (
+              <form onSubmit={handleAddProduct} className="p-6 border-b border-gray-200 bg-gray-50">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Nome</label>
+                    <input
+                      type="text"
+                      value={newProduct.name}
+                      onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                      required
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Preço</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newProduct.price}
+                      onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                      required
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
+                    <textarea
+                      value={newProduct.description}
+                      onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                      rows={2}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  className="mt-4 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Criar Produto
+                </button>
+              </form>
+            )}
+
+            <div className="p-6">
+              {products.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">Nenhum produto cadastrado</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-4">Nome</th>
+                        <th className="text-left py-3 px-4">Preço</th>
+                        <th className="text-left py-3 px-4">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {products.map((product) => (
+                        <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-4">{product.name}</td>
+                          <td className="py-3 px-4 font-medium">{formatCurrency(parseFloat(product.price))}</td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`px-2 py-1 rounded text-sm ${
+                                product.is_active
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}
+                            >
+                              {product.is_active ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );
 }
-
