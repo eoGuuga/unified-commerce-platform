@@ -50,10 +50,21 @@ export class WhatsappService {
     const lowerMessage = message.toLowerCase().trim();
 
     // IMPORTANTE: Verificar pedidos PRIMEIRO (antes de outras respostas)
-    // Comando: Fazer Pedido
-    if (lowerMessage.includes('quero') || lowerMessage.includes('preciso') || 
-        lowerMessage.includes('comprar') || lowerMessage.includes('pedir') ||
-        lowerMessage.includes('vou querer') || lowerMessage.includes('gostaria de')) {
+    // Comando: Fazer Pedido (todas as variações)
+    const palavrasPedido = [
+      'quero', 'preciso', 'comprar', 'pedir', 'vou querer', 'gostaria de',
+      'desejo', 'vou comprar', 'preciso de', 'queria', 'ia querer',
+      'me manda', 'manda', 'pode ser', 'faz', 'me faz', 'faz pra mim',
+      'pode me enviar', 'tem como', 'dá pra', 'dá pra fazer', 'dá pra me enviar',
+      'seria possível', 'poderia', 'pode me mandar', 'me envia', 'envia',
+      'vou pedir', 'quero comprar', 'preciso comprar', 'quero pedir',
+      'preciso pedir', 'quero encomendar', 'preciso encomendar',
+      'quero fazer pedido', 'preciso fazer pedido', 'quero fazer um pedido',
+      'preciso fazer um pedido', 'quero fazer uma encomenda', 'preciso fazer uma encomenda',
+      'quero fazer encomenda', 'preciso fazer encomenda', 'quero fazer', 'preciso fazer'
+    ];
+    
+    if (palavrasPedido.some(palavra => lowerMessage.includes(palavra))) {
       return await this.processOrder(message, tenantId);
     }
 

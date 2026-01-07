@@ -1,0 +1,359 @@
+﻿[
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Brigadeiro Branco*\nSolicitado: 5 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "quero 5 brigadeiros"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Brigadeiro Branco*\nSolicitado: 10 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "preciso de 10 brigadeiros"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Bolo de Cenoura*\nSolicitado: 3 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "vou querer 3 bolos de chocolate"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Bolo de Cenoura*\nSolicitado: 2 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "gostaria de 2 bolos de cenoura"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "👋 Olá! Bem-vindo(a) à nossa loja!\n\nComo posso ajudar você hoje?\n\n💬 Digite *ajuda* para ver os comandos disponíveis.",
+        "Real":  "erro",
+        "Mensagem":  "desejo 1 bolo de chocolate"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "me manda 5 brigadeiros"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "manda 10 brigadeiros"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "👋 Olá! Bem-vindo(a) à nossa loja!\n\nComo posso ajudar você hoje?\n\n💬 Digite *ajuda* para ver os comandos disponíveis.",
+        "Real":  "erro",
+        "Mensagem":  "pode ser 3 bolos de chocolate?"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "faz 1 bolo de cenoura pra mim"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "👋 Olá! Bem-vindo(a) à nossa loja!\n\nComo posso ajudar você hoje?\n\n💬 Digite *ajuda* para ver os comandos disponíveis.",
+        "Real":  "erro",
+        "Mensagem":  "me faz 2 bolos de chocolate"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "pode me enviar 5 brigadeiros?"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "⚠️ *PRODUTOS COM ESTOQUE BAIXO*\n\n• Brigadeiro Teste ACID: 10 unidades\n",
+        "Real":  "erro",
+        "Mensagem":  "tem como me enviar 3 bolos?"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "dÃ¡ pra fazer 1 bolo de cenoura?"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "dÃ¡ pra me enviar 5 brigadeiros?"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "seria possÃ­vel 2 bolos?"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "poderia me enviar 10 brigadeiros?"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "OK",
+        "Resposta":  "✅ *PEDIDO CRIADO COM SUCESSO!*\n\n📦 *Bolo de Chocolate*\nQuantidade: 1 unidades\nPreço unitário: R$ 45,00\nTotal: R$ 45,00\n\n🆔 Código do pedido: *PED-20260107-014*\n📊 Status: ✅ Confirmado\n\n💬 Aguarde a confirmação do pagamento!",
+        "Real":  "sucesso",
+        "Mensagem":  "quero um bolo de chocolate"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Bolo de Cenoura*\nSolicitado: 2 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "preciso de dois bolos de cenoura"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "me manda trÃªs brigadeiros"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Brigadeiro Branco*\nSolicitado: 5 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "quero cinco brigadeiros"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Bolo de Cenoura*\nSolicitado: 10 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "preciso de dez bolos de chocolate"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Brigadeiro Branco*\nSolicitado: 1 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "quero uma dÃºzia de brigadeiros"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Brigadeiro Branco*\nSolicitado: 12 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "preciso de meia dÃºzia de brigadeiros"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "me manda um quilo de brigadeiros"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Brigadeiro Branco*\nSolicitado: 5 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "quero uns brigadeiros"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Bolo Personalizado*\nSolicitado: 5 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "preciso de algumas bolos"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "me manda vÃ¡rios brigadeiros"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Brigadeiro Branco*\nSolicitado: 5 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "quero 5 brigadeiro"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Bolo Personalizado*\nSolicitado: 2 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "preciso de 2 bolo"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "👋 Olá! Bem-vindo(a) à nossa loja!\n\nComo posso ajudar você hoje?\n\n💬 Digite *ajuda* para ver os comandos disponíveis.",
+        "Real":  "erro",
+        "Mensagem":  "me manda 3 bolos de chocolate"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Brigadeiro Branco*\nSolicitado: 5 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "quero 5 brigadeiros por favor"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Brigadeiro Branco*\nSolicitado: 10 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "preciso de 10 brigadeiros, obrigado"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "me manda 3 bolos, pf"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Bolo Personalizado*\nSolicitado: 2 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "quero 2 bolos, pfv"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Brigadeiro Branco*\nSolicitado: 5 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "quero 5 brigadeiros?"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "pode ser 3 bolos?"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❓ Não encontrei exatamente \"brigadero\", mas você quis dizer:\n\n1. *Brigadeiro Branco*\n2. *Brigadeiro Gourmet*\n3. *Brigadeiro Teste ACID*\n4. *Brigadeiro de Leite Ninho*\n5. *Brigadeiro de Maracujá*\n\n💬 Digite o número ou o nome completo do produto que você quer.",
+        "Real":  "erro",
+        "Mensagem":  "quero 5 brigadero"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Bolo de Cenoura*\nSolicitado: 2 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "preciso de 2 bolos de choclate"
+    },
+    {
+        "Esperado":  "pergunta",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "me manda 3 boli"
+    },
+    {
+        "Esperado":  "pergunta",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Bolo Personalizado*\nSolicitado: 5 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "quero 5 bol"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❓ Não encontrei exatamente \"brigadero\", mas você quis dizer:\n\n1. *Brigadeiro Branco*\n2. *Brigadeiro Gourmet*\n3. *Brigadeiro Teste ACID*\n4. *Brigadeiro de Leite Ninho*\n5. *Brigadeiro de Maracujá*\n\n💬 Digite o número ou o nome completo do produto que você quer.",
+        "Real":  "erro",
+        "Mensagem":  "preciso de 10 brigadero"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "me manda 2 bolos de cenora"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Bolo de Cenoura*\nSolicitado: 3 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "quero 3 bolos de choclate"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Bolo de Cenoura*\nSolicitado: 1 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "preciso de 1 bolo de cenoura"
+    },
+    {
+        "Esperado":  "sucesso",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "me manda 5 brigadinho"
+    },
+    {
+        "Esperado":  "pergunta",
+        "Status":  "FALHOU",
+        "Resposta":  "❌ Estoque insuficiente!\n\n*Bolo Personalizado*\nSolicitado: 2 unidades\nDisponível: 0 unidades\n\n💬 Quer fazer pedido com a quantidade disponível?",
+        "Real":  "erro",
+        "Mensagem":  "quero 2 bolinho"
+    },
+    {
+        "Esperado":  "pergunta",
+        "Status":  "OK",
+        "Resposta":  "❓ Quantos *brigadeiros* você gostaria?\n\n💬 Digite a quantidade, por exemplo:\n*\"5 brigadeiros\"* ou *\"uma dúzia\"*",
+        "Real":  "pergunta",
+        "Mensagem":  "quero brigadeiros"
+    },
+    {
+        "Esperado":  "pergunta",
+        "Status":  "OK",
+        "Resposta":  "❓ Quantos *bolos* você gostaria?\n\n💬 Digite a quantidade, por exemplo:\n*\"5 brigadeiros\"* ou *\"uma dúzia\"*",
+        "Real":  "pergunta",
+        "Mensagem":  "preciso de bolos"
+    },
+    {
+        "Esperado":  "pergunta",
+        "Status":  "FALHOU",
+        "Resposta":  "Desculpe, não entendi sua mensagem. 😅\n\n💬 Digite *ajuda* para ver como posso ajudar você!",
+        "Real":  "erro",
+        "Mensagem":  "me manda 5"
+    },
+    {
+        "Esperado":  "erro",
+        "Status":  "FALHOU",
+        "Resposta":  "❓ Quantos *quero* você gostaria?\n\n💬 Digite a quantidade, por exemplo:\n*\"5 brigadeiros\"* ou *\"uma dúzia\"*",
+        "Real":  "pergunta",
+        "Mensagem":  "quero"
+    },
+    {
+        "Esperado":  "erro",
+        "Status":  "FALHOU",
+        "Resposta":  "❓ Quantos *produto inexistente* você gostaria?\n\n💬 Digite a quantidade, por exemplo:\n*\"5 brigadeiros\"* ou *\"uma dúzia\"*",
+        "Real":  "pergunta",
+        "Mensagem":  "preciso de produto inexistente"
+    }
+]
