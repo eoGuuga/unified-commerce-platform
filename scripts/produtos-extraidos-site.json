@@ -1,0 +1,342 @@
+{
+  "fonte": "https://loucasporbrigadeiro.my.canva.site/loucas-por-brigadeiro",
+  "dataExtracao": "2025-01-07",
+  "produtos": {
+    "bolos_festa": [
+      {
+        "name": "Mini Bolo Casadinho",
+        "price": 48.00,
+        "description": "Mini bolo casadinho, peso aproximado 500 gramas (serve até 4 pessoas)",
+        "categoria": "Bolos",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Mini Bolo Ninho com Nutella",
+        "price": 52.00,
+        "description": "Mini bolo ninho com nutella, peso aproximado 500 gramas (serve até 4 pessoas)",
+        "categoria": "Bolos",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Mini Bolo Brigadeiro",
+        "price": 48.00,
+        "description": "Mini bolo brigadeiro, peso aproximado 500 gramas (serve até 4 pessoas)",
+        "categoria": "Bolos",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Mini Bolo Prestígio",
+        "price": 48.00,
+        "description": "Mini bolo prestígio, peso aproximado 500 gramas (serve até 4 pessoas)",
+        "categoria": "Bolos",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      }
+    ],
+    "doces_festa": [
+      {
+        "name": "Doces Tradicionais - 1/2 Cento",
+        "price": 95.00,
+        "description": "1/2 cento de doces tradicionais (Beijinho, Brigadeiro tradicional, Leite ninho, Bicho de pé, Prestígio, Paçoca, Sensação)",
+        "categoria": "Doces",
+        "unit": "1/2 cento",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Doces Tradicionais - Cento",
+        "price": 180.00,
+        "description": "Cento de doces tradicionais (Beijinho, Brigadeiro tradicional, Leite ninho, Bicho de pé, Prestígio, Paçoca, Sensação)",
+        "categoria": "Doces",
+        "unit": "cento",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Doces Clássicos - 1/2 Cento",
+        "price": 105.00,
+        "description": "1/2 cento de doces clássicos (Bicho de pé com nutella, Ninho com nutella, Uva com ninho, Churros, Uva com brigadeiro, Tradicional com nutella, Ferrero rocher)",
+        "categoria": "Doces",
+        "unit": "1/2 cento",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Doces Clássicos - Cento",
+        "price": 200.00,
+        "description": "Cento de doces clássicos (Bicho de pé com nutella, Ninho com nutella, Uva com ninho, Churros, Uva com brigadeiro, Tradicional com nutella, Ferrero rocher)",
+        "categoria": "Doces",
+        "unit": "cento",
+        "estoque": 0,
+        "min_stock": 0
+      }
+    ],
+    "lembrancinhas": [
+      {
+        "name": "Pão de Mel",
+        "price": 14.00,
+        "description": "Pão de mel artesanal",
+        "categoria": "Lembrancinhas",
+        "unit": "unidade",
+        "estoque": 20,
+        "min_stock": 10
+      },
+      {
+        "name": "Pastelzinho Ninho com Nutella",
+        "price": 11.00,
+        "description": "Pastelzinho recheado com ninho e nutella",
+        "categoria": "Lembrancinhas",
+        "unit": "unidade",
+        "estoque": 20,
+        "min_stock": 10
+      },
+      {
+        "name": "Brownie Tradicional",
+        "price": 12.00,
+        "description": "Brownie tradicional artesanal",
+        "categoria": "Lembrancinhas",
+        "unit": "unidade",
+        "estoque": 20,
+        "min_stock": 10
+      },
+      {
+        "name": "Brownie Duplo Ninho e Brigadeiro",
+        "price": 29.90,
+        "description": "Brownie duplo com ninho e brigadeiro",
+        "categoria": "Lembrancinhas",
+        "unit": "unidade",
+        "estoque": 15,
+        "min_stock": 8
+      },
+      {
+        "name": "Cone Trufado",
+        "price": 14.00,
+        "description": "Cone trufado (ninho e brigadeiro)",
+        "categoria": "Lembrancinhas",
+        "unit": "unidade",
+        "estoque": 20,
+        "min_stock": 10
+      },
+      {
+        "name": "Caixa Brigadeiro Belga 6 unidades",
+        "price": 26.00,
+        "description": "Caixa com brigadeiro belga - 6 unidades",
+        "categoria": "Lembrancinhas",
+        "unit": "caixa",
+        "estoque": 15,
+        "min_stock": 8
+      },
+      {
+        "name": "Caixa Brigadeiro Belga 12 unidades",
+        "price": 48.00,
+        "description": "Caixa com brigadeiro belga - 12 unidades",
+        "categoria": "Lembrancinhas",
+        "unit": "caixa",
+        "estoque": 15,
+        "min_stock": 8
+      }
+    ],
+    "sobremesas": [
+      {
+        "name": "Banoffee",
+        "price": 110.00,
+        "description": "Torta banoffee deliciosa",
+        "categoria": "Sobremesas",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Torta de Maracujá",
+        "price": 110.00,
+        "description": "Mousse levinho, base de biscoito, ganache de chocolate ao leite",
+        "categoria": "Sobremesas",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Torta de Limão",
+        "price": 110.00,
+        "description": "Mousse levinho, base de biscoito, chantilly raspas de limão",
+        "categoria": "Sobremesas",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Torta de Limão Grande",
+        "price": 130.00,
+        "description": "Torta de limão inteira - Mousse levinho, base de biscoito, chantilly raspas de limão",
+        "categoria": "Sobremesas",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Torta Supremo de Morango",
+        "price": 190.00,
+        "description": "Creme branquinho, base de biscoito, morangos frescos, finalizado com ganache ao leite",
+        "categoria": "Sobremesas",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Bombom de Uva",
+        "price": 72.00,
+        "description": "Brigadeiro ao leite cremoso, creme branquinho e uvas frescas",
+        "categoria": "Sobremesas",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Bombom de Morango",
+        "price": 72.00,
+        "description": "Brigadeiro ao leite cremoso, creme branquinho e morangos frescos",
+        "categoria": "Sobremesas",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Delícia de Abacaxi",
+        "price": 72.00,
+        "description": "Cremoso branquinho, abacaxi, bolo branco e chantilly",
+        "categoria": "Sobremesas",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Mousse de Limão",
+        "price": 72.00,
+        "description": "Mousse levinho, farofa biscoito, chantilly raspas de limão",
+        "categoria": "Sobremesas",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Banoffe",
+        "price": 72.00,
+        "description": "Farofa biscoito, creme belga, banana caramelizada, doce de leite e chantilly",
+        "categoria": "Sobremesas",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      }
+    ],
+    "bolos_gelados": [
+      {
+        "name": "Bolo Gelado Delícia de Abacaxi",
+        "price": 110.00,
+        "description": "Bolo gelado delícia de abacaxi - serve até 15 pessoas",
+        "categoria": "Bolos",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Bolo Gelado Doce de Leite com Coco",
+        "price": 110.00,
+        "description": "Bolo gelado doce de leite com coco - serve até 15 pessoas",
+        "categoria": "Bolos",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Bolo Gelado Frutas Vermelhas",
+        "price": 110.00,
+        "description": "Bolo gelado frutas vermelhas - serve até 15 pessoas",
+        "categoria": "Bolos",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Bolo Gelado Prestígio",
+        "price": 110.00,
+        "description": "Bolo gelado prestígio - serve até 15 pessoas",
+        "categoria": "Bolos",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Bolo Gelado Coco",
+        "price": 120.00,
+        "description": "Bolo gelado coco - serve até 15 pessoas",
+        "categoria": "Bolos",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Bolo Gelado Doce de Leite com Ameixa",
+        "price": 120.00,
+        "description": "Bolo gelado doce de leite com ameixa - serve até 15 pessoas",
+        "categoria": "Bolos",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Bolo Gelado Dueto Coco Cremoso",
+        "price": 120.00,
+        "description": "Bolo gelado dueto coco cremoso - serve até 15 pessoas",
+        "categoria": "Bolos",
+        "unit": "unidade",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Decoração Opcional Bolo Gelado",
+        "price": 30.00,
+        "description": "Decoração opcional: 6 morangos + 6 brigadeiros ao leite e 100 grs raspas de chocolate",
+        "categoria": "Bolos",
+        "unit": "unidade",
+        "estoque": 999,
+        "min_stock": 0
+      }
+    ],
+    "natal": [
+      {
+        "name": "Kit Feliz",
+        "price": 65.00,
+        "description": "Kit feliz: 1 chocotone gotas 400gr, 1 bala de brigadeiro 100gr, 1 cone trufado (ninho e brigadeiro), 1 brownie, sacola personalizada",
+        "categoria": "Natal",
+        "unit": "kit",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Kit Boas Festas",
+        "price": 23.00,
+        "description": "Kit boas festas: 1 chocotone gotas 400gr, 1 bala de brigadeiro 100gr, 1 cone trufado (ninho e brigadeiro), 1 brownie, sacola personalizada",
+        "categoria": "Natal",
+        "unit": "kit",
+        "estoque": 0,
+        "min_stock": 0
+      },
+      {
+        "name": "Kit Natal",
+        "price": 60.00,
+        "description": "Kit natal: 1 mini chocotone recheado (Brigadeiro), 1 brownie, 1 cone trufado (ninho e brigadeiro)",
+        "categoria": "Natal",
+        "unit": "kit",
+        "estoque": 0,
+        "min_stock": 0
+      }
+    ]
+  }
+}
