@@ -17,6 +17,9 @@ import * as path from 'path';
 config({ path: path.join(__dirname, '../backend/.env') });
 
 // Importar entities
+import { Tenant } from '../backend/src/database/entities/Tenant.entity';
+import { Usuario } from '../backend/src/database/entities/Usuario.entity';
+import { Categoria } from '../backend/src/database/entities/Categoria.entity';
 import { MovimentacaoEstoque } from '../backend/src/database/entities/MovimentacaoEstoque.entity';
 import { Produto } from '../backend/src/database/entities/Produto.entity';
 import { Pedido } from '../backend/src/database/entities/Pedido.entity';
@@ -31,7 +34,7 @@ async function testACIDTransactions() {
   const dataSource = new DataSource({
     type: 'postgres',
     url: process.env.DATABASE_URL,
-    entities: [MovimentacaoEstoque, Produto, Pedido, ItemPedido],
+    entities: [Tenant, Usuario, Categoria, MovimentacaoEstoque, Produto, Pedido, ItemPedido],
     synchronize: false,
     logging: false,
   });
@@ -51,7 +54,7 @@ async function testACIDTransactions() {
       produto = produtoRepo.create({
         tenant_id: TENANT_ID,
         name: 'Brigadeiro Teste ACID',
-        price: '10.50',
+        price: 10.50,
         description: 'Produto para teste de transações ACID',
         unit: 'unidade',
         is_active: true,
@@ -122,11 +125,11 @@ async function testACIDTransactions() {
       const pedido = manager.create(Pedido, {
         tenant_id: TENANT_ID,
         order_no: `TEST-${Date.now()}`,
-        status: 'CONFIRMADO',
-        channel: 'pdv',
+        status: 'confirmado' as any,
+        channel: 'pdv' as any,
         customer_name: 'Cliente Teste',
-        subtotal: '52.50',
-        total_amount: '52.50',
+        subtotal: 52.50,
+        total_amount: 52.50,
       });
 
       const savedPedido = await manager.save(pedido);
@@ -136,8 +139,8 @@ async function testACIDTransactions() {
         pedido_id: savedPedido.id,
         produto_id: produto.id,
         quantity: 5,
-        unit_price: '10.50',
-        subtotal: '52.50',
+        unit_price: 10.50,
+        subtotal: 52.50,
       });
 
       await manager.save(item);

@@ -1,23 +1,15 @@
 {
+  "extends": "../backend/tsconfig.json",
   "compilerOptions": {
-    "module": "commonjs",
-    "target": "ES2021",
-    "lib": ["ES2021"],
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "moduleResolution": "node",
-    "types": ["node"],
-    "typeRoots": ["../backend/node_modules/@types"]
+    "rootDir": ".",
+    "baseUrl": "../backend",
+    "paths": {
+      "*": ["node_modules/*", "../node_modules/*"]
+    }
   },
   "ts-node": {
     "compilerOptions": {
       "module": "commonjs"
-    },
-    "require": ["tsconfig-paths/register"]
+    }
   }
 }
