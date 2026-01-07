@@ -133,27 +133,34 @@ export class WhatsappService {
 
       // Se tem palavras-chave, buscar produto específico
       if (palavras.length > 0) {
-        // Primeiro: buscar por nome exato ou parcial
+        // Estratégia 1: Buscar por todas as palavras (produto composto)
+        const queryCompleta = palavras.join(' ');
         produtoEncontrado = produtos.find(p => {
           const nomeLower = p.name.toLowerCase();
-          return palavras.every(palavra => nomeLower.includes(palavra)) ||
-                 nomeLower.includes(palavras.join(' '));
+          return nomeLower.includes(queryCompleta);
         });
 
-        // Se não encontrou, usar busca do service
+        // Estratégia 2: Buscar por todas as palavras individualmente (todas devem estar no nome)
         if (!produtoEncontrado) {
-          const query = palavras.join(' ');
-          const produtosBuscados = await this.productsService.search(tenantId, query);
+          produtoEncontrado = produtos.find(p => {
+            const nomeLower = p.name.toLowerCase();
+            return palavras.every(palavra => nomeLower.includes(palavra));
+          });
+        }
+
+        // Estratégia 3: Usar busca do service
+        if (!produtoEncontrado) {
+          const produtosBuscados = await this.productsService.search(tenantId, queryCompleta);
           
           if (produtosBuscados.length > 0) {
             produtoEncontrado = produtos.find(p => p.id === produtosBuscados[0].id);
           }
         }
 
-        // Se ainda não encontrou, buscar por qualquer palavra
-        if (!produtoEncontrado) {
+        // Estratégia 4: Buscar por qualquer palavra (fallback)
+        if (!produtoEncontrado && palavras.length === 1) {
           produtoEncontrado = produtos.find(p => 
-            palavras.some(palavra => p.name.toLowerCase().includes(palavra))
+            p.name.toLowerCase().includes(palavras[0])
           );
         }
       }
@@ -196,27 +203,34 @@ export class WhatsappService {
 
       // Se tem palavras-chave, buscar produto específico
       if (palavras.length > 0) {
-        // Primeiro: buscar por nome exato ou parcial
+        // Estratégia 1: Buscar por todas as palavras (produto composto)
+        const queryCompleta = palavras.join(' ');
         produtoEncontrado = produtos.find(p => {
           const nomeLower = p.name.toLowerCase();
-          return palavras.every(palavra => nomeLower.includes(palavra)) ||
-                 nomeLower.includes(palavras.join(' '));
+          return nomeLower.includes(queryCompleta);
         });
 
-        // Se não encontrou, usar busca do service
+        // Estratégia 2: Buscar por todas as palavras individualmente (todas devem estar no nome)
         if (!produtoEncontrado) {
-          const query = palavras.join(' ');
-          const produtosBuscados = await this.productsService.search(tenantId, query);
+          produtoEncontrado = produtos.find(p => {
+            const nomeLower = p.name.toLowerCase();
+            return palavras.every(palavra => nomeLower.includes(palavra));
+          });
+        }
+
+        // Estratégia 3: Usar busca do service
+        if (!produtoEncontrado) {
+          const produtosBuscados = await this.productsService.search(tenantId, queryCompleta);
           
           if (produtosBuscados.length > 0) {
             produtoEncontrado = produtos.find(p => p.id === produtosBuscados[0].id);
           }
         }
 
-        // Se ainda não encontrou, buscar por qualquer palavra
-        if (!produtoEncontrado) {
+        // Estratégia 4: Buscar por qualquer palavra (fallback)
+        if (!produtoEncontrado && palavras.length === 1) {
           produtoEncontrado = produtos.find(p => 
-            palavras.some(palavra => p.name.toLowerCase().includes(palavra))
+            p.name.toLowerCase().includes(palavras[0])
           );
         }
       }
