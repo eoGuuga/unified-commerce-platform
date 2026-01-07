@@ -246,62 +246,64 @@ export class WhatsappService {
     // ============================================
     let quantity: number | null = null;
     
-    // 1.1. Números escritos por extenso (um, dois, três, etc.)
-    const numerosExtenso: Record<string, number> = {
-      'um': 1, 'uma': 1, 'dois': 2, 'duas': 2, 'três': 3, 'tres': 3,
-      'quatro': 4, 'cinco': 5, 'seis': 6, 'sete': 7, 'oito': 8,
-      'nove': 9, 'dez': 10, 'onze': 11, 'doze': 12, 'treze': 13,
-      'quatorze': 14, 'quinze': 15, 'dezesseis': 16, 'dezessete': 17,
-      'dezoito': 18, 'dezenove': 19, 'vinte': 20, 'trinta': 30,
-      'quarenta': 40, 'cinquenta': 50, 'cem': 100
-    };
-    
-    for (const [palavra, valor] of Object.entries(numerosExtenso)) {
-      const regex = new RegExp(`\\b${palavra}\\b`, 'i');
-      if (regex.test(lowerMessage)) {
-        quantity = valor;
-        break;
+    // 1.1. Expressões de quantidade PRIMEIRO (dúzia, meia dúzia, quilo, etc.)
+    // IMPORTANTE: Verificar ANTES de números por extenso para evitar conflitos
+    if (lowerMessage.includes('meia duzia') || lowerMessage.includes('meia dúzia')) {
+      quantity = 6;
+    } else if (lowerMessage.includes('duzia') || lowerMessage.includes('dúzia')) {
+      // Verificar se tem número antes de "dúzia" (duas dúzias, três dúzias, etc.)
+      const duziaMatch = lowerMessage.match(/(\d+)\s*(duzia|dúzia)/);
+      if (duziaMatch) {
+        quantity = parseInt(duziaMatch[1]) * 12;
+      } else if (lowerMessage.includes('uma duzia') || lowerMessage.includes('uma dúzia')) {
+        quantity = 12;
+      } else if (lowerMessage.includes('duas duzias') || lowerMessage.includes('duas dúzias')) {
+        quantity = 24;
+      } else if (lowerMessage.includes('tres duzias') || lowerMessage.includes('três dúzias')) {
+        quantity = 36;
+      } else {
+        // Se só tem "dúzia" sem número, assumir 1 dúzia = 12
+        quantity = 12;
+      }
+    } else if (lowerMessage.includes('quilo') || lowerMessage.includes('kg') || lowerMessage.includes('kilo')) {
+      // Assumir 1 quilo (pode ser ajustado depois)
+      quantity = 1;
+    } else if (lowerMessage.match(/\d+\s*(g|gramas?)/)) {
+      // Quantidade em gramas (ex: "500g de brigadeiros")
+      const gramasMatch = lowerMessage.match(/(\d+)\s*(g|gramas?)/);
+      if (gramasMatch) {
+        // Converter gramas para quantidade aproximada (ex: 500g ≈ 20 brigadeiros)
+        // Por enquanto, usar o número direto
+        quantity = parseInt(gramasMatch[1]);
       }
     }
     
-    // 1.2. Números digitais (5, 10, 100, etc.)
+    // 1.2. Números escritos por extenso (um, dois, três, etc.)
+    // IMPORTANTE: Só verificar se não encontrou quantidade nas expressões acima
+    if (!quantity) {
+      const numerosExtenso: Record<string, number> = {
+        'um': 1, 'uma': 1, 'dois': 2, 'duas': 2, 'três': 3, 'tres': 3,
+        'quatro': 4, 'cinco': 5, 'seis': 6, 'sete': 7, 'oito': 8,
+        'nove': 9, 'dez': 10, 'onze': 11, 'doze': 12, 'treze': 13,
+        'quatorze': 14, 'quinze': 15, 'dezesseis': 16, 'dezessete': 17,
+        'dezoito': 18, 'dezenove': 19, 'vinte': 20, 'trinta': 30,
+        'quarenta': 40, 'cinquenta': 50, 'cem': 100
+      };
+      
+      for (const [palavra, valor] of Object.entries(numerosExtenso)) {
+        const regex = new RegExp(`\\b${palavra}\\b`, 'i');
+        if (regex.test(lowerMessage)) {
+          quantity = valor;
+          break;
+        }
+      }
+    }
+    
+    // 1.3. Números digitais (5, 10, 100, etc.)
     if (!quantity) {
       const quantityMatch = lowerMessage.match(/(\d+)/);
       if (quantityMatch) {
         quantity = parseInt(quantityMatch[1]);
-      }
-    }
-    
-    // 1.3. Expressões de quantidade (dúzia, meia dúzia, quilo, etc.)
-    if (!quantity) {
-      // IMPORTANTE: Verificar "meia dúzia" ANTES de "dúzia" (ordem importa)
-      if (lowerMessage.includes('meia duzia') || lowerMessage.includes('meia dúzia')) {
-        quantity = 6;
-      } else if (lowerMessage.includes('duzia') || lowerMessage.includes('dúzia')) {
-        // Verificar se tem "uma" antes de "dúzia"
-        if (lowerMessage.includes('uma duzia') || lowerMessage.includes('uma dúzia')) {
-          quantity = 12;
-        } else {
-          // Se não tem "uma", pode ser "duas dúzias", "três dúzias", etc.
-          const duziaMatch = lowerMessage.match(/(\d+)\s*(duzia|dúzia)/);
-          if (duziaMatch) {
-            quantity = parseInt(duziaMatch[1]) * 12;
-          } else {
-            // Se só tem "dúzia" sem número, assumir 1 dúzia = 12
-            quantity = 12;
-          }
-        }
-      } else if (lowerMessage.includes('quilo') || lowerMessage.includes('kg') || lowerMessage.includes('kilo')) {
-        // Assumir 1 quilo (pode ser ajustado depois)
-        quantity = 1;
-      } else if (lowerMessage.match(/\d+\s*(g|gramas?)/)) {
-        // Quantidade em gramas (ex: "500g de brigadeiros")
-        const gramasMatch = lowerMessage.match(/(\d+)\s*(g|gramas?)/);
-        if (gramasMatch) {
-          // Converter gramas para quantidade aproximada (ex: 500g ≈ 20 brigadeiros)
-          // Por enquanto, usar o número direto
-          quantity = parseInt(gramasMatch[1]);
-        }
       }
     }
     
