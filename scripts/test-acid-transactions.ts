@@ -197,7 +197,7 @@ async function testACIDTransactions() {
 
     // Criar 2 pedidos simultâneos (cada um tenta comprar 30 unidades)
     const promises = [
-      dataSource.transaction(async (manager) => {
+      dataSource.transaction(async (manager: EntityManager) => {
         const estoqueLocked = await manager
           .createQueryBuilder(MovimentacaoEstoque, 'e')
           .where('e.tenant_id = :tenantId', { tenantId: TENANT_ID })
@@ -222,7 +222,7 @@ async function testACIDTransactions() {
 
         return 'SUCESSO';
       }),
-      dataSource.transaction(async (manager) => {
+      dataSource.transaction(async (manager: EntityManager) => {
         // Pequeno delay para simular simultaneidade
         await new Promise((resolve) => setTimeout(resolve, 10));
 
