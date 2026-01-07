@@ -27,6 +27,8 @@
 - **[07-SECURITY.md](./02-tecnico/07-SECURITY.md)** - Autenticação, autorização, auditoria, compliance
 - **[10-SETUP.md](./02-tecnico/10-SETUP.md)** - Setup técnico, Supabase, deploy, desenvolvimento
 - **[12-GLOSSARY.md](./02-tecnico/12-GLOSSARY.md)** - Glossário de termos técnicos e de negócio
+- **[13-FREE-TIER-STRATEGY.md](./02-tecnico/13-FREE-TIER-STRATEGY.md)** - Estratégia 100% gratuita (sem custos)
+- **[14-ADAPTACAO-OLLAMA.md](./02-tecnico/14-ADAPTACAO-OLLAMA.md)** - Guia para usar Ollama (IA gratuita)
 - **[ANALISE_COMPLETA.md](./02-tecnico/ANALISE_COMPLETA.md)** - Análise completa do estado atual do projeto
 
 ---
