@@ -274,10 +274,23 @@ export class WhatsappService {
     
     // 1.3. Expressões de quantidade (dúzia, meia dúzia, quilo, etc.)
     if (!quantity) {
-      if (lowerMessage.includes('duzia') || lowerMessage.includes('dúzia')) {
-        quantity = 12;
-      } else if (lowerMessage.includes('meia duzia') || lowerMessage.includes('meia dúzia')) {
+      // IMPORTANTE: Verificar "meia dúzia" ANTES de "dúzia" (ordem importa)
+      if (lowerMessage.includes('meia duzia') || lowerMessage.includes('meia dúzia')) {
         quantity = 6;
+      } else if (lowerMessage.includes('duzia') || lowerMessage.includes('dúzia')) {
+        // Verificar se tem "uma" antes de "dúzia"
+        if (lowerMessage.includes('uma duzia') || lowerMessage.includes('uma dúzia')) {
+          quantity = 12;
+        } else {
+          // Se não tem "uma", pode ser "duas dúzias", "três dúzias", etc.
+          const duziaMatch = lowerMessage.match(/(\d+)\s*(duzia|dúzia)/);
+          if (duziaMatch) {
+            quantity = parseInt(duziaMatch[1]) * 12;
+          } else {
+            // Se só tem "dúzia" sem número, assumir 1 dúzia = 12
+            quantity = 12;
+          }
+        }
       } else if (lowerMessage.includes('quilo') || lowerMessage.includes('kg') || lowerMessage.includes('kilo')) {
         // Assumir 1 quilo (pode ser ajustado depois)
         quantity = 1;
