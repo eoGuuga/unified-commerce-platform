@@ -7,7 +7,7 @@
 
 ## 🎯 DOCUMENTO PRINCIPAL
 
-**👉 [`00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`](./00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md)**  
+**👉 [`00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`](./00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md)**  
 **LEIA ESTE PRIMEIRO!** Contém tudo que você precisa saber para continuar.
 
 ---
@@ -17,41 +17,46 @@
 ### 🔴 CRÍTICOS (Leia Primeiro)
 
 1. **`00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`** - Documento mestre completo
-2. **`BACKEND-OPERACIONAL.md`** - Status do backend e endpoints
-3. **`RESUMO-FINAL-CORRECOES.md`** - Correções de segurança implementadas
-4. **`REVISAO-COMPLETA-SEGURANCA-E-PERFORMANCE.md`** - Análise completa de segurança
+2. **`docs/04-status/BACKEND-OPERACIONAL.md`** - Status do backend e endpoints
+3. **`docs/05-correcoes/RESUMO-FINAL-CORRECOES.md`** - Correções de segurança implementadas
+4. **`docs/05-correcoes/REVISAO-COMPLETA-SEGURANCA-E-PERFORMANCE.md`** - Análise completa de segurança
 
-### 📊 Status e Progresso
+### 📊 Status e Progresso (`docs/04-status/`)
 
-5. **`STATUS-ATUAL-2025.md`** - Status consolidado do projeto
-6. **`ESTADO-ATUAL-COMPLETO.md`** - Estado detalhado
-7. **`MIGRATION-EXECUTADA-SUCESSO.md`** - Migration 002 executada
-8. **`ERROS-CORRIGIDOS.md`** - Erros de compilação corrigidos
+5. **`docs/04-status/STATUS-ATUAL-2025.md`** - Status consolidado do projeto
+6. **`docs/04-status/ESTADO-ATUAL-COMPLETO.md`** - Estado detalhado
+7. **`docs/04-status/ESTADO-TESTES-E-DOCUMENTACAO.md`** - Estado dos testes
+8. **`docs/04-status/RESPOSTA-HONESTA-ESTADO-ATUAL.md`** - Resposta sobre estado
+9. **`docs/04-status/CHECKLIST-FINAL-PERFEITO.md`** - Checklist final
 
-### 🛠️ Guias de Implementação
+### ✅ Correções (`docs/05-correcoes/`)
 
-9. **`INSTRUCOES-MANUAIS.md`** - O que fazer manualmente
-10. **`PLANO-IMPLEMENTACAO-CORRECOES.md`** - Plano de correções
-11. **`CORRECOES-CRITICAS-IMPLEMENTADAS.md`** - Detalhes técnicos das correções
+10. **`docs/05-correcoes/TODAS-CORRECOES-IMPLEMENTADAS.md`** - Lista completa
+11. **`docs/05-correcoes/CORRECOES-CRITICAS-IMPLEMENTADAS.md`** - Detalhes técnicos
+12. **`docs/05-correcoes/CORRECOES-SEGURANCA-WHATSAPP.md`** - Correção WhatsApp
+13. **`docs/05-correcoes/ANALISE-COMPLETA-ESTADO-ATUAL.md`** - Análise completa
 
-### 📱 WhatsApp Bot
+### 📱 Implementações (`docs/06-implementacoes/`)
 
-12. **`FASE-3-2-IMPLEMENTADA.md`** - FASE 3.2 implementada
-13. **`TESTE-WHATSAPP-BOT.md`** - Testes do bot
-14. **`backend/src/modules/whatsapp/test-exemplos-pedidos.md`** - Exemplos de testes
+14. **`docs/06-implementacoes/FASE-3-2-IMPLEMENTADA.md`** - FASE 3.2 implementada
+15. **`docs/06-implementacoes/FASE-3-3-IMPLEMENTADA.md`** - FASE 3.3 implementada
+16. **`docs/06-implementacoes/SUCESSO-PDV-FUNCIONANDO.md`** - PDV funcionando
+17. **`docs/06-implementacoes/PLANO-PERFEITO-PDV.md`** - Plano do PDV
 
-### 💻 PDV
+### ⚙️ Setup (`docs/07-setup/`)
 
-15. **`SUCESSO-PDV-FUNCIONANDO.md`** - PDV funcionando
-16. **`PLANO-PERFEITO-PDV.md`** - Plano do PDV
-17. **`SOLUCAO-AUTENTICACAO-PDV.md`** - Solução de autenticação
+18. **`docs/07-setup/SETUP-INICIAL.md`** - Setup inicial
+19. **`docs/07-setup/CHECKLIST-SETUP.md`** - Checklist de setup
+20. **`docs/07-setup/VALIDACAO-SETUP.md`** - Validação do setup
+21. **`docs/07-setup/INSTRUCOES-MANUAIS.md`** - Instruções manuais
+22. **`docs/07-setup/SOLUCAO-POWERSHELL.md`** - Soluções PowerShell
 
-### ⚙️ Setup
+### 🧪 Testes (`docs/08-testes/`)
 
-18. **`SETUP-INICIAL.md`** - Setup inicial
-19. **`CHECKLIST-SETUP.md`** - Checklist de setup
-20. **`VALIDACAO-SETUP.md`** - Validação do setup
-21. **`SOLUCAO-POWERSHELL.md`** - Soluções PowerShell
+23. **`docs/08-testes/TESTE-WHATSAPP-BOT.md`** - Testes do bot
+24. **`docs/08-testes/TESTE-COMPLETO.md`** - Teste completo
+25. **`docs/08-testes/TESTE-INICIAL.md`** - Teste inicial
+26. **`backend/src/modules/whatsapp/test-exemplos-pedidos.md`** - Exemplos de testes
 
 ### 📚 Documentação Organizada (`docs/`)
 

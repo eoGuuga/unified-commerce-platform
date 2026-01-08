@@ -7,6 +7,7 @@ import { ConversationService } from './services/conversation.service';
 import { ProductsModule } from '../products/products.module';
 import { OrdersModule } from '../orders/orders.module';
 import { PaymentsModule } from '../payments/payments.module';
+import { TenantsModule } from '../tenants/tenants.module';
 import { WhatsappConversation } from '../../database/entities/WhatsappConversation.entity';
 import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity';
 
@@ -14,6 +15,7 @@ import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity'
   imports: [
     TypeOrmModule.forFeature([WhatsappConversation, WhatsappMessage]),
     ProductsModule,
+    TenantsModule, // Importar TenantsModule para validar tenant e número de WhatsApp
     forwardRef(() => OrdersModule), // forwardRef para evitar dependência circular
     forwardRef(() => PaymentsModule), // forwardRef para evitar dependência circular
   ],

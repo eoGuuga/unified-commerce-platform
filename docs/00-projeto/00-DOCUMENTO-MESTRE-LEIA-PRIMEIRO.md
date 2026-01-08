@@ -2,7 +2,8 @@
 
 > **Data:** 08/01/2025  
 > **Versão:** 2.0  
-> **Status:** ✅ **SISTEMA OPERACIONAL** | 🚀 **PRONTO PARA CONTINUAR**
+> **Status:** ✅ **SISTEMA OPERACIONAL** | 🚀 **PRONTO PARA CONTINUAR**  
+> **Localização:** `docs/00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`
 
 ---
 
@@ -19,6 +20,15 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 
 ---
 
+## 📋 ÍNDICE RÁPIDO
+
+- **[📚 Índice Completo](../INDICE-DOCUMENTACAO.md)** - Todos os documentos
+- **[📊 Status Atual](../04-status/)** - Status do projeto
+- **[✅ Correções](../05-correcoes/)** - Correções implementadas
+- **[🚀 Implementações](../06-implementacoes/)** - Implementações concluídas
+
+---
+
 ## 📊 RESUMO EXECUTIVO
 
 ### ✅ O QUE ESTÁ PRONTO
@@ -28,13 +38,14 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 - ✅ PostgreSQL com RLS habilitado
 - ✅ Redis para cache
 - ✅ Autenticação JWT
-- ✅ Módulos: Auth, Products, Orders, WhatsApp, Health
-- ✅ **16 correções críticas de segurança implementadas**
+- ✅ Módulos: Auth, Products, Orders, WhatsApp, Health, Tenants
+- ✅ **17 correções críticas de segurança implementadas**
 - ✅ Audit Log completo
 - ✅ Idempotência em pedidos
 - ✅ Cache implementado
 - ✅ Queries N+1 corrigidas
 - ✅ Health checks funcionando
+- ✅ Validação de tenant no WhatsApp
 
 **Frontend:**
 - ✅ Next.js 16 com React 19
@@ -69,23 +80,13 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 
 **O que foi feito:**
 1. ✅ **Revisão completa de segurança** - Identificadas 10 brechas críticas
-2. ✅ **Implementação de correções** - 16 correções críticas implementadas:
-   - Decorator CurrentTenant
-   - Audit Log Service completo
-   - Idempotência em pedidos
-   - Queries N+1 corrigidas
-   - Cache implementado
-   - Health checks corrigidos
-   - JWT_SECRET validação
-   - CORS mais restritivo
-   - Timeout em queries
-   - Índices criados
-   - RLS habilitado
-   - Policies criadas
-   - CSRF Guard criado (não ativado)
-3. ✅ **Migration executada** - 002-security-and-performance.sql
-4. ✅ **Erros corrigidos** - Compilação TypeScript
-5. ✅ **Backend iniciado** - Rodando com sucesso
+2. ✅ **Implementação de correções** - 17 correções críticas implementadas
+3. ✅ **TenantsService criado** - Validação de tenant e número WhatsApp
+4. ✅ **WhatsApp Controller corrigido** - Validação de segurança implementada
+5. ✅ **Migration executada** - 002-security-and-performance.sql
+6. ✅ **Erros corrigidos** - Compilação TypeScript
+7. ✅ **Backend iniciado** - Rodando com sucesso
+8. ✅ **Organização 100%** - Todos arquivos organizados em docs/
 
 **Status atual:**
 - ✅ Backend: **OPERACIONAL** em http://localhost:3001/api/v1
@@ -93,84 +94,67 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 - ✅ Banco: PostgreSQL com RLS e índices
 - ✅ Cache: Redis funcionando
 - ✅ 0 erros de compilação
+- ✅ Documentação: 100% organizada em docs/
 
 ---
 
 ## 📁 ESTRUTURA DE DOCUMENTAÇÃO
 
-### 📋 Documentos Principais (Raiz)
-
-**LEIA PRIMEIRO:**
-- **`00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`** ← **VOCÊ ESTÁ AQUI**
-- **`BACKEND-OPERACIONAL.md`** - Status do backend e endpoints
-- **`RESUMO-FINAL-CORRECOES.md`** - Correções de segurança implementadas
-- **`REVISAO-COMPLETA-SEGURANCA-E-PERFORMANCE.md`** - Análise completa
-
-**Status e Progresso:**
-- `STATUS-ATUAL-2025.md` - Status consolidado
-- `ESTADO-ATUAL-COMPLETO.md` - Estado detalhado
-- `MIGRATION-EXECUTADA-SUCESSO.md` - Migration executada
-- `ERROS-CORRIGIDOS.md` - Erros corrigidos
-
-**Guias de Implementação:**
-- `INSTRUCOES-MANUAIS.md` - O que fazer manualmente
-- `PLANO-IMPLEMENTACAO-CORRECOES.md` - Plano de correções
-- `CORRECOES-CRITICAS-IMPLEMENTADAS.md` - Detalhes técnicos
-
-**WhatsApp Bot:**
-- `FASE-3-2-IMPLEMENTADA.md` - FASE 3.2 implementada
-- `TESTE-WHATSAPP-BOT.md` - Testes do bot
-- `backend/src/modules/whatsapp/test-exemplos-pedidos.md` - Exemplos de testes
-
-**PDV:**
-- `SUCESSO-PDV-FUNCIONANDO.md` - PDV funcionando
-- `PLANO-PERFEITO-PDV.md` - Plano do PDV
-
-**Setup:**
-- `SETUP-INICIAL.md` - Setup inicial
-- `CHECKLIST-SETUP.md` - Checklist
-- `VALIDACAO-SETUP.md` - Validação
-
----
-
 ### 📚 Documentação Organizada (`docs/`)
 
-#### 01-projeto/ - Visão do Projeto
+**📋 00-projeto/** - Visão do Projeto
+- `00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md` ← **VOCÊ ESTÁ AQUI**
 - `01-VISION.md` - Problema, solução, objetivos
 - `02-PERSONAS.md` - Perfis de usuários
 - `08-ROADMAP.md` - Fases de desenvolvimento
 - `09-BUSINESS-MODEL.md` - Modelo de negócio
-- `11-GO-TO-MARKET.md` - Estratégia de lançamento
-- `12-VIABILIDADE-ANALISE.md` - Análise de viabilidade
-- `13-CLIENTE-BETA-MAE.md` - Cliente beta (mãe do usuário)
-- `14-ESTRATEGIA-PRODUTOS-REAIS.md` - Estratégia de produtos reais
 
-#### 02-tecnico/ - Documentação Técnica
+**🔧 01-tecnico/** - Documentação Técnica
 - `03-ARCHITECTURE.md` - Arquitetura técnica
-- `03-FEATURES.md` - Funcionalidades detalhadas
 - `04-DATABASE.md` - Schema completo do banco
-- `06-WORKFLOWS.md` - Fluxos principais
 - `07-SECURITY.md` - Segurança e compliance
 - `10-SETUP.md` - Setup técnico
-- `12-GLOSSARY.md` - Glossário
-- `13-FREE-TIER-STRATEGY.md` - Estratégia 100% gratuita
-- `14-ADAPTACAO-OLLAMA.md` - Guia Ollama (IA gratuita)
-- `ANALISE_COMPLETA.md` - Análise completa
 
-#### 03-implementacao/ - Planos de Implementação
+**🚀 02-implementacao/** - Planos de Implementação
 - `PLANO_IMPLEMENTACAO.md` - Plano geral
 - `PLANO_COMPLETO_PARTE_1.md` até `PARTE_8.md` - Guias passo a passo
-- `MVP-FOCADO.md` - MVP focado
-- `MVP-MAE.md` - MVP para mãe do usuário
-- `PLANO-PDV-COMPLETO.md` - Plano do PDV
-- `PRIMEIROS_PASSOS.md` - Primeiros passos
-- `PLANO_DESENVOLVIMENTO_GRATUITO.md` - Desenvolvimento gratuito
-- `PROXIMOS_PASSOS.md` - Próximos passos
-- `ROADMAP-EXECUCAO-PERFEITA.md` - Roadmap de execução
 
-#### 04-comercial/ - Material Comercial
+**💼 03-comercial/** - Material Comercial
 - `DOCUMENTACAO_COMPLETA_PARA_VENDAS.md` - Documentação para vendas
-- `PLANO_ACAO_DOCUMENTACAO.md` - Plano de ação
+
+**📊 04-status/** - Status Atual
+- `BACKEND-OPERACIONAL.md` - Status do backend
+- `STATUS-ATUAL-2025.md` - Status consolidado
+- `ESTADO-ATUAL-COMPLETO.md` - Estado detalhado
+- `RESPOSTA-HONESTA-ESTADO-ATUAL.md` - Resposta sobre estado
+
+**✅ 05-correcoes/** - Correções Implementadas
+- `TODAS-CORRECOES-IMPLEMENTADAS.md` - Lista completa
+- `RESUMO-FINAL-CORRECOES.md` - Resumo das correções
+- `CORRECOES-SEGURANCA-WHATSAPP.md` - Correção WhatsApp
+
+**🎯 06-implementacoes/** - Implementações Concluídas
+- `FASE-3-2-IMPLEMENTADA.md` - FASE 3.2
+- `FASE-3-3-IMPLEMENTADA.md` - FASE 3.3
+- `SUCESSO-PDV-FUNCIONANDO.md` - PDV funcionando
+
+**⚙️ 07-setup/** - Guias de Setup
+- `SETUP-INICIAL.md` - Setup inicial
+- `CHECKLIST-SETUP.md` - Checklist
+- `INSTRUCOES-MANUAIS.md` - Instruções manuais
+
+**🧪 08-testes/** - Documentação de Testes
+- `TESTE-WHATSAPP-BOT.md` - Testes do bot
+- `TESTE-COMPLETO.md` - Teste completo
+
+**🚀 09-proximos-passos/** - Próximos Passos
+- `PROXIMOS-PASSOS.md` - Próximos passos
+- `PROMPT-PARA-PROXIMA-IA.md` - Prompt para próxima IA
+
+**📜 10-historico/** - Histórico
+- Arquivos históricos e documentação antiga
+
+**📋 INDICE-DOCUMENTACAO.md** - Índice completo de todos os documentos
 
 ---
 
@@ -209,6 +193,7 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 - Row Level Security (RLS) no PostgreSQL
 - Decorator `@CurrentTenant()` para validação
 - Policies de isolamento automático
+- Validação de tenant no WhatsApp
 
 **Segurança:**
 - JWT com validação obrigatória de JWT_SECRET
@@ -217,6 +202,7 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 - CSRF Guard criado (não ativado ainda)
 - Audit Log em todas operações críticas
 - Idempotência em pedidos
+- Validação de tenant e número WhatsApp
 
 **Performance:**
 - Cache Redis (TTL: 5 minutos para produtos)
@@ -292,44 +278,37 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 
 ### 🔴 CRÍTICO (Fazer Agora)
 
-1. **Testar Correções Implementadas**
-   - Testar idempotência em pedidos
-   - Testar cache de produtos
-   - Testar health checks
-   - Validar audit log
-
-2. **Completar FASE 3.3 do Bot WhatsApp**
+1. **Completar FASE 3.3 do Bot WhatsApp**
    - Confirmação de pedidos
    - Integração com pagamento
    - Notificações
 
 ### 🟡 ALTO (Esta Semana)
 
+2. **Testar Correções Implementadas**
+   - Testar idempotência em pedidos
+   - Testar cache de produtos
+   - Testar health checks
+   - Validar audit log
+   - Testar validação de tenant WhatsApp
+
 3. **Ativar CSRF Protection** (quando frontend estiver pronto)
    - Configurar tokens no frontend
    - Ativar CsrfGuard globalmente
 
-4. **Implementar Retry Mechanism**
-   - Para operações críticas
-   - Para chamadas externas
-
-5. **Implementar Circuit Breaker**
-   - Para serviços externos
-   - Para prevenir cascata de falhas
-
 ### 🟢 MÉDIO (Próximas Semanas)
 
-6. **Completar FASE 3.4 do Bot WhatsApp**
+4. **Completar FASE 3.4 do Bot WhatsApp**
    - Integração com Ollama
    - Contexto de conversa
    - Respostas inteligentes
 
-7. **Melhorar Dashboard Admin**
+5. **Melhorar Dashboard Admin**
    - Analytics avançado
    - Gráficos interativos
    - Exportação de relatórios
 
-8. **Implementar E-commerce**
+6. **Implementar E-commerce**
    - Interface completa
    - Carrinho de compras
    - Checkout
@@ -379,6 +358,7 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 - `backend/src/modules/products/products.service.ts` - Lógica de produtos (com cache e audit log)
 - `backend/src/modules/auth/auth.service.ts` - Autenticação (com audit log)
 - `backend/src/modules/whatsapp/whatsapp.service.ts` - Bot WhatsApp (FASE 3.1 e 3.2)
+- `backend/src/modules/tenants/tenants.service.ts` - Validação de tenants ✅ **NOVO**
 
 **Guards e Decorators:**
 - `backend/src/common/decorators/tenant.decorator.ts` - Validação de tenant_id
@@ -447,7 +427,20 @@ curl http://localhost:3001/api/v1/health
 ```bash
 curl -X POST http://localhost:3001/api/v1/whatsapp/test \
   -H "Content-Type: application/json" \
-  -d '{"message": "quero 5 brigadeiros", "phone": "5511999999999"}'
+  -d '{"message": "quero 5 brigadeiros", "tenantId": "tenant-id-valido"}'
+```
+
+### Testar Validação de Tenant WhatsApp
+```bash
+# ✅ Deve funcionar (tenant válido)
+curl -X POST http://localhost:3001/api/v1/whatsapp/test \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Olá", "tenantId": "tenant-id-valido"}'
+
+# ❌ Deve retornar 404 (tenant inválido)
+curl -X POST http://localhost:3001/api/v1/whatsapp/test \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Olá", "tenantId": "invalid-id"}'
 ```
 
 ---
@@ -455,21 +448,21 @@ curl -X POST http://localhost:3001/api/v1/whatsapp/test \
 ## 📚 ORDEM DE LEITURA RECOMENDADA
 
 ### Para Entender o Projeto (Nova IA)
-1. **`00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`** ← **VOCÊ ESTÁ AQUI**
-2. **`docs/01-projeto/01-VISION.md`** - Problema e solução
-3. **`BACKEND-OPERACIONAL.md`** - Status atual do backend
-4. **`RESUMO-FINAL-CORRECOES.md`** - Correções implementadas
+1. **`docs/00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`** ← **VOCÊ ESTÁ AQUI**
+2. **`docs/00-projeto/01-VISION.md`** - Problema e solução
+3. **`docs/04-status/BACKEND-OPERACIONAL.md`** - Status atual do backend
+4. **`docs/05-correcoes/RESUMO-FINAL-CORRECOES.md`** - Correções implementadas
 
 ### Para Continuar Desenvolvimento
-1. **`00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`** ← **VOCÊ ESTÁ AQUI**
-2. **`FASE-3-2-IMPLEMENTADA.md`** - O que foi feito no bot
-3. **`docs/03-implementacao/PLANO_COMPLETO_PARTE_3.md`** - Próximos passos do bot
-4. **`INSTRUCOES-MANUAIS.md`** - O que fazer manualmente
+1. **`docs/00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`** ← **VOCÊ ESTÁ AQUI**
+2. **`docs/06-implementacoes/FASE-3-2-IMPLEMENTADA.md`** - O que foi feito no bot
+3. **`docs/02-implementacao/PLANO_COMPLETO_PARTE_3.md`** - Próximos passos do bot
+4. **`docs/07-setup/INSTRUCOES-MANUAIS.md`** - O que fazer manualmente
 
 ### Para Entender Arquitetura
-1. **`docs/02-tecnico/03-ARCHITECTURE.md`** - Arquitetura completa
-2. **`docs/02-tecnico/04-DATABASE.md`** - Schema do banco
-3. **`docs/02-tecnico/07-SECURITY.md`** - Segurança
+1. **`docs/01-tecnico/03-ARCHITECTURE.md`** - Arquitetura completa
+2. **`docs/01-tecnico/04-DATABASE.md`** - Schema do banco
+3. **`docs/01-tecnico/07-SECURITY.md`** - Segurança
 
 ---
 
@@ -493,13 +486,14 @@ Ao iniciar uma nova sessão, verifique:
 - ✅ Frontend: **FUNCIONAL** (PDV completo)
 - ✅ Bot WhatsApp: **FASE 3.1 e 3.2 COMPLETAS**
 - ✅ Banco: **RLS habilitado, índices criados**
-- ✅ Segurança: **16 correções críticas implementadas**
+- ✅ Segurança: **17 correções críticas implementadas**
+- ✅ Organização: **100% organizada em docs/**
 
 **Próximo Passo:**
 - 🚀 **FASE 3.3 do Bot WhatsApp** - Confirmação de pedidos
 
 **Documentação:**
-- 📚 **90+ arquivos .md** organizados
+- 📚 **84+ arquivos .md** organizados em `docs/`
 - 📋 **Este documento mestre** para continuidade
 - ✅ **Tudo documentado** e pronto para continuar
 

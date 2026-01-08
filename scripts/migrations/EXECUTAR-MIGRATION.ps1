@@ -9,7 +9,7 @@ $containerRunning = docker ps --filter "name=ucm-postgres" --format "{{.Names}}"
 
 if (-not $containerRunning) {
     Write-Host "ERRO: Container ucm-postgres nao esta rodando!" -ForegroundColor Red
-    Write-Host "Execute: docker-compose up -d" -ForegroundColor Yellow
+    Write-Host "Execute: docker-compose -f ../../config/docker-compose.yml up -d" -ForegroundColor Yellow
     exit 1
 }
 
@@ -18,7 +18,7 @@ Write-Host ""
 
 # Copiar arquivo para container
 Write-Host "Copiando migration para container..." -ForegroundColor Cyan
-docker cp scripts/migrations/002-security-and-performance.sql ucm-postgres:/tmp/002-migration.sql
+docker cp 002-security-and-performance.sql ucm-postgres:/tmp/002-migration.sql
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERRO: Falha ao copiar arquivo!" -ForegroundColor Red

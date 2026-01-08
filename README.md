@@ -6,8 +6,8 @@ Plataforma SaaS para unificacao de vendas multi-canal para pequenos negocios art
 
 ## 🚨 DOCUMENTO MASTER - LEIA PRIMEIRO!
 
-> **📋 [00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md](./00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md)** - **LEIA ESTE PRIMEIRO!**  
-> **📚 [INDICE-DOCUMENTACAO.md](./INDICE-DOCUMENTACAO.md)** - **ÍNDICE COMPLETO**
+> **📋 [docs/00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md](./docs/00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md)** - **LEIA ESTE PRIMEIRO!**  
+> **📚 [docs/INDICE-DOCUMENTACAO.md](./docs/INDICE-DOCUMENTACAO.md)** - **ÍNDICE COMPLETO**
 
 Este documento contém **TUDO** que você precisa saber para continuar o desenvolvimento:
 - ✅ Estado atual completo do projeto
@@ -19,7 +19,7 @@ Este documento contém **TUDO** que você precisa saber para continuar o desenvo
 
 **Status Atual:** ✅ **BACKEND OPERACIONAL** | ✅ **16 CORREÇÕES CRÍTICAS IMPLEMENTADAS** | 🚀 **FASE 3.1 e 3.2 COMPLETAS**
 
-**Se você está começando uma nova sessão, leia `00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md` primeiro!**
+**Se você está começando uma nova sessão, leia `docs/00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md` primeiro!**
 
 ---
 
@@ -47,23 +47,24 @@ Resultado: Vende 15 brigadeiros mas só tinha 10 em estoque.
 ### Principais Arquivos:
 
 **Documentacao do Projeto:**
-- **`docs/01-projeto/01-VISION.md`** - Problema, solucao, objetivos
-- **`docs/01-projeto/02-PERSONAS.md`** - Perfis de usuarios
-- **`docs/01-projeto/09-BUSINESS-MODEL.md`** - Modelo de negocio e precificacao
+- **`docs/00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`** - **LEIA PRIMEIRO!**
+- **`docs/00-projeto/01-VISION.md`** - Problema, solucao, objetivos
+- **`docs/00-projeto/02-PERSONAS.md`** - Perfis de usuarios
+- **`docs/00-projeto/09-BUSINESS-MODEL.md`** - Modelo de negocio e precificacao
 
 **Documentacao Tecnica:**
-- **`docs/02-tecnico/03-ARCHITECTURE.md`** - Arquitetura 4 camadas
-- **`docs/02-tecnico/04-DATABASE.md`** - Schema SQL completo
-- **`docs/02-tecnico/06-WORKFLOWS.md`** - Fluxos de venda
-- **`docs/02-tecnico/07-SECURITY.md`** - Seguranca e compliance
-- **`docs/02-tecnico/10-SETUP.md`** - Setup inicial
+- **`docs/01-tecnico/03-ARCHITECTURE.md`** - Arquitetura 4 camadas
+- **`docs/01-tecnico/04-DATABASE.md`** - Schema SQL completo
+- **`docs/01-tecnico/06-WORKFLOWS.md`** - Fluxos de venda
+- **`docs/01-tecnico/07-SECURITY.md`** - Seguranca e compliance
+- **`docs/01-tecnico/10-SETUP.md`** - Setup inicial
 
 **Planos de Implementacao:**
-- **`docs/03-implementacao/PLANO_IMPLEMENTACAO.md`** - Plano geral
-- **`docs/03-implementacao/PLANO_COMPLETO_PARTE_1.md`** até **PARTE_8.md** - Guias passo a passo
+- **`docs/02-implementacao/PLANO_IMPLEMENTACAO.md`** - Plano geral
+- **`docs/02-implementacao/PLANO_COMPLETO_PARTE_1.md`** até **PARTE_8.md** - Guias passo a passo
 
 **Documentacao Comercial:**
-- **`docs/04-comercial/DOCUMENTACAO_COMPLETA_PARA_VENDAS.md`** - Estrutura para vendas
+- **`docs/03-comercial/DOCUMENTACAO_COMPLETA_PARA_VENDAS.md`** - Estrutura para vendas
 
 📚 **Ver [`docs/README.md`](docs/README.md) para estrutura completa**
 
@@ -83,50 +84,64 @@ Resultado: Vende 15 brigadeiros mas só tinha 10 em estoque.
 | **WhatsApp** | Twilio/360Dialog | ✅ **Mock/Evolution API** |
 | **IA** | OpenAI GPT-4 | ✅ **Ollama (Local)** |
 
-💡 **Desenvolvimento 100% Gratuito:** Veja [`docs/02-tecnico/13-FREE-TIER-STRATEGY.md`](docs/02-tecnico/13-FREE-TIER-STRATEGY.md) para estratégia completa sem custos.
+💡 **Desenvolvimento 100% Gratuito:** Veja [`docs/01-tecnico/13-FREE-TIER-STRATEGY.md`](docs/01-tecnico/13-FREE-TIER-STRATEGY.md) para estratégia completa sem custos.
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
-### 1. Setup Database
+### ⚠️ PRIMEIRA VEZ? LEIA O TUTORIAL COMPLETO!
 
-**Opção A: Docker (Local)**
-```bash
-docker-compose up -d postgres redis
-docker exec -i ucm-postgres psql -U postgres -d ucm < scripts/migrations/001-initial-schema.sql
+> **📚 [TUTORIAL-INSTALACAO-COMPLETA.md](./TUTORIAL-INSTALACAO-COMPLETA.md)**  
+> Tutorial passo a passo completo desde a instalação do Docker até rodar backend e frontend!
+
+O tutorial cobre:
+- ✅ Instalação do Node.js
+- ✅ Instalação do Git
+- ✅ Instalação do Docker Desktop
+- ✅ Configuração do ambiente
+- ✅ Setup do banco de dados
+- ✅ Iniciar backend e frontend
+- ✅ Troubleshooting completo
+
+---
+
+### Para Desenvolvedores que Já Têm Ambiente Configurado:
+
+#### 1. Iniciar Ambiente
+
+```powershell
+# Iniciar containers Docker
+.\INICIAR-AMBIENTE.ps1
+
+# OU manualmente
+docker-compose -f config/docker-compose.yml up -d postgres redis
 ```
 
-**Opção B: Supabase (Cloud)**
-- Criar projeto em supabase.com
-- Executar migration SQL no SQL Editor
-
-### 2. Setup Automatico (PowerShell)
+#### 2. Setup Inicial (Primeira vez no projeto)
 
 ```powershell
 .\setup.ps1
 ```
 
-O script configura tudo automaticamente.
-
-### 3. Rodar Backend
+#### 3. Rodar Backend
 
 ```powershell
 cd backend
 npm run start:dev
 ```
 
-### 4. Rodar Frontend
+#### 4. Rodar Frontend
 
 ```powershell
 cd frontend
 npm run dev
 ```
 
-### 5. Testar
+#### 5. Testar
 
 ```powershell
-.\test-backend.ps1
+.\scripts\test\test-backend.ps1
 ```
 
 ---
@@ -148,7 +163,7 @@ npm run dev
   - ✅ Swagger/OpenAPI (API 100% documentada)
   - ✅ Testes Unitários e de Integração
   - ✅ Health Checks, Rate Limiting, Error Boundaries
-- **Scripts**: setup.ps1 e test-backend.ps1 automaticos
+- **Scripts**: Scripts organizados em `scripts/setup/` e `scripts/test/` (wrappers na raiz para compatibilidade)
 
 ---
 
