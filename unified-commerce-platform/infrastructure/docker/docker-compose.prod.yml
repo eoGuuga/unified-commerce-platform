@@ -1,0 +1,169 @@
+# AMBIENTE DE PRODUÇÃO
+# =====================
+# Ambiente otimizado para produção
+# - Segurança máxima
+# - Performance otimizada
+# - Monitoramento ativo
+
+version: '3.8'
+
+services:
+  # BANCO DE DADOS - PRODUÇÃO
+  ucm-postgres-prod:
+    image: postgres:15-alpine
+    container_name: ucm-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ucm_prod
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      - ./scripts/migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "127.0.0.1:5432:5432"  # Só localhost (segurança)
+    networks:
+      - ucm-prod-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ucm_prod"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # REDIS - PRODUÇÃO
+  ucm-redis-prod:
+    image: redis:7-alpine
+    container_name: ucm-redis-prod
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"  # Só localhost (segurança)
+    networks:
+      - ucm-prod-network
+    volumes:
+      - redis_prod_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  # BACKEND - PRODUÇÃO
+  ucm-backend-prod:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ucm-backend-prod
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"  # Só localhost via Nginx
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+
+      # Banco PROD
+      DB_HOST: ucm-postgres-prod
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ucm_prod
+
+      # Redis PROD
+      REDIS_HOST: ucm-redis-prod
+      REDIS_PORT: 6379
+
+      # JWT PROD (forte)
+      JWT_SECRET: ${JWT_SECRET}
+
+      # Mercado Pago PROD
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN}
+      MERCADOPAGO_PUBLIC_KEY: ${MERCADOPAGO_PUBLIC_KEY}
+
+      # Ollama PROD
+      OLLAMA_URL: http://ollama-prod:11434
+
+      # WhatsApp PROD (Twilio/Evolution)
+      WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      TWILIO_WHATSAPP_NUMBER: ${TWILIO_WHATSAPP_NUMBER}
+
+      # CORS PROD (restritivo)
+      CORS_ORIGIN: ${CORS_ORIGIN}
+
+      # Tenant PROD
+      DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID}
+    depends_on:
+      ucm-postgres-prod:
+        condition: service_healthy
+      ucm-redis-prod:
+        condition: service_started
+      ollama-prod:
+        condition: service_started
+    networks:
+      - ucm-prod-network
+
+  # FRONTEND - PRODUÇÃO
+  ucm-frontend-prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ucm-frontend-prod
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"  # Só localhost via Nginx
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_ENVIRONMENT: production
+    depends_on:
+      - ucm-backend-prod
+    networks:
+      - ucm-prod-network
+
+  # OLLAMA - PRODUÇÃO
+  ollama-prod:
+    image: ollama/ollama:latest
+    container_name: ollama-prod
+    restart: unless-stopped
+    expose:
+      - "11434"  # Só interno (não expõe porta externamente)
+    volumes:
+      - ollama_prod_data:/root/.ollama
+    networks:
+      - ucm-prod-network
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  # NGINX - Reverse Proxy PROD
+  nginx-prod:
+    image: nginx:alpine
+    container_name: nginx-prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/ucm.conf:/etc/nginx/conf.d/default.conf
+      - ./deploy/ssl:/etc/nginx/ssl
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - ucm-frontend-prod
+      - ucm-backend-prod
+    networks:
+      - ucm-prod-network
+
+volumes:
+  postgres_prod_data:
+    driver: local
+  redis_prod_data:
+    driver: local
+  ollama_prod_data:
+    driver: local
+  nginx_logs:
+    driver: local
+
+networks:
+  ucm-prod-network:
+    driver: bridge
+    name: ucm-prod-network

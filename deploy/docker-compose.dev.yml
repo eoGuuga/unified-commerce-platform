@@ -1,0 +1,69 @@
+version: '3.8'
+
+# ============================================
+# Ambiente de Desenvolvimento/Testes (VPS)
+# ============================================
+# 
+# Objetivo: PostgreSQL e Redis rodando 24/7 no servidor
+# para desenvolvimento e testes, sem precisar do Docker Desktop local.
+#
+# Portas diferentes da produção para evitar conflitos:
+# - PostgreSQL: 5433 (dev) vs 5432 (prod)
+# - Redis: 6380 (dev) vs 6379 (prod)
+#
+# Uso:
+#   docker compose -f deploy/docker-compose.dev.yml up -d
+#   docker compose -f deploy/docker-compose.dev.yml logs -f
+#   docker compose -f deploy/docker-compose.dev.yml down
+#
+
+services:
+  # PostgreSQL para desenvolvimento/testes
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: ucm-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ucm_dev
+    ports:
+      - "127.0.0.1:5433:5432"  # Porta 5433 (diferente da produção 5432)
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ../scripts/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ucm_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ucm-dev-net
+
+  # Redis para desenvolvimento/testes
+  redis-dev:
+    image: redis:7-alpine
+    container_name: ucm-redis-dev
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6380:6379"  # Porta 6380 (diferente da produção 6379)
+    volumes:
+      - redis_dev_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ucm-dev-net
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+
+networks:
+  ucm-dev-net:
+    driver: bridge
