@@ -7,6 +7,7 @@ import { CurrentUser } from './decorators/user.decorator';
 import { Usuario } from '../../database/entities/Usuario.entity';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { TypedRequest } from '../../common/types/request.types';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -14,14 +15,22 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
+  // ✅ Protege contra brute force / credential stuffing (por IP)
+  @Throttle({ strict: { ttl: 60000, limit: 10 } })
   @ApiOperation({ summary: 'Login de usuario' })
   @ApiResponse({ status: 200, description: 'Login realizado com sucesso' })
   @ApiResponse({ status: 401, description: 'Credenciais invalidas' })
-  async login(@Body() loginDto: LoginDto): Promise<LoginResponse> {
-    return this.authService.login(loginDto);
+  async login(@Body() loginDto: LoginDto, @Request() req: TypedRequest): Promise<LoginResponse> {
+    const tenantId = req.headers['x-tenant-id'];
+    if (!tenantId) {
+      throw new BadRequestException('tenantId é obrigatório no login. Forneça via header x-tenant-id.');
+    }
+    return this.authService.login(loginDto, tenantId);
   }
 
   @Post('register')
+  // ✅ Evita criação massiva de contas
+  @Throttle({ strict: { ttl: 60000, limit: 3 } })
   @ApiOperation({ 
     summary: 'Registro de novo usuario',
     description: '⚠️ CRÍTICO: tenantId é obrigatório via header x-tenant-id. Em produção, isso deve vir do contexto JWT.',

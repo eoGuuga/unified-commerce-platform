@@ -17,7 +17,7 @@ Este documento contém **TUDO** que você precisa saber para continuar o desenvo
 - ✅ Estrutura de documentação (organizada)
 - ✅ Contexto técnico (decisões importantes)
 
-**Status Atual:** ✅ **BACKEND OPERACIONAL** | ✅ **16 CORREÇÕES CRÍTICAS IMPLEMENTADAS** | 🚀 **FASE 3.1 e 3.2 COMPLETAS**
+**Status Atual:** ✅ **PRODUÇÃO OPERACIONAL** (`gtsofthub.com.br`) | ✅ **BACKEND OPERACIONAL** | ✅ **SEGURANÇA E HARDENING COMPLETOS** | 🚀 **FASE 3.1 e 3.2 COMPLETAS**
 
 **Se você está começando uma nova sessão, leia `docs/00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md` primeiro!**
 
@@ -92,7 +92,7 @@ Resultado: Vende 15 brigadeiros mas só tinha 10 em estoque.
 
 ### ⚠️ PRIMEIRA VEZ? LEIA O TUTORIAL COMPLETO!
 
-> **📚 [TUTORIAL-INSTALACAO-COMPLETA.md](./TUTORIAL-INSTALACAO-COMPLETA.md)**  
+> **📚 [docs/07-setup/TUTORIAL-INSTALACAO-COMPLETA.md](./docs/07-setup/TUTORIAL-INSTALACAO-COMPLETA.md)**  
 > Tutorial passo a passo completo desde a instalação do Docker até rodar backend e frontend!
 
 O tutorial cobre:
@@ -112,6 +112,8 @@ O tutorial cobre:
 
 ```powershell
 # Iniciar containers Docker
+.\scripts\INICIAR-AMBIENTE.ps1
+# OU usar wrapper na raiz (compatibilidade)
 .\INICIAR-AMBIENTE.ps1
 
 # OU manualmente
@@ -121,6 +123,8 @@ docker-compose -f config/docker-compose.yml up -d postgres redis
 #### 2. Setup Inicial (Primeira vez no projeto)
 
 ```powershell
+.\scripts\setup\setup.ps1
+# OU usar wrapper na raiz (compatibilidade)
 .\setup.ps1
 ```
 
@@ -195,8 +199,15 @@ ucm/
 │   └── migrations/
 │       └── 001-initial-schema.sql  # SCHEMA COMPLETO
 ├── docker-compose.yml       # PostgreSQL + Redis
-├── setup.ps1                # SETUP AUTOMATICO
-└── test-backend.ps1         # TESTES AUTOMATIZADOS
+├── scripts/
+│   ├── setup/
+│   │   └── setup.ps1        # SETUP AUTOMATICO
+│   ├── test/
+│   │   └── test-backend.ps1 # TESTES AUTOMATIZADOS
+│   ├── DEV-RODAR-TUDO.ps1   # Script "faz tudo"
+│   └── INICIAR-AMBIENTE.ps1 # Iniciar containers
+├── setup.ps1                # Wrapper (compatibilidade)
+└── test-backend.ps1         # Wrapper (compatibilidade)
 ```
 
 ---
@@ -219,9 +230,9 @@ ucm/
 ### Para reiniciar:
 
 1. Instale Node.js: https://nodejs.org/ (versao LTS)
-2. Execute: `.\setup.ps1`
+2. Execute: `.\scripts\setup\setup.ps1` (ou `.\setup.ps1` para compatibilidade)
 3. Rode: `cd backend && npm run start:dev` e `cd frontend && npm run dev`
-4. Teste: `.\test-backend.ps1`
+4. Teste: `.\scripts\test\test-backend.ps1` (ou `.\test-backend.ps1` para compatibilidade)
 
 ---
 
@@ -231,5 +242,9 @@ MIT License
 
 ---
 
-**Status:** ✅ FASE 0, 1 e 2 COMPLETAS | 🚀 Pronto para FASE 3 (Bot WhatsApp)  
-**📊 Ver [STATUS-ATUAL-2025.md](./STATUS-ATUAL-2025.md) para status detalhado**
+**Status:** ✅ **PRODUÇÃO OPERACIONAL** (`gtsofthub.com.br`) | ✅ **FASE 0, 1 e 2 COMPLETAS** | 🚀 **FASE 3.1 e 3.2 COMPLETAS**
+
+**📊 Documentação atualizada:**
+- **Relatório completo:** [`docs/00-projeto/RELATORIO-COMPLETO-DO-PROJETO-2026.md`](./docs/00-projeto/RELATORIO-COMPLETO-DO-PROJETO-2026.md)
+- **Runbook de operação:** [`deploy/RUNBOOK-OPERACAO.md`](./deploy/RUNBOOK-OPERACAO.md)
+- **Checklist de release:** [`deploy/CHECKLIST-DE-RELEASE.md`](./deploy/CHECKLIST-DE-RELEASE.md)

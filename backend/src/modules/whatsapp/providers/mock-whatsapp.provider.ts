@@ -63,8 +63,8 @@ export class MockWhatsappProvider implements IWhatsappProvider {
   }
 
   async validateWebhookSignature(
-    payload: string,
-    signature: string,
+    _payload: string,
+    _signature: string,
   ): Promise<boolean> {
     // Mock sempre retorna true (desenvolvimento)
     // Em produção, validar assinatura real

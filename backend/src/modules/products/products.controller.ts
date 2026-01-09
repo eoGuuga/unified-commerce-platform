@@ -47,6 +47,15 @@ export class ProductsController {
     return this.productsService.search(tenantId, query);
   }
 
+  @Get('stock-summary')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Obter resumo completo de estoque (para página de gestão)' })
+  @ApiResponse({ status: 200, description: 'Resumo de estoque retornado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  getStockSummary(@CurrentTenant() tenantId: string) {
+    return this.productsService.getStockSummary(tenantId);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Buscar produto por ID' })
@@ -130,15 +139,6 @@ export class ProductsController {
     @CurrentTenant() tenantId: string,
   ) {
     return this.productsService.releaseStock(id, quantity || 1, tenantId);
-  }
-
-  @Get('stock-summary')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Obter resumo completo de estoque (para página de gestão)' })
-  @ApiResponse({ status: 200, description: 'Resumo de estoque retornado com sucesso' })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
-  getStockSummary(@CurrentTenant() tenantId: string) {
-    return this.productsService.getStockSummary(tenantId);
   }
 
   @Post(':id/adjust-stock')

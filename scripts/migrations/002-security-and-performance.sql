@@ -53,45 +53,123 @@ ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;
 -- (Será expandida quando implementarmos variável de sessão)
 
 -- Policy para produtos
-CREATE POLICY produtos_tenant_isolation ON produtos
-  FOR ALL
-  USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
-  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'produtos'
+      AND policyname = 'produtos_tenant_isolation'
+  ) THEN
+    EXECUTE $p$
+      CREATE POLICY produtos_tenant_isolation ON produtos
+        FOR ALL
+        USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+        WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+    $p$;
+  END IF;
+END
+$$;
 
 -- Policy para pedidos
-CREATE POLICY pedidos_tenant_isolation ON pedidos
-  FOR ALL
-  USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
-  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'pedidos'
+      AND policyname = 'pedidos_tenant_isolation'
+  ) THEN
+    EXECUTE $p$
+      CREATE POLICY pedidos_tenant_isolation ON pedidos
+        FOR ALL
+        USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+        WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+    $p$;
+  END IF;
+END
+$$;
 
 -- Policy para estoque
-CREATE POLICY estoque_tenant_isolation ON movimentacoes_estoque
-  FOR ALL
-  USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
-  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'movimentacoes_estoque'
+      AND policyname = 'estoque_tenant_isolation'
+  ) THEN
+    EXECUTE $p$
+      CREATE POLICY estoque_tenant_isolation ON movimentacoes_estoque
+        FOR ALL
+        USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+        WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+    $p$;
+  END IF;
+END
+$$;
 
 -- Policy para itens de pedido (via JOIN com pedidos)
-CREATE POLICY itens_pedido_tenant_isolation ON itens_pedido
-  FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM pedidos p 
-      WHERE p.id = itens_pedido.pedido_id 
-      AND p.tenant_id = current_setting('app.current_tenant_id', true)::uuid
-    )
-  );
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'itens_pedido'
+      AND policyname = 'itens_pedido_tenant_isolation'
+  ) THEN
+    EXECUTE $p$
+      CREATE POLICY itens_pedido_tenant_isolation ON itens_pedido
+        FOR ALL
+        USING (
+          EXISTS (
+            SELECT 1 FROM pedidos p
+            WHERE p.id = itens_pedido.pedido_id
+              AND p.tenant_id = current_setting('app.current_tenant_id', true)::uuid
+          )
+        )
+    $p$;
+  END IF;
+END
+$$;
 
 -- Policy para categorias
-CREATE POLICY categorias_tenant_isolation ON categorias
-  FOR ALL
-  USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
-  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'categorias'
+      AND policyname = 'categorias_tenant_isolation'
+  ) THEN
+    EXECUTE $p$
+      CREATE POLICY categorias_tenant_isolation ON categorias
+        FOR ALL
+        USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+        WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+    $p$;
+  END IF;
+END
+$$;
 
 -- Policy para usuários (só vê usuários do mesmo tenant)
-CREATE POLICY usuarios_tenant_isolation ON usuarios
-  FOR ALL
-  USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
-  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'usuarios'
+      AND policyname = 'usuarios_tenant_isolation'
+  ) THEN
+    EXECUTE $p$
+      CREATE POLICY usuarios_tenant_isolation ON usuarios
+        FOR ALL
+        USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+        WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+    $p$;
+  END IF;
+END
+$$;
 
 -- ============================================
 -- COMENTÁRIOS

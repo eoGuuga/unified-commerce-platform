@@ -31,7 +31,8 @@ Uma vez que Docker Desktop está rodando:
 
 ```powershell
 # Na raiz do projeto
-.\INICIAR-AMBIENTE.ps1
+.\scripts\DEV-RODAR-TUDO.ps1
+# OU usar wrapper na raiz (compatibilidade): .\DEV-RODAR-TUDO.ps1
 ```
 
 Este script faz tudo automaticamente:
@@ -39,6 +40,8 @@ Este script faz tudo automaticamente:
 - ✅ Inicia containers (PostgreSQL + Redis)
 - ✅ Aguarda serviços ficarem prontos
 - ✅ Verifica dependências
+- ✅ Aplica migrations
+- ✅ Cria usuário do banco para o app (sem superuser) para RLS ser efetivo
 
 ---
 
@@ -81,7 +84,7 @@ npm run start:dev
 
 Em outro terminal ou navegador:
 ```powershell
-curl http://localhost:3001/api/v1/health
+curl http://localhost:3001/api/v1/whatsapp/health
 ```
 
 Deve retornar:
@@ -99,7 +102,7 @@ docker ps --filter "name=ucm-"
 ```
 
 ### Backend:
-- Health check: http://localhost:3001/api/v1/health
+- Health check: http://localhost:3001/api/v1/whatsapp/health
 - Swagger: http://localhost:3001/api/docs
 
 ### URLs Disponíveis:
@@ -150,3 +153,7 @@ Após ambiente iniciado:
 ---
 
 **Última atualização:** 08/01/2025
+
+### Nota importante (multi-tenant / perfeição)
+- **Login exige** header `x-tenant-id` em `POST /auth/login`.
+- Em produção, **não use usuário superuser** no Postgres (superuser pode bypassar RLS). O setup já cria `ucm_app` no Docker para simular o cenário real.

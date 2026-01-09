@@ -74,6 +74,24 @@
 │ new_data (JSONB)     │
 │ created_at           │
 └──────────────────────┘
+
+┌──────────────────────┐
+│ CUPONS_DESCONTO      │ ✅ **NOVO**
+├──────────────────────┤
+│ id (UUID)            │
+│ tenant_id (FK)       │
+│ code (VARCHAR(50))   │
+│ discount_type (ENUM) │ 'percentage' | 'fixed'
+│ discount_value       │
+│ min_purchase_amount  │
+│ max_discount_amount  │
+│ usage_limit          │
+│ used_count           │
+│ is_active            │
+│ valid_from           │
+│ valid_until          │
+│ created_at           │
+└──────────────────────┘
 \`\`\`
 
 ---

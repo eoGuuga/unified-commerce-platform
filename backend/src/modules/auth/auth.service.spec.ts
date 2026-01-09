@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService, JwtPayload } from './auth.service';
@@ -8,13 +7,12 @@ import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuditLogService } from '../common/services/audit-log.service';
+import { DbContextService } from '../common/services/db-context.service';
 import * as bcrypt from 'bcrypt';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let usuariosRepository: Repository<Usuario>;
   let jwtService: JwtService;
-  let auditLogService: AuditLogService;
 
   const mockUsuariosRepository = {
     findOne: jest.fn(),
@@ -28,6 +26,10 @@ describe('AuthService', () => {
 
   const mockAuditLogService = {
     log: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockDbContextService = {
+    getRepository: jest.fn(() => mockUsuariosRepository),
   };
 
   beforeEach(async () => {
@@ -46,13 +48,15 @@ describe('AuthService', () => {
           provide: AuditLogService,
           useValue: mockAuditLogService,
         },
+        {
+          provide: DbContextService,
+          useValue: mockDbContextService,
+        },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    usuariosRepository = module.get<Repository<Usuario>>(getRepositoryToken(Usuario));
     jwtService = module.get<JwtService>(JwtService);
-    auditLogService = module.get<AuditLogService>(AuditLogService);
   });
 
   afterEach(() => {
@@ -81,6 +85,7 @@ describe('AuthService', () => {
 
     it('deve fazer login com sucesso quando credenciais são válidas', async () => {
       // Arrange
+      const tenantId = '00000000-0000-0000-0000-000000000000';
       mockUsuariosRepository.findOne.mockResolvedValue(mockUsuario);
       mockUsuariosRepository.save.mockResolvedValue({
         ...mockUsuario,
@@ -88,7 +93,7 @@ describe('AuthService', () => {
       } as Usuario);
 
       // Act
-      const result = await service.login(loginDto);
+      const result = await service.login(loginDto, tenantId);
 
       // Assert
       expect(result).toHaveProperty('access_token');
@@ -107,36 +112,39 @@ describe('AuthService', () => {
 
     it('deve lançar UnauthorizedException quando usuário não existe', async () => {
       // Arrange
+      const tenantId = '00000000-0000-0000-0000-000000000000';
       mockUsuariosRepository.findOne.mockResolvedValue(null);
 
       // Act & Assert
-      await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
-      await expect(service.login(loginDto)).rejects.toThrow('Credenciais invalidas');
+      await expect(service.login(loginDto, tenantId)).rejects.toThrow(UnauthorizedException);
+      await expect(service.login(loginDto, tenantId)).rejects.toThrow('Credenciais invalidas');
       expect(jwtService.sign).not.toHaveBeenCalled();
     });
 
     it('deve lançar UnauthorizedException quando usuário está inativo', async () => {
       // Arrange
+      const tenantId = '00000000-0000-0000-0000-000000000000';
       mockUsuariosRepository.findOne.mockResolvedValue({
         ...mockUsuario,
         is_active: false,
       });
 
       // Act & Assert
-      await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
-      await expect(service.login(loginDto)).rejects.toThrow('Usuario inativo');
+      await expect(service.login(loginDto, tenantId)).rejects.toThrow(UnauthorizedException);
+      await expect(service.login(loginDto, tenantId)).rejects.toThrow('Usuario inativo');
     });
 
     it('deve lançar UnauthorizedException quando senha é inválida', async () => {
       // Arrange
+      const tenantId = '00000000-0000-0000-0000-000000000000';
       mockUsuariosRepository.findOne.mockResolvedValue({
         ...mockUsuario,
         encrypted_password: bcrypt.hashSync('wrong-password', 10),
       });
 
       // Act & Assert
-      await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
-      await expect(service.login(loginDto)).rejects.toThrow('Credenciais invalidas');
+      await expect(service.login(loginDto, tenantId)).rejects.toThrow(UnauthorizedException);
+      await expect(service.login(loginDto, tenantId)).rejects.toThrow('Credenciais invalidas');
     });
   });
 

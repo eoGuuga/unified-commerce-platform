@@ -16,12 +16,22 @@ import { CommonModule } from '../common/common.module';
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET', 'change-me-in-production'),
+      useFactory: (config: ConfigService) => {
+        const jwtSecret = config.get<string>('JWT_SECRET');
+        if (!jwtSecret) {
+          throw new Error(
+            'JWT_SECRET deve ser definido em backend/.env (32+ caracteres). ' +
+              'Gere com: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"',
+          );
+        }
+
+        return {
+          secret: jwtSecret,
         signOptions: {
           expiresIn: config.get<string>('JWT_EXPIRATION', '15m'),
         },
-      }),
+        };
+      },
     }),
     CommonModule, // Importar CommonModule para usar AuditLogService
   ],

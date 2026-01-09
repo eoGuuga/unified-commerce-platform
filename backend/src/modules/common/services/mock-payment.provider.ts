@@ -108,7 +108,7 @@ export class MockPaymentProvider {
   /**
    * Gera QR Code Pix (simulado)
    */
-  async generatePixQRCode(amount: number, description?: string): Promise<PixQRCode> {
+  async generatePixQRCode(amount: number, _description?: string): Promise<PixQRCode> {
     const txid = `MOCK${Date.now()}${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     
     // QR Code Pix simulado (EMV format)

@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
+import Redis, { RedisOptions } from 'ioredis';
 
 @Injectable()
-export class HealthService {
+export class HealthService implements OnModuleDestroy {
   private readonly logger = new Logger(HealthService.name);
   private redisClient: Redis;
 
@@ -18,7 +18,18 @@ export class HealthService {
     const redisUrl = this.configService.get<string>('REDIS_URL');
     if (redisUrl) {
       try {
-        this.redisClient = new Redis(redisUrl);
+        const isTest =
+          process.env.NODE_ENV === 'test' || typeof process.env.JEST_WORKER_ID !== 'undefined';
+
+        const redisOptions: RedisOptions = isTest
+          ? {
+              lazyConnect: true,
+              retryStrategy: () => null,
+              maxRetriesPerRequest: 0,
+            }
+          : {};
+
+        this.redisClient = new Redis(redisUrl, redisOptions);
       } catch (error) {
         this.logger.warn('Redis initialization failed, health checks will skip Redis', {
           error: error instanceof Error ? error.message : String(error),
@@ -26,6 +37,15 @@ export class HealthService {
           context: { redisUrl: redisUrl ? 'configured' : 'not configured' },
         });
       }
+    }
+  }
+
+  async onModuleDestroy() {
+    if (!this.redisClient) return;
+    try {
+      await this.redisClient.quit();
+    } catch {
+      this.redisClient.disconnect();
     }
   }
 
@@ -104,6 +124,10 @@ export class HealthService {
     }
 
     try {
+      // Em modo de testes pode estar lazyConnect: conectar apenas uma vez (sem retry infinito)
+      if ((this.redisClient as any).status === 'wait') {
+        await this.redisClient.connect();
+      }
       const start = Date.now();
       await this.redisClient.ping();
       const responseTime = Date.now() - start;

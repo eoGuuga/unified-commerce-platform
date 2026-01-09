@@ -12,10 +12,23 @@ export class EncryptionService {
     @InjectDataSource()
     private dataSource: DataSource,
   ) {
-    // Chave de encriptação do .env (deve ser forte em produção)
-    this.encryptionKey =
-      this.configService.get<string>('ENCRYPTION_KEY') ||
-      'change-me-in-production-min-32-chars';
+    // ✅ Chave de encriptação do .env (obrigatória e forte)
+    // Importante: esta chave precisa ser estável; se mudar, não será possível descriptografar chaves já salvas.
+    const key = (this.configService.get<string>('ENCRYPTION_KEY') || '').trim();
+    const looksInsecure =
+      !key ||
+      key.length < 32 ||
+      key.toLowerCase().includes('change-me') ||
+      key.toLowerCase().includes('dev-secret');
+
+    if (looksInsecure) {
+      throw new Error(
+        'ENCRYPTION_KEY deve ser definido e seguro em backend/.env (32+ caracteres). ' +
+          'Gere uma chave segura com: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"',
+      );
+    }
+
+    this.encryptionKey = key;
   }
 
   /**

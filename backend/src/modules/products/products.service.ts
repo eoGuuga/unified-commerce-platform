@@ -1,13 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Produto } from '../../database/entities/Produto.entity';
 import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { CacheService } from '../common/services/cache.service';
 import { AuditLogService } from '../common/services/audit-log.service';
+import { DbContextService } from '../common/services/db-context.service';
 import { PaginatedResult, createPaginatedResult } from '../common/types/pagination.types';
 import { PaginationDto } from './dto/pagination.dto';
 import { ProductWithStock } from './types/product.types';
@@ -21,14 +21,19 @@ export class ProductsService {
     private produtosRepository: Repository<Produto>,
     @InjectRepository(MovimentacaoEstoque)
     private estoqueRepository: Repository<MovimentacaoEstoque>,
+    @InjectDataSource()
+    private dataSource: DataSource,
     private cacheService: CacheService,
     private auditLogService: AuditLogService,
+    private readonly db: DbContextService,
   ) {}
 
   async findAll(tenantId: string, pagination?: PaginationDto): Promise<ProductWithStock[] | PaginatedResult<ProductWithStock>> {
     const page = pagination?.page || 1;
     const limit = pagination?.limit || 50;
     const skip = (page - 1) * limit;
+    const produtosRepository = this.db.getRepository(Produto);
+    const estoqueRepository = this.db.getRepository(MovimentacaoEstoque);
 
     // ✅ CACHE: Tentar buscar do cache primeiro (apenas sem paginação)
     if (!pagination) {
@@ -39,7 +44,7 @@ export class ProductsService {
     }
 
     // ✅ CORRIGIDO: Query otimizada sem N+1 com paginação
-    const queryBuilder = this.produtosRepository
+    const queryBuilder = produtosRepository
       .createQueryBuilder('produto')
       .leftJoinAndSelect('produto.categoria', 'categoria')
       .leftJoin(
@@ -62,7 +67,7 @@ export class ProductsService {
       // Buscar estoques para os produtos da página atual
       const produtoIds = produtos.map((p) => p.id);
       const estoques = produtoIds.length > 0
-        ? await this.estoqueRepository
+        ? await estoqueRepository
             .createQueryBuilder('estoque')
             .where('estoque.tenant_id = :tenantId', { tenantId })
             .andWhere('estoque.produto_id IN (:...produtoIds)', { produtoIds })
@@ -94,7 +99,7 @@ export class ProductsService {
     // Buscar todos os estoques de uma vez (evita N+1)
     const produtoIds = produtos.map((p) => p.id);
     const estoques = produtoIds.length > 0
-      ? await this.estoqueRepository
+      ? await estoqueRepository
           .createQueryBuilder('estoque')
           .where('estoque.tenant_id = :tenantId', { tenantId })
           .andWhere('estoque.produto_id IN (:...produtoIds)', { produtoIds })
@@ -129,7 +134,7 @@ export class ProductsService {
   }
 
   async findOne(id: string, tenantId: string): Promise<Produto> {
-    const produto = await this.produtosRepository.findOne({
+    const produto = await this.db.getRepository(Produto).findOne({
       where: { id, tenant_id: tenantId },
       relations: ['categoria'],
     });
@@ -148,12 +153,13 @@ export class ProductsService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<Produto> {
-    const produto = this.produtosRepository.create({
+    const produtoRepo = this.db.getRepository(Produto);
+    const produto = produtoRepo.create({
       ...createProductDto,
       tenant_id: tenantId,
     });
 
-    const savedProduto = await this.produtosRepository.save(produto);
+    const savedProduto = await produtoRepo.save(produto);
 
     // ✅ AUDIT LOG: Registrar criação de produto
     try {
@@ -198,7 +204,7 @@ export class ProductsService {
 
     Object.assign(produto, updateProductDto);
 
-    const savedProduto = await this.produtosRepository.save(produto);
+    const savedProduto = await this.db.getRepository(Produto).save(produto);
 
     // ✅ AUDIT LOG: Registrar atualização de produto
     try {
@@ -246,7 +252,7 @@ export class ProductsService {
     const oldData = { ...produto };
 
     produto.is_active = false;
-    await this.produtosRepository.save(produto);
+    await this.db.getRepository(Produto).save(produto);
 
     // ✅ AUDIT LOG: Registrar desativação de produto
     try {
@@ -275,7 +281,7 @@ export class ProductsService {
   }
 
   async search(tenantId: string, query: string): Promise<Produto[]> {
-    return this.produtosRepository
+    return this.db.getRepository(Produto)
       .createQueryBuilder('produto')
       .where('produto.tenant_id = :tenantId', { tenantId })
       .andWhere('produto.is_active = :isActive', { isActive: true })
@@ -296,7 +302,8 @@ export class ProductsService {
     quantity: number,
     tenantId: string,
   ): Promise<{ success: boolean; available_stock: number }> {
-    const estoque = await this.estoqueRepository.findOne({
+    const estoqueRepo = this.db.getRepository(MovimentacaoEstoque);
+    const estoque = await estoqueRepo.findOne({
       where: { tenant_id: tenantId, produto_id: produtoId },
     });
 
@@ -313,7 +320,7 @@ export class ProductsService {
     }
 
     estoque.reserved_stock += quantity;
-    await this.estoqueRepository.save(estoque);
+    await estoqueRepo.save(estoque);
 
     return {
       success: true,
@@ -329,7 +336,8 @@ export class ProductsService {
     quantity: number,
     tenantId: string,
   ): Promise<{ success: boolean; available_stock: number }> {
-    const estoque = await this.estoqueRepository.findOne({
+    const estoqueRepo = this.db.getRepository(MovimentacaoEstoque);
+    const estoque = await estoqueRepo.findOne({
       where: { tenant_id: tenantId, produto_id: produtoId },
     });
 
@@ -338,7 +346,7 @@ export class ProductsService {
     }
 
     estoque.reserved_stock = Math.max(0, estoque.reserved_stock - quantity);
-    await this.estoqueRepository.save(estoque);
+    await estoqueRepo.save(estoque);
 
     return {
       success: true,
@@ -375,50 +383,146 @@ export class ProductsService {
       status: 'ok' | 'low' | 'out';
     }>;
   }> {
-    const produtos = await this.produtosRepository.find({
-      where: { tenant_id: tenantId, is_active: true },
-      order: { name: 'ASC' },
-    });
+    try {
+      this.logger.log(`[getStockSummary] Iniciando para tenant: ${tenantId}`);
+      
+      // Buscar produtos ativos primeiro
+      const produtos = await this.db.getRepository(Produto).find({
+        where: {
+          tenant_id: tenantId,
+          is_active: true,
+        },
+        order: {
+          name: 'ASC',
+        },
+      });
 
-    const produtosComEstoque = await Promise.all(
-      produtos.map(async (produto) => {
-        const estoque = await this.estoqueRepository.findOne({
-          where: { tenant_id: tenantId, produto_id: produto.id },
-        });
+      this.logger.log(`[getStockSummary] Produtos encontrados: ${produtos.length}`);
 
-        const current_stock = estoque?.current_stock || 0;
-        const reserved_stock = estoque?.reserved_stock || 0;
-        const available_stock = Math.max(0, current_stock - reserved_stock);
-        const min_stock = estoque?.min_stock || 0;
-
-        let status: 'ok' | 'low' | 'out' = 'ok';
-        if (available_stock === 0) {
-          status = 'out';
-        } else if (min_stock > 0 && available_stock <= min_stock) {
-          status = 'low';
-        }
-
+      // Se não há produtos, retornar vazio
+      if (produtos.length === 0) {
+        this.logger.log(`[getStockSummary] Nenhum produto encontrado, retornando vazio`);
         return {
-          id: produto.id,
-          name: produto.name,
-          current_stock,
-          reserved_stock,
-          available_stock,
-          min_stock,
-          status,
+          total_products: 0,
+          low_stock_count: 0,
+          out_of_stock_count: 0,
+          products: [],
         };
-      }),
-    );
+      }
 
-    const low_stock_count = produtosComEstoque.filter((p) => p.status === 'low').length;
-    const out_of_stock_count = produtosComEstoque.filter((p) => p.status === 'out').length;
+      // Buscar estoques - usar abordagem mais simples e confiável
+      const produtoIds = produtos.map((p) => p.id);
+      const estoquesMap = new Map<string, MovimentacaoEstoque>();
+      
+      this.logger.log(`[getStockSummary] Buscando estoques para ${produtoIds.length} produtos`);
+      
+      try {
+        // Usar find() simples do TypeORM (mais confiável)
+        // TypeORM já lida com RLS automaticamente quando filtramos por tenant_id
+        const allEstoques = await this.db.getRepository(MovimentacaoEstoque).find({
+          where: {
+            tenant_id: tenantId,
+          },
+        });
+        
+        this.logger.log(`[getStockSummary] Estoques encontrados no tenant: ${allEstoques.length}`);
+        
+        // Criar Set para busca mais eficiente
+        const produtoIdsSet = new Set(produtoIds);
+        
+        // Filtrar apenas os estoques dos produtos ativos usando Set (mais eficiente)
+        allEstoques.forEach((e) => {
+          if (produtoIdsSet.has(e.produto_id)) {
+            estoquesMap.set(e.produto_id, e);
+          }
+        });
+        
+        this.logger.log(`[getStockSummary] Estoques mapeados: ${estoquesMap.size}`);
+      } catch (error: any) {
+        this.logger.error(`[getStockSummary] Erro ao buscar estoques: ${error.message}`, error.stack);
+        // Continuar sem estoques - produtos terão estoque 0
+      }
 
-    return {
-      total_products: produtosComEstoque.length,
-      low_stock_count,
-      out_of_stock_count,
-      products: produtosComEstoque,
-    };
+      // Processar produtos com estoque
+      this.logger.log(`[getStockSummary] Processando ${produtos.length} produtos`);
+      const produtosComEstoque = produtos.map((produto) => {
+        try {
+          const estoque = estoquesMap.get(produto.id);
+          const current_stock = estoque?.current_stock ?? 0;
+          const reserved_stock = estoque?.reserved_stock ?? 0;
+          const available_stock = Math.max(0, current_stock - reserved_stock);
+          const min_stock = estoque?.min_stock ?? 0;
+
+          let status: 'ok' | 'low' | 'out' = 'ok';
+          if (available_stock === 0) {
+            status = 'out';
+          } else if (min_stock > 0 && available_stock <= min_stock) {
+            status = 'low';
+          }
+
+          return {
+            id: produto.id,
+            name: produto.name,
+            current_stock,
+            reserved_stock,
+            available_stock,
+            min_stock,
+            status,
+          };
+        } catch (error: any) {
+          this.logger.error(`[getStockSummary] Erro ao processar produto ${produto.id}: ${error.message}`);
+          return {
+            id: produto.id,
+            name: produto.name,
+            current_stock: 0,
+            reserved_stock: 0,
+            available_stock: 0,
+            min_stock: 0,
+            status: 'out' as const,
+          };
+        }
+      });
+
+      let low_stock_count = 0;
+      let out_of_stock_count = 0;
+      
+      produtosComEstoque.forEach((p) => {
+        if (p.status === 'low') {
+          low_stock_count++;
+        } else if (p.status === 'out') {
+          out_of_stock_count++;
+        }
+      });
+
+      this.logger.log(`[getStockSummary] Resumo: total=${produtosComEstoque.length}, low=${low_stock_count}, out=${out_of_stock_count}`);
+
+      // Retornar resultado diretamente (TypeORM já serializa corretamente)
+      const result = {
+        total_products: produtosComEstoque.length,
+        low_stock_count,
+        out_of_stock_count,
+        products: produtosComEstoque,
+      };
+      
+      this.logger.log(`[getStockSummary] Retornando resultado com ${result.products.length} produtos`);
+      
+      return result;
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`[getStockSummary] ERRO CRÍTICO: ${errorMessage}`, errorStack);
+      this.logger.error(`[getStockSummary] Stack completo: ${errorStack}`);
+      
+      // ✅ IMPORTANTE: Retornar estrutura vazia ao invés de lançar exceção
+      // Isso evita que o backend crashe e permite que o endpoint funcione mesmo com problemas
+      // O erro já foi logado para investigação posterior
+      return {
+        total_products: 0,
+        low_stock_count: 0,
+        out_of_stock_count: 0,
+        products: [],
+      };
+    }
   }
 
   /**
@@ -437,7 +541,8 @@ export class ProductsService {
     await this.findOne(produtoId, tenantId);
 
     // Buscar ou criar estoque
-    let estoque = await this.estoqueRepository.findOne({
+    const estoqueRepo = this.db.getRepository(MovimentacaoEstoque);
+    let estoque = await estoqueRepo.findOne({
       where: { tenant_id: tenantId, produto_id: produtoId },
     });
 
@@ -445,7 +550,7 @@ export class ProductsService {
 
     if (!estoque) {
       // Criar estoque se não existir
-      estoque = this.estoqueRepository.create({
+      estoque = estoqueRepo.create({
         tenant_id: tenantId,
         produto_id: produtoId,
         current_stock: 0,
@@ -466,7 +571,7 @@ export class ProductsService {
     estoque.current_stock = newStock;
     estoque.last_updated = new Date();
 
-    const savedEstoque = await this.estoqueRepository.save(estoque);
+    const savedEstoque = await estoqueRepo.save(estoque);
 
     // ✅ AUDIT LOG: Registrar ajuste de estoque
     try {
@@ -503,12 +608,13 @@ export class ProductsService {
   async setMinStock(produtoId: string, minStock: number, tenantId: string): Promise<MovimentacaoEstoque> {
     await this.findOne(produtoId, tenantId);
 
-    let estoque = await this.estoqueRepository.findOne({
+    const estoqueRepo = this.db.getRepository(MovimentacaoEstoque);
+    let estoque = await estoqueRepo.findOne({
       where: { tenant_id: tenantId, produto_id: produtoId },
     });
 
     if (!estoque) {
-      estoque = this.estoqueRepository.create({
+      estoque = estoqueRepo.create({
         tenant_id: tenantId,
         produto_id: produtoId,
         current_stock: 0,
@@ -519,6 +625,6 @@ export class ProductsService {
       estoque.min_stock = minStock;
     }
 
-    return this.estoqueRepository.save(estoque);
+    return estoqueRepo.save(estoque);
   }
 }

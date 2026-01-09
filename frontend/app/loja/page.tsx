@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import api from '@/lib/api-client';
+import { useAuth } from '@/hooks/useAuth';
+import { getDevCredentials, hasDevCredentials } from '@/lib/config';
+import { Toaster, toast } from 'react-hot-toast';
 
 interface Product {
   id: string;
@@ -34,17 +37,20 @@ export default function LojaPage() {
     address: '',
   });
 
-  // Auto-login (apenas em desenvolvimento)
+  // ✅ CRÍTICO: Auto-login APENAS em desenvolvimento e se explicitamente habilitado
   useEffect(() => {
     const autoLogin = async () => {
       if (authLoading) return;
       if (!isAuthenticated || !tenantId) {
-        if (process.env.NODE_ENV === 'development' && hasDevCredentials()) {
+        const isDevelopment = process.env.NODE_ENV === 'development';
+        const allowAutoLogin = process.env.NEXT_PUBLIC_ALLOW_AUTO_LOGIN === 'true';
+        
+        if (isDevelopment && allowAutoLogin && hasDevCredentials()) {
           try {
             const devCreds = getDevCredentials();
             await login(devCreds.email, devCreds.password, devCreds.tenantId);
           } catch (err) {
-            console.error('Erro no login automático:', err);
+            console.error('[DEV] Erro no login automático:', err);
           }
         }
       }
@@ -54,20 +60,24 @@ export default function LojaPage() {
 
   useEffect(() => {
     if (!tenantId) return;
-    loadProducts();
-  }, [tenantId]);
+    let cancelled = false;
 
-  const loadProducts = async () => {
-    if (!tenantId) return;
-    try {
-      const data = await api.getProducts(tenantId);
-      setProducts(data);
-      setLoading(false);
-    } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
-      setLoading(false);
-    }
-  };
+    (async () => {
+      try {
+        const data = await api.getProducts(tenantId);
+        if (cancelled) return;
+        setProducts(data);
+      } catch (error) {
+        console.error('Erro ao carregar produtos:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantId]);
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
@@ -138,6 +148,7 @@ export default function LojaPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Toaster position="top-right" />
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Loja Chocola Velha</h1>

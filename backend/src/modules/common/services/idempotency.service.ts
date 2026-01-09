@@ -1,14 +1,12 @@
-import { Injectable, ConflictException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { IdempotencyKey } from '../../../database/entities/IdempotencyKey.entity';
+import { DbContextService } from './db-context.service';
 
 @Injectable()
 export class IdempotencyService {
   constructor(
-    @InjectRepository(IdempotencyKey)
-    private idempotencyRepository: Repository<IdempotencyKey>,
+    private readonly db: DbContextService,
   ) {}
 
   private hashKey(key: string): string {
@@ -21,35 +19,33 @@ export class IdempotencyService {
     key: string,
     ttlSeconds = 3600,
   ): Promise<IdempotencyKey | null> {
+    const idempotencyRepository = this.db.getRepository(IdempotencyKey);
     const keyHash = this.hashKey(key);
 
     // Verificar se chave já existe
-    const existing = await this.idempotencyRepository.findOne({
-      where: { key_hash: keyHash },
+    const existing = await idempotencyRepository.findOne({
+      where: { tenant_id: tenantId, operation_type: operationType, key_hash: keyHash },
     });
 
     if (existing) {
       // Verificar se ainda está válida (não expirou)
       const now = new Date();
       if (now < existing.expires_at) {
-        if (existing.status === 'completed') {
-          throw new ConflictException(
-            `Operação já foi processada. Key: ${key}`,
-          );
-        }
-        // Ainda pendente, retornar existente
+        // ✅ IMPORTANTE: não lançar erro em "completed" aqui.
+        // Quem chama (ex.: OrdersService) decide se retorna o resultado anterior
+        // ou trata como conflito. Aqui retornamos o registro existente.
         return existing;
       }
 
       // Expirou, pode deletar e criar nova
-      await this.idempotencyRepository.remove(existing);
+      await idempotencyRepository.remove(existing);
     }
 
     // Criar nova chave
     const expiresAt = new Date();
     expiresAt.setSeconds(expiresAt.getSeconds() + ttlSeconds);
 
-    const idempotencyKey = this.idempotencyRepository.create({
+    const idempotencyKey = idempotencyRepository.create({
       tenant_id: tenantId,
       key_hash: keyHash,
       operation_type: operationType,
@@ -57,7 +53,7 @@ export class IdempotencyService {
       expires_at: expiresAt,
     });
 
-    return this.idempotencyRepository.save(idempotencyKey);
+    return idempotencyRepository.save(idempotencyKey);
   }
 
   async markCompleted<T = unknown>(
@@ -65,7 +61,7 @@ export class IdempotencyService {
     result: T,
     metadata?: Record<string, unknown>,
   ): Promise<void> {
-    await this.idempotencyRepository.update(id, {
+    await this.db.getRepository(IdempotencyKey).update(id, {
       status: 'completed',
       result: result as any, // TypeORM JSONB requer 'any'
       metadata: (metadata || {}) as Record<string, any>, // TypeORM JSONB requer 'any'
@@ -73,25 +69,27 @@ export class IdempotencyService {
   }
 
   async markFailed(id: string, metadata?: Record<string, unknown>): Promise<void> {
-    await this.idempotencyRepository.update(id, {
+    await this.db.getRepository(IdempotencyKey).update(id, {
       status: 'failed',
       metadata: (metadata || {}) as Record<string, any>, // TypeORM JSONB requer 'any'
     });
   }
 
-  async remove(tenantId: string, key: string): Promise<void> {
+  async remove(tenantId: string, key: string, operationType?: string): Promise<void> {
     const keyHash = this.hashKey(key);
-    await this.idempotencyRepository.delete({
+    await this.db.getRepository(IdempotencyKey).delete({
       tenant_id: tenantId,
       key_hash: keyHash,
-    });
+      ...(operationType ? { operation_type: operationType } : {}),
+    } as any);
   }
 
   async cleanup(tenantId: string, olderThanDays = 7): Promise<number> {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
-    const result = await this.idempotencyRepository
+    const result = await this.db
+      .getRepository(IdempotencyKey)
       .createQueryBuilder()
       .delete()
       .where('tenant_id = :tenantId', { tenantId })

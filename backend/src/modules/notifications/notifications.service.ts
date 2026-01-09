@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { WhatsappConversation } from '../../database/entities/WhatsappConversation.entity';
 import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity';
 import { Pedido, PedidoStatus } from '../../database/entities/Pedido.entity';
-import { Pagamento, PagamentoStatus } from '../../database/entities/Pagamento.entity';
+import { Pagamento } from '../../database/entities/Pagamento.entity';
 import { ConversationService } from '../whatsapp/services/conversation.service';
 
 export interface NotificationMessage {
@@ -85,11 +85,11 @@ export class NotificationsService {
   async notifyOrderStatusChange(
     tenantId: string,
     pedido: Pedido,
-    oldStatus: PedidoStatus,
+    oldStatus: PedidoStatus | null,
     newStatus: PedidoStatus,
   ): Promise<void> {
     this.logger.log(
-      `Notifying order status change: ${oldStatus} → ${newStatus} for order ${pedido.order_no}`,
+      `Notifying order status change: ${oldStatus || 'NEW'} → ${newStatus} for order ${pedido.order_no}`,
     );
 
     // Buscar conversa associada ao pedido
@@ -210,7 +210,7 @@ export class NotificationsService {
    */
   private generateOrderStatusChangeMessage(
     pedido: Pedido,
-    oldStatus: PedidoStatus,
+    oldStatus: PedidoStatus | null,
     newStatus: PedidoStatus,
   ): string {
     const statusMessages: Record<PedidoStatus, string> = {
@@ -224,6 +224,15 @@ export class NotificationsService {
     };
 
     const statusMessage = statusMessages[newStatus] || newStatus;
+
+    // ✅ NOVO: Se é criação de pedido (oldStatus é null), mensagem especial
+    if (oldStatus === null || oldStatus === undefined) {
+      return `🎉 *PEDIDO CRIADO COM SUCESSO!*\n\n` +
+        `📦 Pedido: *${pedido.order_no}*\n` +
+        `💰 Total: R$ ${Number(pedido.total_amount).toFixed(2).replace('.', ',')}\n\n` +
+        `⏳ Aguardando pagamento...\n\n` +
+        `💬 Você receberá instruções de pagamento em breve!`;
+    }
 
     let message = `📦 *ATUALIZAÇÃO DO PEDIDO*\n\n` +
       `Pedido: *${pedido.order_no}*\n` +
@@ -302,23 +311,111 @@ export class NotificationsService {
   }
 
   /**
-   * Envia mensagem via WhatsApp (mock para desenvolvimento)
+   * Envia mensagem via WhatsApp
+   * ⚠️ MOCK: Em produção, integrar com Twilio/Evolution API
+   * 
+   * IMPLEMENTAÇÃO NECESSÁRIA:
+   * 
+   * 1. Instalar SDK do provider:
+   *    npm install twilio
+   *    # OU
+   *    npm install @evolution-api/evolution-api
+   * 
+   * 2. Configurar variáveis de ambiente:
+   *    - WHATSAPP_PROVIDER=twilio|evolution
+   *    - TWILIO_ACCOUNT_SID=... (se Twilio)
+   *    - TWILIO_AUTH_TOKEN=... (se Twilio)
+   *    - TWILIO_WHATSAPP_NUMBER=whatsapp:+5511999999999
+   *    - EVOLUTION_API_URL=... (se Evolution API)
+   *    - EVOLUTION_API_KEY=... (se Evolution API)
+   * 
+   * 3. Exemplo Twilio:
+   *    import twilio from 'twilio';
+   *    const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+   *    await client.messages.create({
+   *      from: TWILIO_WHATSAPP_NUMBER,
+   *      to: `whatsapp:${notification.to}`,
+   *      body: notification.message,
+   *    });
+   * 
+   * 4. Exemplo Evolution API:
+   *    await fetch(`${EVOLUTION_API_URL}/message/sendText/${instance}`, {
+   *      method: 'POST',
+   *      headers: { 'apikey': EVOLUTION_API_KEY },
+   *      body: JSON.stringify({
+   *        number: notification.to,
+   *        text: notification.message,
+   *      }),
+   *    });
    */
   private async sendWhatsAppMessage(notification: NotificationMessage): Promise<void> {
-    this.logger.log(
-      `[MOCK] Would send WhatsApp message to ${notification.to}: ${notification.message.substring(0, 50)}...`,
-    );
+    const provider = process.env.WHATSAPP_PROVIDER || 'mock';
+    
+    if (provider === 'mock') {
+      this.logger.log(
+        `[MOCK] Would send WhatsApp message to ${notification.to}: ${notification.message.substring(0, 50)}...`,
+      );
 
-    // TODO: Em produção, integrar com Twilio/Evolution API
-    // Por enquanto, apenas loga a mensagem
-    if (notification.imageUrl) {
-      this.logger.log(`[MOCK] Would send image: ${notification.imageUrl.substring(0, 50)}...`);
+      // TODO: Em produção, integrar com Twilio/Evolution API
+      // Por enquanto, apenas loga a mensagem
+      if (notification.imageUrl) {
+        this.logger.log(`[MOCK] Would send image: ${notification.imageUrl.substring(0, 50)}...`);
+      }
+      return;
     }
 
-    // Em produção:
-    // await this.whatsappProvider.sendMessage(notification.to, notification.message);
-    // if (notification.imageUrl) {
-    //   await this.whatsappProvider.sendImage(notification.to, notification.imageUrl);
-    // }
+    // ⚠️ IMPLEMENTAR: Integração real com provider escolhido
+    // Ver comentários acima para exemplos
+    this.logger.warn(
+      `[TODO] WhatsApp provider "${provider}" configurado mas não implementado. Usando mock.`,
+    );
+  }
+
+  /**
+   * Envia email (não implementado - usar para confirmações de pedido)
+   * ⚠️ MOCK: Em produção, integrar com Nodemailer/SendGrid
+   * 
+   * IMPLEMENTAÇÃO NECESSÁRIA:
+   * 
+   * 1. Instalar Nodemailer:
+   *    npm install nodemailer
+   *    npm install @types/nodemailer --save-dev
+   * 
+   * 2. Configurar variáveis de ambiente:
+   *    - EMAIL_PROVIDER=nodemailer|sendgrid
+   *    - SMTP_HOST=smtp.gmail.com (se Gmail)
+   *    - SMTP_PORT=587
+   *    - SMTP_USER=seu-email@gmail.com
+   *    - SMTP_PASS=sua-senha-app
+   *    - EMAIL_FROM=noreply@suaempresa.com
+   * 
+   * 3. Exemplo Nodemailer:
+   *    import nodemailer from 'nodemailer';
+   *    const transporter = nodemailer.createTransport({
+   *      host: SMTP_HOST,
+   *      port: SMTP_PORT,
+   *      secure: false,
+   *      auth: { user: SMTP_USER, pass: SMTP_PASS },
+   *    });
+   *    await transporter.sendMail({
+   *      from: EMAIL_FROM,
+   *      to: to,
+   *      subject: subject,
+   *      html: html,
+   *    });
+   */
+  async sendEmail(to: string, subject: string, html: string): Promise<void> {
+    const provider = process.env.EMAIL_PROVIDER || 'mock';
+    
+    if (provider === 'mock') {
+      this.logger.log(`[MOCK] Would send email to ${to}: ${subject}`);
+      return;
+    }
+
+    // ⚠️ IMPLEMENTAR: Integração real com Nodemailer/SendGrid
+    // Ver comentários acima para exemplos
+    this.logger.warn(
+      `[TODO] Email provider "${provider}" configurado mas não implementado. Usando mock.`,
+    );
   }
 }

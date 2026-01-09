@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
+import Redis, { RedisOptions } from 'ioredis';
 import { ProductWithStock } from '../../products/types/product.types';
 
 @Injectable()
@@ -10,10 +10,22 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private configService: ConfigService) {
     const redisUrl = this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
-    this.redis = new Redis(redisUrl);
+    const isTest =
+      process.env.NODE_ENV === 'test' || typeof process.env.JEST_WORKER_ID !== 'undefined';
+
+    // ✅ Importante para testes: evitar retry infinito (gera timers/handles abertos e deixa Jest “pendurado”).
+    const redisOptions: RedisOptions = isTest
+      ? {
+          lazyConnect: true,
+          retryStrategy: () => null,
+          maxRetriesPerRequest: 0,
+        }
+      : {};
+
+    this.redis = new Redis(redisUrl, redisOptions);
   }
 
-  onModuleInit() {
+  async onModuleInit() {
     this.redis.on('connect', () => {
       this.logger.log('Redis connected');
     });
@@ -21,10 +33,26 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     this.redis.on('error', (error) => {
       this.logger.error(`Redis error: ${error}`);
     });
+
+    // Se for lazyConnect (test), conectar explicitamente uma vez (sem retry).
+    try {
+      if ((this.redis as any).status === 'wait') {
+        await this.redis.connect();
+      }
+    } catch (error) {
+      // Não derrubar o app por Redis em testes/dev: cache é otimização, não requisito para funcionar.
+      this.logger.warn(
+        `Redis não conectou (${this.redis.options.host}:${this.redis.options.port}). Cache ficará desabilitado até próxima inicialização.`,
+      );
+    }
   }
 
-  onModuleDestroy() {
-    this.redis.disconnect();
+  async onModuleDestroy() {
+    try {
+      await this.redis.quit();
+    } catch {
+      this.redis.disconnect();
+    }
   }
 
   /**

@@ -105,7 +105,15 @@
 **API de Ordens**
 - GET /api/orders (listar)
 - PUT /api/orders/:id (atualizar status)
+- POST /api/orders (criar com suporte a cupons)
 - **Realtime:** WebSocket para atualizações
+- ✅ **Sistema de Cupons** - Descontos percentuais e fixos integrados
+
+**API de Cupons** ✅ **NOVO**
+- GET /api/coupons (listar cupons)
+- POST /api/coupons (criar cupom)
+- GET /api/coupons/:code (validar cupom)
+- **Integração:** Automática em pedidos via `coupon_code`
 
 **API de Relatórios**
 - GET /api/reports/sales (vendas por período/canal)
@@ -115,10 +123,12 @@
 ### Banco de Dados (Camada 3)
 
 **PostgreSQL (Supabase)**
-- Tabelas: users, products, inventory, orders, order_items, sales_transactions, payments, audit_log
+- Tabelas: users, products, inventory, orders, order_items, sales_transactions, payments, audit_log, cupons_desconto
 - Transações ACID garantem atomicidade
 - Triggers para auditoria automática
 - Índices para performance
+- ✅ **RLS automático** via `TenantDbContextInterceptor`
+- ✅ **Transações compartilhadas** via `DbContextService`
 
 **Redis (Upstash)**
 - Cache de produtos: TTL 60s
@@ -129,6 +139,8 @@
 - Cada usuário só vê dados de sua loja
 - Políticas de segurança no Supabase
 - Não precisa checar store_id em código
+- ✅ **TenantDbContextInterceptor** - Gerencia RLS automaticamente por request
+- ✅ **DbContextService** - Compartilha transações entre serviços
 
 ### Integrações (Camada 4)
 

@@ -27,6 +27,13 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 - **[✅ Correções](../05-correcoes/)** - Correções implementadas
 - **[🚀 Implementações](../06-implementacoes/)** - Implementações concluídas
 
+### Produção (Runbook)
+- **Operação/produção (runbook):** `deploy/RUNBOOK-OPERACAO.md`
+- **Checklist de release (produção):** `deploy/CHECKLIST-DE-RELEASE.md`
+- **Onboarding 2º dev:** `deploy/ONBOARDING-SEGUNDO-DEV.md`
+- **Regras p/ dev iniciante (frontend-only):** `frontend/CONTRIBUICAO-FRONTEND-INICIANTE.md`
+- **Relatório consolidado (projeto + operação):** `docs/00-projeto/RELATORIO-COMPLETO-DO-PROJETO-2026.md`
+
 ---
 
 ## 📊 RESUMO EXECUTIVO
@@ -38,7 +45,7 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 - ✅ PostgreSQL com RLS habilitado
 - ✅ Redis para cache
 - ✅ Autenticação JWT
-- ✅ Módulos: Auth, Products, Orders, WhatsApp, Health, Tenants
+- ✅ Módulos: Auth, Products, Orders, WhatsApp, Health, Tenants, Coupons
 - ✅ **17 correções críticas de segurança implementadas**
 - ✅ Audit Log completo
 - ✅ Idempotência em pedidos
@@ -46,6 +53,9 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 - ✅ Queries N+1 corrigidas
 - ✅ Health checks funcionando
 - ✅ Validação de tenant no WhatsApp
+- ✅ **DbContextService** - Gerenciamento centralizado de transações
+- ✅ **TenantDbContextInterceptor** - RLS automático por request
+- ✅ **Sistema de Cupons** - Descontos percentuais e fixos com validação completa
 
 **Frontend:**
 - ✅ Next.js 16 com React 19
@@ -87,6 +97,10 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 6. ✅ **Erros corrigidos** - Compilação TypeScript
 7. ✅ **Backend iniciado** - Rodando com sucesso
 8. ✅ **Organização 100%** - Todos arquivos organizados em docs/
+9. ✅ **DbContextService implementado** - Gerenciamento centralizado de transações
+10. ✅ **TenantDbContextInterceptor implementado** - RLS automático por request
+11. ✅ **Sistema de Cupons implementado** - Descontos percentuais e fixos
+12. ✅ **Documentação completa** - Todas as features documentadas
 
 **Status atual:**
 - ✅ Backend: **OPERACIONAL** em http://localhost:3001/api/v1
@@ -114,6 +128,8 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 - `04-DATABASE.md` - Schema completo do banco
 - `07-SECURITY.md` - Segurança e compliance
 - `10-SETUP.md` - Setup técnico
+- `DBCONTEXT-SERVICE.md` - ✅ **NOVO** - Gerenciamento de transações
+- `TENANT-DB-CONTEXT-INTERCEPTOR.md` - ✅ **NOVO** - RLS automático
 
 **🚀 02-implementacao/** - Planos de Implementação
 - `PLANO_IMPLEMENTACAO.md` - Plano geral
@@ -137,6 +153,7 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 - `FASE-3-2-IMPLEMENTADA.md` - FASE 3.2
 - `FASE-3-3-IMPLEMENTADA.md` - FASE 3.3
 - `SUCESSO-PDV-FUNCIONANDO.md` - PDV funcionando
+- `SISTEMA-CUPONS-IMPLEMENTADO.md` - ✅ **NOVO** - Sistema completo de cupons
 
 **⚙️ 07-setup/** - Guias de Setup
 - `SETUP-INICIAL.md` - Setup inicial
@@ -194,6 +211,8 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 - Decorator `@CurrentTenant()` para validação
 - Policies de isolamento automático
 - Validação de tenant no WhatsApp
+- ✅ **TenantDbContextInterceptor** - Gerencia transações e RLS automaticamente
+- ✅ **DbContextService** - Compartilha transações entre serviços
 
 **Segurança:**
 - JWT com validação obrigatória de JWT_SECRET
@@ -354,11 +373,14 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 - `backend/src/database/entities/` - Todas as entidades TypeORM
 
 **Serviços Críticos:**
-- `backend/src/modules/orders/orders.service.ts` - Lógica de pedidos (com idempotência e audit log)
+- `backend/src/modules/orders/orders.service.ts` - Lógica de pedidos (com idempotência, audit log e cupons)
 - `backend/src/modules/products/products.service.ts` - Lógica de produtos (com cache e audit log)
-- `backend/src/modules/auth/auth.service.ts` - Autenticação (com audit log)
+- `backend/src/modules/auth/auth.service.ts` - Autenticação (com audit log e tenantId obrigatório)
 - `backend/src/modules/whatsapp/whatsapp.service.ts` - Bot WhatsApp (FASE 3.1 e 3.2)
-- `backend/src/modules/tenants/tenants.service.ts` - Validação de tenants ✅ **NOVO**
+- `backend/src/modules/tenants/tenants.service.ts` - Validação de tenants
+- `backend/src/modules/coupons/coupons.service.ts` - ✅ **NOVO** - Sistema de cupons
+- `backend/src/modules/common/services/db-context.service.ts` - ✅ **NOVO** - Gerenciamento de transações
+- `backend/src/common/interceptors/tenant-db-context.interceptor.ts` - ✅ **NOVO** - RLS automático
 
 **Guards e Decorators:**
 - `backend/src/common/decorators/tenant.decorator.ts` - Validação de tenant_id
@@ -488,6 +510,10 @@ Ao iniciar uma nova sessão, verifique:
 - ✅ Banco: **RLS habilitado, índices criados**
 - ✅ Segurança: **17 correções críticas implementadas**
 - ✅ Organização: **100% organizada em docs/**
+- ✅ **DbContextService:** Gerenciamento centralizado de transações
+- ✅ **TenantDbContextInterceptor:** RLS automático em todos os requests
+- ✅ **Sistema de Cupons:** Descontos percentuais e fixos com validação completa
+- ✅ **Documentação:** 100% completa e atualizada
 
 **Próximo Passo:**
 - 🚀 **FASE 3.3 do Bot WhatsApp** - Confirmação de pedidos

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { NotFoundException } from '@nestjs/common';
 import { ProductsService } from './products.service';
@@ -15,8 +15,6 @@ describe('ProductsService', () => {
   let service: ProductsService;
   let produtosRepository: Repository<Produto>;
   let estoquesRepository: Repository<MovimentacaoEstoque>;
-  let cacheService: CacheService;
-  let auditLogService: AuditLogService;
 
   const mockProdutosRepository = {
     create: jest.fn(),
@@ -48,6 +46,11 @@ describe('ProductsService', () => {
     log: jest.fn().mockResolvedValue(undefined),
   };
 
+  const mockDataSource = {
+    // ProductsService usa DataSource em alguns métodos, mas estes unit tests não dependem dele.
+    transaction: jest.fn(async (cb: any) => cb({})),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -59,6 +62,10 @@ describe('ProductsService', () => {
         {
           provide: getRepositoryToken(MovimentacaoEstoque),
           useValue: mockEstoquesRepository,
+        },
+        {
+          provide: getDataSourceToken(),
+          useValue: mockDataSource,
         },
         {
           provide: CacheService,
@@ -74,8 +81,6 @@ describe('ProductsService', () => {
     service = module.get<ProductsService>(ProductsService);
     produtosRepository = module.get<Repository<Produto>>(getRepositoryToken(Produto));
     estoquesRepository = module.get<Repository<MovimentacaoEstoque>>(getRepositoryToken(MovimentacaoEstoque));
-    cacheService = module.get<CacheService>(CacheService);
-    auditLogService = module.get<AuditLogService>(AuditLogService);
   });
 
   afterEach(() => {

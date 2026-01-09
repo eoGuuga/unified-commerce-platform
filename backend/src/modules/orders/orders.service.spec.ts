@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
-import { Repository, DataSource, QueryRunner, EntityManager } from 'typeorm';
+import { EntityManager } from 'typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { Pedido, PedidoStatus } from '../../database/entities/Pedido.entity';
@@ -12,26 +12,25 @@ import { CanalVenda } from '../../database/entities/Pedido.entity';
 import { IdempotencyService } from '../common/services/idempotency.service';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { DbContextService } from '../common/services/db-context.service';
+import { CouponsService } from '../coupons/coupons.service';
 
 describe('OrdersService', () => {
   let service: OrdersService;
-  let pedidosRepository: Repository<Pedido>;
-  let itensRepository: Repository<ItemPedido>;
-  let produtosRepository: Repository<Produto>;
-  let dataSource: DataSource;
   let manager: EntityManager;
 
   const mockPedidoRepository = {
-    create: jest.fn(),
+    create: jest.fn().mockReturnValue({}),
     save: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
     count: jest.fn(),
+    findAndCount: jest.fn(),
   };
 
   const mockItensRepository = {
-    create: jest.fn(),
+    create: jest.fn().mockReturnValue({}),
     save: jest.fn(),
   };
 
@@ -43,6 +42,12 @@ describe('OrdersService', () => {
     createQueryBuilder: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    getRepository: jest.fn((entity) => {
+      if (entity === Pedido) return mockPedidoRepository;
+      if (entity === ItemPedido) return mockItensRepository;
+      if (entity === Produto) return mockProdutosRepository;
+      return {};
+    }),
   };
 
   const mockDataSource = {
@@ -63,6 +68,24 @@ describe('OrdersService', () => {
     notifyOrderStatusChange: jest.fn().mockResolvedValue(undefined),
     notifyPaymentConfirmed: jest.fn().mockResolvedValue(undefined),
     notifyPaymentPending: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockDbContextService = {
+    getRepository: jest.fn((entity) => {
+      if (entity === Pedido) return mockPedidoRepository;
+      if (entity === ItemPedido) return mockItensRepository;
+      if (entity === Produto) return mockProdutosRepository;
+      return {};
+    }),
+    runInTransaction: jest.fn(async (callback) => {
+      return callback(mockManager);
+    }),
+  };
+
+  const mockCouponsService = {
+    findActiveByCode: jest.fn().mockResolvedValue(null),
+    validateCoupon: jest.fn().mockReturnValue({ valid: false, reason: 'Cupom não encontrado' }),
+    computeDiscount: jest.fn().mockReturnValue(0),
   };
 
   beforeEach(async () => {
@@ -97,15 +120,18 @@ describe('OrdersService', () => {
           provide: NotificationsService,
           useValue: mockNotificationsService,
         },
+        {
+          provide: DbContextService,
+          useValue: mockDbContextService,
+        },
+        {
+          provide: CouponsService,
+          useValue: mockCouponsService,
+        },
       ],
     }).compile();
 
     service = module.get<OrdersService>(OrdersService);
-    pedidosRepository = module.get<Repository<Pedido>>(getRepositoryToken(Pedido));
-    itensRepository = module.get<Repository<ItemPedido>>(getRepositoryToken(ItemPedido));
-    produtosRepository = module.get<Repository<Produto>>(getRepositoryToken(Produto));
-    dataSource = module.get<DataSource>(getDataSourceToken());
-
     manager = mockManager as unknown as EntityManager;
   });
 
@@ -189,8 +215,9 @@ describe('OrdersService', () => {
       mockManager.create = jest.fn().mockReturnValue(mockPedido);
       mockManager.save = jest.fn().mockResolvedValue(mockPedido);
 
-      mockDataSource.transaction = jest.fn(async (callback) => {
-        return callback(manager);
+      // ✅ OrdersService agora usa db.runInTransaction, não dataSource.transaction
+      mockDbContextService.runInTransaction = jest.fn(async (callback) => {
+        return callback(mockManager);
       });
 
       jest.spyOn(service as any, 'generateOrderNumber').mockResolvedValue('PED-20260107-001');
@@ -202,7 +229,7 @@ describe('OrdersService', () => {
       expect(result).toBeDefined();
       expect(result.total_amount).toBe(112.5); // (5 * 10.5) + (3 * 20.0) = 52.5 + 60 = 112.5
       expect(result.status).toBe(PedidoStatus.ENTREGUE); // PDV = ENTREGUE
-      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockDbContextService.runInTransaction).toHaveBeenCalled();
       expect(queryBuilder.setLock).toHaveBeenCalledWith('pessimistic_write');
       expect(queryBuilder.getMany).toHaveBeenCalled();
       expect(mockManager.save).toHaveBeenCalled();
@@ -210,18 +237,38 @@ describe('OrdersService', () => {
 
     it('deve lançar NotFoundException quando produto não tem estoque cadastrado', async () => {
       // Arrange
-      const queryBuilder = {
+      const estoqueQueryBuilder = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         setLock: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([mockEstoques[0]]), // Apenas um produto
+        getMany: jest.fn().mockResolvedValue([mockEstoques[0]]), // Apenas um estoque (faltará um produto)
       };
 
-      mockManager.createQueryBuilder = jest.fn(() => queryBuilder as any);
+      const produtosQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          { id: produtoId1, tenant_id: tenantId, is_active: true },
+          { id: produtoId2, tenant_id: tenantId, is_active: true },
+        ]),
+      };
 
-      mockDataSource.transaction = jest.fn(async (callback) => {
+      mockManager.createQueryBuilder = jest.fn((entity) => {
+        // 1) MovimentacaoEstoque -> getMany retorna estoques
+        if (entity && (entity as any).name === 'MovimentacaoEstoque') {
+          return estoqueQueryBuilder as any;
+        }
+        // 2) Produto -> getMany retorna produtos ativos
+        if (entity && (entity as any).name === 'Produto') {
+          return produtosQueryBuilder as any;
+        }
+        return estoqueQueryBuilder as any;
+      });
+
+      // ✅ OrdersService agora usa db.runInTransaction
+      mockDbContextService.runInTransaction = jest.fn(async (callback) => {
         try {
-          return await callback(manager);
+          return await callback(mockManager);
         } catch (error) {
           throw error;
         }
@@ -283,8 +330,9 @@ describe('OrdersService', () => {
 
       mockManager.createQueryBuilder = jest.fn(() => queryBuilder as any);
 
-      mockDataSource.transaction = jest.fn(async (callback) => {
-        return callback(manager);
+      // ✅ OrdersService agora usa db.runInTransaction
+      mockDbContextService.runInTransaction = jest.fn(async (callback) => {
+        return callback(mockManager);
       });
 
       // Act & Assert
@@ -321,8 +369,9 @@ describe('OrdersService', () => {
       mockManager.create = jest.fn().mockReturnValue(pedidoComDesconto);
       mockManager.save = jest.fn().mockResolvedValue(pedidoComDesconto);
 
-      mockDataSource.transaction = jest.fn(async (callback) => {
-        return callback(manager);
+      // ✅ OrdersService agora usa db.runInTransaction
+      mockDbContextService.runInTransaction = jest.fn(async (callback) => {
+        return callback(mockManager);
       });
 
       jest.spyOn(service as any, 'generateOrderNumber').mockResolvedValue('PED-20260107-001');
@@ -353,8 +402,9 @@ describe('OrdersService', () => {
       mockManager.create = jest.fn().mockReturnValue(mockPedido);
       mockManager.save = jest.fn().mockResolvedValue(mockPedido);
 
-      mockDataSource.transaction = jest.fn(async (callback) => {
-        return callback(manager);
+      // ✅ OrdersService agora usa db.runInTransaction
+      mockDbContextService.runInTransaction = jest.fn(async (callback) => {
+        return callback(mockManager);
       });
 
       jest.spyOn(service as any, 'generateOrderNumber').mockResolvedValue('PED-20260107-001');

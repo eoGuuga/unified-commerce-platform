@@ -10,7 +10,7 @@ import {
 import { Tenant } from './Tenant.entity';
 
 @Entity('idempotency_keys')
-@Index(['key_hash'], { unique: true })
+@Index(['tenant_id', 'operation_type', 'key_hash'], { unique: true })
 @Index(['tenant_id', 'operation_type', 'created_at'])
 @Index(['expires_at'])
 export class IdempotencyKey {
@@ -24,7 +24,7 @@ export class IdempotencyKey {
   @JoinColumn({ name: 'tenant_id' })
   tenant: Tenant;
 
-  @Column({ type: 'varchar', length: 255, unique: true })
+  @Column({ type: 'varchar', length: 255 })
   key_hash: string;
 
   @Column({ type: 'varchar', length: 50 })

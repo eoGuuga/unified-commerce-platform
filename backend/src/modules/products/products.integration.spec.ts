@@ -83,16 +83,22 @@ describe('Products Integration Tests (e2e)', () => {
   });
 
   describe('GET /products - Listar Produtos', () => {
-    it('deve listar produtos sem autenticação (endpoint público)', async () => {
+    it('deve listar produtos com autenticação', async () => {
       if (!app) {
         console.log('⏭️ Pulando teste - app não inicializado');
         return;
       }
       const response = await request(app.getHttpServer())
-        .get(`/api/v1/products?tenantId=${tenantId}`)
+        .get(`/api/v1/products`)
+        .set('Authorization', `Bearer ${jwtToken}`)
         .expect(200);
 
-      expect(Array.isArray(response.body)).toBe(true);
+      // Pode retornar array (compat) ou paginação (quando aplicável)
+      if (Array.isArray(response.body)) {
+        expect(Array.isArray(response.body)).toBe(true);
+      } else {
+        expect(response.body).toHaveProperty('data');
+      }
     });
   });
 
@@ -103,7 +109,7 @@ describe('Products Integration Tests (e2e)', () => {
         return;
       }
       const response = await request(app.getHttpServer())
-        .post(`/api/v1/products?tenantId=${tenantId}`)
+        .post(`/api/v1/products`)
         .set('Authorization', `Bearer ${jwtToken}`)
         .send({
           name: 'Produto Teste',
@@ -124,7 +130,7 @@ describe('Products Integration Tests (e2e)', () => {
         return;
       }
       await request(app.getHttpServer())
-        .post(`/api/v1/products?tenantId=${tenantId}`)
+        .post(`/api/v1/products`)
         .send({
           name: 'Produto Teste',
           price: 15.99,
@@ -138,7 +144,7 @@ describe('Products Integration Tests (e2e)', () => {
         return;
       }
       const response = await request(app.getHttpServer())
-        .post(`/api/v1/products?tenantId=${tenantId}`)
+        .post(`/api/v1/products`)
         .set('Authorization', `Bearer ${jwtToken}`)
         .send({
           // Sem name e price
@@ -156,7 +162,7 @@ describe('Products Integration Tests (e2e)', () => {
         return;
       }
       const response = await request(app.getHttpServer())
-        .get(`/api/v1/products/stock-summary?tenantId=${tenantId}`)
+        .get(`/api/v1/products/stock-summary`)
         .set('Authorization', `Bearer ${jwtToken}`)
         .expect(200);
 
@@ -173,7 +179,7 @@ describe('Products Integration Tests (e2e)', () => {
         return;
       }
       await request(app.getHttpServer())
-        .get(`/api/v1/products/stock-summary?tenantId=${tenantId}`)
+        .get(`/api/v1/products/stock-summary`)
         .expect(401);
     });
   });

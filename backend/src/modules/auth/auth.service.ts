@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -7,6 +7,7 @@ import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuditLogService } from '../common/services/audit-log.service';
+import { DbContextService } from '../common/services/db-context.service';
 
 export interface JwtPayload {
   sub: string; // user id
@@ -34,11 +35,12 @@ export class AuthService {
     private usuariosRepository: Repository<Usuario>,
     private jwtService: JwtService,
     private auditLogService: AuditLogService,
+    private readonly db: DbContextService,
   ) {}
 
-  async login(loginDto: LoginDto): Promise<LoginResponse> {
-    const usuario = await this.usuariosRepository.findOne({
-      where: { email: loginDto.email },
+  async login(loginDto: LoginDto, tenantId: string): Promise<LoginResponse> {
+    const usuario = await this.db.getRepository(Usuario).findOne({
+      where: { email: loginDto.email, tenant_id: tenantId },
     });
 
     if (!usuario) {
@@ -60,7 +62,7 @@ export class AuthService {
 
     // Atualizar last_login
     usuario.last_login = new Date();
-    await this.usuariosRepository.save(usuario);
+    await this.db.getRepository(Usuario).save(usuario);
 
     const payload: JwtPayload = {
       sub: usuario.id,
@@ -101,24 +103,25 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto, tenantId: string): Promise<LoginResponse> {
-    const existingUser = await this.usuariosRepository.findOne({
-      where: { email: registerDto.email },
+    const existingUser = await this.db.getRepository(Usuario).findOne({
+      where: { email: registerDto.email, tenant_id: tenantId },
     });
 
     if (existingUser) {
-      throw new UnauthorizedException('Email ja cadastrado');
+      // ✅ Correto semântico: email duplicado é erro de validação (400), não auth (401)
+      throw new BadRequestException('Email ja cadastrado');
     }
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
-    const usuario = this.usuariosRepository.create({
+    const usuario = this.db.getRepository(Usuario).create({
       ...registerDto,
       encrypted_password: hashedPassword,
       tenant_id: tenantId,
       role: registerDto.role || UserRole.SELLER,
     });
 
-    const savedUser = await this.usuariosRepository.save(usuario);
+    const savedUser = await this.db.getRepository(Usuario).save(usuario);
 
     const payload: JwtPayload = {
       sub: savedUser.id,
@@ -139,8 +142,8 @@ export class AuthService {
   }
 
   async validateUser(payload: JwtPayload): Promise<Usuario> {
-    const usuario = await this.usuariosRepository.findOne({
-      where: { id: payload.sub },
+    const usuario = await this.db.getRepository(Usuario).findOne({
+      where: { id: payload.sub, tenant_id: payload.tenant_id },
     });
 
     if (!usuario || !usuario.is_active) {

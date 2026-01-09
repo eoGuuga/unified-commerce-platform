@@ -88,6 +88,9 @@ export class Pedido {
   @Column('decimal', { precision: 10, scale: 2, default: 0 })
   shipping_amount: number;
 
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  coupon_code?: string;
+
   @Column('decimal', { precision: 10, scale: 2 })
   total_amount: number;
 

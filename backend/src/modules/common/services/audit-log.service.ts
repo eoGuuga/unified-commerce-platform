@@ -1,18 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere } from 'typeorm';
+import { FindOptionsWhere } from 'typeorm';
 import { AuditLog } from '../../../database/entities/AuditLog.entity';
-import { AuditLogParams, AuditLogFilters } from '../types/audit.types';
+import { AuditLogParams } from '../types/audit.types';
+import { DbContextService } from './db-context.service';
 
 @Injectable()
 export class AuditLogService {
   constructor(
-    @InjectRepository(AuditLog)
-    private auditLogRepository: Repository<AuditLog>,
+    private readonly db: DbContextService,
   ) {}
 
   async log(params: AuditLogParams): Promise<AuditLog> {
-    const auditLog = this.auditLogRepository.create({
+    const auditLogRepository = this.db.getRepository(AuditLog);
+    const auditLog = auditLogRepository.create({
       tenant_id: params.tenantId,
       user_id: params.userId,
       action: params.action,
@@ -25,7 +25,7 @@ export class AuditLogService {
       metadata: (params.metadata || {}) as Record<string, any>, // TypeORM JSONB requer 'any'
     });
 
-    return this.auditLogRepository.save(auditLog);
+    return auditLogRepository.save(auditLog);
   }
 
   async findByTenant(
@@ -33,7 +33,7 @@ export class AuditLogService {
     limit: number = 100,
     offset: number = 0,
   ): Promise<{ data: AuditLog[]; total: number }> {
-    const [data, total] = await this.auditLogRepository.findAndCount({
+    const [data, total] = await this.db.getRepository(AuditLog).findAndCount({
       where: { tenant_id: tenantId },
       order: { created_at: 'DESC' },
       take: limit,
@@ -57,7 +57,7 @@ export class AuditLogService {
       where.record_id = recordId;
     }
 
-    return this.auditLogRepository.find({
+    return this.db.getRepository(AuditLog).find({
       where,
       order: { created_at: 'DESC' },
     });

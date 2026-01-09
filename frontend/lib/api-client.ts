@@ -1,4 +1,4 @@
-import { API_BASE_URL, getDevCredentials, hasDevCredentials } from './config';
+import { API_BASE_URL } from './config';
 
 // ⚠️ REMOVIDO: Credenciais hardcoded - devem vir do contexto JWT ou variáveis de ambiente
 
@@ -13,7 +13,9 @@ class ApiClient {
     this.baseUrl = baseUrl;
   }
 
-  private async request<T>(endpoint: string, options: ApiOptions = {}): Promise<T> {
+  // Default genérico = any para evitar "unknown" espalhando no app.
+  // (Podemos evoluir para tipagem forte por endpoint depois.)
+  private async request<T = any>(endpoint: string, options: ApiOptions = {}): Promise<T> {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
     const { params, ...fetchOptions } = options;
@@ -44,17 +46,23 @@ class ApiClient {
   }
 
   // Auth endpoints
-  async login(email: string, password: string) {
+  async login(email: string, password: string, tenantId?: string) {
+    const tid =
+      tenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenant_id') : null);
     return this.request('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+      headers: tid ? { 'x-tenant-id': tid } : undefined,
     });
   }
 
-  async register(data: { email: string; password: string; full_name: string }) {
+  async register(data: { email: string; password: string; full_name: string }, tenantId?: string) {
+    const tid =
+      tenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenant_id') : null);
     return this.request('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
+      headers: tid ? { 'x-tenant-id': tid } : undefined,
     });
   }
 
@@ -155,23 +163,9 @@ class ApiClient {
         body: JSON.stringify({ quantity }),
       });
     } catch (error: any) {
-      // Se for erro de autenticação, tentar fazer login novamente
+      // ✅ Segurança: nunca fazer login automático com credenciais hardcoded.
       if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
-        try {
-          const response: any = await this.login('admin@loja.com', 'senha123');
-          if (response.access_token) {
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('token', response.access_token);
-            }
-            return await this.request(`/products/${productId}/release`, {
-              method: 'POST',
-              params: { tenantId },
-              body: JSON.stringify({ quantity }),
-            });
-          }
-        } catch (loginError) {
-          throw new Error('Erro de autenticação. Por favor, recarregue a página.');
-        }
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
       }
       throw error;
     }

@@ -17,6 +17,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
+    const isDevelopment = process.env.NODE_ENV === 'development';
+
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
     let error = 'Internal Server Error';
@@ -40,6 +42,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
       error = exception.constructor.name;
     }
 
+    // ✅ Segurança: nunca expor detalhes de erro interno em produção
+    // - Em produção, qualquer erro 5xx retorna mensagem genérica
+    // - Evita vazamento de mensagens do DB, stack traces, etc.
+    if (!isDevelopment && status >= 500) {
+      message = 'Internal server error';
+      error = 'Internal Server Error';
+      details = null;
+    }
+
     // Log error
     const errorLog = {
       statusCode: status,
@@ -57,8 +68,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
       this.logger.warn('Client Error', JSON.stringify(errorLog, null, 2));
     }
 
-    // Don't expose internal errors in production
-    const isDevelopment = process.env.NODE_ENV === 'development';
     const responseBody: any = {
       statusCode: status,
       timestamp: new Date().toISOString(),

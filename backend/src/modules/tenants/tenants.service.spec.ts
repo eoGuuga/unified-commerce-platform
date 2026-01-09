@@ -1,13 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { TenantsService } from './tenants.service';
 import { Tenant } from '../../database/entities/Tenant.entity';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 
 describe('TenantsService', () => {
   let service: TenantsService;
-  let repository: Repository<Tenant>;
 
   const mockTenant: Tenant = {
     id: 'tenant-123',
@@ -40,7 +38,6 @@ describe('TenantsService', () => {
     }).compile();
 
     service = module.get<TenantsService>(TenantsService);
-    repository = module.get<Repository<Tenant>>(getRepositoryToken(Tenant));
   });
 
   afterEach(() => {

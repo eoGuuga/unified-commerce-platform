@@ -107,10 +107,10 @@ export default function PDVPage() {
 
   // SWR para produtos - configurado para atualização quase em tempo real
   // ⚠️ CRÍTICO: tenantId deve vir do contexto JWT, nunca hardcoded
-  const swrKey = mounted && tenantId ? `products-${tenantId}` : null;
+  const swrKey = mounted && tenantId ? `products:${tenantId}` : null;
   const { data: products = [], error, isLoading, mutate } = useSWR<Product[]>(
-    swrKey ? tenantId : null, // Só buscar quando montado e tenantId disponível
-    productsFetcher,
+    swrKey, // Só buscar quando montado e tenantId disponível
+    () => productsFetcher(tenantId!),
     {
       refreshInterval: 3000, // Atualiza a cada 3 segundos para quase tempo real
       revalidateOnFocus: true, // Revalidar ao focar para garantir dados atualizados
@@ -118,8 +118,9 @@ export default function PDVPage() {
       keepPreviousData: true, // Manter dados anteriores durante atualização
       dedupingInterval: 1000, // Evitar requisições duplicadas em 1s
       onError: (err) => {
+        const msg = err instanceof Error ? err.message : String(err);
         console.error('❌ Erro ao carregar produtos:', err);
-        toast.error('Erro ao carregar produtos. Verifique o console (F12).');
+        toast.error(msg.includes('401') ? 'Sessão expirada. Faça login novamente.' : 'Erro ao carregar produtos. Verifique o console (F12).');
       },
       onSuccess: (data) => {
         // Log apenas em desenvolvimento e quando necessário
@@ -259,6 +260,7 @@ export default function PDVPage() {
     };
   }, [mounted, cart, tenantId]);
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (!mounted || authLoading) return;
     
@@ -277,8 +279,10 @@ export default function PDVPage() {
       setTimeout(() => mutate(), 500);
     }
   }, [mounted, authLoading, isAuthenticated, tenantId, mutate, router]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Atalhos de teclado (apenas no cliente)
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (!mounted) return;
     
@@ -361,6 +365,7 @@ export default function PDVPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [mounted, cart, isSelling, suggestions, selectedProductIndex, showHelp]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Salvar buscas recentes
   useEffect(() => {
@@ -389,8 +394,18 @@ export default function PDVPage() {
     }
   }, [mounted]);
 
-  const autoLogin = async () => {
+  const autoLogin = useCallback(async () => {
     if (typeof window === 'undefined') return;
+    
+    // ✅ CRÍTICO: Auto-login APENAS em desenvolvimento e se explicitamente habilitado
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const allowAutoLogin = process.env.NEXT_PUBLIC_ALLOW_AUTO_LOGIN === 'true';
+    
+    if (!isDevelopment || !allowAutoLogin) {
+      // Em produção ou se não habilitado, não fazer auto-login
+      setIsLoggingIn(false);
+      return;
+    }
     
     setIsLoggingIn(true);
     try {
@@ -401,12 +416,12 @@ export default function PDVPage() {
         return;
       }
 
-      console.log('Fazendo login automático...');
+      console.log('[DEV] Fazendo login automático...');
       const devCreds = getDevCredentials();
       const result = await login(devCreds.email, devCreds.password, devCreds.tenantId);
       
       if (result.success) {
-        console.log('Login realizado, carregando produtos...');
+        console.log('[DEV] Login realizado, carregando produtos...');
         // Aguardar um pouco antes de forçar revalidação
         setTimeout(() => {
           mutate();
@@ -420,7 +435,7 @@ export default function PDVPage() {
     } finally {
       setIsLoggingIn(false);
     }
-  };
+  }, [login, mutate]);
 
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
@@ -936,7 +951,9 @@ export default function PDVPage() {
                   </div>
                 </div>
               ) : filteredProducts.length === 0 && searchTerm ? (
-                <p className="text-gray-500 text-center py-8">Nenhum produto encontrado para "{searchTerm}"</p>
+                <p className="text-gray-500 text-center py-8">
+                  Nenhum produto encontrado para &quot;{searchTerm}&quot;
+                </p>
               ) : (
                 <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
                   {filteredProducts.map(product => (

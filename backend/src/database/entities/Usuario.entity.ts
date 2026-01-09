@@ -18,8 +18,8 @@ export enum UserRole {
 }
 
 @Entity('usuarios')
-@Index(['email'], { unique: true })
 @Index(['tenant_id'])
+@Index(['tenant_id', 'email'], { unique: true })
 export class Usuario {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -31,7 +31,7 @@ export class Usuario {
   @JoinColumn({ name: 'tenant_id' })
   tenant: Tenant;
 
-  @Column({ length: 255, unique: true })
+  @Column({ length: 255 })
   email: string;
 
   @Column({ length: 255 })

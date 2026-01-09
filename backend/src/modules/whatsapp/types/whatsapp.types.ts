@@ -10,11 +10,69 @@ export interface ProductSearchResult {
 }
 
 /**
+ * Estados possíveis da conversa durante o fluxo de pedido
+ */
+export type ConversationState = 
+  | 'idle'                    // Sem contexto, aguardando comando
+  | 'collecting_order'        // Coletando itens do pedido
+  | 'collecting_name'         // Coletando nome do cliente
+  | 'collecting_address'      // Coletando endereço (se entrega)
+  | 'collecting_phone'        // Coletando telefone de contato
+  | 'confirming_order'        // Confirmando pedido completo antes de criar
+  | 'waiting_payment'         // Aguardando seleção e processamento de pagamento
+  | 'order_confirmed'         // Pedido confirmado e pago
+  | 'order_completed';        // Pedido completo (entregue)
+
+/**
+ * Dados do cliente coletados durante a conversa
+ */
+export interface CustomerData {
+  name?: string;
+  address?: {
+    street: string;
+    number: string;
+    complement?: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
+  phone?: string;
+  notes?: string;
+  delivery_type?: 'delivery' | 'pickup'; // Entrega ou retirada
+}
+
+/**
+ * Item do pedido pendente
+ */
+export interface PendingOrderItem {
+  produto_id: string;
+  produto_name: string;
+  quantity: number;
+  unit_price: number;
+}
+
+/**
+ * Pedido pendente (antes de confirmar)
+ */
+export interface PendingOrder {
+  items: PendingOrderItem[];
+  subtotal: number;
+  coupon_code?: string | null;
+  discount_amount: number;
+  shipping_amount: number;
+  total_amount: number;
+}
+
+/**
  * Tipo para contexto de conversa
  */
 export interface ConversationContext {
   pedido_id?: string;
   waiting_payment?: boolean;
+  state?: ConversationState;           // Estado atual da conversa
+  customer_data?: CustomerData;         // Dados do cliente coletados
+  pending_order?: PendingOrder;        // Pedido pendente (antes de confirmar)
   [key: string]: unknown; // Para permitir extensibilidade
 }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { jwtDecode } from 'jwt-decode';
 import api from '@/lib/api-client';
 
 interface User {
@@ -38,9 +39,9 @@ export function useAuth() {
 
     const token = localStorage.getItem('token');
     if (token) {
-      // Decodificar JWT para extrair tenant_id (sem validar assinatura, apenas ler payload)
+      // ✅ Decodificar JWT usando jwt-decode (suporta UTF-8 e caracteres especiais)
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
+        const payload = jwtDecode<{ tenant_id?: string; exp?: number }>(token);
         const tenantId = payload.tenant_id;
         
         // Verificar se token expirou
@@ -92,7 +93,8 @@ export function useAuth() {
   const loadUser = async (token: string) => {
     try {
       const user = await api.getCurrentUser();
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      // ✅ Decodificar JWT usando jwt-decode (suporta UTF-8 e caracteres especiais)
+      const payload = jwtDecode<{ tenant_id?: string }>(token);
       const tenantId = payload.tenant_id || user.tenant_id;
 
       setAuthState({
@@ -122,8 +124,8 @@ export function useAuth() {
       if (response.access_token && typeof window !== 'undefined') {
         localStorage.setItem('token', response.access_token);
         
-        // Extrair tenant_id do JWT
-        const payload = JSON.parse(atob(response.access_token.split('.')[1]));
+        // ✅ Extrair tenant_id do JWT usando jwt-decode (suporta UTF-8 e caracteres especiais)
+        const payload = jwtDecode<{ tenant_id?: string }>(response.access_token);
         const extractedTenantId = payload.tenant_id || tenantId;
 
         if (!extractedTenantId) {

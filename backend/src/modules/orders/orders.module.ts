@@ -8,12 +8,14 @@ import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque
 import { Produto } from '../../database/entities/Produto.entity';
 import { CommonModule } from '../common/common.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { CouponsModule } from '../coupons/coupons.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Pedido, ItemPedido, MovimentacaoEstoque, Produto]),
     CommonModule, // Importar CommonModule para usar IdempotencyService e AuditLogService
     forwardRef(() => NotificationsModule),
+    CouponsModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

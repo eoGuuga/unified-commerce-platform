@@ -194,7 +194,9 @@ CREATE TABLE reservas_estoque (
 
 CREATE INDEX idx_reservas_tenant ON reservas_estoque(tenant_id);
 CREATE INDEX idx_reservas_produto ON reservas_estoque(produto_id);
-CREATE INDEX idx_reservas_expires ON reservas_estoque(expires_at) WHERE expires_at > NOW();
+-- OBS: nao usar NOW() em predicado de indice parcial (nao e IMMUTABLE).
+-- Um indice normal em expires_at ja ajuda o planner a filtrar por (expires_at > now()).
+CREATE INDEX idx_reservas_expires ON reservas_estoque(expires_at);
 
 -- ============================================
 -- TABELA: PAGAMENTOS

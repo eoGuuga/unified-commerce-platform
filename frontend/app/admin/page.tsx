@@ -44,7 +44,6 @@ interface SalesReport {
 export default function AdminDashboard() {
   const router = useRouter();
   const { tenantId, isAuthenticated, isLoading: authLoading, login } = useAuth();
-  const [products, setProducts] = useState<Product[]>([]);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProduct, setNewProduct] = useState({
     name: '',
@@ -52,20 +51,24 @@ export default function AdminDashboard() {
     description: '',
   });
 
-  // Auto-login (apenas em desenvolvimento)
+  // ✅ CRÍTICO: Auto-login APENAS em desenvolvimento e se explicitamente habilitado
   useEffect(() => {
     const autoLogin = async () => {
       if (typeof window === 'undefined' || authLoading) return;
       if (!isAuthenticated || !tenantId) {
-        if (process.env.NODE_ENV === 'development' && hasDevCredentials()) {
+        const isDevelopment = process.env.NODE_ENV === 'development';
+        const allowAutoLogin = process.env.NEXT_PUBLIC_ALLOW_AUTO_LOGIN === 'true';
+        
+        if (isDevelopment && allowAutoLogin && hasDevCredentials()) {
           try {
             const devCreds = getDevCredentials();
             await login(devCreds.email, devCreds.password, devCreds.tenantId);
           } catch (err) {
-            console.error('Erro no login automático:', err);
+            console.error('[DEV] Erro no login automático:', err);
             toast.error('Erro ao fazer login automático. Verifique as credenciais.');
           }
         } else {
+          // Em produção ou se não habilitado, redirecionar para login
           toast.error('Autenticação necessária. Redirecionando para login...');
           router.push('/login');
         }
@@ -76,23 +79,19 @@ export default function AdminDashboard() {
 
   // SWR para produtos
   const { data: productsData, mutate: mutateProducts } = useSWR<Product[]>(
-    tenantId ? `products-${tenantId}` : null,
-    () => tenantId ? api.getProducts(tenantId) : Promise.resolve([]),
+    tenantId ? `products:${tenantId}` : null,
+    () => api.getProducts(tenantId!),
     { refreshInterval: 10000, revalidateOnFocus: true },
   );
 
   // SWR para relatório de vendas
   const { data: salesReport, error, isLoading } = useSWR<SalesReport>(
-    tenantId ? `sales-report-${tenantId}` : null,
-    () => tenantId ? api.getSalesReport(tenantId) : Promise.resolve(null),
+    tenantId ? `sales-report:${tenantId}` : null,
+    () => api.getSalesReport(tenantId!),
     { refreshInterval: 30000, revalidateOnFocus: true },
   );
 
-  useEffect(() => {
-    if (productsData) {
-      setProducts(productsData);
-    }
-  }, [productsData]);
+  const products = productsData || [];
 
   const handleLogout = () => {
     localStorage.removeItem('token');

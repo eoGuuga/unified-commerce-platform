@@ -10,7 +10,6 @@ import { CommonModule } from '../common/common.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { databaseConfig } from '../../config/database.config';
 import { JwtService } from '@nestjs/jwt';
-import { AuthService } from '../auth/auth.service';
 import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -88,7 +87,7 @@ describe('Orders Integration Tests (e2e)', () => {
   });
 
   describe('POST /orders - Criar Pedido', () => {
-    it.skip('deve criar pedido com sucesso quando há estoque suficiente', async () => {
+    it('deve criar pedido com sucesso quando há estoque suficiente', async () => {
       if (!app) {
         console.log('⏭️ Pulando teste - app não inicializado');
         return;
@@ -135,7 +134,7 @@ describe('Orders Integration Tests (e2e)', () => {
       expect(orderResponse.body.total_amount).toBe(52.5); // 5 * 10.5
     });
 
-    it.skip('deve retornar erro 400 quando estoque insuficiente', async () => {
+    it('deve retornar erro 400 quando estoque insuficiente', async () => {
       if (!app) {
         console.log('⏭️ Pulando teste - app não inicializado');
         return;

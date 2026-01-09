@@ -7,6 +7,7 @@ import { EncryptionService } from './services/encryption.service';
 import { IdempotencyService } from './services/idempotency.service';
 import { AuditLogService } from './services/audit-log.service';
 import { CsrfService } from '../../common/services/csrf.service';
+import { DbContextService } from './services/db-context.service';
 import { UsageLog } from '../../database/entities/UsageLog.entity';
 import { IdempotencyKey } from '../../database/entities/IdempotencyKey.entity';
 import { AuditLog } from '../../database/entities/AuditLog.entity';
@@ -24,6 +25,7 @@ import { AuditLog } from '../../database/entities/AuditLog.entity';
     IdempotencyService,
     AuditLogService,
     CsrfService,
+    DbContextService,
   ],
   exports: [
     CacheService,
@@ -32,6 +34,7 @@ import { AuditLog } from '../../database/entities/AuditLog.entity';
     IdempotencyService,
     AuditLogService,
     CsrfService,
+    DbContextService,
   ],
 })
 export class CommonModule {}

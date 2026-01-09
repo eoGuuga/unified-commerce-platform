@@ -8,6 +8,7 @@ import { ProductsModule } from '../products/products.module';
 import { OrdersModule } from '../orders/orders.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { TenantsModule } from '../tenants/tenants.module';
+import { CouponsModule } from '../coupons/coupons.module';
 import { WhatsappConversation } from '../../database/entities/WhatsappConversation.entity';
 import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity';
 
@@ -18,6 +19,7 @@ import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity'
     TenantsModule, // Importar TenantsModule para validar tenant e número de WhatsApp
     forwardRef(() => OrdersModule), // forwardRef para evitar dependência circular
     forwardRef(() => PaymentsModule), // forwardRef para evitar dependência circular
+    CouponsModule,
   ],
   controllers: [WhatsappController],
   providers: [WhatsappService, OpenAIService, ConversationService],

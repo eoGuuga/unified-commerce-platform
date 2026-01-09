@@ -1,11 +1,67 @@
+/**
+ * ⚠️ ATENÇÃO: INTEGRAÇÃO DE PAGAMENTOS
+ * 
+ * Este serviço atualmente usa MOCKS para desenvolvimento.
+ * ANTES DE IR PARA PRODUÇÃO, você DEVE integrar com um gateway de pagamento real:
+ * 
+ * OPÇÕES RECOMENDADAS:
+ * 
+ * 1. STRIPE (Internacional)
+ *    - Documentação: https://stripe.com/docs/payments
+ *    - SDK: @stripe/stripe-js
+ *    - Suporta: Cartão, Pix (Brasil), Boleto (Brasil)
+ *    - Taxa: ~3.9% + R$ 0.40 por transação
+ * 
+ * 2. MERCADO PAGO (Brasil)
+ *    - Documentação: https://www.mercadopago.com.br/developers/pt/docs
+ *    - SDK: mercadopago
+ *    - Suporta: Cartão, Pix, Boleto, PEC
+ *    - Taxa: ~4.99% por transação
+ * 
+ * 3. GERENCIANET / EFI (Brasil)
+ *    - Documentação: https://dev.gerencianet.com.br/
+ *    - SDK: @gerencianet/gn-api-sdk-typescript
+ *    - Suporta: Pix, Boleto, Cartão
+ *    - Taxa: ~2.99% por transação
+ * 
+ * IMPLEMENTAÇÃO NECESSÁRIA:
+ * 
+ * 1. Instalar SDK do provider escolhido
+ * 2. Configurar variáveis de ambiente:
+ *    - PAYMENT_PROVIDER=stripe|mercadopago|gerencianet
+ *    - STRIPE_SECRET_KEY=sk_... (se Stripe)
+ *    - MERCADOPAGO_ACCESS_TOKEN=... (se Mercado Pago)
+ *    - GERENCIANET_CLIENT_ID=... (se Gerencianet)
+ *    - GERENCIANET_CLIENT_SECRET=... (se Gerencianet)
+ * 
+ * 3. Substituir métodos mock:
+ *    - processPixPayment() - usar API real para gerar QR Code
+ *    - processCardPayment() - usar SDK para processar cartão
+ *    - processBoletoPayment() - usar API real para gerar boleto
+ * 
+ * 4. Implementar webhooks:
+ *    - Criar endpoint POST /payments/webhook/:provider
+ *    - Validar assinatura do webhook
+ *    - Atualizar status do pagamento automaticamente
+ * 
+ * 5. Testes:
+ *    - Usar ambiente sandbox/test do provider
+ *    - Testar todos os métodos de pagamento
+ *    - Testar webhooks de confirmação
+ * 
+ * ⚠️ NUNCA use este código em produção sem integração real!
+ * Usar mocks em produção resultará em produtos entregues de graça.
+ */
+
 import { Injectable, Logger, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Pagamento, PagamentoStatus, MetodoPagamento } from '../../database/entities/Pagamento.entity';
 import { Pedido, PedidoStatus } from '../../database/entities/Pedido.entity';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as QRCode from 'qrcode';
+import { DbContextService } from '../common/services/db-context.service';
 
 export interface CreatePaymentDto {
   pedido_id: string;
@@ -31,6 +87,7 @@ export class PaymentsService {
     @InjectRepository(Pedido)
     private pedidosRepository: Repository<Pedido>,
     private configService: ConfigService,
+    private readonly db: DbContextService,
     @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
   ) {}
@@ -47,7 +104,7 @@ export class PaymentsService {
     );
 
     // Buscar pedido
-    const pedido = await this.pedidosRepository.findOne({
+    const pedido = await this.db.getRepository(Pedido).findOne({
       where: { id: createPaymentDto.pedido_id, tenant_id: tenantId },
     });
 
@@ -60,6 +117,25 @@ export class PaymentsService {
       throw new BadRequestException(
         `Pedido não está pendente de pagamento. Status atual: ${pedido.status}`,
       );
+    }
+
+    // ✅ IDEMPOTÊNCIA (Pagamento): se já existe um pagamento pendente/processando
+    // para este pedido + método, reutilizar (evita criação duplicada via chat/webhook).
+    const existingPagamento = await this.db.getRepository(Pagamento).findOne({
+      where: {
+        tenant_id: tenantId,
+        pedido_id: createPaymentDto.pedido_id,
+        method: createPaymentDto.method,
+        status: In([PagamentoStatus.PENDING, PagamentoStatus.PROCESSING]),
+      },
+      order: { created_at: 'DESC' },
+    });
+
+    if (existingPagamento) {
+      this.logger.warn(
+        `Reusing existing payment ${existingPagamento.id} for order ${createPaymentDto.pedido_id} (${createPaymentDto.method})`,
+      );
+      return this.buildPaymentResult(existingPagamento, pedido);
     }
 
     // Validar valor (converter para número para garantir comparação correta)
@@ -82,7 +158,8 @@ export class PaymentsService {
     }
 
     // Criar pagamento
-    const pagamento = this.pagamentosRepository.create({
+    const pagamentoRepo = this.db.getRepository(Pagamento);
+    const pagamento = pagamentoRepo.create({
       tenant_id: tenantId,
       pedido_id: createPaymentDto.pedido_id,
       method: createPaymentDto.method,
@@ -91,7 +168,7 @@ export class PaymentsService {
       metadata: {},
     });
 
-    await this.pagamentosRepository.save(pagamento);
+    await pagamentoRepo.save(pagamento);
 
     // Processar pagamento conforme método
     const result = await this.processPayment(pagamento, pedido);
@@ -99,6 +176,68 @@ export class PaymentsService {
     this.logger.log(`Payment created: ${pagamento.id}, status: ${pagamento.status}`);
 
     return result;
+  }
+
+  /**
+   * Monta o resultado do pagamento a partir do registro existente (reuso).
+   * Importante para Pix/Boleto: devolver copy/paste e links já gerados.
+   */
+  private buildPaymentResult(pagamento: Pagamento, pedido: Pedido): PaymentResult {
+    if (pagamento.method === MetodoPagamento.PIX) {
+      const pixData = String(pagamento.metadata?.pix_copy_paste || '');
+      return {
+        pagamento,
+        qr_code: typeof pagamento.metadata?.pix_qr_code === 'string' ? pagamento.metadata.pix_qr_code : undefined,
+        qr_code_url: typeof pagamento.metadata?.pix_qr_code_url === 'string' ? pagamento.metadata.pix_qr_code_url : undefined,
+        copy_paste: pixData || undefined,
+        message: pixData ? this.generatePixMessage(pedido, pagamento, pixData) : undefined,
+      };
+    }
+
+    if (pagamento.method === MetodoPagamento.BOLETO) {
+      const boletoUrl = String(pagamento.metadata?.boleto_url || '');
+      const boletoBarcode = String(pagamento.metadata?.boleto_barcode || '');
+      const message =
+        boletoUrl || boletoBarcode
+          ? `📄 *BOLETO BANCÁRIO*\n\n` +
+            `📦 Pedido: *${pedido.order_no}*\n` +
+            `💰 Valor: R$ ${Number(pagamento.amount).toFixed(2).replace('.', ',')}\n\n` +
+            (boletoBarcode ? `📄 Código de barras:\n\`\`\`${boletoBarcode}\`\`\`\n\n` : '') +
+            (boletoUrl ? `🔗 Link do boleto:\n${boletoUrl}\n\n` : '') +
+            `⏳ Após o pagamento, seu pedido será confirmado automaticamente!`
+          : undefined;
+
+      return {
+        pagamento,
+        message,
+      };
+    }
+
+    if (pagamento.method === MetodoPagamento.DINHEIRO) {
+      return {
+        pagamento,
+        message:
+          `💵 *PAGAMENTO EM DINHEIRO*\n\n` +
+          `📦 Pedido: *${pedido.order_no}*\n` +
+          `💰 Valor: R$ ${Number(pagamento.amount).toFixed(2).replace('.', ',')}\n\n` +
+          `⏳ Aguarde a confirmação do pagamento pela loja.`,
+      };
+    }
+
+    if (pagamento.method === MetodoPagamento.CREDITO || pagamento.method === MetodoPagamento.DEBITO) {
+      return {
+        pagamento,
+        message:
+          `💳 *PAGAMENTO COM CARTÃO*\n\n` +
+          `📦 Pedido: *${pedido.order_no}*\n` +
+          `💰 Valor: R$ ${Number(pagamento.amount).toFixed(2).replace('.', ',')}\n` +
+          `💳 Método: ${pagamento.method === MetodoPagamento.CREDITO ? 'Crédito' : 'Débito'}\n\n` +
+          `⏳ Status: ${pagamento.status}\n` +
+          `Você receberá uma notificação quando o pagamento for confirmado.`,
+      };
+    }
+
+    return { pagamento };
   }
 
   /**
@@ -129,6 +268,7 @@ export class PaymentsService {
 
   /**
    * Processa pagamento Pix
+   * ⚠️ MOCK: Em produção, usar API real (GerenciaNet, Stripe, Mercado Pago)
    */
   private async processPixPayment(
     pagamento: Pagamento,
@@ -136,7 +276,11 @@ export class PaymentsService {
   ): Promise<PaymentResult> {
     this.logger.log(`Processing Pix payment for order ${pedido.order_no}`);
 
-    // Gerar QR Code Pix (mock para desenvolvimento)
+    // ⚠️ MOCK: Gerar QR Code Pix (mock para desenvolvimento)
+    // Em produção, usar API real:
+    // - GerenciaNet: gn.pix.createCharge()
+    // - Stripe: stripe.paymentIntents.create() com payment_method_types: ['pix']
+    // - Mercado Pago: mercadopago.payment.create()
     const pixData = this.generatePixData(pedido, pagamento);
     
     // Gerar QR Code em base64
@@ -169,7 +313,7 @@ export class PaymentsService {
       pix_copy_paste: pixData,
     };
 
-    await this.pagamentosRepository.save(pagamento);
+    await this.db.getRepository(Pagamento).save(pagamento);
 
     return {
       pagamento,
@@ -181,11 +325,17 @@ export class PaymentsService {
   }
 
   /**
-   * Gera dados Pix (mock - em produção usar API real como GerenciaNet)
+   * Gera dados Pix (MOCK - em produção usar API real como GerenciaNet)
    * Formato EMC (EMV Code) simplificado para desenvolvimento
+   * 
+   * ⚠️ ATENÇÃO: Este método é apenas para desenvolvimento!
+   * Em produção, use a API do provider escolhido:
+   * - GerenciaNet: gn.pix.createCharge()
+   * - Stripe: stripe.paymentIntents.create()
+   * - Mercado Pago: mercadopago.payment.create()
    */
   private generatePixData(pedido: Pedido, pagamento: Pagamento): string {
-    // Mock: Em produção, usar API real (GerenciaNet, Stripe, etc)
+    // ⚠️ MOCK: Em produção, usar API real (GerenciaNet, Stripe, etc)
     const chavePix = this.configService.get<string>('PIX_KEY') || 'mock-chave-pix-123456789';
     const valor = Number(pagamento.amount).toFixed(2);
     const descricao = `Pedido ${pedido.order_no}`;
@@ -251,7 +401,7 @@ export class PaymentsService {
       requires_manual_confirmation: true,
     };
 
-    await this.pagamentosRepository.save(pagamento);
+    await this.db.getRepository(Pagamento).save(pagamento);
 
     return {
       pagamento,
@@ -265,6 +415,7 @@ export class PaymentsService {
 
   /**
    * Processa pagamento com cartão
+   * ⚠️ MOCK: Em produção, integrar com Stripe/GerenciaNet/Mercado Pago
    */
   private async processCardPayment(
     pagamento: Pagamento,
@@ -272,7 +423,13 @@ export class PaymentsService {
   ): Promise<PaymentResult> {
     this.logger.log(`Processing card payment for order ${pedido.order_no}`);
 
-    // Mock: Em produção, integrar com Stripe/GerenciaNet
+    // ⚠️ MOCK: Em produção, integrar com Stripe/GerenciaNet/Mercado Pago
+    // Exemplo Stripe:
+    // const paymentIntent = await stripe.paymentIntents.create({
+    //   amount: Math.round(pagamento.amount * 100), // centavos
+    //   currency: 'brl',
+    //   metadata: { pedido_id: pedido.id, tenant_id: pagamento.tenant_id },
+    // });
     const provider = this.configService.get<string>('PAYMENT_PROVIDER') || 'mock';
 
     if (provider === 'mock') {
@@ -283,7 +440,7 @@ export class PaymentsService {
         simulated: true,
       };
 
-      await this.pagamentosRepository.save(pagamento);
+      await this.db.getRepository(Pagamento).save(pagamento);
 
       // Simular confirmação após 2 segundos (em produção seria via webhook)
       setTimeout(async () => {
@@ -307,6 +464,7 @@ export class PaymentsService {
 
   /**
    * Processa pagamento com boleto
+   * ⚠️ MOCK: Em produção, gerar boleto real via GerenciaNet/Mercado Pago
    */
   private async processBoletoPayment(
     pagamento: Pagamento,
@@ -314,7 +472,12 @@ export class PaymentsService {
   ): Promise<PaymentResult> {
     this.logger.log(`Processing boleto payment for order ${pedido.order_no}`);
 
-    // Mock: Em produção, gerar boleto real
+    // ⚠️ MOCK: Em produção, gerar boleto real via GerenciaNet/Mercado Pago
+    // Exemplo GerenciaNet:
+    // const charge = await gn.charge.create({
+    //   items: [{ name: `Pedido ${pedido.order_no}`, value: pagamento.amount, amount: 1 }],
+    //   payment: { banking_billet: { expire_at: '2024-12-31' } },
+    // });
     const boletoUrl = `https://example.com/boleto/${pagamento.id}`;
     const boletoBarcode = '34191.09008 01234.567890 12345.678901 2 12345678901234';
 
@@ -323,7 +486,7 @@ export class PaymentsService {
       boleto_barcode: boletoBarcode,
     };
 
-    await this.pagamentosRepository.save(pagamento);
+    await this.db.getRepository(Pagamento).save(pagamento);
 
     return {
       pagamento,
@@ -343,7 +506,7 @@ export class PaymentsService {
    * Confirma um pagamento (chamado via webhook ou manualmente)
    */
   async confirmPayment(pagamentoId: string, tenantId: string): Promise<Pagamento> {
-    const pagamento = await this.pagamentosRepository.findOne({
+    const pagamento = await this.db.getRepository(Pagamento).findOne({
       where: { id: pagamentoId, tenant_id: tenantId },
       relations: ['pedido'],
     });
@@ -359,7 +522,7 @@ export class PaymentsService {
 
     // Atualizar status do pagamento
     pagamento.status = PagamentoStatus.PAID;
-    await this.pagamentosRepository.save(pagamento);
+    await this.db.getRepository(Pagamento).save(pagamento);
 
     // Atualizar status do pedido
     const pedido = pagamento.pedido;
@@ -367,10 +530,10 @@ export class PaymentsService {
     
     if (pedido.status === PedidoStatus.PENDENTE_PAGAMENTO) {
       pedido.status = PedidoStatus.CONFIRMADO;
-      await this.pedidosRepository.save(pedido);
+      await this.db.getRepository(Pedido).save(pedido);
       this.logger.log(`Order ${pedido.order_no} confirmed after payment`);
 
-      // Notificar cliente sobre confirmação de pagamento
+      // ✅ Notificar cliente sobre confirmação de pagamento
       try {
         await this.notificationsService.notifyPaymentConfirmed(
           pagamento.tenant_id,
@@ -390,6 +553,28 @@ export class PaymentsService {
         });
         // Não falhar a confirmação se a notificação falhar
       }
+
+      // ✅ NOVO: Notificar também sobre mudança de status do pedido
+      try {
+        await this.notificationsService.notifyOrderStatusChange(
+          pagamento.tenant_id,
+          pedido,
+          oldStatus,
+          PedidoStatus.CONFIRMADO,
+        );
+      } catch (error) {
+        this.logger.error('Error sending order status change notification', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          context: {
+            tenantId: pagamento.tenant_id,
+            pedidoId: pagamento.pedido_id,
+            oldStatus,
+            newStatus: PedidoStatus.CONFIRMADO,
+          },
+        });
+        // Não falhar a confirmação se a notificação falhar
+      }
     }
 
     return pagamento;
@@ -399,7 +584,7 @@ export class PaymentsService {
    * Busca pagamento por ID
    */
   async findById(pagamentoId: string, tenantId: string): Promise<Pagamento> {
-    const pagamento = await this.pagamentosRepository.findOne({
+    const pagamento = await this.db.getRepository(Pagamento).findOne({
       where: { id: pagamentoId, tenant_id: tenantId },
       relations: ['pedido'],
     });
@@ -415,7 +600,7 @@ export class PaymentsService {
    * Busca pagamentos de um pedido
    */
   async findByPedido(pedidoId: string, tenantId: string): Promise<Pagamento[]> {
-    return await this.pagamentosRepository.find({
+    return await this.db.getRepository(Pagamento).find({
       where: { pedido_id: pedidoId, tenant_id: tenantId },
       order: { created_at: 'DESC' },
     });

@@ -1,18 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { WhatsappConversation } from '../../../database/entities/WhatsappConversation.entity';
 import { WhatsappMessage } from '../../../database/entities/WhatsappMessage.entity';
+import { DbContextService } from '../../common/services/db-context.service';
 
 @Injectable()
 export class ConversationService {
   private readonly logger = new Logger(ConversationService.name);
 
   constructor(
-    @InjectRepository(WhatsappConversation)
-    private conversationRepository: Repository<WhatsappConversation>,
-    @InjectRepository(WhatsappMessage)
-    private messageRepository: Repository<WhatsappMessage>,
+    private readonly db: DbContextService,
   ) {}
 
   /**
@@ -23,7 +19,8 @@ export class ConversationService {
     customerPhone: string,
     customerName?: string,
   ): Promise<WhatsappConversation> {
-    let conversation = await this.conversationRepository.findOne({
+    const conversationRepository = this.db.getRepository(WhatsappConversation);
+    let conversation = await conversationRepository.findOne({
       where: {
         tenant_id: tenantId,
         customer_phone: customerPhone,
@@ -33,7 +30,7 @@ export class ConversationService {
     });
 
     if (!conversation) {
-      conversation = this.conversationRepository.create({
+      conversation = conversationRepository.create({
         tenant_id: tenantId,
         customer_phone: customerPhone,
         customer_name: customerName,
@@ -41,12 +38,12 @@ export class ConversationService {
         context: {},
         last_message_at: new Date(),
       });
-      conversation = await this.conversationRepository.save(conversation);
+      conversation = await conversationRepository.save(conversation);
       this.logger.log(`Created new conversation ${conversation.id} for ${customerPhone}`);
     } else {
       // Atualizar timestamp
       conversation.last_message_at = new Date();
-      await this.conversationRepository.save(conversation);
+      await conversationRepository.save(conversation);
     }
 
     return conversation;
@@ -59,7 +56,8 @@ export class ConversationService {
     conversationId: string,
     contextUpdates: Record<string, any>,
   ): Promise<void> {
-    const conversation = await this.conversationRepository.findOne({
+    const conversationRepository = this.db.getRepository(WhatsappConversation);
+    const conversation = await conversationRepository.findOne({
       where: { id: conversationId },
     });
 
@@ -73,14 +71,15 @@ export class ConversationService {
       ...contextUpdates,
     };
 
-    await this.conversationRepository.save(conversation);
+    await conversationRepository.save(conversation);
   }
 
   /**
    * Define o pedido_id na conversa
    */
   async setPedidoId(conversationId: string, pedidoId: string): Promise<void> {
-    const conversation = await this.conversationRepository.findOne({
+    const conversationRepository = this.db.getRepository(WhatsappConversation);
+    const conversation = await conversationRepository.findOne({
       where: { id: conversationId },
     });
 
@@ -97,7 +96,110 @@ export class ConversationService {
       waiting_payment: true,
     };
 
-    await this.conversationRepository.save(conversation);
+    await conversationRepository.save(conversation);
+  }
+
+  /**
+   * Atualiza o estado da conversa
+   */
+  async updateState(
+    conversationId: string,
+    state: string,
+  ): Promise<void> {
+    const conversationRepository = this.db.getRepository(WhatsappConversation);
+    const conversation = await conversationRepository.findOne({
+      where: { id: conversationId },
+    });
+
+    if (!conversation) {
+      this.logger.warn(`Conversation ${conversationId} not found`);
+      return;
+    }
+
+    conversation.context = {
+      ...conversation.context,
+      state,
+    };
+
+    await conversationRepository.save(conversation);
+  }
+
+  /**
+   * Salva dados do cliente no contexto
+   */
+  async saveCustomerData(
+    conversationId: string,
+    customerData: Record<string, any>,
+  ): Promise<void> {
+    const conversationRepository = this.db.getRepository(WhatsappConversation);
+    const conversation = await conversationRepository.findOne({
+      where: { id: conversationId },
+    });
+
+    if (!conversation) {
+      this.logger.warn(`Conversation ${conversationId} not found`);
+      return;
+    }
+
+    // Atualizar customer_name se fornecido
+    if (customerData.name) {
+      conversation.customer_name = customerData.name;
+    }
+
+    conversation.context = {
+      ...conversation.context,
+      customer_data: {
+        ...(conversation.context?.customer_data || {}),
+        ...customerData,
+      },
+    };
+
+    await conversationRepository.save(conversation);
+  }
+
+  /**
+   * Salva pedido pendente no contexto (antes de confirmar)
+   */
+  async savePendingOrder(
+    conversationId: string,
+    pendingOrder: Record<string, any>,
+  ): Promise<void> {
+    const conversationRepository = this.db.getRepository(WhatsappConversation);
+    const conversation = await conversationRepository.findOne({
+      where: { id: conversationId },
+    });
+
+    if (!conversation) {
+      this.logger.warn(`Conversation ${conversationId} not found`);
+      return;
+    }
+
+    conversation.context = {
+      ...conversation.context,
+      pending_order: pendingOrder,
+    };
+
+    await conversationRepository.save(conversation);
+  }
+
+  /**
+   * Limpa o contexto de pedido pendente (após confirmar)
+   */
+  async clearPendingOrder(conversationId: string): Promise<void> {
+    const conversationRepository = this.db.getRepository(WhatsappConversation);
+    const conversation = await conversationRepository.findOne({
+      where: { id: conversationId },
+    });
+
+    if (!conversation) {
+      this.logger.warn(`Conversation ${conversationId} not found`);
+      return;
+    }
+
+    const { pending_order: _pending_order, ...restContext } = conversation.context || {};
+    conversation.context = restContext;
+
+    await conversationRepository.save(conversation);
   }
 
   /**
@@ -109,21 +211,22 @@ export class ConversationService {
     body: string,
     messageType: 'text' | 'image' | 'document' = 'text',
   ): Promise<WhatsappMessage> {
-    const message = this.messageRepository.create({
+    const messageRepository = this.db.getRepository(WhatsappMessage);
+    const message = messageRepository.create({
       conversation_id: conversationId,
       direction,
       body,
       message_type: messageType,
     });
 
-    return await this.messageRepository.save(message);
+    return await messageRepository.save(message);
   }
 
   /**
    * Busca conversa por ID
    */
   async findById(conversationId: string): Promise<WhatsappConversation | null> {
-    return await this.conversationRepository.findOne({
+    return await this.db.getRepository(WhatsappConversation).findOne({
       where: { id: conversationId },
       relations: ['pedido'],
     });

@@ -10,6 +10,11 @@
 **👉 [`00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`](./00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md)**  
 **LEIA ESTE PRIMEIRO!** Contém tudo que você precisa saber para continuar.
 
+### 🧭 Playbook (Ordem Oficial)
+
+**👉 [`00-projeto/00-PLAYBOOK-PERFEICAO.md`](./00-projeto/00-PLAYBOOK-PERFEICAO.md)**  
+Roteiro único e sequencial com gates de **setup → segurança → testes → escalabilidade → operação → produção**.
+
 ---
 
 ## 📋 DOCUMENTOS POR CATEGORIA
@@ -42,6 +47,7 @@
 15. **`docs/06-implementacoes/FASE-3-3-IMPLEMENTADA.md`** - FASE 3.3 implementada
 16. **`docs/06-implementacoes/SUCESSO-PDV-FUNCIONANDO.md`** - PDV funcionando
 17. **`docs/06-implementacoes/PLANO-PERFEITO-PDV.md`** - Plano do PDV
+18. **`docs/06-implementacoes/SISTEMA-CUPONS-IMPLEMENTADO.md`** - ✅ **NOVO** - Sistema completo de cupons
 
 ### ⚙️ Setup (`docs/07-setup/`)
 
@@ -56,7 +62,10 @@
 23. **`docs/08-testes/TESTE-WHATSAPP-BOT.md`** - Testes do bot
 24. **`docs/08-testes/TESTE-COMPLETO.md`** - Teste completo
 25. **`docs/08-testes/TESTE-INICIAL.md`** - Teste inicial
-26. **`backend/src/modules/whatsapp/test-exemplos-pedidos.md`** - Exemplos de testes
+26. **`docs/08-testes/ANALISE-ALINHAMENTO-COMPLETA.md`** - Análise de alinhamento
+27. **`docs/08-testes/ANALISE-EXTERNA-COMPLETA.md`** - Análise externa recebida
+28. **`docs/08-testes/ANALISE-COMPLETA-PERFEICAO-2026.md`** - ✅ **NOVO** - Análise completa de perfeição
+29. **`backend/src/modules/whatsapp/test-exemplos-pedidos.md`** - Exemplos de testes
 
 ### 📚 Documentação Organizada (`docs/`)
 
@@ -71,18 +80,20 @@
 28. **`docs/01-projeto/13-CLIENTE-BETA-MAE.md`** - Cliente beta
 29. **`docs/01-projeto/14-ESTRATEGIA-PRODUTOS-REAIS.md`** - Estratégia de produtos
 
-#### 02-tecnico/ - Documentação Técnica
+#### 01-tecnico/ - Documentação Técnica
 
-30. **`docs/02-tecnico/03-ARCHITECTURE.md`** - Arquitetura técnica
-31. **`docs/02-tecnico/03-FEATURES.md`** - Funcionalidades detalhadas
-32. **`docs/02-tecnico/04-DATABASE.md`** - Schema completo do banco
-33. **`docs/02-tecnico/06-WORKFLOWS.md`** - Fluxos principais
-34. **`docs/02-tecnico/07-SECURITY.md`** - Segurança e compliance
-35. **`docs/02-tecnico/10-SETUP.md`** - Setup técnico
-36. **`docs/02-tecnico/12-GLOSSARY.md`** - Glossário
-37. **`docs/02-tecnico/13-FREE-TIER-STRATEGY.md`** - Estratégia 100% gratuita
-38. **`docs/02-tecnico/14-ADAPTACAO-OLLAMA.md`** - Guia Ollama
-39. **`docs/02-tecnico/ANALISE_COMPLETA.md`** - Análise completa
+30. **`docs/01-tecnico/03-ARCHITECTURE.md`** - Arquitetura técnica
+31. **`docs/01-tecnico/03-FEATURES.md`** - Funcionalidades detalhadas
+32. **`docs/01-tecnico/04-DATABASE.md`** - Schema completo do banco
+33. **`docs/01-tecnico/06-WORKFLOWS.md`** - Fluxos principais
+34. **`docs/01-tecnico/07-SECURITY.md`** - Segurança e compliance
+35. **`docs/01-tecnico/10-SETUP.md`** - Setup técnico
+36. **`docs/01-tecnico/12-GLOSSARY.md`** - Glossário
+37. **`docs/01-tecnico/13-FREE-TIER-STRATEGY.md`** - Estratégia 100% gratuita
+38. **`docs/01-tecnico/14-ADAPTACAO-OLLAMA.md`** - Guia Ollama
+39. **`docs/01-tecnico/ANALISE_COMPLETA.md`** - Análise completa
+40. **`docs/01-tecnico/DBCONTEXT-SERVICE.md`** - ✅ **NOVO** - Gerenciamento de transações
+41. **`docs/01-tecnico/TENANT-DB-CONTEXT-INTERCEPTOR.md`** - ✅ **NOVO** - RLS automático
 
 #### 03-implementacao/ - Planos de Implementação
 
@@ -135,9 +146,14 @@
 - `docs/02-tecnico/10-SETUP.md`
 
 **Arquitetura:**
-- `docs/02-tecnico/03-ARCHITECTURE.md`
-- `docs/02-tecnico/04-DATABASE.md`
-- `docs/02-tecnico/06-WORKFLOWS.md`
+- `docs/01-tecnico/03-ARCHITECTURE.md`
+- `docs/01-tecnico/04-DATABASE.md`
+- `docs/01-tecnico/06-WORKFLOWS.md`
+- `docs/01-tecnico/DBCONTEXT-SERVICE.md` - ✅ **NOVO**
+- `docs/01-tecnico/TENANT-DB-CONTEXT-INTERCEPTOR.md` - ✅ **NOVO**
+
+**Sistema de Cupons:**
+- `docs/06-implementacoes/SISTEMA-CUPONS-IMPLEMENTADO.md` - ✅ **NOVO**
 
 ---
 
@@ -150,4 +166,22 @@
 
 ---
 
-**Última atualização:** 08/01/2025
+**Última atualização:** 09/01/2026
+
+---
+
+## 🏭 Produção / Operação (VPS)
+> Documentos de operação do ambiente real (`gtsofthub.com.br`).
+
+- **`deploy/RUNBOOK-OPERACAO.md`** — Manual de operação (incidentes, logs, SSL, backups, restore drill, monitoramento).
+- **`deploy/CHECKLIST-DE-RELEASE.md`** — Checklist de release com smoke tests e rollback.
+- **`deploy/ONBOARDING-SEGUNDO-DEV.md`** — Onboarding e governança do 2º desenvolvedor.
+- **`deploy/README-PRODUCAO.md`** — Guia de deploy inicial e configuração.
+- **`docs/00-projeto/RELATORIO-COMPLETO-DO-PROJETO-2026.md`** — Relatório consolidado (projeto + operação).
+
+## 👨‍💻 Dev Iniciante (Frontend-Only)
+> Documentos específicos para dev iniciante que trabalha apenas no frontend.
+
+- **`frontend/CONTRIBUICAO-FRONTEND-INICIANTE.md`** — Regras e fluxo (frontend-only) para dev iniciante.
+- **`frontend/AREA-DEV-INICIANTE/README.md`** — Guia rápido da área do dev iniciante.
+- **`docs/07-setup/ARQUIVOS-PARA-DEV-INICIANTE.md`** — Lista oficial de arquivos permitidos.

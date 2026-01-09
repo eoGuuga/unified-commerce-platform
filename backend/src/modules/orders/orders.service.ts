@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException, Inject, forwardRef, Logger } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
-import { Repository, DataSource, QueryRunner } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Pedido, PedidoStatus, CanalVenda } from '../../database/entities/Pedido.entity';
 import { ItemPedido } from '../../database/entities/ItemPedido.entity';
 import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque.entity';
@@ -12,6 +12,9 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { IdempotencyRecord, toIdempotencyRecord } from './types/orders.types';
 import { PaginatedResult, createPaginatedResult } from '../common/types/pagination.types';
 import { PaginationDto } from './dto/pagination.dto';
+import { CouponsService } from '../coupons/coupons.service';
+import { CupomDesconto } from '../../database/entities/CupomDesconto.entity';
+import { DbContextService } from '../common/services/db-context.service';
 
 @Injectable()
 export class OrdersService {
@@ -26,8 +29,10 @@ export class OrdersService {
     private produtosRepository: Repository<Produto>,
     @InjectDataSource()
     private dataSource: DataSource,
+    private readonly db: DbContextService,
     private idempotencyService: IdempotencyService,
     private auditLogService: AuditLogService,
+    private couponsService: CouponsService,
     @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
   ) {}
@@ -66,17 +71,45 @@ export class OrdersService {
         }
       }
 
+    const deliveryTypeRaw = (createOrderDto.delivery_type || '').trim();
+    const deliveryType = deliveryTypeRaw ? deliveryTypeRaw.toLowerCase() : undefined;
+    const deliveryAddress = createOrderDto.delivery_address;
+
+    if (deliveryType && deliveryType !== 'delivery' && deliveryType !== 'pickup') {
+      throw new BadRequestException(`delivery_type inválido: ${deliveryTypeRaw}`);
+    }
+    if (deliveryType === 'delivery' && !deliveryAddress) {
+      throw new BadRequestException('delivery_address é obrigatório quando delivery_type=delivery');
+    }
+
     // Cálculo de subtotal
     const subtotal = createOrderDto.items.reduce(
       (sum, item) => sum + item.unit_price * item.quantity,
       0,
     );
-    const discount = createOrderDto.discount_amount || 0;
+
     const shipping = createOrderDto.shipping_amount || 0;
+
+    // Cupom: recalcular desconto no momento da criação (regra única e proteção contra corrida)
+    let couponCode = (createOrderDto.coupon_code || '').trim().toUpperCase() || null;
+    let discount = createOrderDto.discount_amount || 0;
+    if (couponCode) {
+      const coupon = await this.couponsService.findActiveByCode(tenantId, couponCode);
+      if (!coupon) {
+        throw new BadRequestException(`Cupom inválido/inativo: ${couponCode}`);
+      }
+      const validation = this.couponsService.validateCoupon(subtotal, coupon);
+      if (!validation.valid) {
+        throw new BadRequestException(`Cupom inválido: ${validation.reason}`);
+      }
+      discount = validation.discountAmount;
+      couponCode = validation.code;
+    }
+
     const total = subtotal - discount + shipping;
 
     // Inicia transação CRÍTICA
-    const pedido = await this.dataSource.transaction(async (manager) => {
+    const pedido = await this.db.runInTransaction(async (manager) => {
       // 1. FOR UPDATE lock - Bloqueia linhas de estoque
       const produtoIds = createOrderDto.items.map((item) => item.produto_id);
       const estoques = await manager
@@ -86,7 +119,24 @@ export class OrdersService {
         .setLock('pessimistic_write') // FOR UPDATE lock
         .getMany();
 
-      // 2. Verificar se todos os produtos têm estoque cadastrado
+      // 2. Verificar se todos os produtos existem e estão ativos
+      const produtoIdsParaValidar = createOrderDto.items.map((item) => item.produto_id);
+      const produtos = await manager
+        .createQueryBuilder(Produto, 'p')
+        .where('p.id IN (:...produtoIds)', { produtoIds: produtoIdsParaValidar })
+        .andWhere('p.tenant_id = :tenantId', { tenantId })
+        .andWhere('p.is_active = :isActive', { isActive: true })
+        .getMany();
+      
+      if (produtos.length !== produtoIdsParaValidar.length) {
+        const produtosEncontrados = produtos.map((p) => p.id);
+        const produtosNaoEncontrados = produtoIdsParaValidar.filter((id) => !produtosEncontrados.includes(id));
+        throw new NotFoundException(
+          `Produtos não encontrados ou inativos: ${produtosNaoEncontrados.join(', ')}`,
+        );
+      }
+
+      // 3. Verificar se todos os produtos têm estoque cadastrado
       const produtosMap = new Map(estoques.map((e) => [e.produto_id, e]));
       for (const item of createOrderDto.items) {
         if (!produtosMap.has(item.produto_id)) {
@@ -94,7 +144,7 @@ export class OrdersService {
         }
       }
 
-      // 3. Validar estoque disponível (considerando reservas)
+      // 4. Validar estoque disponível (considerando reservas)
       for (const item of createOrderDto.items) {
         const estoque = produtosMap.get(item.produto_id)!;
         const availableStock = estoque.current_stock - estoque.reserved_stock;
@@ -105,7 +155,7 @@ export class OrdersService {
         }
       }
 
-      // 4. Abater estoque e liberar reserva (dentro da transação)
+      // 5. Abater estoque e liberar reserva (dentro da transação)
       for (const item of createOrderDto.items) {
         await manager
           .createQueryBuilder()
@@ -120,7 +170,7 @@ export class OrdersService {
           .execute();
       }
 
-      // 5. Criar pedido
+      // 6. Criar pedido
       const orderNo = await this.generateOrderNumber(tenantId);
       // PDV = ENTREGUE (pagamento no ato)
       // WHATSAPP = PENDENTE_PAGAMENTO (aguarda confirmação)
@@ -134,23 +184,25 @@ export class OrdersService {
         initialStatus = PedidoStatus.CONFIRMADO;
       }
 
-      const pedido = manager.create(Pedido, {
-        tenant_id: tenantId,
-        order_no: orderNo,
-        status: initialStatus,
-        channel: createOrderDto.channel,
-        customer_name: createOrderDto.customer_name,
-        customer_email: createOrderDto.customer_email,
-        customer_phone: createOrderDto.customer_phone,
-        subtotal,
-        discount_amount: discount,
-        shipping_amount: shipping,
-        total_amount: total,
-      });
+      const pedido = manager.getRepository(Pedido).create();
+      pedido.tenant_id = tenantId;
+      pedido.order_no = orderNo;
+      pedido.status = initialStatus;
+      pedido.channel = createOrderDto.channel;
+      pedido.customer_name = createOrderDto.customer_name;
+      pedido.customer_email = createOrderDto.customer_email;
+      pedido.customer_phone = createOrderDto.customer_phone;
+      pedido.subtotal = subtotal;
+      pedido.discount_amount = discount;
+      pedido.shipping_amount = shipping;
+      pedido.coupon_code = couponCode || undefined;
+      pedido.total_amount = total;
+      pedido.delivery_type = deliveryType;
+      pedido.delivery_address = deliveryType === 'delivery' ? (deliveryAddress as any) : null;
 
       const savedPedido = await manager.save(pedido);
 
-      // 6. Criar itens do pedido
+      // 7. Criar itens do pedido
       const itens = createOrderDto.items.map((item) =>
         manager.create(ItemPedido, {
           pedido_id: savedPedido.id,
@@ -162,6 +214,23 @@ export class OrdersService {
       );
 
       await manager.save(itens);
+
+      // Consumir cupom (incrementa used_count com proteção contra corrida)
+      if (couponCode) {
+        const res = await manager
+          .createQueryBuilder()
+          .update(CupomDesconto)
+          .set({ used_count: () => '"used_count" + 1' })
+          .where('tenant_id = :tenantId', { tenantId })
+          .andWhere('code = :code', { code: couponCode })
+          .andWhere('is_active = true')
+          .andWhere('(usage_limit IS NULL OR used_count < usage_limit)')
+          .execute();
+
+        if (!res.affected || res.affected < 1) {
+          throw new BadRequestException(`Cupom esgotado/inválido: ${couponCode}`);
+        }
+      }
 
       // 7. COMMIT (ou ROLLBACK se houver erro)
       return savedPedido;
@@ -209,6 +278,30 @@ export class OrdersService {
       }
     }
 
+    // ✅ NOVO: Notificar cliente sobre criação do pedido (especialmente para WhatsApp)
+    if (createOrderDto.channel === CanalVenda.WHATSAPP) {
+      try {
+        // Notificar mudança de status (de null para PENDENTE_PAGAMENTO)
+        await this.notificationsService.notifyOrderStatusChange(
+          tenantId,
+          pedido,
+          null, // Status anterior não existe (pedido novo)
+          pedido.status,
+        );
+      } catch (error) {
+        // Não falhar a criação se a notificação falhar
+        this.logger.error('Error sending order creation notification', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          context: {
+            tenantId,
+            pedidoId: pedido.id,
+            channel: createOrderDto.channel,
+          },
+        });
+      }
+    }
+
     return pedido;
   }
 
@@ -216,12 +309,15 @@ export class OrdersService {
     const page = pagination?.page || 1;
     const limit = pagination?.limit || 50;
     const skip = (page - 1) * limit;
+    const pedidosRepository = this.db.getRepository(Pedido);
 
+    // ✅ PERFORMANCE: Remover relations do findAll para evitar N+1 e queries pesadas
+    // Relations serão carregadas apenas no findOne quando necessário
     // Se paginação foi solicitada, retornar resultado paginado
     if (pagination) {
-      const [data, total] = await this.pedidosRepository.findAndCount({
+      const [data, total] = await pedidosRepository.findAndCount({
         where: { tenant_id: tenantId },
-        relations: ['itens', 'itens.produto', 'seller'],
+        // Removido relations para performance - carregar apenas no findOne
         order: { created_at: 'DESC' },
         skip,
         take: limit,
@@ -230,16 +326,16 @@ export class OrdersService {
       return createPaginatedResult(data, total, page, limit);
     }
 
-    // Sem paginação: comportamento original (retorna todos)
-    return this.pedidosRepository.find({
+    // Sem paginação: comportamento original (retorna todos, sem relations)
+    return pedidosRepository.find({
       where: { tenant_id: tenantId },
-      relations: ['itens', 'itens.produto', 'seller'],
+      // Removido relations para performance - carregar apenas no findOne
       order: { created_at: 'DESC' },
     });
   }
 
   async findOne(id: string, tenantId: string): Promise<Pedido> {
-    const pedido = await this.pedidosRepository.findOne({
+    const pedido = await this.db.getRepository(Pedido).findOne({
       where: { id, tenant_id: tenantId },
       relations: ['itens', 'itens.produto', 'seller'],
     });
@@ -251,6 +347,16 @@ export class OrdersService {
     return pedido;
   }
 
+  async findByOrderNo(orderNo: string, tenantId: string): Promise<Pedido | null> {
+    const normalized = (orderNo || '').trim();
+    if (!normalized) return null;
+
+    return await this.db.getRepository(Pedido).findOne({
+      where: { order_no: normalized, tenant_id: tenantId },
+      relations: ['itens', 'itens.produto', 'seller'],
+    });
+  }
+
   async updateStatus(
     id: string,
     status: PedidoStatus,
@@ -259,7 +365,7 @@ export class OrdersService {
     const pedido = await this.findOne(id, tenantId);
     const oldStatus = pedido.status;
     pedido.status = status;
-    const updatedPedido = await this.pedidosRepository.save(pedido);
+    const updatedPedido = await this.db.getRepository(Pedido).save(pedido);
 
     // Notificar cliente sobre mudança de status
     if (oldStatus !== status) {
@@ -294,7 +400,7 @@ export class OrdersService {
     const today = dateStr.substring(0, 8); // YYYYMMDD
 
     // Contar pedidos do dia
-    const count = await this.pedidosRepository.count({
+    const count = await this.db.getRepository(Pedido).count({
       where: {
         tenant_id: tenantId,
       },

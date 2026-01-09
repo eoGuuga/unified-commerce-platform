@@ -47,18 +47,23 @@ export class TenantsService {
     const whatsappNumbers = tenant.settings?.whatsappNumbers || tenant.settings?.whatsapp_numbers || [];
 
     if (!Array.isArray(whatsappNumbers) || whatsappNumbers.length === 0) {
-      // Se não tem números configurados, em desenvolvimento permitir
-      // Em produção, isso deve ser obrigatório
-      this.logger.warn(
-        `Tenant ${tenantId} não tem números de WhatsApp configurados. Permitindo em desenvolvimento.`,
-      );
-
-      // Em produção, lançar exceção:
-      // throw new ForbiddenException(
-      //   `Tenant ${tenantId} não tem números de WhatsApp configurados. Contate o administrador.`,
-      // );
+      const isProduction = process.env.NODE_ENV === 'production';
       
-      return true; // Em desenvolvimento, permitir
+      if (isProduction) {
+        // ✅ CRÍTICO: Em produção, números de WhatsApp são obrigatórios para segurança multi-tenant
+        this.logger.error(
+          `[SEGURANÇA] Tenant ${tenantId} não tem números de WhatsApp configurados em PRODUÇÃO. Bloqueando acesso.`,
+        );
+        throw new ForbiddenException(
+          `Tenant ${tenantId} não tem números de WhatsApp configurados. Contate o administrador para configurar os números autorizados.`,
+        );
+      }
+      
+      // Em desenvolvimento, permitir mas avisar
+      this.logger.warn(
+        `[DEV] Tenant ${tenantId} não tem números de WhatsApp configurados. Permitindo em desenvolvimento apenas.`,
+      );
+      return true;
     }
 
     // Verificar se o número está na lista de números autorizados

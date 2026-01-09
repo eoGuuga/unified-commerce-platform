@@ -1,7 +1,32 @@
-import { IsString, IsEnum, IsNumber, IsArray, ValidateNested, IsOptional, IsUUID, Min } from 'class-validator';
+import { IsString, IsEnum, IsNumber, IsArray, ValidateNested, IsOptional, IsUUID, Min, Length } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { CanalVenda } from '../../../database/entities/Pedido.entity';
+
+export class DeliveryAddressDto {
+  @IsString()
+  street: string;
+
+  @IsString()
+  number: string;
+
+  @IsOptional()
+  @IsString()
+  complement?: string;
+
+  @IsString()
+  neighborhood: string;
+
+  @IsString()
+  city: string;
+
+  @IsString()
+  @Length(2, 2)
+  state: string;
+
+  @IsString()
+  zipcode: string;
+}
 
 export class CreateOrderItemDto {
   @ApiProperty({ description: 'ID do produto' })
@@ -43,6 +68,17 @@ export class CreateOrderDto {
   @IsString()
   customer_phone?: string;
 
+  @ApiProperty({ description: 'Tipo de entrega (delivery/pickup)', required: false })
+  @IsOptional()
+  @IsString()
+  delivery_type?: string;
+
+  @ApiProperty({ description: 'Endereco de entrega', required: false, type: DeliveryAddressDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DeliveryAddressDto)
+  delivery_address?: DeliveryAddressDto;
+
   @ApiProperty({ 
     description: 'Itens do pedido',
     type: [CreateOrderItemDto] 
@@ -57,6 +93,12 @@ export class CreateOrderDto {
   @IsNumber()
   @Min(0)
   discount_amount?: number;
+
+  @ApiProperty({ description: 'Codigo do cupom aplicado', required: false })
+  @IsOptional()
+  @IsString()
+  @Length(2, 50)
+  coupon_code?: string;
 
   @ApiProperty({ description: 'Valor de frete', default: 0, required: false })
   @IsOptional()
