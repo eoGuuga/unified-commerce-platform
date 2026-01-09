@@ -89,7 +89,7 @@ const client = new Client({
     connectionString: dbUrlMatch[1].trim()
 });
 
-const migrationFile = path.join(__dirname, '../../scripts/migrations/011-create-pagamentos-table.sql');
+const migrationFile = path.join(__dirname, '../scripts/migrations/011-create-pagamentos-table.sql');
 const migrationSQL = fs.readFileSync(migrationFile, 'utf8');
 
 (async () => {
