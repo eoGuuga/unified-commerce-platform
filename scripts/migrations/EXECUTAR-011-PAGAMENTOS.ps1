@@ -106,12 +106,13 @@ const migrationSQL = fs.readFileSync(migrationFile, 'utf8');
 })();
 "@
     
-    $nodeScriptFile = Join-Path $PSScriptRoot "temp-exec-migration.js"
+    # Criar arquivo temporário no diretório backend
+    $backendDir = Join-Path $PSScriptRoot "..\..\backend"
+    $nodeScriptFile = Join-Path $backendDir "temp-exec-migration.js"
     $nodeScript | Out-File -FilePath $nodeScriptFile -Encoding UTF8
-    
+
     try {
         # Executar do diretório backend onde o node_modules está
-        $backendDir = Join-Path $PSScriptRoot "..\..\backend"
         Push-Location $backendDir
         node $nodeScriptFile
         if ($LASTEXITCODE -eq 0) {
