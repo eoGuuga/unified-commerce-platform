@@ -94,30 +94,31 @@ Roteiro único e sequencial com gates de **setup → segurança → testes → e
 39. **`docs/01-tecnico/ANALISE_COMPLETA.md`** - Análise completa
 40. **`docs/01-tecnico/DBCONTEXT-SERVICE.md`** - ✅ **NOVO** - Gerenciamento de transações
 41. **`docs/01-tecnico/TENANT-DB-CONTEXT-INTERCEPTOR.md`** - ✅ **NOVO** - RLS automático
+42. **`docs/01-tecnico/ANALISE-SENIOR-2026.md`** - ✅ **NOVO** - Análise sênior completa com plano de ação
 
-#### 03-implementacao/ - Planos de Implementação
+#### 02-implementacao/ - Planos de Implementação
 
-40. **`docs/03-implementacao/PLANO_IMPLEMENTACAO.md`** - Plano geral
-41. **`docs/03-implementacao/PLANO_COMPLETO_PARTE_1.md`** - Parte 1: Fundamentos
-42. **`docs/03-implementacao/PLANO_COMPLETO_PARTE_2.md`** - Parte 2: WhatsApp Bot Base
-43. **`docs/03-implementacao/PLANO_COMPLETO_PARTE_3.md`** - Parte 3: Integração IA
-44. **`docs/03-implementacao/PLANO_COMPLETO_PARTE_4.md`** - Parte 4: Fluxo WhatsApp
-45. **`docs/03-implementacao/PLANO_COMPLETO_PARTE_5.md`** - Parte 5: Dashboard
-46. **`docs/03-implementacao/PLANO_COMPLETO_PARTE_6.md`** - Parte 6: Relatórios
-47. **`docs/03-implementacao/PLANO_COMPLETO_PARTE_7.md`** - Parte 7: Extras
-48. **`docs/03-implementacao/PLANO_COMPLETO_PARTE_8.md`** - Parte 8: Deploy
-49. **`docs/03-implementacao/MVP-FOCADO.md`** - MVP focado
-50. **`docs/03-implementacao/MVP-MAE.md`** - MVP para mãe
-51. **`docs/03-implementacao/PLANO-PDV-COMPLETO.md`** - Plano do PDV
-52. **`docs/03-implementacao/PRIMEIROS_PASSOS.md`** - Primeiros passos
-53. **`docs/03-implementacao/PLANO_DESENVOLVIMENTO_GRATUITO.md`** - Desenvolvimento gratuito
-54. **`docs/03-implementacao/PROXIMOS_PASSOS.md`** - Próximos passos
-55. **`docs/03-implementacao/ROADMAP-EXECUCAO-PERFEITA.md`** - Roadmap
+40. **`docs/02-implementacao/PLANO_IMPLEMENTACAO.md`** - Plano geral
+41. **`docs/02-implementacao/PLANO_COMPLETO_PARTE_1.md`** - Parte 1: Fundamentos
+42. **`docs/02-implementacao/PLANO_COMPLETO_PARTE_2.md`** - Parte 2: WhatsApp Bot Base
+43. **`docs/02-implementacao/PLANO_COMPLETO_PARTE_3.md`** - Parte 3: Integração IA
+44. **`docs/02-implementacao/PLANO_COMPLETO_PARTE_4.md`** - Parte 4: Fluxo WhatsApp
+45. **`docs/02-implementacao/PLANO_COMPLETO_PARTE_5.md`** - Parte 5: Dashboard
+46. **`docs/02-implementacao/PLANO_COMPLETO_PARTE_6.md`** - Parte 6: Relatórios
+47. **`docs/02-implementacao/PLANO_COMPLETO_PARTE_7.md`** - Parte 7: Extras
+48. **`docs/02-implementacao/PLANO_COMPLETO_PARTE_8.md`** - Parte 8: Deploy
+49. **`docs/02-implementacao/MVP-FOCADO.md`** - MVP focado
+50. **`docs/02-implementacao/MVP-MAE.md`** - MVP para mãe
+51. **`docs/02-implementacao/PLANO-PDV-COMPLETO.md`** - Plano do PDV
+52. **`docs/02-implementacao/PRIMEIROS_PASSOS.md`** - Primeiros passos
+53. **`docs/02-implementacao/PLANO_DESENVOLVIMENTO_GRATUITO.md`** - Desenvolvimento gratuito
+54. **`docs/02-implementacao/PROXIMOS_PASSOS.md`** - Próximos passos
+55. **`docs/02-implementacao/ROADMAP-EXECUCAO-PERFEITA.md`** - Roadmap
 
-#### 04-comercial/ - Material Comercial
+#### 03-comercial/ - Material Comercial
 
-56. **`docs/04-comercial/DOCUMENTACAO_COMPLETA_PARA_VENDAS.md`** - Documentação para vendas
-57. **`docs/04-comercial/PLANO_ACAO_DOCUMENTACAO.md`** - Plano de ação
+56. **`docs/03-comercial/DOCUMENTACAO_COMPLETA_PARA_VENDAS.md`** - Documentação para vendas
+57. **`docs/03-comercial/PLANO_ACAO_DOCUMENTACAO.md`** - Plano de ação
 
 ---
 
@@ -128,22 +129,22 @@ Roteiro único e sequencial com gates de **setup → segurança → testes → e
 **Segurança:**
 - `REVISAO-COMPLETA-SEGURANCA-E-PERFORMANCE.md`
 - `RESUMO-FINAL-CORRECOES.md`
-- `docs/02-tecnico/07-SECURITY.md`
+- `docs/01-tecnico/07-SECURITY.md`
 
 **WhatsApp Bot:**
 - `FASE-3-2-IMPLEMENTADA.md`
 - `TESTE-WHATSAPP-BOT.md`
-- `docs/03-implementacao/PLANO_COMPLETO_PARTE_2.md`
+- `docs/02-implementacao/PLANO_COMPLETO_PARTE_2.md`
 
 **PDV:**
 - `SUCESSO-PDV-FUNCIONANDO.md`
 - `PLANO-PERFEITO-PDV.md`
-- `docs/03-implementacao/PLANO-PDV-COMPLETO.md`
+- `docs/02-implementacao/PLANO-PDV-COMPLETO.md`
 
 **Setup:**
 - `SETUP-INICIAL.md`
 - `CHECKLIST-SETUP.md`
-- `docs/02-tecnico/10-SETUP.md`
+- `docs/01-tecnico/10-SETUP.md`
 
 **Arquitetura:**
 - `docs/01-tecnico/03-ARCHITECTURE.md`
