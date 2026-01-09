@@ -77,7 +77,7 @@ const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
-const envFile = path.join(__dirname, '../../backend/.env');
+const envFile = path.join(__dirname, '.env');
 const envContent = fs.readFileSync(envFile, 'utf8');
 const dbUrlMatch = envContent.match(/^\s*DATABASE_URL\s*=\s*(.+)\s*$/m);
 if (!dbUrlMatch) {
@@ -89,7 +89,7 @@ const client = new Client({
     connectionString: dbUrlMatch[1].trim()
 });
 
-const migrationFile = path.join(__dirname, '011-create-pagamentos-table.sql');
+const migrationFile = path.join(__dirname, '../../scripts/migrations/011-create-pagamentos-table.sql');
 const migrationSQL = fs.readFileSync(migrationFile, 'utf8');
 
 (async () => {
