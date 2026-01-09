@@ -94,13 +94,16 @@ const migrationSQL = fs.readFileSync(migrationFile, 'utf8');
 
 (async () => {
     try {
+        console.log('Tentando conectar ao banco...');
         await client.connect();
         console.log('Conectado ao banco de dados');
+        console.log('Executando migration...');
         await client.query(migrationSQL);
         console.log('SUCESSO: Migration executada com sucesso!');
         await client.end();
     } catch (error) {
         console.error('ERRO:', error.message);
+        console.error('Stack:', error.stack);
         process.exit(1);
     }
 })();
