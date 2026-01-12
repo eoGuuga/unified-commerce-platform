@@ -9,6 +9,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CacheService } from '../common/services/cache.service';
 import { AuditLogService } from '../common/services/audit-log.service';
+import { DbContextService } from '../common/services/db-context.service';
 import { PaginationDto } from './dto/pagination.dto';
 
 describe('ProductsService', () => {
@@ -46,6 +47,15 @@ describe('ProductsService', () => {
     log: jest.fn().mockResolvedValue(undefined),
   };
 
+  const mockDbContextService = {
+    getRepository: jest.fn((entity) => {
+      if (entity === Produto) return mockProdutosRepository;
+      if (entity === MovimentacaoEstoque) return mockEstoquesRepository;
+      return {};
+    }),
+    runInTransaction: jest.fn(async (callback) => callback(mockDataSource)),
+  };
+
   const mockDataSource = {
     // ProductsService usa DataSource em alguns métodos, mas estes unit tests não dependem dele.
     transaction: jest.fn(async (cb: any) => cb({})),
@@ -74,6 +84,10 @@ describe('ProductsService', () => {
         {
           provide: AuditLogService,
           useValue: mockAuditLogService,
+        },
+        {
+          provide: DbContextService,
+          useValue: mockDbContextService,
         },
       ],
     }).compile();

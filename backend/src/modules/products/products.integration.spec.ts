@@ -10,7 +10,7 @@ import { databaseConfig } from '../../config/database.config';
 import { JwtService } from '@nestjs/jwt';
 import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
 describe('Products Integration Tests (e2e)', () => {
@@ -42,7 +42,12 @@ describe('Products Integration Tests (e2e)', () => {
       await app.init();
 
       // Criar usuário de teste no banco para autenticação funcionar
-      const usuariosRepository = moduleFixture.get<Repository<Usuario>>(getRepositoryToken(Usuario));
+      const dataSource = moduleFixture.get<DataSource>(DataSource);
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+
+      const usuariosRepository = queryRunner.manager.getRepository<Usuario>(Usuario);
       const testUserId = '00000000-0000-0000-0000-000000000001';
       
       // Verificar se usuário já existe
@@ -70,6 +75,8 @@ describe('Products Integration Tests (e2e)', () => {
         role: testUser.role,
         tenant_id: testUser.tenant_id,
       });
+
+      await queryRunner.release();
     } catch (error) {
       console.error('❌ Erro ao inicializar testes de integração:', error);
       app = null;

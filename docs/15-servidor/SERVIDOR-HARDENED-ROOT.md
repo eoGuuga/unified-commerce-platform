@@ -68,7 +68,7 @@ ssh ubuntu@37.59.118.210
 
 # Depois elevar para root
 sudo -i
-# Digite: Ramongu2005
+# Use a senha armazenada no seu gerenciador de senhas (nao documentar aqui)
 ```
 
 ---

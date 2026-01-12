@@ -301,8 +301,8 @@ describe('OrdersService', () => {
 
       mockManager.createQueryBuilder = jest.fn(() => queryBuilder as any);
 
-      mockDataSource.transaction = jest.fn(async (callback) => {
-        return callback(manager);
+      mockDbContextService.runInTransaction = jest.fn(async (callback) => {
+        return callback(mockManager);
       });
 
       // Act & Assert

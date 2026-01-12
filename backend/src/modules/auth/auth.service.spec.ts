@@ -221,7 +221,7 @@ describe('AuthService', () => {
       // Assert
       expect(result).toEqual(mockUsuario);
       expect(mockUsuariosRepository.findOne).toHaveBeenCalledWith({
-        where: { id: payload.sub },
+        where: { id: payload.sub, tenant_id: payload.tenant_id },
       });
     });
 
