@@ -93,6 +93,7 @@ Status atual (feito nesta sessao):
 - Senha de sudo removida da documentacao; falta rotacionar no servidor.
 - Auditoria inicial do servidor documentada em `docs/15-servidor/AUDITORIA-2026-01-12.md`.
 - Hardening aplicado: SSH sem senha + X11 off + rate limit UFW + TLS headers + backups/restore drill com log.
+- Ambientes ativos: producao em `https://gtsofthub.com.br` e dev em `https://dev.gtsofthub.com.br`.
 
 FASE B - Evidencias e confiabilidade (1 a 2 semanas)
 Gates:
@@ -126,6 +127,7 @@ Acoes:
 - Padronizar logs (backend + nginx).
 - Alertas de health e backup.
 - Simular incidente e registrar postmortem.
+- Checklist de deploy/rollback oficial em `docs/15-servidor/DEPLOY-ROLLBACK-CHECKLIST.md`.
 
 FASE E - Performance e resiliencia (1 a 2 semanas)
 Gates:

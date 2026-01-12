@@ -31,6 +31,8 @@ Status apos correcoes (12/01/2026)
 - Restore drill: log criado + cron mensal + logrotate configurado e teste OK.
 - Updates: sistema atualizado; unattended-upgrades ativo.
 - Nginx: TLS hardening aplicado (ciphers, HSTS, headers). OCSP stapling com warning (cert sem OCSP URL).
+- Ambiente dev publicado em `https://dev.gtsofthub.com.br` apontando para o stack de teste.
+- Nginx prod ajustado para montar `/etc/letsencrypt` no container (certificados OK).
 
 ---
 
