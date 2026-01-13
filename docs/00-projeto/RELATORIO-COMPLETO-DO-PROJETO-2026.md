@@ -393,4 +393,10 @@ Somente após DNS apontar:
   - ler logs (`docker logs ...`)
   - rodar backup/restore de teste
   - checar health endpoints
+---
 
+## Atualizacao (tenant/auth)
+
+- Em producao, o tenant vem somente do JWT.
+- Em dev/test, `x-tenant-id` pode ser aceito quando `ALLOW_TENANT_FROM_REQUEST=true`.
+- O login nao deve depender de header em producao.

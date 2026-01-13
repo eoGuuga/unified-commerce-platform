@@ -150,3 +150,10 @@ const result = await productsService.findAll(tenantId, { page: 1, limit: 50 });
 ---
 
 **Nota Final:** 7.5/10 - **Muito melhor!** Problemas críticos de segurança corrigidos.
+---
+
+## Atualizacao (tenant/auth)
+
+- Em producao, o tenant vem somente do JWT.
+- Em dev/test, `x-tenant-id` pode ser aceito quando `ALLOW_TENANT_FROM_REQUEST=true`.
+- O login nao deve depender de header em producao.

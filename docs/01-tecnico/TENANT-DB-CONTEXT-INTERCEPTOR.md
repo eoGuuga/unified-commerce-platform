@@ -529,3 +529,11 @@ O interceptor é aplicado **automaticamente** a todos os controllers:
 
 **Última atualização:** 08/01/2025  
 **Status:** ✅ **DOCUMENTAÇÃO COMPLETA**
+
+---
+
+## Atualizacao de comportamento (prod)
+
+- Em producao, o tenant e extraido somente do JWT.
+- Em dev/test, `x-tenant-id` e `tenantId` no body podem ser aceitos.
+- Controle via `ALLOW_TENANT_FROM_REQUEST=true|false`.

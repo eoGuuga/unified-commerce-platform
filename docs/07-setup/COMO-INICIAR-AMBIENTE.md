@@ -154,6 +154,16 @@ Após ambiente iniciado:
 
 **Última atualização:** 08/01/2025
 
-### Nota importante (multi-tenant / perfeição)
-- **Login exige** header `x-tenant-id` em `POST /auth/login`.
-- Em produção, **não use usuário superuser** no Postgres (superuser pode bypassar RLS). O setup já cria `ucm_app` no Docker para simular o cenário real.
+### Nota importante (multi-tenant / autenticacao)
+- Em dev/test, o login aceita `x-tenant-id`.
+- Em producao, o tenant vem somente do JWT.
+- Em producao, nao use usuario superuser no Postgres (superuser pode bypassar RLS). O setup cria `ucm_app` no Docker para simular o cenario real.
+
+---
+
+## Nota (auth/tenant e CSRF)
+
+- Em dev/test, o login aceita `x-tenant-id` no header.
+- Em producao, o tenant vem somente do JWT e o header e ignorado.
+- Para habilitar CSRF com cookies, defina `CSRF_ENABLED=true` e envie `x-csrf-token`.
+- Para permitir header em dev/test, use `ALLOW_TENANT_FROM_REQUEST=true`.

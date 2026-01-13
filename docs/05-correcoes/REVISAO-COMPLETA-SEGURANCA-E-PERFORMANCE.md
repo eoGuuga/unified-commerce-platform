@@ -873,3 +873,9 @@ async findAll(
 **Última atualização:** 08/01/2025  
 **Status:** ✅ **ANÁLISE COMPLETA REALIZADA**  
 **Próximo passo:** Implementar itens críticos (Semana 1)
+---
+
+## Atualizacao (CSRF)
+
+- O CsrfGuard agora e aplicado globalmente, mas fica desativado por padrao.
+- Para habilitar, use `CSRF_ENABLED=true` e envie `x-csrf-token` + cookie/session.

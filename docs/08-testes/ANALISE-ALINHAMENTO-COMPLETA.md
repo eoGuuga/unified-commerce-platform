@@ -290,3 +290,10 @@
 
 **Última atualização:** 08/01/2025  
 **Status:** 🟡 **ANÁLISE COMPLETA - CORREÇÕES IDENTIFICADAS**
+---
+
+## Atualizacao (tenant/auth)
+
+- Em producao, o tenant vem somente do JWT.
+- Em dev/test, `x-tenant-id` pode ser aceito quando `ALLOW_TENANT_FROM_REQUEST=true`.
+- O login nao deve depender de header em producao.

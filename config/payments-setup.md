@@ -145,3 +145,13 @@ Após configurar pagamentos:
 5. ✅ **Implemente reembolsos**
 
 **O sistema já está preparado para receber pagamentos reais!** 🚀💰
+---
+
+## Notas de integracao no backend
+
+- O endpoint `POST /api/v1/payments` aceita campos extras para cartao:
+  - `cardToken` (token gerado no frontend)
+  - `installments` (numero de parcelas)
+  - `payerEmail` (email do comprador)
+- Para Pix e boleto, `payerEmail` e recomendado quando disponivel.
+- Defina `MERCADOPAGO_WEBHOOK_URL` para confirmar pagamentos automaticamente.

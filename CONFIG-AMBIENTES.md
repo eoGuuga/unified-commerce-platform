@@ -178,3 +178,38 @@ CORS_ORIGIN=https://seudominio.com
 - **🔄 Deploy**: Processo seguro de atualizações
 
 **Workflow perfeito: Desenvolva no DEV → Teste tudo → Deploy no PROD!** 🚀✨
+---
+
+## Flags de seguranca e integracoes
+
+```bash
+# Multi-tenant
+ALLOW_TENANT_FROM_REQUEST=true   # dev/test only
+
+# CSRF
+CSRF_ENABLED=false
+CSRF_COOKIE_NAME=csrf-token
+CSRF_HEADER_NAME=x-csrf-token
+CSRF_SESSION_HEADER_NAME=x-csrf-session-token
+
+# OpenAI/Ollama
+OPENAI_API_KEY=
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_TIMEOUT_MS=8000
+OPENAI_ALLOW_NO_KEY=false
+
+# Email (Resend)
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=
+EMAIL_FROM=noreply@your-domain.com
+
+# WhatsApp (Twilio/Evolution)
+WHATSAPP_PROVIDER=twilio
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_WHATSAPP_NUMBER=whatsapp:+5511999999999
+EVOLUTION_API_URL=
+EVOLUTION_API_KEY=
+EVOLUTION_INSTANCE=default
+```

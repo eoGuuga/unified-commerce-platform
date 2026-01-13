@@ -528,3 +528,10 @@ Ao iniciar uma nova sessão, verifique:
 **Última atualização:** 08/01/2025  
 **Status:** ✅ **SISTEMA OPERACIONAL** | 🚀 **PRONTO PARA CONTINUAR**  
 **Próxima Sessão:** Continuar FASE 3.3 do Bot WhatsApp
+---
+
+## Atualizacao (tenant/auth)
+
+- Em producao, o tenant vem somente do JWT.
+- Em dev/test, `x-tenant-id` pode ser aceito quando `ALLOW_TENANT_FROM_REQUEST=true`.
+- O login nao deve depender de header em producao.

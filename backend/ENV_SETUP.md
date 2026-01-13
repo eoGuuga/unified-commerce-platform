@@ -1,70 +1,89 @@
-# Setup de Variáveis de Ambiente - Backend
+# Setup de Variaveis de Ambiente - Backend
 
-Crie um arquivo `.env` na pasta `backend/` com as seguintes variáveis:
+Crie um arquivo `.env` na pasta `backend/` com as seguintes variaveis:
 
 ```env
-# APPLICATION
+# Application
 NODE_ENV=development
 PORT=3001
 API_VERSION=v1
 
-# DATABASE - Supabase
-DATABASE_URL=postgresql://postgres:SENHA@db.xxx.supabase.co:5432/postgres
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_ANON_KEY=xxx
-SUPABASE_SERVICE_ROLE_KEY=xxx
+# Database
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ucm
 
-# REDIS - Upstash
-REDIS_URL=https://xxx.upstash.io
-REDIS_TOKEN=xxx
+# Redis
+REDIS_URL=
+REDIS_TOKEN=
 
 # JWT
-JWT_SECRET=seu-jwt-secret-super-seguro
+JWT_SECRET=change-me
 JWT_EXPIRATION=15m
-JWT_REFRESH_SECRET=seu-refresh-secret-super-seguro
+JWT_REFRESH_SECRET=change-me
 JWT_REFRESH_EXPIRATION=7d
 
-# STRIPE
-STRIPE_SECRET_KEY=sk_test_xxx
-STRIPE_WEBHOOK_SECRET=whsec_xxx
+# Multi-tenant e CSRF
+ALLOW_TENANT_FROM_REQUEST=true
+CSRF_ENABLED=false
+CSRF_COOKIE_NAME=csrf-token
+CSRF_HEADER_NAME=x-csrf-token
+CSRF_SESSION_HEADER_NAME=x-csrf-session-token
 
-# TWILIO
-WHATSAPP_API_KEY=xxx
-WHATSAPP_API_SECRET=xxx
+# Pagamentos (Mercado Pago)
+PAYMENT_PROVIDER=mercadopago
+MERCADOPAGO_ACCESS_TOKEN=
+MERCADOPAGO_WEBHOOK_URL=https://your-domain.com/api/v1/payments/webhook
 
-# OPENAI
-OPENAI_API_KEY=sk-xxx
+# Pix (mock fallback)
+PIX_KEY=
+MERCHANT_NAME=Loja
 
-# RESEND
-RESEND_API_KEY=re_xxx
-EMAIL_FROM=noreply@seu-dominio.com
+# WhatsApp
+WHATSAPP_PROVIDER=twilio
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_WHATSAPP_NUMBER=whatsapp:+5511999999999
+EVOLUTION_API_URL=
+EVOLUTION_API_KEY=
+EVOLUTION_INSTANCE=default
 
-# SENTRY
-SENTRY_DSN=https://xxx@sentry.io/xxx
+# OpenAI ou Ollama
+OPENAI_API_KEY=
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_TIMEOUT_MS=8000
+OPENAI_ALLOW_NO_KEY=false
+
+# Email
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=
+EMAIL_FROM=noreply@your-domain.com
+
+# CORS
+FRONTEND_URL=http://localhost:3000
+CORS_ORIGINS=
 ```
 
-## Como Obter as Credenciais
+## Observacoes
 
-### Supabase
-1. Acesse [supabase.com](https://supabase.com)
-2. Crie um projeto
-3. Vá em Settings → API
-4. Copie as chaves
+- Em producao, o tenant vem do JWT. Em dev/test, o header `x-tenant-id` e aceito.
+- Para Ollama, defina `OPENAI_ALLOW_NO_KEY=true` e `OPENAI_BASE_URL=http://localhost:11434/v1`.
+- Para WhatsApp real, escolha `WHATSAPP_PROVIDER=twilio` ou `WHATSAPP_PROVIDER=evolution`.
+- Para CSRF com cookies, habilite `CSRF_ENABLED=true` e envie `x-csrf-token`.
 
-### Redis (Upstash)
-1. Acesse [upstash.com](https://upstash.com)
-2. Crie um database
-3. Copie URL e Token
+## Como obter credenciais
 
-### Stripe
-1. Acesse [stripe.com](https://stripe.com)
-2. Dashboard → Developers → API keys
-3. Use chaves de teste inicialmente
+### Mercado Pago
+1. Acesse https://www.mercadopago.com.br/developers/panel/credentials
+2. Use chaves `TEST-` em dev e chaves sem `TEST-` em prod.
 
 ### Twilio
-1. Acesse [twilio.com](https://twilio.com)
-2. Console → API keys & credentials
+1. Acesse https://www.twilio.com/console
+2. Copie Account SID e Auth Token.
+
+### Resend
+1. Acesse https://resend.com
+2. Gere um API key e configure `EMAIL_FROM`.
 
 ### OpenAI
-1. Acesse [platform.openai.com](https://platform.openai.com)
-2. API keys → Create new secret key
+1. Acesse https://platform.openai.com
+2. Gere uma API key.
