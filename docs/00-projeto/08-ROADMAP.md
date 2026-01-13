@@ -48,7 +48,7 @@
 **Backend:**
 - API de checkout: POST /api/checkout
 - Integração Stripe: Payment Intent
-- Webhook de pagamento: POST /api/payments/webhook
+- Webhook de pagamento: POST /api/v1/payments/webhook/mercadopago
 - Email de confirmação
 
 **Frontend:**

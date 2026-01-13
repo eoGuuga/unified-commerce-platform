@@ -254,7 +254,7 @@ const paymentIntent = await stripe.paymentIntents.create({
 ### Webhook Stripe
 
 \`\`\`ts
-// POST /api/payments/webhook
+// POST /api/v1/payments/webhook/mercadopago
 // Verifica assinatura do webhook (que Stripe enviou)
 const event = stripe.webhooks.constructEvent(
   request.body,

@@ -1,7 +1,19 @@
-import { Controller, Post, Get, Body, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  Headers,
+  Query,
+} from '@nestjs/common';
 import { PaymentsService, CreatePaymentDto } from './payments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../common/decorators/tenant.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('Payments')
@@ -46,5 +58,25 @@ export class PaymentsController {
     @Param('pedidoId') pedidoId: string,
   ) {
     return await this.paymentsService.findByPedido(pedidoId, tenantId);
+  }
+
+  @Public()
+  @Post('webhook/mercadopago')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Webhook Mercado Pago (publico)' })
+  async mercadoPagoWebhook(
+    @Body() body: Record<string, any>,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('token') token?: string,
+  ) {
+    const signature = String(headers['x-signature'] || headers['x-mp-signature'] || '');
+    const requestId = String(headers['x-request-id'] || '');
+    const tokenHeader = String(headers['x-webhook-token'] || '');
+
+    return await this.paymentsService.handleMercadoPagoWebhook(body, {
+      signature,
+      requestId,
+      token: tokenHeader || token,
+    });
   }
 }

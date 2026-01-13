@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
+import { createHmac, timingSafeEqual } from 'crypto';
 
 export interface MercadoPagoPixResult {
   qr_code: string;
@@ -21,6 +22,14 @@ export interface MercadoPagoBoletoResult {
   barcode: string;
   external_resource_url: string;
   date_of_expiration: string;
+}
+
+export interface MercadoPagoPaymentDetails {
+  status: string;
+  status_detail: string;
+  metadata: Record<string, any>;
+  external_reference?: string;
+  payment_method_id?: string;
 }
 
 @Injectable()
@@ -55,6 +64,7 @@ export class MercadoPagoProvider {
     description: string,
     externalReference: string,
     payerEmail?: string,
+    metadata?: Record<string, any>,
   ): Promise<MercadoPagoPixResult> {
     if (!this.isConfigured()) {
       throw new Error('Mercado Pago nao esta configurado');
@@ -72,6 +82,7 @@ export class MercadoPagoProvider {
         },
         external_reference: externalReference,
         notification_url: this.configService.get<string>('MERCADOPAGO_WEBHOOK_URL') || undefined,
+        ...(metadata ? { metadata } : {}),
       };
 
       const result = await payment.create({ body: paymentData });
@@ -104,6 +115,7 @@ export class MercadoPagoProvider {
     token: string,
     installments: number = 1,
     payerEmail?: string,
+    metadata?: Record<string, any>,
   ): Promise<MercadoPagoCardResult> {
     if (!this.isConfigured()) {
       throw new Error('Mercado Pago nao esta configurado');
@@ -123,6 +135,7 @@ export class MercadoPagoProvider {
         },
         external_reference: externalReference,
         notification_url: this.configService.get<string>('MERCADOPAGO_WEBHOOK_URL') || undefined,
+        ...(metadata ? { metadata } : {}),
       };
 
       const result = await payment.create({ body: paymentData });
@@ -148,6 +161,7 @@ export class MercadoPagoProvider {
     externalReference: string,
     expirationDate?: string,
     payerEmail?: string,
+    metadata?: Record<string, any>,
   ): Promise<MercadoPagoBoletoResult> {
     if (!this.isConfigured()) {
       throw new Error('Mercado Pago nao esta configurado');
@@ -168,6 +182,7 @@ export class MercadoPagoProvider {
         external_reference: externalReference,
         date_of_expiration: expireDate,
         notification_url: this.configService.get<string>('MERCADOPAGO_WEBHOOK_URL') || undefined,
+        ...(metadata ? { metadata } : {}),
       };
 
       const result = await payment.create({ body: paymentData });
@@ -193,7 +208,7 @@ export class MercadoPagoProvider {
     }
   }
 
-  async getPaymentStatus(paymentId: string): Promise<{ status: string; status_detail: string }> {
+  async getPaymentDetails(paymentId: string): Promise<MercadoPagoPaymentDetails> {
     if (!this.isConfigured()) {
       throw new Error('Mercado Pago nao esta configurado');
     }
@@ -205,6 +220,9 @@ export class MercadoPagoProvider {
       return {
         status: result.status || 'pending',
         status_detail: result.status_detail || '',
+        metadata: (result as any).metadata || {},
+        external_reference: (result as any).external_reference || undefined,
+        payment_method_id: result.payment_method_id || undefined,
       };
     } catch (error: any) {
       this.logger.error('Erro ao buscar status do pagamento no Mercado Pago', {
@@ -215,11 +233,48 @@ export class MercadoPagoProvider {
     }
   }
 
+  async getPaymentStatus(paymentId: string): Promise<{ status: string; status_detail: string }> {
+    const details = await this.getPaymentDetails(paymentId);
+    return {
+      status: details.status,
+      status_detail: details.status_detail,
+    };
+  }
+
   validateWebhookSignature(
-    _dataId: string,
-    _requestId: string,
-    _signature: string,
+    dataId: string,
+    requestId: string,
+    signature: string,
   ): boolean {
-    return true;
+    const secret = this.configService.get<string>('MERCADOPAGO_WEBHOOK_SECRET') || '';
+    if (!secret) {
+      return true;
+    }
+
+    if (!signature || !dataId || !requestId) {
+      return false;
+    }
+
+    const parts = signature.split(',').map((part) => part.trim());
+    const tsPart = parts.find((part) => part.startsWith('ts='));
+    const v1Part = parts.find((part) => part.startsWith('v1='));
+    if (!tsPart || !v1Part) {
+      return false;
+    }
+
+    const ts = tsPart.slice(3);
+    const v1 = v1Part.slice(3);
+    if (!ts || !v1) {
+      return false;
+    }
+
+    const manifest = `id:${dataId};request-id:${requestId};ts:${ts};`;
+    const expected = createHmac('sha256', secret).update(manifest).digest('hex');
+
+    try {
+      return timingSafeEqual(Buffer.from(v1), Buffer.from(expected));
+    } catch {
+      return false;
+    }
   }
 }

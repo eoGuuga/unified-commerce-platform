@@ -1,10 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { WhatsappConversation } from '../../database/entities/WhatsappConversation.entity';
 import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity';
 import { Pedido, PedidoStatus } from '../../database/entities/Pedido.entity';
 import { Pagamento } from '../../database/entities/Pagamento.entity';
+import { DbContextService } from '../common/services/db-context.service';
 
 export interface NotificationMessage {
   to: string; // numero do WhatsApp
@@ -17,12 +16,7 @@ export interface NotificationMessage {
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(
-    @InjectRepository(WhatsappConversation)
-    private conversationRepository: Repository<WhatsappConversation>,
-    @InjectRepository(WhatsappMessage)
-    private messageRepository: Repository<WhatsappMessage>,
-  ) {}
+  constructor(private readonly db: DbContextService) {}
 
   async notifyPaymentConfirmed(
     tenantId: string,
@@ -31,7 +25,10 @@ export class NotificationsService {
   ): Promise<void> {
     this.logger.log(`Notifying payment confirmation for order ${pedido.order_no}`);
 
-    const conversation = await this.conversationRepository.findOne({
+    const conversationRepository = this.db.getRepository(WhatsappConversation);
+    const messageRepository = this.db.getRepository(WhatsappMessage);
+
+    const conversation = await conversationRepository.findOne({
       where: {
         tenant_id: tenantId,
         pedido_id: pedido.id,
@@ -45,13 +42,13 @@ export class NotificationsService {
 
     const message = this.generatePaymentConfirmedMessage(pedido, pagamento);
 
-    const whatsappMessage = this.messageRepository.create({
+    const whatsappMessage = messageRepository.create({
       conversation_id: conversation.id,
       direction: 'outbound',
       body: message,
       message_type: 'text',
     });
-    await this.messageRepository.save(whatsappMessage);
+    await messageRepository.save(whatsappMessage);
 
     await this.sendWhatsAppMessage({
       to: conversation.customer_phone,
@@ -64,7 +61,7 @@ export class NotificationsService {
     });
 
     conversation.status = 'order_placed';
-    await this.conversationRepository.save(conversation);
+    await conversationRepository.save(conversation);
 
     this.logger.log(`Payment confirmation sent to ${conversation.customer_phone}`);
   }
@@ -79,7 +76,10 @@ export class NotificationsService {
       `Notifying order status change: ${oldStatus || 'NEW'} -> ${newStatus} for order ${pedido.order_no}`,
     );
 
-    const conversation = await this.conversationRepository.findOne({
+    const conversationRepository = this.db.getRepository(WhatsappConversation);
+    const messageRepository = this.db.getRepository(WhatsappMessage);
+
+    const conversation = await conversationRepository.findOne({
       where: {
         tenant_id: tenantId,
         pedido_id: pedido.id,
@@ -93,13 +93,13 @@ export class NotificationsService {
 
     const message = this.generateOrderStatusChangeMessage(pedido, oldStatus, newStatus);
 
-    const whatsappMessage = this.messageRepository.create({
+    const whatsappMessage = messageRepository.create({
       conversation_id: conversation.id,
       direction: 'outbound',
       body: message,
       message_type: 'text',
     });
-    await this.messageRepository.save(whatsappMessage);
+    await messageRepository.save(whatsappMessage);
 
     await this.sendWhatsAppMessage({
       to: conversation.customer_phone,
@@ -122,7 +122,10 @@ export class NotificationsService {
   ): Promise<void> {
     this.logger.log(`Notifying payment pending for order ${pedido.order_no}`);
 
-    const conversation = await this.conversationRepository.findOne({
+    const conversationRepository = this.db.getRepository(WhatsappConversation);
+    const messageRepository = this.db.getRepository(WhatsappMessage);
+
+    const conversation = await conversationRepository.findOne({
       where: {
         tenant_id: tenantId,
         pedido_id: pedido.id,
@@ -143,13 +146,13 @@ export class NotificationsService {
       message = this.generatePaymentReminderMessage(pedido, pagamento);
     }
 
-    const whatsappMessage = this.messageRepository.create({
+    const whatsappMessage = messageRepository.create({
       conversation_id: conversation.id,
       direction: 'outbound',
       body: message,
       message_type: 'text',
     });
-    await this.messageRepository.save(whatsappMessage);
+    await messageRepository.save(whatsappMessage);
 
     await this.sendWhatsAppMessage({
       to: conversation.customer_phone,
@@ -276,7 +279,7 @@ export class NotificationsService {
       `Aguardando confirmacao do pagamento...`;
   }
 
-  private async sendWhatsAppMessage(notification: NotificationMessage): Promise<void> {
+  async sendWhatsAppMessage(notification: NotificationMessage): Promise<void> {
     const provider = (process.env.WHATSAPP_PROVIDER || 'mock').toLowerCase();
 
     if (provider === 'mock') {

@@ -5,6 +5,7 @@ import { ConversationService } from './services/conversation.service';
 import { ProductsService } from '../products/products.service';
 import { OrdersService } from '../orders/orders.service';
 import { PaymentsService, CreatePaymentDto } from '../payments/payments.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CanalVenda, PedidoStatus, Pedido } from '../../database/entities/Pedido.entity';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
 import { TypedConversation, ProductSearchResult, toTypedConversation, ConversationState, CustomerData, PendingOrder, PendingOrderItem } from './types/whatsapp.types';
@@ -50,6 +51,7 @@ export class WhatsappService {
     private ordersService: OrdersService,
     private paymentsService: PaymentsService,
     private couponsService: CouponsService,
+    private notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -2168,8 +2170,10 @@ export class WhatsappService {
   }
 
   async sendMessage(to: string, message: string): Promise<void> {
-    this.logger.log(`Would send message to ${to}: ${message}`);
-    // TODO: Implementar envio via Twilio/Evolution API quando configurado
-    // Por enquanto, apenas loga a mensagem
+    await this.notificationsService.sendWhatsAppMessage({
+      to,
+      message,
+      metadata: { source: 'whatsapp_service' },
+    });
   }
 }

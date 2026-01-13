@@ -5,7 +5,15 @@
  * - mercadopago (recomendado para BR)
  * - mock (apenas desenvolvimento)
  */
-import { Injectable, Logger, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  UnauthorizedException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Pagamento, PagamentoStatus, MetodoPagamento } from '../../database/entities/Pagamento.entity';
@@ -142,6 +150,15 @@ export class PaymentsService {
     return (this.configService.get<string>('PAYMENT_PROVIDER') || 'mock').toLowerCase();
   }
 
+  private buildMercadoPagoMetadata(pagamento: Pagamento, pedido: Pedido): Record<string, any> {
+    return {
+      tenant_id: pagamento.tenant_id,
+      pedido_id: pedido.id,
+      pedido_no: pedido.order_no,
+      pagamento_id: pagamento.id,
+    };
+  }
+
   /**
    * Monta o resultado do pagamento a partir do registro existente (reuso).
    */
@@ -246,6 +263,7 @@ export class PaymentsService {
         `Pedido ${pedido.order_no}`,
         pedido.order_no,
         context.payerEmail,
+        this.buildMercadoPagoMetadata(pagamento, pedido),
       );
 
       const qrCodeDataUrl = pixResult.qr_code_base64
@@ -429,6 +447,7 @@ export class PaymentsService {
         context.cardToken,
         context.installments || 1,
         context.payerEmail,
+        this.buildMercadoPagoMetadata(pagamento, pedido),
       );
 
       const status = (cardResult.status || '').toLowerCase();
@@ -489,6 +508,7 @@ export class PaymentsService {
         pedido.order_no,
         undefined,
         context.payerEmail,
+        this.buildMercadoPagoMetadata(pagamento, pedido),
       );
 
       pagamento.status = PagamentoStatus.PENDING;
@@ -622,6 +642,117 @@ export class PaymentsService {
     return await this.db.getRepository(Pagamento).find({
       where: { pedido_id: pedidoId, tenant_id: tenantId },
       order: { created_at: 'DESC' },
+    });
+  }
+
+  private mapMercadoPagoStatus(status: string): PagamentoStatus {
+    const normalized = (status || '').toLowerCase();
+    if (normalized === 'approved') return PagamentoStatus.PAID;
+    if (normalized === 'authorized' || normalized === 'in_process') return PagamentoStatus.PROCESSING;
+    if (normalized === 'pending' || normalized === 'in_mediation') return PagamentoStatus.PENDING;
+    if (normalized === 'refunded') return PagamentoStatus.REFUNDED;
+    if (normalized === 'rejected' || normalized === 'cancelled' || normalized === 'charged_back') {
+      return PagamentoStatus.FAILED;
+    }
+    return PagamentoStatus.PENDING;
+  }
+
+  private extractTenantId(metadata: Record<string, any> | undefined): string | null {
+    if (!metadata) return null;
+    const tenantId = metadata.tenant_id || metadata.tenantId;
+    if (typeof tenantId === 'string' && tenantId.trim()) {
+      return tenantId.trim();
+    }
+    return null;
+  }
+
+  async handleMercadoPagoWebhook(payload: Record<string, any>, opts: {
+    signature?: string;
+    requestId?: string;
+    token?: string;
+  }): Promise<{ status: 'ok' | 'ignored' }> {
+    if (!this.mercadoPagoProvider.isConfigured()) {
+      this.logger.warn('Mercado Pago webhook recebido, mas provider nao configurado');
+      return { status: 'ignored' };
+    }
+
+    const expectedToken = (this.configService.get<string>('MERCADOPAGO_WEBHOOK_TOKEN') || '').trim();
+    if (expectedToken && expectedToken !== (opts.token || '').trim()) {
+      throw new UnauthorizedException('Webhook token invalido');
+    }
+
+    const dataId =
+      payload?.data?.id ||
+      payload?.id ||
+      payload?.payment_id ||
+      payload?.data?.payment_id;
+
+    if (!dataId) {
+      this.logger.warn('Webhook Mercado Pago sem data.id');
+      return { status: 'ignored' };
+    }
+
+    const signature = (opts.signature || '').trim();
+    const requestId = (opts.requestId || '').trim();
+    if (!this.mercadoPagoProvider.validateWebhookSignature(String(dataId), requestId, signature)) {
+      throw new UnauthorizedException('Assinatura de webhook invalida');
+    }
+
+    const details = await this.mercadoPagoProvider.getPaymentDetails(String(dataId));
+    const tenantId = this.extractTenantId(details.metadata);
+
+    if (!tenantId) {
+      this.logger.warn('Webhook Mercado Pago sem tenant_id no metadata', {
+        paymentId: dataId,
+        externalReference: details.external_reference,
+      });
+      return { status: 'ignored' };
+    }
+
+    return await this.db.runInTransaction(async (manager) => {
+      await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [tenantId]);
+
+      return await this.db.runWithManager(manager, async () => {
+        const pagamentoRepo = this.db.getRepository(Pagamento);
+        const pagamento = await pagamentoRepo.findOne({
+          where: { transaction_id: String(dataId), tenant_id: tenantId },
+          relations: ['pedido'],
+        });
+
+        if (!pagamento) {
+          this.logger.warn('Pagamento nao encontrado para webhook Mercado Pago', {
+            paymentId: dataId,
+            tenantId,
+          });
+          return { status: 'ignored' };
+        }
+
+        const mappedStatus = this.mapMercadoPagoStatus(details.status);
+        const providerMeta = {
+          provider: 'mercadopago',
+          provider_status: details.status,
+          provider_status_detail: details.status_detail,
+          provider_payment_method: details.payment_method_id,
+        };
+
+        if (pagamento.status === PagamentoStatus.PAID && mappedStatus === PagamentoStatus.PAID) {
+          return { status: 'ok' };
+        }
+
+        if (mappedStatus === PagamentoStatus.PAID) {
+          await this.confirmPayment(pagamento.id, tenantId);
+          return { status: 'ok' };
+        }
+
+        pagamento.status = mappedStatus;
+        pagamento.metadata = {
+          ...pagamento.metadata,
+          ...providerMeta,
+        };
+
+        await pagamentoRepo.save(pagamento);
+        return { status: 'ok' };
+      });
     });
   }
 }

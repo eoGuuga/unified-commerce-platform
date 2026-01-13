@@ -77,7 +77,7 @@
 #### Backend
 - ⏳ API de checkout: POST /api/checkout - **NÃO IMPLEMENTADO**
 - ⏳ Integração Stripe: Payment Intent - **MOCK APENAS**
-- ⏳ Webhook de pagamento: POST /api/payments/webhook - **NÃO IMPLEMENTADO**
+- ✅ Webhook de pagamento: POST /api/v1/payments/webhook/mercadopago - **IMPLEMENTADO**
 - ⏳ Email de confirmação - **MOCK APENAS**
 
 #### Frontend
