@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import request from 'supertest';
@@ -12,6 +13,7 @@ import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { TenantDbContextInterceptor } from '../../common/interceptors/tenant-db-context.interceptor';
 
 describe('Products Integration Tests (e2e)', () => {
   let app: INestApplication | null = null;
@@ -27,6 +29,12 @@ describe('Products Integration Tests (e2e)', () => {
           CommonModule,
           AuthModule,
           ProductsModule,
+        ],
+        providers: [
+          {
+            provide: APP_INTERCEPTOR,
+            useClass: TenantDbContextInterceptor,
+          },
         ],
       }).compile();
 

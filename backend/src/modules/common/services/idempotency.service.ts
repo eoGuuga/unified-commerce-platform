@@ -53,7 +53,20 @@ export class IdempotencyService {
       expires_at: expiresAt,
     });
 
-    return idempotencyRepository.save(idempotencyKey);
+    try {
+      return await idempotencyRepository.save(idempotencyKey);
+    } catch (error: any) {
+      // Race condition: outro request criou a chave antes (unique_violation)
+      if (error && error.code === '23505') {
+        const raced = await idempotencyRepository.findOne({
+          where: { tenant_id: tenantId, operation_type: operationType, key_hash: keyHash },
+        });
+        if (raced) {
+          return raced;
+        }
+      }
+      throw error;
+    }
   }
 
   async markCompleted<T = unknown>(

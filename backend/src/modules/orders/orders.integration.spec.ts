@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import request from 'supertest';
@@ -14,6 +15,7 @@ import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { TenantDbContextInterceptor } from '../../common/interceptors/tenant-db-context.interceptor';
 
 describe('Orders Integration Tests (e2e)', () => {
   let app: INestApplication | null = null;
@@ -31,6 +33,12 @@ describe('Orders Integration Tests (e2e)', () => {
           ProductsModule,
           OrdersModule,
           NotificationsModule,
+        ],
+        providers: [
+          {
+            provide: APP_INTERCEPTOR,
+            useClass: TenantDbContextInterceptor,
+          },
         ],
       }).compile();
 
@@ -113,8 +121,12 @@ describe('Orders Integration Tests (e2e)', () => {
 
       const productId = productResponse.body.id;
 
-      // Criar estoque manualmente (via SQL ou endpoint se existir)
-      // Por enquanto, vamos assumir que o estoque já existe ou será criado automaticamente
+      // Criar estoque para o produto
+      await request(app.getHttpServer())
+        .post(`/api/v1/products/${productId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ quantity: 10, reason: 'Teste de integracao' })
+        .expect(201);
 
       // Criar pedido
       const orderResponse = await request(app.getHttpServer())
