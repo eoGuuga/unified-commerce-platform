@@ -2,34 +2,42 @@ import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@
 import { Request } from 'express';
 
 /**
- * CSRF Guard - Protege contra ataques CSRF
- * 
- * Valida que requisições POST/PUT/DELETE incluem token CSRF válido
- * GET/HEAD/OPTIONS são permitidos sem token (safe methods)
+ * CSRF Guard - Protege contra ataques CSRF.
+ * Ativo apenas quando CSRF_ENABLED=true.
  */
 @Injectable()
 export class CsrfGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
+    const enabled = String(process.env.CSRF_ENABLED || '').toLowerCase() === 'true';
+    if (!enabled) {
+      return true;
+    }
+
     const request = context.switchToHttp().getRequest<Request>();
-    
-    // Skip para métodos seguros (GET, HEAD, OPTIONS)
+
+    // Skip para metodos seguros (GET, HEAD, OPTIONS)
     if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
       return true;
     }
-    
-    // Obter tokens
-    const csrfToken = request.headers['x-csrf-token'] as string;
-    const sessionToken = request.cookies?.['csrf-token'] || request.headers['x-csrf-session-token'];
-    
-    // Validar tokens
+
+    const csrfHeaderName = (process.env.CSRF_HEADER_NAME || 'x-csrf-token').toLowerCase();
+    const csrfCookieName = process.env.CSRF_COOKIE_NAME || 'csrf-token';
+    const csrfSessionHeaderName =
+      (process.env.CSRF_SESSION_HEADER_NAME || 'x-csrf-session-token').toLowerCase();
+
+    const headers = request.headers || {};
+    const csrfToken = (headers as any)[csrfHeaderName] as string | undefined;
+    const sessionToken =
+      request.cookies?.[csrfCookieName] || (headers as any)[csrfSessionHeaderName];
+
     if (!csrfToken || !sessionToken) {
-      throw new ForbiddenException('CSRF token não fornecido');
+      throw new ForbiddenException('CSRF token nao fornecido');
     }
-    
+
     if (csrfToken !== sessionToken) {
-      throw new ForbiddenException('CSRF token inválido');
+      throw new ForbiddenException('CSRF token invalido');
     }
-    
+
     return true;
   }
 }

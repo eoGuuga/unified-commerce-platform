@@ -4,22 +4,21 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { CsrfGuard } from './common/guards/csrf.guard';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  // ✅ Tratamento de erros não capturados para evitar crashes
+  // Tratamento de erros nao capturados para evitar crashes.
   process.on('uncaughtException', (error: Error) => {
-    console.error('❌ UNCAUGHT EXCEPTION - Backend pode crashar:', error);
+    console.error('UNCAUGHT EXCEPTION - Backend pode crashar:', error);
     console.error('Stack:', error.stack);
-    // Não fazer exit imediato - deixar NestJS lidar
   });
 
-  process.on('unhandledRejection', (reason: any, _promise: Promise<any>) => {
-    console.error('❌ UNHANDLED REJECTION - Backend pode crashar:', reason);
+  process.on('unhandledRejection', (reason: any) => {
+    console.error('UNHANDLED REJECTION - Backend pode crashar:', reason);
     if (reason instanceof Error) {
       console.error('Stack:', reason.stack);
     }
-    // Não fazer exit imediato - deixar NestJS lidar
   });
 
   const app = await NestFactory.create(AppModule);
@@ -27,13 +26,12 @@ async function bootstrap() {
   const isProd = process.env.NODE_ENV === 'production';
   const enableSwagger = !isProd || process.env.ENABLE_SWAGGER === 'true';
 
-  // ✅ Hardening básico do Express/Nest
-  // INestApplication não expõe `disable`, mas o Express instance expõe.
+  // Hardening basico do Express/Nest.
   try {
     const instance = app.getHttpAdapter().getInstance() as any;
     instance?.disable?.('x-powered-by');
   } catch {
-    // Se não for Express (ou adapter não suportar), ignorar.
+    // ignore
   }
   app.enableShutdownHooks();
   app.use(cookieParser());
@@ -41,37 +39,32 @@ async function bootstrap() {
     helmet(
       enableSwagger
         ? {
-            // Swagger UI usa inline scripts/styles
             contentSecurityPolicy: false,
-            // Evita quebras com Swagger em dev
             crossOriginEmbedderPolicy: false,
           }
         : {
-            // Produção: CSP/COEP mais restritivos
             contentSecurityPolicy: true,
             crossOriginEmbedderPolicy: { policy: 'require-corp' },
           },
     ),
   );
 
-  // ✅ CORS - Validação robusta e segura
+  // CORS.
   const frontendUrl = process.env.FRONTEND_URL?.trim();
   const extraOriginsRaw = process.env.CORS_ORIGINS?.trim() || '';
   const extraOrigins = extraOriginsRaw
     ? extraOriginsRaw.split(',').map((o) => o.trim()).filter(Boolean)
     : [];
 
-  // ✅ CRÍTICO: Em produção, FRONTEND_URL é obrigatório
   if (isProd && !frontendUrl) {
-    console.error('❌ ERRO CRÍTICO: FRONTEND_URL não definido em produção!');
-    console.error('   Configure: FRONTEND_URL=https://app.suaempresa.com');
+    console.error('ERRO CRITICO: FRONTEND_URL nao definido em producao!');
+    console.error('Configure: FRONTEND_URL=https://app.suaempresa.com');
     throw new Error(
-      'FRONTEND_URL deve ser definido em produção (CORS). ' +
+      'FRONTEND_URL deve ser definido em producao (CORS). ' +
         'Ex.: FRONTEND_URL=https://app.suaempresa.com',
     );
   }
 
-  // Validar URLs (básico)
   const validateUrl = (url: string): boolean => {
     try {
       const parsed = new URL(url);
@@ -93,38 +86,44 @@ async function bootstrap() {
 
   if (isProd && allowedOrigins.length === 0) {
     throw new Error(
-      'Nenhuma origem CORS válida configurada. Verifique FRONTEND_URL e CORS_ORIGINS.',
+      'Nenhuma origem CORS valida configurada. Verifique FRONTEND_URL e CORS_ORIGINS.',
     );
   }
 
-  console.log(`✅ CORS configurado: ${allowedOrigins.length} origem(ns) permitida(s)`);
+  console.log(`CORS configurado: ${allowedOrigins.length} origem(ns) permitida(s)`);
   if (isProd) {
-    console.log(`   Produção: ${allowedOrigins.join(', ')}`);
+    console.log(`Producao: ${allowedOrigins.join(', ')}`);
+  }
+
+  const allowTenantHeader =
+    !isProd && process.env.ALLOW_TENANT_FROM_REQUEST !== 'false';
+  const allowedHeaders = [
+    'Content-Type',
+    'Authorization',
+    'X-CSRF-Token',
+    'Idempotency-Key',
+  ];
+  if (allowTenantHeader) {
+    allowedHeaders.push('x-tenant-id');
   }
 
   app.enableCors({
     origin: (origin, callback) => {
-      // Permitir requests sem Origin (curl, health checks, server-to-server)
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
-      
-      // Log de tentativa bloqueada (apenas em dev para debug)
       if (!isProd) {
-        console.warn(`⚠️ CORS bloqueado para origin: ${origin}`);
+        console.warn(`CORS bloqueado para origin: ${origin}`);
       }
-      
       return callback(new Error(`CORS bloqueado para origin: ${origin}`), false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'Idempotency-Key', 'x-tenant-id'],
+    allowedHeaders,
     exposedHeaders: ['X-Total-Count', 'X-Rate-Limit-Remaining'],
   });
 
-  // Global exception filter
   app.useGlobalFilters(new HttpExceptionFilter());
-
-  // Global validation pipe
+  app.useGlobalGuards(new CsrfGuard());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -134,11 +133,10 @@ async function bootstrap() {
   );
 
   if (enableSwagger) {
-    // Swagger/OpenAPI Configuration (desativado em producao por padrao)
     const config = new DocumentBuilder()
       .setTitle('Unified Commerce Platform API')
       .setDescription(
-        'API completa para gestão de vendas multi-canal com controle de estoque em tempo real',
+        'API completa para gestao de vendas multi-canal com controle de estoque em tempo real',
       )
       .setVersion('1.0')
       .addBearerAuth(
@@ -152,9 +150,9 @@ async function bootstrap() {
         },
         'JWT-auth',
       )
-      .addTag('Auth', 'Autenticação e autorização')
-      .addTag('Products', 'Gestão de produtos e estoque')
-      .addTag('Orders', 'Gestão de pedidos e vendas')
+      .addTag('Auth', 'Autenticacao e autorizacao')
+      .addTag('Products', 'Gestao de produtos e estoque')
+      .addTag('Orders', 'Gestao de pedidos e vendas')
       .addTag('WhatsApp', 'Bot WhatsApp e mensagens')
       .addServer('http://localhost:3001/api/v1', 'Development server')
       .build();
@@ -167,14 +165,13 @@ async function bootstrap() {
     });
   }
 
-  // API prefix
   app.setGlobalPrefix('api/v1');
 
   const port = process.env.PORT || 3001;
   await app.listen(port);
 
-  console.log(`🚀 Backend running on http://localhost:${port}/api/v1`);
-  console.log(`📚 Swagger documentation: http://localhost:${port}/api/docs`);
+  console.log(`Backend running on http://localhost:${port}/api/v1`);
+  console.log(`Swagger documentation: http://localhost:${port}/api/docs`);
 }
 
 bootstrap();

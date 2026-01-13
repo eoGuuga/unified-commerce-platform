@@ -38,10 +38,26 @@ export class AuthService {
     private readonly db: DbContextService,
   ) {}
 
-  async login(loginDto: LoginDto, tenantId: string): Promise<LoginResponse> {
-    const usuario = await this.db.getRepository(Usuario).findOne({
-      where: { email: loginDto.email, tenant_id: tenantId },
-    });
+  async login(loginDto: LoginDto, tenantId?: string): Promise<LoginResponse> {
+    let usuario: Usuario | null = null;
+
+    if (tenantId) {
+      usuario = await this.db.getRepository(Usuario).findOne({
+        where: { email: loginDto.email, tenant_id: tenantId },
+      });
+    } else {
+      const matches = await this.db.getRepository(Usuario).find({
+        where: { email: loginDto.email },
+      });
+
+      if (matches.length > 1) {
+        throw new BadRequestException(
+          'Email pertence a mais de um tenant. Use o fluxo de login por tenant.',
+        );
+      }
+
+      usuario = matches[0] || null;
+    }
 
     if (!usuario) {
       throw new UnauthorizedException('Credenciais invalidas');

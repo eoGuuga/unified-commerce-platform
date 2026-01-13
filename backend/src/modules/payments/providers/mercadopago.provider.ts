@@ -31,7 +31,7 @@ export class MercadoPagoProvider {
 
   constructor(private configService: ConfigService) {
     this.accessToken = this.configService.get<string>('MERCADOPAGO_ACCESS_TOKEN') || '';
-    
+
     if (this.accessToken) {
       this.client = new MercadoPagoConfig({
         accessToken: this.accessToken,
@@ -46,23 +46,18 @@ export class MercadoPagoProvider {
     }
   }
 
-  /**
-   * Verifica se o provider está configurado
-   */
   isConfigured(): boolean {
     return !!this.client && !!this.accessToken;
   }
 
-  /**
-   * Cria pagamento Pix via Mercado Pago
-   */
   async createPixPayment(
     amount: number,
     description: string,
     externalReference: string,
+    payerEmail?: string,
   ): Promise<MercadoPagoPixResult> {
     if (!this.isConfigured()) {
-      throw new Error('Mercado Pago não está configurado');
+      throw new Error('Mercado Pago nao esta configurado');
     }
 
     try {
@@ -73,7 +68,7 @@ export class MercadoPagoProvider {
         description: description,
         payment_method_id: 'pix',
         payer: {
-          email: 'customer@example.com', // Em produção, obter do pedido/usuário
+          email: payerEmail || 'customer@example.com',
         },
         external_reference: externalReference,
         notification_url: this.configService.get<string>('MERCADOPAGO_WEBHOOK_URL') || undefined,
@@ -82,7 +77,7 @@ export class MercadoPagoProvider {
       const result = await payment.create({ body: paymentData });
 
       if (!result.point_of_interaction?.transaction_data) {
-        throw new Error('Resposta do Mercado Pago inválida para Pix');
+        throw new Error('Resposta do Mercado Pago invalida para Pix');
       }
 
       const transactionData = result.point_of_interaction.transaction_data;
@@ -102,18 +97,16 @@ export class MercadoPagoProvider {
     }
   }
 
-  /**
-   * Cria pagamento com cartão via Mercado Pago
-   */
   async createCardPayment(
     amount: number,
     description: string,
     externalReference: string,
-    token: string, // Token do cartão (gerado no frontend)
+    token: string,
     installments: number = 1,
+    payerEmail?: string,
   ): Promise<MercadoPagoCardResult> {
     if (!this.isConfigured()) {
-      throw new Error('Mercado Pago não está configurado');
+      throw new Error('Mercado Pago nao esta configurado');
     }
 
     try {
@@ -126,7 +119,7 @@ export class MercadoPagoProvider {
         token: token,
         installments: installments,
         payer: {
-          email: 'customer@example.com', // Em produção, obter do pedido/usuário
+          email: payerEmail || 'customer@example.com',
         },
         external_reference: externalReference,
         notification_url: this.configService.get<string>('MERCADOPAGO_WEBHOOK_URL') || undefined,
@@ -141,7 +134,7 @@ export class MercadoPagoProvider {
         payment_method_id: result.payment_method_id || 'credit_card',
       };
     } catch (error: any) {
-      this.logger.error('Erro ao criar pagamento com cartão no Mercado Pago', {
+      this.logger.error('Erro ao criar pagamento com cartao no Mercado Pago', {
         error: error.message,
         stack: error.stack,
       });
@@ -149,31 +142,28 @@ export class MercadoPagoProvider {
     }
   }
 
-  /**
-   * Cria pagamento com boleto via Mercado Pago
-   */
   async createBoletoPayment(
     amount: number,
     description: string,
     externalReference: string,
     expirationDate?: string,
+    payerEmail?: string,
   ): Promise<MercadoPagoBoletoResult> {
     if (!this.isConfigured()) {
-      throw new Error('Mercado Pago não está configurado');
+      throw new Error('Mercado Pago nao esta configurado');
     }
 
     try {
       const payment = new Payment(this.client!);
 
-      // Data de vencimento padrão: 3 dias
       const expireDate = expirationDate || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
       const paymentData: any = {
         transaction_amount: amount,
         description: description,
-        payment_method_id: 'bolbradesco', // ou 'pec' para PEC
+        payment_method_id: 'bolbradesco',
         payer: {
-          email: 'customer@example.com', // Em produção, obter do pedido/usuário
+          email: payerEmail || 'customer@example.com',
         },
         external_reference: externalReference,
         date_of_expiration: expireDate,
@@ -182,16 +172,15 @@ export class MercadoPagoProvider {
 
       const result = await payment.create({ body: paymentData });
 
-      // Boleto: buscar dados do boleto na resposta
-      const barcode = (result as any).transaction_details?.external_resource_url || 
-                     (result as any).transaction_details?.financial_institution || 
+      const barcode = (result as any).transaction_details?.external_resource_url ||
+                     (result as any).transaction_details?.financial_institution ||
                      '';
 
       return {
         transaction_id: String(result.id || ''),
         barcode: barcode,
-        external_resource_url: (result as any).transaction_details?.external_resource_url || 
-                              (result as any).external_resource_url || 
+        external_resource_url: (result as any).transaction_details?.external_resource_url ||
+                              (result as any).external_resource_url ||
                               '',
         date_of_expiration: expireDate,
       };
@@ -204,12 +193,9 @@ export class MercadoPagoProvider {
     }
   }
 
-  /**
-   * Busca status de um pagamento
-   */
   async getPaymentStatus(paymentId: string): Promise<{ status: string; status_detail: string }> {
     if (!this.isConfigured()) {
-      throw new Error('Mercado Pago não está configurado');
+      throw new Error('Mercado Pago nao esta configurado');
     }
 
     try {
@@ -229,17 +215,11 @@ export class MercadoPagoProvider {
     }
   }
 
-  /**
-   * Valida assinatura do webhook
-   */
   validateWebhookSignature(
-    dataId: string,
-    requestId: string,
-    signature: string,
+    _dataId: string,
+    _requestId: string,
+    _signature: string,
   ): boolean {
-    // Implementar validação de assinatura do webhook
-    // Ver: https://www.mercadopago.com.br/developers/pt/docs/your-integrations/notifications/webhooks
-    // Por enquanto, retorna true (em produção, validar corretamente)
     return true;
   }
 }

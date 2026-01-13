@@ -25,11 +25,17 @@ export class TenantDbContextInterceptor implements NestInterceptor {
     const userTenant = (request as any)?.user?.tenant_id;
     if (typeof userTenant === 'string' && userTenant.trim()) return userTenant.trim();
 
-    const headerTenant = request.headers?.['x-tenant-id'];
-    if (typeof headerTenant === 'string' && headerTenant.trim()) return headerTenant.trim();
+    const isProd = process.env.NODE_ENV === 'production';
+    const allowNonJwtTenant =
+      !isProd && process.env.ALLOW_TENANT_FROM_REQUEST !== 'false';
 
-    const bodyTenant = request.body?.tenantId || request.body?.tenant_id;
-    if (typeof bodyTenant === 'string' && bodyTenant.trim()) return bodyTenant.trim();
+    if (allowNonJwtTenant) {
+      const headerTenant = request.headers?.['x-tenant-id'];
+      if (typeof headerTenant === 'string' && headerTenant.trim()) return headerTenant.trim();
+
+      const bodyTenant = request.body?.tenantId || request.body?.tenant_id;
+      if (typeof bodyTenant === 'string' && bodyTenant.trim()) return bodyTenant.trim();
+    }
 
     return null;
   }
@@ -42,7 +48,7 @@ export class TenantDbContextInterceptor implements NestInterceptor {
     const req = context.switchToHttp().getRequest();
     const tenantId = this.extractTenantId(req);
 
-    // Sem tenant -> não abrir transação nem setar variável de sessão.
+    // Sem tenant -> nao abrir transacao nem setar variavel de sessao.
     if (!tenantId) {
       return next.handle();
     }
@@ -56,7 +62,7 @@ export class TenantDbContextInterceptor implements NestInterceptor {
     await queryRunner.startTransaction();
 
     try {
-      // SET LOCAL: escopo da transação (não vaza entre requests/pool)
+      // SET LOCAL: escopo da transacao (nao vaza entre requests/pool).
       await queryRunner.manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [tenantId]);
 
       const result = await this.dbContext.runWithManager(queryRunner.manager, async () => {
@@ -84,4 +90,3 @@ export class TenantDbContextInterceptor implements NestInterceptor {
     }
   }
 }
-
