@@ -695,12 +695,13 @@ export class PaymentsService {
     const signature = (opts.signature || '').trim();
     const requestId = (opts.requestId || '').trim();
     const secret = (this.configService.get<string>('MERCADOPAGO_WEBHOOK_SECRET') || '').trim();
-    const isProd = (this.configService.get<string>('NODE_ENV') || '').toLowerCase() === 'production';
+    const allowUnsigned =
+      (this.configService.get<string>('MERCADOPAGO_WEBHOOK_ALLOW_UNSIGNED') || '').toLowerCase() === 'true';
     const isLiveMode = Boolean(payload?.live_mode);
 
     if (secret) {
       if (!signature || !requestId) {
-        if (isProd || isLiveMode) {
+        if (!allowUnsigned || isLiveMode) {
           throw new UnauthorizedException('Assinatura de webhook invalida');
         }
         this.logger.warn('Webhook Mercado Pago sem assinatura (modo teste) - validacao ignorada');
