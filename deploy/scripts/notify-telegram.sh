@@ -2,12 +2,12 @@
 set -euo pipefail
 
 # Envia alerta via Telegram (gratuito).
-# Requer no ambiente (ex.: deploy/env.prod):
+# Requer no ambiente (ex.: deploy/.env):
 #   TELEGRAM_BOT_TOKEN=...
 #   TELEGRAM_CHAT_ID=...
 #
 # Uso:
-#   set -a; source /opt/ucm/deploy/env.prod; set +a
+#   set -a; source /opt/ucm/deploy/.env; set +a
 #   bash deploy/scripts/notify-telegram.sh "mensagem"
 
 msg="${1:-UCM alert}"

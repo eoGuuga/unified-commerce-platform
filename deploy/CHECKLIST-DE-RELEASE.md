@@ -1,7 +1,7 @@
 # Checklist de Release (Produção) — gtsofthub.com.br
 > **Objetivo:** publicar uma nova versão com risco mínimo e rollback rápido.
 >
-> **Regras:** sem segredos neste documento. Tudo sensível fica em `/opt/ucm/deploy/env.prod` (VPS) e em gerenciador de senhas.
+> **Regras:** sem segredos neste documento. Tudo sensível fica em `/opt/ucm/deploy/.env` (VPS) e em gerenciador de senhas.
 
 ---
 
@@ -15,7 +15,7 @@
 
 ## 0) Pré-requisitos (uma vez)
 - Produção rodando em `/opt/ucm` (VPS).
-- `deploy/env.prod` com permissões seguras (ideal `600 root:root`).
+- `deploy/.env` com permissões seguras (ideal `600 root:root`).
 - Backups:
   - **Local diário:** `deploy/scripts/backup-postgres.sh` (cron)
   - **Offsite B2:** `deploy/scripts/backup-offsite.sh` (cron)
@@ -78,7 +78,7 @@ crontab -l | tail -n 5
 ```bash
 cd /opt/ucm
 bash deploy/scripts/backup-postgres.sh
-set -a; source /opt/ucm/deploy/env.prod; set +a
+set -a; source /opt/ucm/deploy/.env; set +a
 bash deploy/scripts/backup-offsite.sh
 ```
 
@@ -96,7 +96,7 @@ bash deploy/scripts/run-migrations.sh
 ### 3.2 Subir stack (rebuild se mudou código)
 ```bash
 cd /opt/ucm
-docker compose --env-file ./deploy/env.prod -f ./deploy/docker-compose.prod.yml up -d --build
+docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d --build
 ```
 
 ### 3.3 Validar Nginx

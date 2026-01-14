@@ -5,6 +5,9 @@
 > **Domínio:** `gtsofthub.com.br`  
 > **Servidor:** VPS Ubuntu (OVHcloud)
 
+> **Atualizacao (2026-01-14):** pontos de HTTPS/Nginx abaixo foram resolvidos.  
+> Ver status atual em `docs/04-status/ATUALIZACAO-2026-01-14.md`.
+
 ---
 
 ## 📊 RESUMO EXECUTIVO
@@ -20,12 +23,10 @@
 7. **Hardening:** UFW, fail2ban, unattended upgrades
 8. **Documentação:** Runbook completo de operação
 
-### ⚠️ Pontos de Atenção Identificados
+### ⚠️ Pontos de Atenção (verificar)
 
-1. **Nginx não está configurado para HTTPS (443)** - Apenas HTTP (80)
-2. **Certificados SSL mencionados mas não integrados no Nginx**
-3. **Falta configuração de renovação automática de certificados**
-4. **Variável `FRONTEND_URL` pode estar desatualizada**
+1. **Renovação automática de certificados** - garantir cron/hook ativo no VPS.
+2. **`FRONTEND_URL` e DNS** - confirmar alinhamento em produção e dev.
 
 ---
 
@@ -59,7 +60,7 @@
 │  └──────────────────────────────────┘  │
 └─────────────────────────────────────────┘
          │
-         │ HTTPS (443) - ⚠️ NÃO CONFIGURADO
+         │ HTTPS (443) - ✅ CONFIGURADO
          │ HTTP (80) - ✅ CONFIGURADO
          │
          ▼
@@ -71,7 +72,7 @@
 | Container | Porta Interna | Porta Externa | Status |
 |-----------|---------------|---------------|--------|
 | `ucm-nginx` | 80 | 80 | ✅ Configurado |
-| `ucm-nginx` | 443 | 443 | ⚠️ **NÃO configurado** |
+| `ucm-nginx` | 443 | 443 | ✅ Configurado |
 | `ucm-frontend` | 3000 | - | ✅ Configurado |
 | `ucm-backend` | 3001 | - | ✅ Configurado |
 | `ucm-postgres` | 5432 | - | ✅ Configurado |
@@ -84,7 +85,8 @@
 ### ✅ O Que Existe
 
 1. **Certificados Let's Encrypt:**
-   - Localização: `/etc/letsencrypt/live/gtsofthub.com.br/`
+   - Produção: `/etc/letsencrypt/live/gtsofthub.com.br/`
+   - Dev: `/etc/letsencrypt/live/dev.gtsofthub.com.br/`
    - Arquivos:
      - `fullchain.pem` ✅
      - `privkey.pem` ✅
@@ -93,20 +95,11 @@
    - Renovação: `certbot renew --dry-run` ✅
    - Documentação presente ✅
 
-### ❌ O Que FALTA
+### ⚠️ O Que Ainda Precisa Validar
 
-1. **Nginx não está configurado para HTTPS:**
-   - `deploy/nginx/ucm.conf` **apenas escuta na porta 80**
-   - **Não há configuração de servidor SSL (443)**
-   - **Certificados não estão sendo usados**
-
-2. **Docker Compose não expõe porta 443:**
-   - `deploy/docker-compose.prod.yml` **não mapeia porta 443**
-   - Nginx container não tem acesso aos certificados
-
-3. **Falta configuração de renovação automática:**
-   - Sem cron job para `certbot renew`
-   - Sem hooks para recarregar Nginx após renovação
+1. **Renovação automática de certificados:**
+   - Verificar cron/job para `certbot renew`
+   - Garantir reload do Nginx após renovação
 
 ---
 
@@ -114,126 +107,59 @@
 
 ### Nginx (`deploy/nginx/ucm.conf`)
 
-**Status:** ⚠️ **APENAS HTTP (80)**
+**Status:** ✅ **HTTP + HTTPS (80/443)**
 
 ```nginx
-server {
-  listen 80;  # ⚠️ Apenas HTTP
-  server_name _;
-  # ... configuração ...
-}
-```
-
-**Problemas:**
-- ❌ Não escuta na porta 443 (HTTPS)
-- ❌ Não referencia certificados SSL
-- ❌ Não tem redirect HTTP → HTTPS
-- ❌ Não tem configuração de HSTS
-
-### Docker Compose (`deploy/docker-compose.prod.yml`)
-
-**Status:** ⚠️ **PORTA 443 NÃO MAPEADA**
-
-```yaml
-nginx:
-  ports:
-    - "80:80"  # ⚠️ Apenas porta 80
-    # ❌ Falta: "443:443"
-  volumes:
-    - ./nginx/ucm.conf:/etc/nginx/conf.d/default.conf:ro
-    # ❌ Falta: volume para certificados SSL
-```
-
-**Problemas:**
-- ❌ Porta 443 não está mapeada
-- ❌ Certificados SSL não estão montados como volume
-- ❌ Nginx não tem acesso aos certificados
-
----
-
-## 🔧 CORREÇÕES NECESSÁRIAS
-
-### 1. Atualizar Nginx para HTTPS
-
-**Arquivo:** `deploy/nginx/ucm.conf`
-
-**Adicionar:**
-```nginx
-# Redirect HTTP → HTTPS
 server {
   listen 80;
-  server_name gtsofthub.com.br www.gtsofthub.com.br;
+  server_name gtsofthub.com.br;
   return 301 https://gtsofthub.com.br$request_uri;
 }
 
-# Servidor HTTPS
 server {
-  listen 443 ssl http2;
+  listen 443 ssl;
   server_name gtsofthub.com.br;
-
-  # Certificados SSL
-  ssl_certificate /etc/nginx/ssl/fullchain.pem;
-  ssl_certificate_key /etc/nginx/ssl/privkey.pem;
-
-  # Configurações SSL modernas
-  ssl_protocols TLSv1.2 TLSv1.3;
-  ssl_ciphers HIGH:!aNULL:!MD5;
-  ssl_prefer_server_ciphers on;
-  ssl_session_cache shared:SSL:10m;
-  ssl_session_timeout 10m;
-
-  # HSTS
+  ssl_certificate /etc/letsencrypt/live/gtsofthub.com.br/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/gtsofthub.com.br/privkey.pem;
   add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-
-  # ... resto da configuração ...
 }
 ```
 
-### 2. Atualizar Docker Compose
+**Status atual:**
+- ✅ Escuta 80 e 443
+- ✅ Certificados SSL montados via `/etc/letsencrypt`
+- ✅ Redirect HTTP → HTTPS
+- ✅ HSTS habilitado
 
-**Arquivo:** `deploy/docker-compose.prod.yml`
+### Docker Compose (`deploy/docker-compose.prod.yml`)
 
-**Adicionar:**
+**Status:** ✅ **PORTA 443 MAPEADA**
+
 ```yaml
 nginx:
   ports:
     - "80:80"
-    - "443:443"  # ✅ Adicionar porta 443
+    - "443:443"
   volumes:
     - ./nginx/ucm.conf:/etc/nginx/conf.d/default.conf:ro
-    - /etc/letsencrypt/live/gtsofthub.com.br:/etc/nginx/ssl:ro  # ✅ Montar certificados
+    - /etc/letsencrypt:/etc/letsencrypt:ro
+    - /var/www/certbot:/var/www/certbot:ro
 ```
 
-### 3. Configurar Renovação Automática
+**Status atual:**
+- ✅ Porta 443 mapeada
+- ✅ Certificados SSL montados como volume
+- ✅ Nginx com acesso aos certificados
 
-**Criar:** `deploy/scripts/renew-ssl.sh`
+---
 
-```bash
-#!/bin/bash
-# Renovar certificados SSL e recarregar Nginx
+## 🔧 CORREÇÕES APLICADAS (2026-01-14)
 
-certbot renew --quiet
-
-# Recarregar Nginx se certificados foram renovados
-if [ $? -eq 0 ]; then
-  docker exec ucm-nginx nginx -s reload
-fi
-```
-
-**Adicionar ao cron:**
-```bash
-# Renovar SSL todo dia às 3:30 AM
-30 3 * * * /opt/ucm/deploy/scripts/renew-ssl.sh >> /var/log/ucm-ssl-renew.log 2>&1
-```
-
-### 4. Atualizar Variável de Ambiente
-
-**Arquivo:** `deploy/env.prod`
-
-```bash
-# ✅ Atualizar para HTTPS
-FRONTEND_URL=https://gtsofthub.com.br
-```
+- ✅ Nginx com HTTPS ativo (80/443), redirects HTTP → HTTPS e www → sem www.
+- ✅ Docker Compose mapeando 443 e montando `/etc/letsencrypt`.
+- ✅ Certificados para produção e dev em `/etc/letsencrypt/live/...`.
+- ✅ Script de renovação disponível em `deploy/scripts/renew-ssl.sh`.
+- ⚠️ Validar cron/hook de renovação no VPS (se ainda não configurado).
 
 ---
 
@@ -243,16 +169,16 @@ FRONTEND_URL=https://gtsofthub.com.br
 - [x] ✅ UFW configurado (22/80/443)
 - [x] ✅ Fail2ban ativo
 - [x] ✅ Unattended upgrades
-- [ ] ⚠️ **HTTPS configurado** (pendente)
-- [ ] ⚠️ **HSTS ativo** (pendente)
-- [ ] ⚠️ **Renovação automática SSL** (pendente)
+- [x] ✅ **HTTPS configurado**
+- [x] ✅ **HSTS ativo**
+- [ ] ⚠️ **Renovação automática SSL** (verificar cron/hook)
 
 ### Infraestrutura
 - [x] ✅ Docker Compose funcionando
 - [x] ✅ Containers com health checks
 - [x] ✅ Logs rotacionados
-- [ ] ⚠️ **Porta 443 exposta** (pendente)
-- [ ] ⚠️ **Certificados montados** (pendente)
+- [x] ✅ **Porta 443 exposta**
+- [x] ✅ **Certificados montados**
 
 ### Backups
 - [x] ✅ Backup local diário
@@ -271,40 +197,25 @@ FRONTEND_URL=https://gtsofthub.com.br
 
 ### 🔴 CRÍTICO (Fazer Agora)
 
-1. **Configurar HTTPS no Nginx**
-   - Adicionar servidor SSL (443)
-   - Montar certificados no Docker
-   - Testar acesso HTTPS
-
-2. **Atualizar Docker Compose**
-   - Mapear porta 443
-   - Montar volume de certificados
-
-3. **Configurar Renovação Automática**
-   - Script de renovação
-   - Cron job
+Nenhuma pendência crítica no momento.
 
 ### 🟡 IMPORTANTE (Fazer Em Breve)
 
-1. **Atualizar `FRONTEND_URL`**
-   - Mudar para `https://gtsofthub.com.br`
+1. **Validar renovação automática SSL**
+   - Cron + `certbot renew --dry-run`
 
-2. **Testar Redirects**
-   - HTTP → HTTPS
-   - www → sem www
-
-3. **Validar HSTS**
-   - Verificar header `Strict-Transport-Security`
+2. **Revalidar URLs**
+   - Prod e dev (`/api/v1/health`)
 
 ---
 
 ## 📝 PRÓXIMOS PASSOS
 
-1. ✅ **Criar configuração Nginx com HTTPS**
-2. ✅ **Atualizar Docker Compose**
-3. ✅ **Criar script de renovação SSL**
-4. ✅ **Atualizar documentação**
-5. ⏳ **Aplicar no servidor (deploy)**
+1. ✅ **Configuração HTTPS aplicada no servidor**
+2. ✅ **Docker Compose com 443 e certificados**
+3. ✅ **Documentação atualizada**
+4. ⏳ **Confirmar cron de renovação SSL no VPS**
+5. ⏳ **Monitorar health prod/dev após deploys**
 
 ---
 
@@ -317,5 +228,5 @@ FRONTEND_URL=https://gtsofthub.com.br
 
 ---
 
-**Última atualização:** 09/01/2026  
-**Status:** ✅ **ANÁLISE COMPLETA** | ⚠️ **CORREÇÕES IDENTIFICADAS**
+**Última atualização:** 14/01/2026  
+**Status:** ✅ **ANÁLISE COMPLETA** | ✅ **CORREÇÕES APLICADAS**

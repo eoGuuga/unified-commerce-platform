@@ -50,12 +50,12 @@
 - [ ] **4. Rebuild Backend**
   ```bash
   cd /opt/ucm
-  docker compose --env-file ./deploy/env.prod -f ./deploy/docker-compose.prod.yml build backend
+  docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml build backend
   ```
 
 - [ ] **5. Deploy Backend**
   ```bash
-  docker compose --env-file ./deploy/env.prod -f ./deploy/docker-compose.prod.yml up -d backend
+  docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d backend
   ```
 
 - [ ] **6. Verificar Deploy**
@@ -172,8 +172,8 @@
   # Ou fazer rollback para versão anterior
   cd /opt/ucm
   git checkout HEAD~1  # se usar git
-  docker compose --env-file ./deploy/env.prod -f ./deploy/docker-compose.prod.yml build backend
-  docker compose --env-file ./deploy/env.prod -f ./deploy/docker-compose.prod.yml up -d backend
+  docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml build backend
+  docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d backend
   ```
 
 - [ ] **2. Rollback de Banco (Se necessário)**

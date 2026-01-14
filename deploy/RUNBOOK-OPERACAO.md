@@ -1,7 +1,7 @@
 # RUNBOOK de Operação — gtsofthub.com.br (Produção)
 > **Objetivo:** ser o manual “de guerra” (operação) do ambiente de produção da UCM.
 >
-> **Este documento NÃO contém segredos.** Tokens/senhas ficam apenas no servidor (ex.: `/opt/ucm/deploy/env.prod`) e em gerenciador de senhas.
+> **Este documento NÃO contém segredos.** Tokens/senhas ficam apenas no servidor (ex.: `/opt/ucm/deploy/.env`) e em gerenciador de senhas.
 
 ---
 
@@ -55,13 +55,13 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 ### Subir/atualizar stack (sem rebuild)
 ```bash
 cd /opt/ucm
-docker compose --env-file ./deploy/env.prod -f ./deploy/docker-compose.prod.yml up -d
+docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d
 ```
 
 ### Recriar apenas backend/frontend (pegar env novo)
 ```bash
 cd /opt/ucm
-docker compose --env-file ./deploy/env.prod -f ./deploy/docker-compose.prod.yml up -d backend frontend
+docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d backend frontend
 ```
 
 ### Reiniciar um container
@@ -87,6 +87,13 @@ curl -I https://www.gtsofthub.com.br/
 ## Nginx (config e reload)
 ### Arquivo de configuração
 - `/opt/ucm/deploy/nginx/ucm.conf`
+### Dev domain (se ativo)
+- `https://dev.gtsofthub.com.br` aponta para o stack de teste.
+- O container `ucm-nginx` deve estar conectado na rede `ucm-test-net`:
+```bash
+docker network connect ucm-test-net ucm-nginx 2>/dev/null || true
+```
+
 
 ### Validar e recarregar
 ```bash
@@ -111,6 +118,8 @@ ufw status verbose
 ### Certificados no host
 - `/etc/letsencrypt/live/gtsofthub.com.br/fullchain.pem`
 - `/etc/letsencrypt/live/gtsofthub.com.br/privkey.pem`
+- `/etc/letsencrypt/live/dev.gtsofthub.com.br/fullchain.pem`
+- `/etc/letsencrypt/live/dev.gtsofthub.com.br/privkey.pem`
 
 ### Renovação (teste)
 ```bash
@@ -176,18 +185,18 @@ Todo mês, o servidor:
 
 ### Rodar manualmente
 ```bash
-set -a; source /opt/ucm/deploy/env.prod; set +a
+set -a; source /opt/ucm/deploy/.env; set +a
 bash /opt/ucm/deploy/scripts/restore-drill-offsite.sh
 tail -n 80 /var/log/ucm-restore-drill.log
 ```
 
 ### Testar alerta (falha controlada)
 ```bash
-set -a; source /opt/ucm/deploy/env.prod; set +a
+set -a; source /opt/ucm/deploy/.env; set +a
 REMOTE="b2crypt:nao-existe/" bash /opt/ucm/deploy/scripts/restore-drill-offsite.sh || true
 ```
 
-### Variáveis no env.prod (sem expor valores aqui)
+### Variáveis no .env (sem expor valores aqui)
 - `TELEGRAM_BOT_TOKEN=...`
 - `TELEGRAM_CHAT_ID=...`
 

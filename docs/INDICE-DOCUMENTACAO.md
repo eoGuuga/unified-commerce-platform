@@ -57,6 +57,7 @@ Roteiro único e sequencial com gates de **setup → segurança → testes → e
 20. **`docs/07-setup/VALIDACAO-SETUP.md`** - Validação do setup
 21. **`docs/07-setup/INSTRUCOES-MANUAIS.md`** - Instruções manuais
 22. **`docs/07-setup/SOLUCAO-POWERSHELL.md`** - Soluções PowerShell
+23. **`docs/07-setup/SETUP-DEV-PROD-MERCADOPAGO.md`** - Setup Mercado Pago (dev/prod)
 
 ### 🧪 Testes (`docs/08-testes/`)
 

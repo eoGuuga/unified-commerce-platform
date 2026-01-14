@@ -3,7 +3,7 @@
 Objetivo: garantir deploy e rollback sem surpresas para producao e teste.
 Ambientes:
 - Producao: /opt/ucm (https://gtsofthub.com.br)
-- Teste: /opt/ucm-test (https://dev.gtsofthub.com.br)
+- Teste: /opt/ucm-test-repo (https://dev.gtsofthub.com.br)
 
 ---
 
@@ -31,7 +31,7 @@ Ambientes:
 cd /opt/ucm
 git status
 git pull
-docker compose --env-file ./deploy/env.prod -f ./deploy/docker-compose.prod.yml up -d --build
+docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d --build
 curl -s https://gtsofthub.com.br/api/v1/health
 ```
 
@@ -44,10 +44,10 @@ Se o health falhar:
 ## 3) Deploy seguro (teste)
 
 ```
-cd /opt/ucm-test
+cd /opt/ucm-test-repo
 git status
 git pull
-docker compose -p ucmtest --env-file ./deploy/env.test -f ./deploy/docker-compose.test.yml up -d --build
+docker compose --project-name ucmtest --env-file ./deploy/.env -f ./deploy/docker-compose.test.yml up -d --build
 curl -s https://dev.gtsofthub.com.br/api/v1/health
 ```
 
@@ -62,7 +62,7 @@ Uso quando o health falha ou erros criticos surgem.
 cd /opt/ucm
 git log --oneline -n 5
 git reset --hard <commit_anterior>
-docker compose --env-file ./deploy/env.prod -f ./deploy/docker-compose.prod.yml up -d --build
+docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d --build
 curl -s https://gtsofthub.com.br/api/v1/health
 ```
 

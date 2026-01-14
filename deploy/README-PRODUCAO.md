@@ -49,8 +49,8 @@ No servidor:
 
 ```bash
 cd /opt/ucm
-cp deploy/env.prod.example deploy/env.prod
-nano deploy/env.prod
+cp deploy/env.prod.example deploy/.env
+nano deploy/.env
 ```
 
 Troque os valores (senhas e segredos).
@@ -60,14 +60,14 @@ Dica: por enquanto use `FRONTEND_URL=http://SEU_IP_PUBLICO`.
 
 ```bash
 cd /opt/ucm
-docker compose --env-file ./deploy/env.prod -f ./deploy/docker-compose.prod.yml up -d postgres redis
+docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d postgres redis
 
 # aplicar migrations
 bash deploy/scripts/run-migrations.sh
 
 # criar/garantir usuario do app (RLS real)
 set -a
-source deploy/env.prod
+source deploy/.env
 set +a
 bash deploy/scripts/provision-db-user.sh
 ```
@@ -75,7 +75,7 @@ bash deploy/scripts/provision-db-user.sh
 ### 6) Subir o app (backend + frontend + nginx)
 
 ```bash
-docker compose --env-file ./deploy/env.prod -f ./deploy/docker-compose.prod.yml up -d --build
+docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d --build
 ```
 
 Agora abra no navegador:
@@ -119,17 +119,21 @@ bash deploy/scripts/post-deploy-hardening.sh
 ```
 
 O que isso faz:
-- ajusta permissoes do `deploy/env.prod` (root-only)
-- garante UFW com apenas **22/80** (443 fica fechado ate SSL)
+- ajusta permissoes do `deploy/.env` (root-only)
+- garante UFW com **22/80/443** (se SSL ainda nao estiver ativo, mantenha 443 fechado)
 - configura cron de backup com log
 - habilita unattended upgrades (seguranca)
 - habilita fail2ban (SSH)
 
 ---
 
-## SSL / domínio (quando você comprar um domínio)
-Quando tiver domínio apontando pro IP:
-- eu te passo o passo a passo de **Let's Encrypt** e atualizo o `nginx` para 443.
+## SSL / dominio
+Status atual deste projeto:
+- `gtsofthub.com.br` com HTTPS ativo
+- `dev.gtsofthub.com.br` com HTTPS ativo
+
+Se precisar repetir em outro servidor/dominio:
+- seguir `deploy/SCRIPTS-SSL-SETUP.md` para emitir certificados e recarregar o Nginx.
 
 Obs:
 - Swagger fica **desativado em producao por padrao** (variavel `ENABLE_SWAGGER=false`) e, mesmo se ativar, o nginx bloqueia acesso externo a `/api/docs`.
@@ -149,7 +153,7 @@ Obs:
 - `deploy/scripts/restore-drill-offsite.sh` — baixa o último backup e restaura em Postgres temporário (valida contagens)
 - `deploy/scripts/notify-telegram.sh` — alerta gratuito no Telegram (quando configurado)
 
-### Variáveis sugeridas (em `deploy/env.prod`)
+### Variáveis sugeridas (em `deploy/.env`)
 ```bash
 # Offsite (rclone)
 REMOTE=b2crypt:
@@ -166,6 +170,6 @@ TELEGRAM_CHAT_ID=...
 0 3 * * * cd /opt/ucm && bash deploy/scripts/backup-postgres.sh >> /opt/ucm/backups/backup.log 2>&1 && bash deploy/scripts/backup-offsite.sh >> /var/log/ucm-backup-offsite.log 2>&1
 
 # Restore drill mensal (alerta Telegram se falhar)
-30 4 1 * * set -a; source /opt/ucm/deploy/env.prod; set +a; bash /opt/ucm/deploy/scripts/restore-drill-offsite.sh >> /var/log/ucm-restore-drill.log 2>&1
+30 4 1 * * set -a; source /opt/ucm/deploy/.env; set +a; bash /opt/ucm/deploy/scripts/restore-drill-offsite.sh >> /var/log/ucm-restore-drill.log 2>&1
 ```
 

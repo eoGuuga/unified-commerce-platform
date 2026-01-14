@@ -30,7 +30,7 @@ Se optar por senha, manter fail2ban ativo e limites no `sshd_config`.
 ### Regras de escopo (obrigatórias)
 - **Pode mexer:** somente `frontend/**` (UI/UX).
 - **Não pode mexer:** `backend/**`, `deploy/**`, `scripts/**`, `scripts/migrations/**`.
-- **Sem acesso à produção:** sem SSH/VPS, sem `env.prod`, sem tokens (B2/Telegram/UptimeRobot).
+- **Sem acesso à produção:** sem SSH/VPS, sem `.env`, sem tokens (B2/Telegram/UptimeRobot).
 
 Documento oficial de regras:
 - `frontend/CONTRIBUICAO-FRONTEND-INICIANTE.md`
@@ -73,7 +73,7 @@ Rodar:
 
 ## 4) Produção (como operar sem quebrar)
 ### 4.1 O que NÃO fazer
-- Não editar `deploy/env.prod` sem registrar a mudança.
+- Não editar `deploy/.env` sem registrar a mudança.
 - Não desativar RLS nem trocar `DB_APP_USER` para superuser.
 - Não abrir portas no firewall sem necessidade.
 - Não expor Swagger externamente.
@@ -85,7 +85,7 @@ Rodar:
 
 ### 4.3 Onde ficam as coisas (no VPS)
 - Código: `/opt/ucm`
-- Env de produção: `/opt/ucm/deploy/env.prod`
+- Env de produção: `/opt/ucm/deploy/.env`
 - Backups locais: `/opt/ucm/backups`
 - Logs:
   - backup local: `/opt/ucm/backups/backup.log`

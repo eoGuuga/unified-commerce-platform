@@ -1,6 +1,6 @@
 # ✅ Resumo Final - Sincronização Servidor → Repositório
 
-> **Data:** 09/01/2026  
+> **Data:** 14/01/2026  
 > **Status:** ✅ **SINCRONIZAÇÃO COMPLETA**
 
 ---
@@ -11,6 +11,7 @@
 - ✅ **100% idêntico ao servidor**
 - ✅ Estrutura organizada com comentários (A), (A2), (B), (C), (D)
 - ✅ Todas as melhorias do servidor incluídas
+- ✅ Bloco dev (E) com upstreams `ucm-frontend-test` e `ucm-backend-test`
 
 ### 2. `deploy/docker-compose.prod.yml`
 - ✅ Porta 443 mapeada
@@ -62,6 +63,10 @@
 - Headers de segurança completos
 - `Permissions-Policy` header
 
+### Bloco (E) - HTTPS 443 (domínio dev)
+- `dev.gtsofthub.com.br` roteado para `ucm-frontend-test` / `ucm-backend-test`
+- `ucm-nginx` conectado à rede `ucm-test-net`
+
 ---
 
 ## ✅ STATUS FINAL
@@ -83,7 +88,7 @@ Se quiser verificar outros arquivos:
    ls -la /opt/ucm/deploy/scripts/
    ```
 
-2. **Env.prod (exemplo):**
+2. **.env (exemplo):**
    - Já está atualizado com `FRONTEND_URL=https://gtsofthub.com.br`
 
 3. **Outros arquivos:**
@@ -91,5 +96,5 @@ Se quiser verificar outros arquivos:
 
 ---
 
-**Última atualização:** 09/01/2026  
+**Última atualização:** 14/01/2026  
 **Status:** ✅ **SINCRONIZAÇÃO 100% COMPLETA**

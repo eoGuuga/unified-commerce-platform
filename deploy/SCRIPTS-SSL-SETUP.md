@@ -1,7 +1,8 @@
 # 🔒 Scripts e Guia para Configurar SSL/HTTPS
 
 > **Objetivo:** Configurar HTTPS completo para `gtsofthub.com.br`  
-> **Pré-requisito:** DNS apontando para o VPS
+> **Pré-requisito:** DNS apontando para o VPS  
+> **Status atual:** prod e dev ja estao com HTTPS ativo neste servidor.
 
 ---
 
@@ -50,6 +51,7 @@ docker stop ucm-nginx
 certbot certonly --standalone \
   -d gtsofthub.com.br \
   -d www.gtsofthub.com.br \
+  -d dev.gtsofthub.com.br \
   --email seu-email@exemplo.com \
   --agree-tos \
   --non-interactive
@@ -69,6 +71,7 @@ certbot certonly --webroot \
   -w /var/www/certbot \
   -d gtsofthub.com.br \
   -d www.gtsofthub.com.br \
+  -d dev.gtsofthub.com.br \
   --email seu-email@exemplo.com \
   --agree-tos \
   --non-interactive
@@ -80,6 +83,7 @@ certbot certonly --webroot \
 
 ```bash
 ls -la /etc/letsencrypt/live/gtsofthub.com.br/
+ls -la /etc/letsencrypt/live/dev.gtsofthub.com.br/
 ```
 
 Deve mostrar:
@@ -111,7 +115,7 @@ O arquivo `deploy/nginx/ucm.conf` já está atualizado com:
 
 ```bash
 cd /opt/ucm
-docker compose --env-file ./deploy/env.prod -f ./deploy/docker-compose.prod.yml up -d --force-recreate nginx
+docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d --force-recreate nginx
 ```
 
 ---
@@ -151,7 +155,7 @@ crontab -l
 
 ```bash
 cd /opt/ucm
-nano deploy/env.prod
+nano deploy/.env
 ```
 
 Alterar:
@@ -161,7 +165,7 @@ FRONTEND_URL=https://gtsofthub.com.br
 
 Recriar containers que usam essa variável:
 ```bash
-docker compose --env-file ./deploy/env.prod -f ./deploy/docker-compose.prod.yml up -d --force-recreate backend frontend
+docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d --force-recreate backend frontend
 ```
 
 ---
@@ -211,7 +215,7 @@ certbot renew --dry-run -v
 ### Erro: "SSL certificate not found"
 **Solução:** Verificar se certificados estão montados:
 ```bash
-docker exec ucm-nginx ls -la /etc/nginx/ssl/
+docker exec ucm-nginx ls -la /etc/letsencrypt/live/gtsofthub.com.br/
 ```
 
 ---

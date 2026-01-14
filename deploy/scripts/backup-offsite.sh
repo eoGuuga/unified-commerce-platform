@@ -4,13 +4,13 @@ set -euo pipefail
 # Backup offsite (B2 via rclone).
 # Recomendado usar um remote criptografado (ex.: b2crypt:) para armazenar backups cifrados no bucket.
 #
-# Variáveis (ex.: deploy/env.prod):
+# Variáveis (ex.: deploy/.env):
 #   BACKUP_DIR=/opt/ucm/backups
 #   REMOTE=b2crypt:
 #   OFFSITE_KEEP_DAYS=30
 #
 # Uso:
-#   set -a; source /opt/ucm/deploy/env.prod; set +a
+#   set -a; source /opt/ucm/deploy/.env; set +a
 #   bash deploy/scripts/backup-offsite.sh
 
 BACKUP_DIR="${BACKUP_DIR:-/opt/ucm/backups}"

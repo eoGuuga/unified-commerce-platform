@@ -4,13 +4,13 @@ set -euo pipefail
 # Restore drill offsite (mensal): valida que o backup no B2 é restaurável.
 # Em caso de falha, envia alerta no Telegram (se configurado).
 #
-# Variáveis (ex.: deploy/env.prod):
+# Variáveis (ex.: deploy/.env):
 #   REMOTE=b2crypt:
 #   TELEGRAM_BOT_TOKEN=...
 #   TELEGRAM_CHAT_ID=...
 #
 # Uso:
-#   set -a; source /opt/ucm/deploy/env.prod; set +a
+#   set -a; source /opt/ucm/deploy/.env; set +a
 #   bash deploy/scripts/restore-drill-offsite.sh
 
 REMOTE="${REMOTE:-b2crypt:}"

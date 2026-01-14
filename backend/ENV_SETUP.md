@@ -31,9 +31,12 @@ CSRF_SESSION_HEADER_NAME=x-csrf-session-token
 # Pagamentos (Mercado Pago)
 PAYMENT_PROVIDER=mercadopago
 MERCADOPAGO_ACCESS_TOKEN=
+MERCADOPAGO_PUBLIC_KEY=
 MERCADOPAGO_WEBHOOK_URL=https://your-domain.com/api/v1/payments/webhook/mercadopago?token=change-me
 MERCADOPAGO_WEBHOOK_TOKEN=change-me
 MERCADOPAGO_WEBHOOK_SECRET=
+# Apenas DEV: liberar webhook sem assinatura (o painel de teste pode omitir assinatura)
+MERCADOPAGO_WEBHOOK_ALLOW_UNSIGNED=false
 
 # Pix (mock fallback)
 PIX_KEY=
@@ -77,8 +80,10 @@ CORS_ORIGINS=
 ### Mercado Pago
 1. Acesse https://www.mercadopago.com.br/developers/panel/credentials
 2. Use chaves `TEST-` em dev e chaves sem `TEST-` em prod.
-3. Configure o webhook apontando para `/api/v1/payments/webhook/mercadopago` e mantenha `MERCADOPAGO_WEBHOOK_TOKEN` igual ao query param.
-4. (Opcional) Se sua conta fornecer assinatura, defina `MERCADOPAGO_WEBHOOK_SECRET` para validar `x-signature`.
+3. Copie tambem a `MERCADOPAGO_PUBLIC_KEY` (usada no frontend).
+4. Configure o webhook apontando para `/api/v1/payments/webhook/mercadopago` e mantenha `MERCADOPAGO_WEBHOOK_TOKEN` igual ao query param.
+5. (Opcional) Se sua conta fornecer assinatura, defina `MERCADOPAGO_WEBHOOK_SECRET` para validar `x-signature`.
+6. Dev somente: `MERCADOPAGO_WEBHOOK_ALLOW_UNSIGNED=true` se o painel de teste nao enviar assinatura.
 
 ### Twilio
 1. Acesse https://www.twilio.com/console

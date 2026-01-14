@@ -17,9 +17,9 @@ if [[ "${EUID}" -ne 0 ]]; then
 fi
 
 echo "== Permissoes de segredos =="
-if [[ -f "./deploy/env.prod" ]]; then
-  chmod 600 "./deploy/env.prod" || true
-  chown root:root "./deploy/env.prod" || true
+if [[ -f "./deploy/.env" ]]; then
+  chmod 600 "./deploy/.env" || true
+  chown root:root "./deploy/.env" || true
 fi
 
 echo "== UFW (22/80 apenas; 443 fica fechado ate SSL) =="

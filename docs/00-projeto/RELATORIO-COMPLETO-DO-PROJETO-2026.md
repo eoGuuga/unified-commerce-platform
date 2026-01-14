@@ -16,16 +16,23 @@
 - **Hostname (VPS)**: `vps-0e3446f6.vps.ovh.net` *(referência operacional)*
 - **Path do projeto no servidor**: `/opt/ucm`
 - **Serviços (Docker)**:
-  - `ucm-nginx` (publica 80)
+  - `ucm-nginx` (publica 80/443)
   - `ucm-frontend` (interno 3000)
   - `ucm-backend` (interno 3001)
   - `ucm-postgres` (interno 5432)
   - `ucm-redis` (interno 6379)
-- **UFW (produção)**: liberado 22/80; **443 fechado** até ativar HTTPS.
+- **UFW (produção)**: liberado 22/80/443.
+
+### Dev/Teste (VPS)
+- **Domínio dev**: `https://dev.gtsofthub.com.br`
+- **Path do projeto (teste)**: `/opt/ucm-test-repo`
+- **Compose**: `deploy/docker-compose.test.yml` (project `ucmtest`)
+- **Containers**: `ucm-frontend-test`, `ucm-backend-test`, `ucm-postgres-test`, `ucm-redis-test`
+- **Rede**: `ucm-nginx` conectado em `ucm-test-net` para rotear o dev.
 
 ### Domínio
 - **Domínio escolhido**: `gtsofthub.com.br`
-- **Status DNS**: no Registro.br pode ficar “em transição” nas primeiras horas (normal).
+- **Status DNS**: ativo (propagado).
 
 ---
 
@@ -54,7 +61,7 @@
 
 ### Fase “perfeição” (produção + hardening + RLS efetivo)
 - Compra/configuração do VPS e deploy em `/opt/ucm`.
-- Correção de problemas de **CRLF → LF** em scripts e `deploy/env.prod` (para permitir `bash`/`source` corretamente).
+- Correção de problemas de **CRLF → LF** em scripts e `deploy/.env` (para permitir `bash`/`source` corretamente).
 - Ajustes para build/deploy:
   - correção TypeScript em `DbContextService.getRepository<T extends ObjectLiteral>()`
   - correção de migration (índice com `NOW()` → removido do predicate)
@@ -62,14 +69,14 @@
 - Subida do compose de produção + migrations + criação do user `ucm_app` (sem superuser).
 - Implementação/ativação do RLS por request com `TenantDbContextInterceptor` e `AsyncLocalStorage`.
 - Hardening do servidor:
-  - UFW restritivo (22/80)
+  - UFW restritivo (22/80/443)
   - unattended-upgrades
   - fail2ban (sshd)
   - rotinas de backup + logs
 - Observabilidade/auto-recuperação (no VPS):
   - Netdata bound em localhost + SSH tunnel
   - watchdog (systemd timer) + logrotate
-- Domínio definido (`gtsofthub.com.br`) e iniciado o processo de DNS/HTTPS (pendente finalizar).
+- Domínio definido (`gtsofthub.com.br`) com DNS/HTTPS concluídos (443 ativo).
 
 ---
 
@@ -151,17 +158,17 @@ Foram implementados mecanismos para garantir que **todas as queries do app** exe
 
 ### 3.4 Segurança em produção (aplicação + Nginx)
 - **Swagger em produção**: desativado por padrão via env e também protegido no Nginx.
-  - `ENABLE_SWAGGER=false` no `deploy/env.prod`
+  - `ENABLE_SWAGGER=false` no `deploy/.env`
   - Nginx bloqueia `/api/docs` e `/api/docs-json` externamente (só local/Docker).
   - `backend/src/main.ts` (toggle via `ENABLE_SWAGGER`)
   - `deploy/nginx/ucm.conf` (restrição de acesso)
 
 ### 3.5 Hardening do servidor (VPS)
 Automatizações e configuração “mínimo seguro”:
-- UFW liberando apenas **22 e 80** (443 fica fechado até SSL)
+- UFW liberando **22/80/443** (HTTPS ativo)
 - `unattended-upgrades` habilitado
 - `fail2ban` (jail sshd)
-- permissões de `deploy/env.prod` como root-only
+- permissões de `deploy/.env` como root-only
 - cron de backup diário com log
 
 Script:
@@ -278,7 +285,7 @@ Leia e siga:
 
 ### 7.2 Ordem recomendada (produção)
 1. Preparar VPS (Docker + UFW): `deploy/scripts/prod-setup-ubuntu.sh`
-2. Criar `deploy/env.prod` a partir do exemplo
+2. Criar `deploy/.env` a partir do exemplo
 3. Subir `postgres` + `redis`
 4. Rodar migrations: `deploy/scripts/run-migrations.sh`
 5. Criar usuário do app (RLS real): `deploy/scripts/provision-db-user.sh`
@@ -334,31 +341,22 @@ Script “faz-tudo” (dev):
 ---
 
 ## 10) Domínio e HTTPS (gtsofthub.com.br)
-### 10.1 Situação
-- Domínio escolhido: **`gtsofthub.com.br`**
-- DNS no Registro.br pode ficar em “transição” (normal nas primeiras horas).
+### 10.1 Situação atual (2026-01-14)
+- DNS ativo (A `@` e A `www` apontando para `37.59.118.210`).
+- HTTPS ativo (443 liberado no UFW + certificados Let's Encrypt).
+- Nginx com redirect HTTP → HTTPS e www → sem www.
+- `FRONTEND_URL` ajustado para `https://gtsofthub.com.br`.
 
-### 10.2 O que falta (DNS)
-Quando a zona DNS liberar, criar:
-- **A** `@` → IP do VPS
-- **A** `www` → IP do VPS
-
-Depois validar propagação (do seu PC):
+### 10.2 Verificação rápida
 - `nslookup gtsofthub.com.br`
 - `nslookup www.gtsofthub.com.br`
-
-### 10.3 O que falta (HTTPS)
-Somente após DNS apontar:
-- liberar 443 no UFW
-- emitir certificado (Let’s Encrypt)
-- ajustar Nginx para 443 e redirect 80→443
-- atualizar `FRONTEND_URL` para `https://gtsofthub.com.br`
+- `curl -I https://gtsofthub.com.br/`
+- `curl -I https://www.gtsofthub.com.br/` (301 para sem www)
 
 ---
 
 ## 11) O que falta fazer (backlog priorizado)
 ### 11.1 Crítico (para produção “comercial”)
-- **DNS + HTTPS** para `gtsofthub.com.br` (fechar o ciclo com 443).
 - **Onboarding de segundo dev** com acesso seguro ao VPS (ideal: chaves SSH; se insistir em senha, reforçar políticas e 2FA onde possível).
 - **Runbook formal de incidentes** (SLA, checklist de quedas, rollback, restore).
 

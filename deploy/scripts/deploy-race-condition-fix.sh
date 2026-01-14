@@ -64,13 +64,13 @@ echo ""
 # Passo 4: Rebuild backend
 echo "🔨 Passo 4: Rebuild do backend..."
 cd /opt/ucm
-docker compose --env-file ./deploy/env.prod -f ./deploy/docker-compose.prod.yml build backend
+docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml build backend
 check_success "Backend rebuild concluído"
 echo ""
 
 # Passo 5: Deploy
 echo "🚀 Passo 5: Deploy do backend..."
-docker compose --env-file ./deploy/env.prod -f ./deploy/docker-compose.prod.yml up -d backend
+docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d backend
 check_success "Backend deployado"
 echo ""
 
