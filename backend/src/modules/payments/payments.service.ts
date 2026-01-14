@@ -22,7 +22,7 @@ import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as QRCode from 'qrcode';
 import { DbContextService } from '../common/services/db-context.service';
-import { MercadoPagoProvider } from './providers/mercadopago.provider';
+import { MercadoPagoProvider, MercadoPagoPaymentDetails } from './providers/mercadopago.provider';
 
 export interface CreatePaymentDto {
   pedido_id: string;
