@@ -74,6 +74,7 @@ CORS_ORIGINS=
 - Para Ollama, defina `OPENAI_ALLOW_NO_KEY=true` e `OPENAI_BASE_URL=http://localhost:11434/v1`.
 - Para WhatsApp real, escolha `WHATSAPP_PROVIDER=twilio` ou `WHATSAPP_PROVIDER=evolution`.
 - Para CSRF com cookies, habilite `CSRF_ENABLED=true` e envie `x-csrf-token`.
+- Separe chaves entre dev e prod. Veja `docs/07-setup/SEPARAR-CHAVES-DEV-PROD.md`.
 
 ## Como obter credenciais
 

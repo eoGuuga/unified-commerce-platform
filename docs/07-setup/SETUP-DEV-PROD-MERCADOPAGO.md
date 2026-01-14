@@ -13,6 +13,10 @@ payments/webhooks deployment on the server.
 - Dev domain: `https://dev.gtsofthub.com.br`
 - Prod domain: `https://gtsofthub.com.br`
 
+Security note:
+- Nunca reutilize credenciais entre dev e prod.
+- Veja `docs/07-setup/SEPARAR-CHAVES-DEV-PROD.md`.
+
 ## Required env vars (both dev and prod)
 
 - `PAYMENT_PROVIDER=mercadopago`

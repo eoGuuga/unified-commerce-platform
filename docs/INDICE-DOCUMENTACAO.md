@@ -58,6 +58,8 @@ Roteiro único e sequencial com gates de **setup → segurança → testes → e
 21. **`docs/07-setup/INSTRUCOES-MANUAIS.md`** - Instruções manuais
 22. **`docs/07-setup/SOLUCAO-POWERSHELL.md`** - Soluções PowerShell
 23. **`docs/07-setup/SETUP-DEV-PROD-MERCADOPAGO.md`** - Setup Mercado Pago (dev/prod)
+24. **`docs/07-setup/SEPARAR-CHAVES-DEV-PROD.md`** - Separar chaves dev vs prod
+25. **`docs/07-setup/PEGAR-CREDENCIAIS-OFICIAIS.md`** - Como pegar todas as credenciais
 
 ### 🧪 Testes (`docs/08-testes/`)
 
