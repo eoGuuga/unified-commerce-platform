@@ -33,6 +33,7 @@ Roteiro único e sequencial com gates de **setup → segurança → testes → e
 7. **`docs/04-status/ESTADO-TESTES-E-DOCUMENTACAO.md`** - Estado dos testes
 8. **`docs/04-status/RESPOSTA-HONESTA-ESTADO-ATUAL.md`** - Resposta sobre estado
 9. **`docs/04-status/CHECKLIST-FINAL-PERFEITO.md`** - Checklist final
+10. **`docs/04-status/ATUALIZACAO-2026-01-14.md`** - Atualizacao dev/prod (Mercado Pago)
 
 ### ✅ Correções (`docs/05-correcoes/`)
 
