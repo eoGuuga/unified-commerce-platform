@@ -698,7 +698,16 @@ export class PaymentsService {
       throw new UnauthorizedException('Assinatura de webhook invalida');
     }
 
-    const details = await this.mercadoPagoProvider.getPaymentDetails(String(dataId));
+    let details: MercadoPagoPaymentDetails;
+    try {
+      details = await this.mercadoPagoProvider.getPaymentDetails(String(dataId));
+    } catch (error) {
+      this.logger.warn('Erro ao consultar pagamento Mercado Pago para webhook', {
+        paymentId: dataId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { status: 'ignored' };
+    }
     const tenantId = this.extractTenantId(details.metadata);
 
     if (!tenantId) {
