@@ -694,8 +694,19 @@ export class PaymentsService {
 
     const signature = (opts.signature || '').trim();
     const requestId = (opts.requestId || '').trim();
-    if (!this.mercadoPagoProvider.validateWebhookSignature(String(dataId), requestId, signature)) {
-      throw new UnauthorizedException('Assinatura de webhook invalida');
+    const secret = (this.configService.get<string>('MERCADOPAGO_WEBHOOK_SECRET') || '').trim();
+    const isProd = (this.configService.get<string>('NODE_ENV') || '').toLowerCase() === 'production';
+    const isLiveMode = Boolean(payload?.live_mode);
+
+    if (secret) {
+      if (!signature || !requestId) {
+        if (isProd || isLiveMode) {
+          throw new UnauthorizedException('Assinatura de webhook invalida');
+        }
+        this.logger.warn('Webhook Mercado Pago sem assinatura (modo teste) - validacao ignorada');
+      } else if (!this.mercadoPagoProvider.validateWebhookSignature(String(dataId), requestId, signature)) {
+        throw new UnauthorizedException('Assinatura de webhook invalida');
+      }
     }
 
     let details: MercadoPagoPaymentDetails;
