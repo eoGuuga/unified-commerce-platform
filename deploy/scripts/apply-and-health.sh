@@ -21,5 +21,13 @@ chmod +x /opt/ucm/deploy/scripts/fix-prod-dev-health.sh
 RESET_REDIS=0 /opt/ucm/deploy/scripts/fix-prod-dev-health.sh
 
 echo "==> Health (prod/dev)"
-curl -i https://gtsofthub.com.br/api/v1/health || true
-curl -i https://dev.gtsofthub.com.br/api/v1/health || true
+for target in "https://gtsofthub.com.br/api/v1/health" "https://dev.gtsofthub.com.br/api/v1/health"; do
+  echo "--> $target"
+  for i in {1..6}; do
+    if curl -fsS "$target" >/dev/null; then
+      break
+    fi
+    sleep 5
+  done
+  curl -i "$target" || true
+done
