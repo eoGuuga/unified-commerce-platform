@@ -119,6 +119,14 @@ sudo -i
 /opt/ucm/deploy/scripts/apply-and-health.sh
 ```
 
+### Cron diario (apply + health)
+```bash
+sudo -i
+chmod +x /opt/ucm/deploy/scripts/setup-apply-health-cron.sh
+/opt/ucm/deploy/scripts/setup-apply-health-cron.sh
+tail -n 200 /var/log/ucm-apply-health.log
+```
+
 ---
 
 ## Firewall (UFW)
