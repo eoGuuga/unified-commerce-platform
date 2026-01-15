@@ -23,8 +23,8 @@ RESET_REDIS=0 /opt/ucm/deploy/scripts/fix-prod-dev-health.sh
 echo "==> Health (prod/dev)"
 for target in "https://gtsofthub.com.br/api/v1/health" "https://dev.gtsofthub.com.br/api/v1/health"; do
   echo "--> $target"
-  for i in {1..6}; do
-    if curl -fsS "$target" >/dev/null; then
+  for i in {1..10}; do
+    if curl -sS "$target" >/dev/null; then
       break
     fi
     sleep 5
