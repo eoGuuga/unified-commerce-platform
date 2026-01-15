@@ -24,4 +24,10 @@ fi
 
 docker exec ucm-nginx nginx -t
 docker exec ucm-nginx nginx -s reload
+
+# Ensure nginx can resolve dev/test upstreams when dev is active.
+if docker network inspect ucmtest_ucm-test-net >/dev/null 2>&1; then
+  docker network connect ucmtest_ucm-test-net ucm-nginx 2>/dev/null || true
+fi
+
 echo "Nginx config applied."
