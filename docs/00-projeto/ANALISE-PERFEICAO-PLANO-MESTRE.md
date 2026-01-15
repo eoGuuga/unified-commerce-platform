@@ -52,7 +52,7 @@ Testes declarados sem relatórios
 - Ha documentos de testes, mas nao encontrei saidas reais (JUnit/coverage) anexadas.
 
 Duplicacao de fontes
-- Existe pasta `deploy/` e outra `unified-commerce-platform/infrastructure/deploy`. Precisamos definir uma fonte canonica.
+- Fonte canonica definida: `deploy/` (duplicacao antiga removida).
 
 ---
 
