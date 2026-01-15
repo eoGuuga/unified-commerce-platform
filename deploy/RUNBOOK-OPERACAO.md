@@ -113,6 +113,12 @@ sudo -i
 /opt/ucm/deploy/scripts/fix-prod-dev-health.sh
 ```
 
+### Script unico (pull + nginx + health)
+```bash
+sudo -i
+/opt/ucm/deploy/scripts/apply-and-health.sh
+```
+
 ---
 
 ## Firewall (UFW)
