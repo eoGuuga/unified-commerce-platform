@@ -25,9 +25,7 @@ update_env_urls() {
   if [ -n "${DB_APP_USER:-}" ] && [ -n "${DB_APP_PASSWORD:-}" ]; then
     sed -i '/^DATABASE_URL=/d' "$env_file"
     echo "DATABASE_URL=postgresql://${DB_APP_USER}:${DB_APP_PASSWORD}@postgres:5432/ucm" >> "$env_file"
-  fi
-
-  if [ -n "${POSTGRES_PASSWORD:-}" ]; then
+  elif [ -n "${POSTGRES_PASSWORD:-}" ]; then
     sed -i '/^DATABASE_URL=/d' "$env_file"
     echo "DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/ucm" >> "$env_file"
   fi

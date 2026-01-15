@@ -18,7 +18,9 @@ if [ -f "$dst" ]; then
   cp "$dst" "${dst}.bak.$(date +%Y%m%d-%H%M%S)"
 fi
 
-cp "$src" "$dst"
+if [ "$(readlink -f "$src")" != "$(readlink -f "$dst")" ]; then
+  cp "$src" "$dst"
+fi
 
 docker exec ucm-nginx nginx -t
 docker exec ucm-nginx nginx -s reload
