@@ -42,3 +42,8 @@ temp/
 # Backups/VPS
 *.tar.gz
 ucm.tar.gz
+# Local backups and runtime files (server only)
+backups/
+deploy/env.prod
+**/*.bak
+**/*.bak.*
