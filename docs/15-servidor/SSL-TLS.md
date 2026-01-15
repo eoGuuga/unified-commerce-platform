@@ -15,3 +15,21 @@ ls -la /etc/letsencrypt/live
 curl -s https://gtsofthub.com.br/api/v1/health
 curl -s https://dev.gtsofthub.com.br/api/v1/health
 ```
+
+Se o curl falhar com erro de "subject name", reemitir o certificado com SAN correto:
+```
+sudo certbot certificates
+sudo certbot certonly --nginx \
+  -d gtsofthub.com.br \
+  -d www.gtsofthub.com.br
+sudo certbot certonly --nginx \
+  -d dev.gtsofthub.com.br
+
+sudo systemctl reload nginx || docker restart ucm-nginx
+```
+
+Validacao (sem ignorar SSL):
+```
+curl -i https://gtsofthub.com.br/api/v1/health
+curl -i https://dev.gtsofthub.com.br/api/v1/health
+```
