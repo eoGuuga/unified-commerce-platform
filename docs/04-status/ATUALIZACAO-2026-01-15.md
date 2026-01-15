@@ -16,7 +16,8 @@ Checklist de alinhamento (executado no VPS):
 - [x] redis prod com senha correta e volume resetado
 - [x] postgres prod com senhas alinhadas (postgres + ucm_app)
 - [x] backend prod usando DATABASE_URL completo
-- [ ] SSL com SAN correto (gtsofthub.com.br + www) validado sem -k
+- [x] SSL com SAN correto (gtsofthub.com.br + www) validado sem -k
+- [x] bloco de prod no nginx (gtsofthub.com.br + www)
 
 Comandos de referencia (sem segredos):
 ```
@@ -37,4 +38,4 @@ docker exec -u postgres ucm-postgres psql -d ucm -c "ALTER USER ucm_app WITH PAS
 ```
 
 Pendencia critica:
-- Reemitir certificado SSL com SAN correto para gtsofthub.com.br + www
+- Nenhuma pendencia critica no momento

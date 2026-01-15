@@ -19,10 +19,14 @@ curl -s https://dev.gtsofthub.com.br/api/v1/health
 Se o curl falhar com erro de "subject name", reemitir o certificado com SAN correto:
 ```
 sudo certbot certificates
-sudo certbot certonly --nginx \
+sudo apt-get install -y certbot
+sudo mkdir -p /var/www/certbot
+sudo certbot certonly --webroot \
+  -w /var/www/certbot \
   -d gtsofthub.com.br \
   -d www.gtsofthub.com.br
-sudo certbot certonly --nginx \
+sudo certbot certonly --webroot \
+  -w /var/www/certbot \
   -d dev.gtsofthub.com.br
 
 sudo systemctl reload nginx || docker restart ucm-nginx

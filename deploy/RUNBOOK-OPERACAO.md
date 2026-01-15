@@ -101,6 +101,12 @@ docker exec ucm-nginx nginx -t
 docker exec ucm-nginx nginx -s reload
 ```
 
+### Script rapido (prod + dev health)
+```bash
+sudo -i
+/opt/ucm/deploy/scripts/fix-prod-dev-health.sh
+```
+
 ---
 
 ## Firewall (UFW)
