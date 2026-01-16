@@ -37,6 +37,14 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --ink-900: #0b1119;
+  --ink-850: #0e1622;
+  --ink-800: #111d2a;
+  --ice-100: #eef3f7;
+  --accent-coral: #ff7a3d;
+  --accent-teal: #25b7a7;
+  --accent-gold: #f2c14e;
+  --line: rgba(255, 255, 255, 0.08);
 }
 
 .dark {
@@ -134,7 +142,72 @@ html {
 }
 
 body {
-  background: linear-gradient(to bottom right, #0f172a, #1e293b);
-  color: #f1f5f9;
-  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--ink-900);
+  color: var(--ice-100);
+  font-family: var(--font-body), "Sora", sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-display), "Bebas Neue", sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.hero-bg {
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(22, 78, 99, 0.45), transparent 60%),
+    radial-gradient(900px 500px at 90% 0%, rgba(20, 184, 166, 0.3), transparent 55%),
+    linear-gradient(135deg, var(--ink-900) 0%, var(--ink-850) 45%, var(--ink-800) 100%);
+}
+
+.glass-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--line);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+}
+
+.accent-line {
+  background: linear-gradient(90deg, var(--accent-coral), var(--accent-gold));
+}
+
+.glow-coral {
+  background: radial-gradient(circle, rgba(255, 122, 61, 0.35) 0%, transparent 65%);
+}
+
+.glow-teal {
+  background: radial-gradient(circle, rgba(37, 183, 167, 0.35) 0%, transparent 65%);
+}
+
+.animate-fade-up {
+  animation: fade-up 0.7s ease-out both;
+}
+
+.animate-fade-up-delay {
+  animation: fade-up 0.9s ease-out both;
+  animation-delay: 0.15s;
+}
+
+.float-slow {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }

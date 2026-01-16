@@ -1,6 +1,20 @@
 import type React from "react"
 import type { Metadata } from "next"
+import { Sora, Bebas_Neue } from "next/font/google"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
+
+const sora = Sora({
+  subsets: ["latin"],
+  variable: "--font-body",
+  display: "swap",
+})
+
+const bebasNeue = Bebas_Neue({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-display",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
   title: "Unified Commerce Platform",
@@ -18,7 +32,7 @@ export default function RootLayout({
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body>
+      <body className={`${sora.variable} ${bebasNeue.variable} font-body`}>
         <ErrorBoundary>
           {children}
         </ErrorBoundary>
