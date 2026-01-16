@@ -123,7 +123,7 @@ sudo -i
 ```bash
 sudo -i
 chmod +x /opt/ucm/deploy/scripts/setup-apply-health-cron.sh
-/opt/ucm/deploy/scripts/setup-apply-health-cron.sh
+CRON_TIME="0 19 * * *" /opt/ucm/deploy/scripts/setup-apply-health-cron.sh
 tail -n 200 /var/log/ucm-apply-health.log
 ```
 

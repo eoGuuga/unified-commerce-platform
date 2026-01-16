@@ -3,7 +3,7 @@
 Objetivo: garantir deploy e rollback sem surpresas para producao e teste.
 Ambientes:
 - Producao: /opt/ucm (https://gtsofthub.com.br)
-- Teste: /opt/ucm-test-repo (https://dev.gtsofthub.com.br)
+- Dev/Teste: /opt/ucm-test-repo (https://dev.gtsofthub.com.br)
 
 ---
 
@@ -21,33 +21,40 @@ Ambientes:
   - `docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"`
 - Confirmar health atual (baseline):
   - Producao: `curl -s https://gtsofthub.com.br/api/v1/health`
-  - Teste: `curl -s https://dev.gtsofthub.com.br/api/v1/health`
+  - Dev: `curl -s https://dev.gtsofthub.com.br/api/v1/health`
+- Confirmar cron diario:
+  - `crontab -l | grep apply-and-health.sh`
 
 ---
 
-## 2) Deploy seguro (producao)
+## 2) Deploy seguro (prod + dev)
 
 ```
-cd /opt/ucm
-git status
-git pull
-docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d --build
-curl -s https://gtsofthub.com.br/api/v1/health
+sudo -i
+/opt/ucm/deploy/scripts/apply-and-health.sh
 ```
 
 Se o health falhar:
-- verificar logs: `docker logs --tail 200 ucm-backend`
+- verificar logs: `docker logs --tail 200 ucm-backend` e `docker logs --tail 200 ucm-backend-test`
 - rollback imediato (ver secao 4).
 
 ---
 
-## 3) Deploy seguro (teste)
+## 3) Deploy manual (somente se necessario)
 
 ```
-cd /opt/ucm-test-repo
-git status
-git pull
-docker compose --project-name ucmtest --env-file ./deploy/.env -f ./deploy/docker-compose.test.yml up -d --build
+# Producao
+cd /opt/ucm
+git status -sb
+git pull --ff-only
+docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d --build
+curl -s https://gtsofthub.com.br/api/v1/health
+
+# Dev/Teste
+cd /opt/ucm-test-repo/deploy
+git status -sb
+git pull --ff-only
+docker compose --env-file ./.env -f ./docker-compose.test.yml --project-name ucmtest up -d --build
 curl -s https://dev.gtsofthub.com.br/api/v1/health
 ```
 
@@ -61,9 +68,15 @@ Uso quando o health falha ou erros criticos surgem.
 ```
 cd /opt/ucm
 git log --oneline -n 5
-git reset --hard <commit_anterior>
+git checkout <commit_anterior>
 docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d --build
 curl -s https://gtsofthub.com.br/api/v1/health
+```
+
+Para retornar ao main:
+```
+git checkout main
+git pull --ff-only
 ```
 
 2) Alternativa: restaurar do backup (se necessario):
@@ -87,6 +100,7 @@ Use o script oficial de restore (ver deploy/scripts/restore-drill-offsite.sh).
 - Certificados validos no host:
   - `/etc/letsencrypt/live/gtsofthub.com.br/`
   - `/etc/letsencrypt/live/dev.gtsofthub.com.br/`
+- Registrar status final (data/hora, prod+dev OK).
 
 ---
 
@@ -95,3 +109,13 @@ Use o script oficial de restore (ver deploy/scripts/restore-drill-offsite.sh).
 - Nunca fazer deploy com git sujo.
 - Sempre gerar backup antes de um deploy grande.
 - Sempre validar health e logs no final.
+- 502 durante reload e recreates pode ocorrer temporariamente; o health final deve ser OK.
+
+---
+
+## 7) Operacao diaria (cron)
+
+- Agendado para 19:00:
+  - `0 19 * * * /opt/ucm/deploy/scripts/apply-and-health.sh >> /var/log/ucm-apply-health.log 2>&1`
+- Log:
+  - `tail -n 200 /var/log/ucm-apply-health.log`
