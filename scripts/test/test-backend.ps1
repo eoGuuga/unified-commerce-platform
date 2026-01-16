@@ -98,6 +98,16 @@ try {
     }
 }
 
+# Test 2.1: Verificar token (me)
+Write-Host "[2.1/6] Verificando token (auth/me)..." -ForegroundColor Yellow
+try {
+    Invoke-UcmRequest -Uri "$baseUrl/auth/me" -Method GET -Headers (@{"Authorization"="Bearer $token"} + $tenantHeader) | Out-Null
+    Write-Host "SUCESSO: Token valido!" -ForegroundColor Green
+} catch {
+    Write-Host "ERRO: Token invalido" -ForegroundColor Red
+    exit 1
+}
+
 # Test 3: Listar Produtos (com token)
 Write-Host "[3/6] Listando produtos..." -ForegroundColor Yellow
 try {
@@ -108,7 +118,14 @@ try {
     $response = Invoke-UcmRequest -Uri "$baseUrl/products" -Method GET -Headers $authHeaders
     Write-Host "SUCESSO: Produtos listados!" -ForegroundColor Green
     $products = $response.Content | ConvertFrom-Json
-    Write-Host "  Total de produtos: $($products.Count)" -ForegroundColor Gray
+    if ($products -is [System.Array]) {
+        Write-Host "  Total de produtos: $($products.Count)" -ForegroundColor Gray
+    } elseif ($products.data) {
+        $count = if ($products.total -ne $null) { $products.total } else { $products.data.Count }
+        Write-Host "  Total de produtos: $count" -ForegroundColor Gray
+    } else {
+        Write-Host "  Total de produtos: 0" -ForegroundColor Gray
+    }
 } catch {
     Write-Host "AVISO: Nao foi possivel listar produtos (verifique autenticacao)" -ForegroundColor Yellow
 }
@@ -176,6 +193,7 @@ if ($productId) {
     try {
         $response = Invoke-UcmRequest -Uri "$baseUrl/orders" -Method POST -Body $orderBody -Headers (@{"Authorization"="Bearer $token"} + $tenantHeader)
         $order = $response.Content | ConvertFrom-Json
+        $orderId = $order.id
         Write-Host "SUCESSO: Pedido criado!" -ForegroundColor Green
         Write-Host "  Pedido: $($order.order_no)" -ForegroundColor Gray
     } catch {
@@ -184,6 +202,25 @@ if ($productId) {
     }
 } else {
     Write-Host "[6/6] Pulando teste de pedido (produto nao criado)" -ForegroundColor Yellow
+}
+
+# Teste extra: Listar pedidos e relatorio
+Write-Host "[6.1/6] Listando pedidos..." -ForegroundColor Yellow
+try {
+    $response = Invoke-UcmRequest -Uri "$baseUrl/orders" -Method GET -Headers (@{"Authorization"="Bearer $token"} + $tenantHeader)
+    $orders = $response.Content | ConvertFrom-Json
+    $orderCount = if ($orders -is [System.Array]) { $orders.Count } elseif ($orders.data) { $orders.data.Count } else { 0 }
+    Write-Host "SUCESSO: Pedidos listados! Total: $orderCount" -ForegroundColor Green
+} catch {
+    Write-Host "AVISO: Nao foi possivel listar pedidos" -ForegroundColor Yellow
+}
+
+Write-Host "[6.2/6] Relatorio de vendas..." -ForegroundColor Yellow
+try {
+    Invoke-UcmRequest -Uri "$baseUrl/orders/reports/sales" -Method GET -Headers (@{"Authorization"="Bearer $token"} + $tenantHeader) | Out-Null
+    Write-Host "SUCESSO: Relatorio de vendas gerado!" -ForegroundColor Green
+} catch {
+    Write-Host "AVISO: Nao foi possivel gerar relatorio" -ForegroundColor Yellow
 }
 
 Write-Host ""
