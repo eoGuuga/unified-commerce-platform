@@ -26,6 +26,22 @@ is_http_ok() {
   [ "$code" = "200" ]
 }
 
+wait_for_postgres() {
+  local container_name="$1"
+  local attempts=20
+  local delay=2
+
+  for i in $(seq 1 "$attempts"); do
+    if docker exec -u postgres "$container_name" pg_isready -d ucm >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep "$delay"
+  done
+
+  echo "Postgres not ready in $container_name after $((attempts * delay))s" >&2
+  return 1
+}
+
 sync_postgres_users() {
   local container_name="$1"
   local env_file="$2"
@@ -90,6 +106,7 @@ if [ -n "$REDIS_PASSWORD" ]; then
   REDIS_PASSWORD="$REDIS_PASSWORD" docker compose --env-file "$prod_dir/.env" -f "$prod_dir/docker-compose.prod.yml" up -d redis
 fi
 docker compose --env-file "$prod_dir/.env" -f "$prod_dir/docker-compose.prod.yml" up -d postgres
+wait_for_postgres "ucm-postgres"
 sync_postgres_users "ucm-postgres" "$prod_dir/.env"
 if is_http_ok "$prod_url"; then
   echo "Prod health OK. Skipping backend restart."
@@ -107,6 +124,7 @@ if [ -n "$REDIS_PASSWORD" ]; then
   REDIS_PASSWORD="$REDIS_PASSWORD" docker compose --env-file "$dev_dir/.env" -f "$dev_dir/docker-compose.test.yml" --project-name ucmtest up -d redis
 fi
 docker compose --env-file "$dev_dir/.env" -f "$dev_dir/docker-compose.test.yml" --project-name ucmtest up -d postgres
+wait_for_postgres "ucm-postgres-test"
 sync_postgres_users "ucm-postgres-test" "$dev_dir/.env"
 if is_http_ok "$dev_url"; then
   echo "Dev health OK. Skipping backend restart."
