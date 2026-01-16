@@ -1,4 +1,4 @@
-﻿# Script de Testes Automatizados - FASE 3.2 Melhorada
+# Script de Testes Automatizados - FASE 3.2 Melhorada
 # Testa diversos exemplos reais de pedidos brasileiros
 
 $baseUrl = "http://localhost:3001/api/v1/whatsapp/test"
@@ -6,7 +6,7 @@ $testResults = @()
 
 # Array de testes: [mensagem, esperado (sucesso/erro/pergunta)]
 $testes = @(
-    # Formas BÃ¡sicas
+    # Formas Básicas
     @("quero 5 brigadeiros", "sucesso"),
     @("preciso de 10 brigadeiros", "sucesso"),
     @("vou querer 3 bolos de chocolate", "sucesso"),
@@ -21,29 +21,29 @@ $testes = @(
     @("me faz 2 bolos de chocolate", "sucesso"),
     @("pode me enviar 5 brigadeiros?", "sucesso"),
     @("tem como me enviar 3 bolos?", "sucesso"),
-    @("dÃ¡ pra fazer 1 bolo de cenoura?", "sucesso"),
-    @("dÃ¡ pra me enviar 5 brigadeiros?", "sucesso"),
-    @("seria possÃ­vel 2 bolos?", "sucesso"),
+    @("dá pra fazer 1 bolo de cenoura?", "sucesso"),
+    @("dá pra me enviar 5 brigadeiros?", "sucesso"),
+    @("seria possível 2 bolos?", "sucesso"),
     @("poderia me enviar 10 brigadeiros?", "sucesso"),
     
     # Quantidades por Extenso
     @("quero um bolo de chocolate", "sucesso"),
     @("preciso de dois bolos de cenoura", "sucesso"),
-    @("me manda trÃªs brigadeiros", "sucesso"),
+    @("me manda três brigadeiros", "sucesso"),
     @("quero cinco brigadeiros", "sucesso"),
     @("preciso de dez bolos de chocolate", "sucesso"),
     
-    # ExpressÃµes de Quantidade
-    @("quero uma dÃºzia de brigadeiros", "sucesso"),
-    @("preciso de meia dÃºzia de brigadeiros", "sucesso"),
+    # Expressões de Quantidade
+    @("quero uma dúzia de brigadeiros", "sucesso"),
+    @("preciso de meia dúzia de brigadeiros", "sucesso"),
     @("me manda um quilo de brigadeiros", "sucesso"),
     
     # Quantidades Indefinidas
     @("quero uns brigadeiros", "sucesso"),
     @("preciso de algumas bolos", "sucesso"),
-    @("me manda vÃ¡rios brigadeiros", "sucesso"),
+    @("me manda vários brigadeiros", "sucesso"),
     
-    # VariaÃ§Ãµes de Produtos
+    # Variações de Produtos
     @("quero 5 brigadeiro", "sucesso"),
     @("preciso de 2 bolo", "sucesso"),
     @("me manda 3 bolos de chocolate", "sucesso"),
@@ -54,21 +54,21 @@ $testes = @(
     @("me manda 3 bolos, pf", "sucesso"),
     @("quero 2 bolos, pfv", "sucesso"),
     
-    # Com InterrogaÃ§Ãµes
+    # Com Interrogações
     @("quero 5 brigadeiros?", "sucesso"),
     @("pode ser 3 bolos?", "sucesso"),
     
-    # Erros Comuns de DigitaÃ§Ã£o (deve encontrar mesmo com erro)
+    # Erros Comuns de Digitação (deve encontrar mesmo com erro)
     @("quero 5 brigadero", "sucesso"),
     @("preciso de 2 bolos de choclate", "sucesso"),
     @("me manda 3 boli", "pergunta"),  # Erro muito grande - deve perguntar
     @("quero 5 bol", "pergunta"),  # Erro muito grande - deve perguntar
     @("preciso de 10 brigadero", "sucesso"),  # Erro pequeno - deve encontrar
     @("me manda 2 bolos de cenora", "sucesso"),  # Erro de acento - deve encontrar
-    @("quero 3 bolos de choclate", "sucesso"),  # Erro de digitaÃ§Ã£o - deve encontrar
+    @("quero 3 bolos de choclate", "sucesso"),  # Erro de digitação - deve encontrar
     @("preciso de 1 bolo de cenoura", "sucesso"),  # Correto
     @("me manda 5 brigadinho", "sucesso"),  # Diminutivo - deve encontrar
-    @("quero 2 bolinho", "pergunta"),  # Diminutivo muito genÃ©rico - deve perguntar qual bolo
+    @("quero 2 bolinho", "pergunta"),  # Diminutivo muito genérico - deve perguntar qual bolo
     
     # Casos Especiais - Deve Perguntar
     @("quero brigadeiros", "pergunta"),
@@ -107,9 +107,9 @@ foreach ($teste in $testes) {
         $resultadoReal = "erro"
         if ($resposta -match "PEDIDO CRIADO COM SUCESSO") {
             $resultadoReal = "sucesso"
-        } elseif ($resposta -match "Quantos|Qual produto|NÃ£o consegui entender") {
+        } elseif ($resposta -match "Quantos|Qual produto|Não consegui entender") {
             $resultadoReal = "pergunta"
-        } elseif ($resposta -match "NÃ£o encontrei|Estoque insuficiente") {
+        } elseif ($resposta -match "Não encontrei|Estoque insuficiente") {
             $resultadoReal = "erro"
         }
         

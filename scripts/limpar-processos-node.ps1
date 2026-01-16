@@ -1,4 +1,4 @@
-﻿# Script para limpar processos Node Ã³rfÃ£os
+# Script para limpar processos Node órfãos
 Write-Host "Verificando processos Node..." -ForegroundColor Cyan
 $nodeProcesses = Get-Process node -ErrorAction SilentlyContinue
 if ($nodeProcesses) {
