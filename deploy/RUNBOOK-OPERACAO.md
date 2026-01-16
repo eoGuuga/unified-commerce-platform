@@ -127,6 +127,14 @@ CRON_TIME="0 19 * * *" /opt/ucm/deploy/scripts/setup-apply-health-cron.sh
 tail -n 200 /var/log/ucm-apply-health.log
 ```
 
+### Logrotate do cron (apply + health)
+```bash
+sudo -i
+chmod +x /opt/ucm/deploy/scripts/setup-apply-health-logrotate.sh
+/opt/ucm/deploy/scripts/setup-apply-health-logrotate.sh
+tail -n 200 /var/log/ucm-apply-health.log
+```
+
 ---
 
 ## Firewall (UFW)

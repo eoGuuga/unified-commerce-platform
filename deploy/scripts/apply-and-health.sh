@@ -5,6 +5,7 @@ set -euo pipefail
 # Usage: sudo -i; /opt/ucm/deploy/scripts/apply-and-health.sh
 
 repo_root="/opt/ucm"
+lock_dir="/tmp/ucm-apply-health.lock"
 health_urls=(
   "https://gtsofthub.com.br/api/v1/health"
   "https://dev.gtsofthub.com.br/api/v1/health"
@@ -53,6 +54,12 @@ require_cmd git
 require_cmd docker
 require_cmd curl
 
+if ! mkdir "$lock_dir" 2>/dev/null; then
+  echo "Another apply-and-health run is in progress." >&2
+  exit 1
+fi
+trap 'rmdir "$lock_dir"' EXIT
+
 cd "$repo_root"
 git pull --ff-only
 
@@ -61,6 +68,7 @@ chmod +x /opt/ucm/deploy/scripts/fix-prod-dev-health.sh
 
 /opt/ucm/deploy/scripts/apply-nginx-config.sh
 RESET_REDIS=0 /opt/ucm/deploy/scripts/fix-prod-dev-health.sh
+sleep 5
 
 echo "==> Health (prod/dev)"
 for target in "${health_urls[@]}"; do
