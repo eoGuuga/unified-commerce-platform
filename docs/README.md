@@ -52,6 +52,7 @@
 ### 04-status
 - [`BACKEND-OPERACIONAL.md`](./04-status/BACKEND-OPERACIONAL.md)
 - [`ATUALIZACAO-2026-01-15.md`](./04-status/ATUALIZACAO-2026-01-15.md)
+- [`ATUALIZACAO-2026-01-16.md`](./04-status/ATUALIZACAO-2026-01-16.md)
 - [`CHECKLIST-FINAL-PERFEITO.md`](./04-status/CHECKLIST-FINAL-PERFEITO.md)
 
 ### 05-correcoes
@@ -111,4 +112,4 @@
 
 ---
 
-Ultima atualizacao: 2026-01-15
+Ultima atualizacao: 2026-01-16
