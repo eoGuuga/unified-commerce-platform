@@ -439,7 +439,8 @@ export class OrdersService {
     }, {} as Record<string, number>);
 
     // Top produtos mais vendidos
-    const productSales = new Map<string, { name: string; quantity: number; revenue: number }>();
+    const productSales = new Map<string, { id: string; name: string; quantity: number; revenue: number }>();
+    const productSalesByName = new Map<string, { name: string; quantity: number; revenue: number }>();
     
     for (const order of orders) {
       if (order.itens && Array.isArray(order.itens)) {
@@ -449,17 +450,34 @@ export class OrdersService {
           const produtoName = produto?.name || `Produto ${produtoId}`;
           
           if (!productSales.has(produtoId)) {
-            productSales.set(produtoId, { name: produtoName, quantity: 0, revenue: 0 });
+            productSales.set(produtoId, {
+              id: produtoId,
+              name: produtoName,
+              quantity: 0,
+              revenue: 0,
+            });
           }
           
           const productData = productSales.get(produtoId)!;
           productData.quantity += item.quantity;
           productData.revenue += Number(item.subtotal || item.unit_price * item.quantity);
+
+          if (!productSalesByName.has(produtoName)) {
+            productSalesByName.set(produtoName, { name: produtoName, quantity: 0, revenue: 0 });
+          }
+          const nameData = productSalesByName.get(produtoName)!;
+          nameData.quantity += item.quantity;
+          nameData.revenue += Number(item.subtotal || item.unit_price * item.quantity);
         }
       }
     }
 
     const topProducts = Array.from(productSales.values())
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 10)
+      .map((p, index) => ({ ...p, rank: index + 1 }));
+
+    const topProductsByName = Array.from(productSalesByName.values())
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 10)
       .map((p, index) => ({ ...p, rank: index + 1 }));
@@ -508,6 +526,7 @@ export class OrdersService {
       salesByChannel,
       ordersByStatus,
       topProducts,
+      topProductsByName,
       salesByPeriod: {
         today: salesToday,
         thisWeek: salesThisWeek,
