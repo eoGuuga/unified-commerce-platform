@@ -9,12 +9,21 @@ RESET_REDIS="${RESET_REDIS:-0}"
 
 prod_dir="/opt/ucm/deploy"
 dev_dir="/opt/ucm-test-repo/deploy"
+prod_url="https://gtsofthub.com.br/api/v1/health"
+dev_url="https://dev.gtsofthub.com.br/api/v1/health"
 
 require_file() {
   if [ ! -f "$1" ]; then
     echo "Missing file: $1" >&2
     exit 1
   fi
+}
+
+is_http_ok() {
+  local url="$1"
+  local code
+  code="$(curl -k -sS -o /dev/null -w "%{http_code}" "$url" || true)"
+  [ "$code" = "200" ]
 }
 
 update_env_urls() {
@@ -63,7 +72,11 @@ if [ -n "$REDIS_PASSWORD" ]; then
   REDIS_PASSWORD="$REDIS_PASSWORD" docker compose --env-file "$prod_dir/.env" -f "$prod_dir/docker-compose.prod.yml" up -d redis
 fi
 docker compose --env-file "$prod_dir/.env" -f "$prod_dir/docker-compose.prod.yml" up -d postgres
-docker compose --env-file "$prod_dir/.env" -f "$prod_dir/docker-compose.prod.yml" up -d --no-deps --force-recreate backend
+if is_http_ok "$prod_url"; then
+  echo "Prod health OK. Skipping backend restart."
+else
+  docker compose --env-file "$prod_dir/.env" -f "$prod_dir/docker-compose.prod.yml" up -d --no-deps --force-recreate backend
+fi
 
 echo "==> DEV"
 require_file "$dev_dir/.env"
@@ -75,7 +88,11 @@ if [ -n "$REDIS_PASSWORD" ]; then
   REDIS_PASSWORD="$REDIS_PASSWORD" docker compose --env-file "$dev_dir/.env" -f "$dev_dir/docker-compose.test.yml" --project-name ucmtest up -d redis
 fi
 docker compose --env-file "$dev_dir/.env" -f "$dev_dir/docker-compose.test.yml" --project-name ucmtest up -d postgres
-docker compose --env-file "$dev_dir/.env" -f "$dev_dir/docker-compose.test.yml" --project-name ucmtest up -d --no-deps --force-recreate backend
+if is_http_ok "$dev_url"; then
+  echo "Dev health OK. Skipping backend restart."
+else
+  docker compose --env-file "$dev_dir/.env" -f "$dev_dir/docker-compose.test.yml" --project-name ucmtest up -d --no-deps --force-recreate backend
+fi
 
 echo "==> HEALTH"
 curl -k -s https://gtsofthub.com.br/api/v1/health || true

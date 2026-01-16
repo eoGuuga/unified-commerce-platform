@@ -67,10 +67,24 @@ chmod +x /opt/ucm/deploy/scripts/apply-nginx-config.sh
 chmod +x /opt/ucm/deploy/scripts/fix-prod-dev-health.sh
 
 /opt/ucm/deploy/scripts/apply-nginx-config.sh
+echo "==> Health (prod/dev)"
+health_failed=0
+for target in "${health_urls[@]}"; do
+  if ! check_health "$target"; then
+    health_failed=1
+  fi
+done
+
+if [ "$health_failed" -eq 0 ]; then
+  echo "Health OK. No remediation needed."
+  exit 0
+fi
+
+echo "Health failed. Running remediation..."
 RESET_REDIS=0 /opt/ucm/deploy/scripts/fix-prod-dev-health.sh
 sleep 5
 
-echo "==> Health (prod/dev)"
+echo "==> Health (prod/dev) after remediation"
 for target in "${health_urls[@]}"; do
   check_health "$target"
 done
