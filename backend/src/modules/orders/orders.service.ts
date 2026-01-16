@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException, Inject, forwardRef, Logger } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import { randomBytes } from 'crypto';
 import { Pedido, PedidoStatus, CanalVenda } from '../../database/entities/Pedido.entity';
 import { ItemPedido } from '../../database/entities/ItemPedido.entity';
 import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque.entity';
@@ -395,25 +396,30 @@ export class OrdersService {
   }
 
   private async generateOrderNumber(tenantId: string): Promise<string> {
-    const date = new Date();
-    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
-    const today = dateStr.substring(0, 8); // YYYYMMDD
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const prefix = `PED-${dateStr}-`;
 
-    // Contar pedidos do dia
-    const count = await this.db.getRepository(Pedido).count({
-      where: {
-        tenant_id: tenantId,
-      },
-    });
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const suffix = randomBytes(2).toString('hex').toUpperCase();
+      const orderNo = `${prefix}${suffix}`;
+      const exists = await this.db.getRepository(Pedido).count({
+        where: { order_no: orderNo, tenant_id: tenantId },
+      });
+      if (!exists) {
+        return orderNo;
+      }
+    }
 
-    const seq = String(count + 1).padStart(3, '0');
-    return `PED-${today}-${seq}`;
+    const fallback = randomBytes(4).toString('hex').toUpperCase();
+    return `${prefix}${fallback}`;
   }
 
   async getSalesReport(tenantId: string): Promise<any> {
-    // Para relatório, precisamos de todos os pedidos (sem paginação)
-    const ordersResult = await this.findAll(tenantId);
-    const orders = Array.isArray(ordersResult) ? ordersResult : ordersResult.data;
+    const orders = await this.db.getRepository(Pedido).find({
+      where: { tenant_id: tenantId },
+      relations: ['itens', 'itens.produto', 'seller'],
+      order: { created_at: 'DESC' },
+    });
     
     const totalSales = orders.reduce((sum, order) => sum + Number(order.total_amount), 0);
     const totalOrders = orders.length;

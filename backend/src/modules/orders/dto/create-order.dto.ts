@@ -1,4 +1,15 @@
-import { IsString, IsEnum, IsNumber, IsArray, ValidateNested, IsOptional, IsUUID, Min, Length } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsNumber,
+  IsArray,
+  ValidateNested,
+  IsOptional,
+  IsUUID,
+  Min,
+  Length,
+  ArrayMinSize,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { CanalVenda } from '../../../database/entities/Pedido.entity';
@@ -84,6 +95,7 @@ export class CreateOrderDto {
     type: [CreateOrderItemDto] 
   })
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDto)
   items: CreateOrderItemDto[];

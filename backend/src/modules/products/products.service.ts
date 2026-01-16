@@ -160,6 +160,22 @@ export class ProductsService {
     });
 
     const savedProduto = await produtoRepo.save(produto);
+    const estoqueRepo = this.db.getRepository(MovimentacaoEstoque);
+    const existingStock = await estoqueRepo.findOne({
+      where: { tenant_id: tenantId, produto_id: savedProduto.id },
+    });
+
+    if (!existingStock) {
+      await estoqueRepo.save(
+        estoqueRepo.create({
+          tenant_id: tenantId,
+          produto_id: savedProduto.id,
+          current_stock: 0,
+          reserved_stock: 0,
+          min_stock: 0,
+        }),
+      );
+    }
 
     // ✅ AUDIT LOG: Registrar criação de produto
     try {

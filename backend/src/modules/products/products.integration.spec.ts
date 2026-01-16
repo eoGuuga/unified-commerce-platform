@@ -137,6 +137,15 @@ describe('Products Integration Tests (e2e)', () => {
       expect(response.body).toHaveProperty('id');
       expect(response.body.name).toBe('Produto Teste');
       expect(response.body.price).toBe(15.99);
+
+      const stockResponse = await request(app.getHttpServer())
+        .get(`/api/v1/products/stock-summary`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .expect(200);
+
+      const created = stockResponse.body.products.find((p: any) => p.id === response.body.id);
+      expect(created).toBeTruthy();
+      expect(created.current_stock).toBe(0);
     });
 
     it('deve retornar 401 sem autenticação', async () => {
