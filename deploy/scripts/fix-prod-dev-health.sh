@@ -26,6 +26,24 @@ is_http_ok() {
   [ "$code" = "200" ]
 }
 
+sync_postgres_users() {
+  local container_name="$1"
+  local env_file="$2"
+
+  # shellcheck disable=SC1090
+  set -a; source "$env_file"; set +a
+
+  if [ -n "${POSTGRES_PASSWORD:-}" ]; then
+    docker exec -u postgres "$container_name" psql -d ucm -v ON_ERROR_STOP=1 \
+      -c "ALTER USER postgres WITH PASSWORD '${POSTGRES_PASSWORD}';" >/dev/null
+  fi
+
+  if [ -n "${DB_APP_USER:-}" ] && [ -n "${DB_APP_PASSWORD:-}" ]; then
+    docker exec -u postgres "$container_name" psql -d ucm -v ON_ERROR_STOP=1 \
+      -c "ALTER USER ${DB_APP_USER} WITH PASSWORD '${DB_APP_PASSWORD}';" >/dev/null
+  fi
+}
+
 update_env_urls() {
   local env_file="$1"
   # shellcheck disable=SC1090
@@ -72,6 +90,7 @@ if [ -n "$REDIS_PASSWORD" ]; then
   REDIS_PASSWORD="$REDIS_PASSWORD" docker compose --env-file "$prod_dir/.env" -f "$prod_dir/docker-compose.prod.yml" up -d redis
 fi
 docker compose --env-file "$prod_dir/.env" -f "$prod_dir/docker-compose.prod.yml" up -d postgres
+sync_postgres_users "ucm-postgres" "$prod_dir/.env"
 if is_http_ok "$prod_url"; then
   echo "Prod health OK. Skipping backend restart."
 else
@@ -88,6 +107,7 @@ if [ -n "$REDIS_PASSWORD" ]; then
   REDIS_PASSWORD="$REDIS_PASSWORD" docker compose --env-file "$dev_dir/.env" -f "$dev_dir/docker-compose.test.yml" --project-name ucmtest up -d redis
 fi
 docker compose --env-file "$dev_dir/.env" -f "$dev_dir/docker-compose.test.yml" --project-name ucmtest up -d postgres
+sync_postgres_users "ucm-postgres-test" "$dev_dir/.env"
 if is_http_ok "$dev_url"; then
   echo "Dev health OK. Skipping backend restart."
 else
