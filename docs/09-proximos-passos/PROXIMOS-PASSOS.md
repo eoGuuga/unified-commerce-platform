@@ -50,7 +50,7 @@ npm run seed:mae
 
 ### 2. Documentação Atualizada
 
-- ✅ `ESTADO-ATUAL-COMPLETO.md` - Documento master criado
+- ✅ `BACKEND-OPERACIONAL.md` - Status do backend consolidado
 - ✅ `scripts/README.md` - Guia de uso dos scripts
 - ✅ `README.md` - Referência ao documento master
 
@@ -184,7 +184,7 @@ npm run seed:mae
 - [ ] Toast notifications
 - [ ] Atalhos de teclado
 
-**Documento:** `docs/03-implementacao/PLANO-PDV-COMPLETO.md`
+**Documento:** `docs/06-implementacoes/SUCESSO-PDV-FUNCIONANDO.md`
 
 ---
 
@@ -259,7 +259,7 @@ npm run seed:mae
 
 ## 📚 DOCUMENTAÇÃO RELEVANTE
 
-- **`ESTADO-ATUAL-COMPLETO.md`** - Estado completo do projeto
+- **`BACKEND-OPERACIONAL.md`** - Estado atual do backend
 - **`VALIDACAO-SETUP.md`** - Checklist de validação
 - **`scripts/README.md`** - Guia de uso dos scripts
 - **`docs/03-implementacao/ROADMAP-EXECUCAO-PERFEITA.md`** - Roadmap técnico completo

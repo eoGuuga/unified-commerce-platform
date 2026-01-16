@@ -177,7 +177,7 @@ async function processSale(storeId, items, channel, sellerId) {
 }
 \`\`\`
 
-### O Que Garante This
+### O Que Garante Isso
 
 **Atomicidade:** Se qualquer etapa falhar (ex: estoque insuficiente na etapa 2), ROLLBACK é automático.
 

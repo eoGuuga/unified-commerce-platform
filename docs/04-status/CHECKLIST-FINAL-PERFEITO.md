@@ -84,8 +84,8 @@
 - [x] **Documento Mestre** - `00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md` ✅
 - [x] **Índice** - `INDICE-DOCUMENTACAO.md` ✅
 - [x] **Status Backend** - `BACKEND-OPERACIONAL.md` ✅
-- [x] **Correções** - `RESUMO-FINAL-CORRECOES.md` ✅
-- [x] **Bot WhatsApp** - `FASE-3-2-IMPLEMENTADA.md` ✅
+- [x] **Correções** - `RESUMO-CORRECOES-CRITICAS.md` ✅
+- [x] **Bot WhatsApp** - `STATUS-ATUAL-FASE-3-3.md` ✅
 - [x] **Migration Script** - `EXECUTAR-MIGRATION.ps1` ✅
 
 ---

@@ -6,7 +6,7 @@
 > **Servidor:** VPS Ubuntu (OVHcloud)
 
 > **Atualizacao (2026-01-14):** pontos de HTTPS/Nginx abaixo foram resolvidos.  
-> Ver status atual em `docs/04-status/ATUALIZACAO-2026-01-14.md`.
+> Ver status atual em `docs/04-status/ATUALIZACAO-2026-01-15.md`.
 
 ---
 

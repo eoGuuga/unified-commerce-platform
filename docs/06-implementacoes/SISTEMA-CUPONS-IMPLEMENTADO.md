@@ -674,7 +674,7 @@ throw new BadRequestException('Cupom inválido');
 ## 🔗 RELACIONADOS
 
 - **[DbContextService](../01-tecnico/DBCONTEXT-SERVICE.md)** - Gerencia transações
-- **[OrdersService](./FASE-3-3-IMPLEMENTACAO-COMPLETA.md)** - Integração com pedidos
+- **[OrdersService](./STATUS-ATUAL-FASE-3-3.md)** - Integração com pedidos
 - **[Database Schema](../01-tecnico/04-DATABASE.md)** - Schema do banco
 
 ---

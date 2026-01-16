@@ -3,7 +3,7 @@
 > **Data:** 07/01/2025  
 > **Status:** ✅ FASE 0, 1 e 2 COMPLETAS | 🚀 Próximo: FASE 3 (Bot WhatsApp)  
 > **Foco:** Sistema 100% perfeito para produção  
-> **📊 Ver [STATUS-ATUAL-2025.md](./STATUS-ATUAL-2025.md) para status consolidado**
+> **📊 Ver [BACKEND-OPERACIONAL.md](../04-status/BACKEND-OPERACIONAL.md) para status consolidado**
 
 ---
 
@@ -79,7 +79,7 @@
 - ✅ Testes para endpoints críticos
 - ✅ Testa criação de pedido, validação, autenticação
 
-**Ver `SUCESSO-FASE-0.md` para detalhes**
+**Ver [SUCESSO-PDV-FUNCIONANDO.md](../06-implementacoes/SUCESSO-PDV-FUNCIONANDO.md) para detalhes**
 
 ---
 
@@ -371,4 +371,4 @@ Bot: "Encomenda coletada! Valor: R$ 80,00. Aguarde aprovação."
 
 **Última atualização:** 07/01/2025  
 **Status:** ✅ FASE 0, 1 e 2 COMPLETAS | 🚀 Pronto para FASE 3 (Bot WhatsApp)  
-**📊 Ver [STATUS-ATUAL-2025.md](./STATUS-ATUAL-2025.md) para status consolidado**
+**📊 Ver [BACKEND-OPERACIONAL.md](../04-status/BACKEND-OPERACIONAL.md) para status consolidado**

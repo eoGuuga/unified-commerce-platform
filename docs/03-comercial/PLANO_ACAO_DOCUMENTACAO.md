@@ -312,7 +312,7 @@ Todos com:
 
 - 📧 Email: suporte@seudominio.com
 - 💬 WhatsApp: (11) 99999-9999
-- 📚 [Ver Manual Completo](/manual)
+- 📚 Ver Manual Completo (pendente)
 ```
 
 ---
@@ -435,7 +435,7 @@ Você tem 14 dias grátis para testar todas as funcionalidades. Não precisa de 
 Sim, cancelamento é imediato e sem multa. Você continua tendo acesso até o final do período pago.
 
 ### Meus dados estão seguros?
-Sim! Usamos criptografia de nível militar, backup automático diário e compliance LGPD completo. [Ver Política de Segurança](/seguranca)
+Sim! Usamos criptografia de nível militar, backup automático diário e compliance LGPD completo. Ver Politica de Seguranca (pendente)
 
 ## Funcionalidades
 
@@ -443,7 +443,7 @@ Sim! Usamos criptografia de nível militar, backup automático diário e complia
 Sim, o bot responde automaticamente 24/7. Se precisar de atendimento humano, você recebe notificação.
 
 ### Posso integrar com meu site existente?
-Sim, temos API completa. Você pode integrar com qualquer sistema. [Ver Documentação da API](/api/docs)
+Sim, temos API completa. Você pode integrar com qualquer sistema. Ver Documentacao da API (Swagger /api/docs)
 
 ### Funciona offline?
 O PDV funciona offline usando cache local. Quando voltar online, sincroniza automaticamente.

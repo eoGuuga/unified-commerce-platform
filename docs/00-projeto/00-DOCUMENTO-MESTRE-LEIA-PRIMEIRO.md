@@ -133,43 +133,54 @@ Este é o **documento mestre** que você deve ler **PRIMEIRO** ao iniciar uma no
 
 **🚀 02-implementacao/** - Planos de Implementação
 - `PLANO_IMPLEMENTACAO.md` - Plano geral
-- `PLANO_COMPLETO_PARTE_1.md` até `PARTE_8.md` - Guias passo a passo
+- `MVP-FOCADO.md` - MVP focado
+- `MVP-MAE.md` - MVP para mae
+- `ROADMAP-EXECUCAO-PERFEITA.md` - Roadmap de execucao
 
 **💼 03-comercial/** - Material Comercial
 - `DOCUMENTACAO_COMPLETA_PARA_VENDAS.md` - Documentação para vendas
 
 **📊 04-status/** - Status Atual
 - `BACKEND-OPERACIONAL.md` - Status do backend
-- `STATUS-ATUAL-2025.md` - Status consolidado
-- `ESTADO-ATUAL-COMPLETO.md` - Estado detalhado
-- `RESPOSTA-HONESTA-ESTADO-ATUAL.md` - Resposta sobre estado
+- `ATUALIZACAO-2026-01-15.md` - Status dev/prod (alinhamento)
+- `CHECKLIST-FINAL-PERFEITO.md` - Checklist final
 
 **✅ 05-correcoes/** - Correções Implementadas
-- `TODAS-CORRECOES-IMPLEMENTADAS.md` - Lista completa
-- `RESUMO-FINAL-CORRECOES.md` - Resumo das correções
-- `CORRECOES-SEGURANCA-WHATSAPP.md` - Correção WhatsApp
+- `RESUMO-CORRECOES-CRITICAS.md` - Resumo das correcoes criticas
+- `REVISAO-COMPLETA-SEGURANCA-E-PERFORMANCE.md` - Revisao completa
 
 **🎯 06-implementacoes/** - Implementações Concluídas
-- `FASE-3-2-IMPLEMENTADA.md` - FASE 3.2
-- `FASE-3-3-IMPLEMENTADA.md` - FASE 3.3
+- `PLANO-FASE-3-3-PERFEITO.md` - Plano da fase 3.3
+- `STATUS-ATUAL-FASE-3-3.md` - Status da fase 3.3
 - `SUCESSO-PDV-FUNCIONANDO.md` - PDV funcionando
-- `SISTEMA-CUPONS-IMPLEMENTADO.md` - ✅ **NOVO** - Sistema completo de cupons
+- `SISTEMA-CUPONS-IMPLEMENTADO.md` - Sistema completo de cupons
 
 **⚙️ 07-setup/** - Guias de Setup
 - `SETUP-INICIAL.md` - Setup inicial
 - `CHECKLIST-SETUP.md` - Checklist
-- `INSTRUCOES-MANUAIS.md` - Instruções manuais
+- `COMO-INICIAR-AMBIENTE.md` - Passo a passo
+- `PEGAR-CREDENCIAIS-OFICIAIS.md` - Credenciais oficiais
+- `SEPARAR-CHAVES-DEV-PROD.md` - Separar chaves dev/prod
+- `SETUP-DEV-PROD-MERCADOPAGO.md` - Setup Mercado Pago
+- `SOLUCAO-POWERSHELL.md` - Ajustes de PowerShell
+- `VALIDACAO-SETUP.md` - Validacao do setup
 
 **🧪 08-testes/** - Documentação de Testes
-- `TESTE-WHATSAPP-BOT.md` - Testes do bot
-- `TESTE-COMPLETO.md` - Teste completo
+- `ANALISE-ALINHAMENTO-COMPLETA.md` - Analise de alinhamento
+- `ANALISE-SERVIDOR-DOMINIO-COMPLETA.md` - Analise servidor/dominio
+- `RESUMO-TESTES-EXECUTADOS.md` - Resumo dos testes
+- `RESUMO-SINCRONIZACAO-FINAL.md` - Resumo da sincronizacao
 
-**🚀 09-proximos-passos/** - Próximos Passos
-- `PROXIMOS-PASSOS.md` - Próximos passos
-- `PROMPT-PARA-PROXIMA-IA.md` - Prompt para próxima IA
+**🚀 09-proximos-passos/** - Proximos Passos
+- `PROXIMOS-PASSOS.md` - Proximos passos
+- `PLANO-PROXIMOS-PASSOS-PERFEITO.md` - Plano de proximos passos
 
-**📜 10-historico/** - Histórico
-- Arquivos históricos e documentação antiga
+**🛡️ 15-servidor/** - Operacao
+- `AUDITORIA-2026-01-12.md` - Auditoria do servidor
+- `DEPLOY-ROLLBACK-CHECKLIST.md` - Checklist de rollback
+- `SSL-TLS.md` - SSL e TLS
+- `SERVIDOR-HARDENED-ROOT.md` - Hardening
+- `SERVIDOR-OTIMIZADO.md` - Otimizacoes
 
 **📋 INDICE-DOCUMENTACAO.md** - Índice completo de todos os documentos
 
@@ -473,13 +484,13 @@ curl -X POST http://localhost:3001/api/v1/whatsapp/test \
 1. **`docs/00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`** ← **VOCÊ ESTÁ AQUI**
 2. **`docs/00-projeto/01-VISION.md`** - Problema e solução
 3. **`docs/04-status/BACKEND-OPERACIONAL.md`** - Status atual do backend
-4. **`docs/05-correcoes/RESUMO-FINAL-CORRECOES.md`** - Correções implementadas
+4. **`docs/05-correcoes/RESUMO-CORRECOES-CRITICAS.md`** - Correções implementadas
 
 ### Para Continuar Desenvolvimento
 1. **`docs/00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`** ← **VOCÊ ESTÁ AQUI**
-2. **`docs/06-implementacoes/FASE-3-2-IMPLEMENTADA.md`** - O que foi feito no bot
-3. **`docs/02-implementacao/PLANO_COMPLETO_PARTE_3.md`** - Próximos passos do bot
-4. **`docs/07-setup/INSTRUCOES-MANUAIS.md`** - O que fazer manualmente
+2. **`docs/06-implementacoes/STATUS-ATUAL-FASE-3-3.md`** - Estado do bot e dependencias
+3. **`docs/06-implementacoes/PLANO-FASE-3-3-PERFEITO.md`** - Proximos passos do bot
+4. **`docs/07-setup/COMO-INICIAR-AMBIENTE.md`** - Execucao do setup
 
 ### Para Entender Arquitetura
 1. **`docs/01-tecnico/03-ARCHITECTURE.md`** - Arquitetura completa
