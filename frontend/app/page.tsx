@@ -1,4 +1,4 @@
-"use client"
+ï»¿"use client"
 
 export default function Page() {
   return (
@@ -38,11 +38,11 @@ export default function Page() {
 
               <div className="space-y-6">
                 <h1 className="font-display text-[clamp(3.2rem,8vw,5.6rem)] leading-[0.95] text-white animate-fade-up">
-                  O comando absoluto da sua operação de vendas.
+                  O comando absoluto da sua operacao de vendas.
                 </h1>
                 <p className="text-lg text-slate-300 max-w-xl animate-fade-up-delay">
-                  Unifique PDV, e-commerce e WhatsApp em uma só orquestra. Estoque blindado, pedidos fluindo,
-                  automação de atendimento e dados que antecipam o próximo movimento.
+                  Unifique PDV, e-commerce e WhatsApp em uma so orquestra. Estoque blindado, pedidos fluindo,
+                  automacao de atendimento e dados que antecipam o proximo movimento.
                 </p>
               </div>
 
@@ -72,7 +72,7 @@ export default function Page() {
                 </div>
                 <div>
                   <p className="text-white font-semibold">-40%</p>
-                  <p>Redução de rupturas</p>
+                  <p>Reducao de rupturas</p>
                 </div>
               </div>
             </div>
@@ -87,8 +87,8 @@ export default function Page() {
                 <div className="space-y-4">
                   {[
                     { label: "Pedidos sincronizados", value: "1.284", delta: "+18% 24h" },
-                    { label: "Estoque crítico", value: "12", delta: "Ajuste automático" },
-                    { label: "Atendimento WhatsApp", value: "3.2s", delta: "Resposta média" },
+                    { label: "Estoque critico", value: "12", delta: "Ajuste automatico" },
+                    { label: "Atendimento WhatsApp", value: "3.2s", delta: "Resposta media" },
                   ].map((metric) => (
                     <div key={metric.label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                       <p className="text-xs text-slate-400">{metric.label}</p>
@@ -103,7 +103,7 @@ export default function Page() {
                 <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
                   <p className="text-xs text-slate-400">Alertas inteligentes</p>
                   <p className="mt-2 text-sm text-slate-200">
-                    Sugestões de reposição baseadas em velocidade de venda, sazonalidade e campanhas.
+                    Sugestoes de reposicao baseadas em velocidade de venda, sazonalidade e campanhas.
                   </p>
                 </div>
               </div>
@@ -112,9 +112,9 @@ export default function Page() {
 
           <section className="mt-16 grid gap-6 md:grid-cols-3">
             {[
-              { title: "Estoque impenetrável", text: "Transações ACID e reserva inteligente para nunca vender o que não existe." },
-              { title: "Checkout sem atrito", text: "Pagamentos e confirmações fluem com integração imediata." },
-              { title: "Automação em cadeia", text: "WhatsApp e notificações em um fluxo unificado que não perde pedidos." },
+              { title: "Estoque impenetravel", text: "Transacoes ACID e reserva inteligente para nunca vender o que nao existe." },
+              { title: "Checkout sem atrito", text: "Pagamentos e confirmacoes fluem com integracao imediata." },
+              { title: "Automacao em cadeia", text: "WhatsApp e notificacoes em um fluxo unificado que nao perde pedidos." },
             ].map((item) => (
               <div key={item.title} className="glass-card rounded-2xl p-6">
                 <div className="h-1 w-12 rounded-full accent-line mb-4" />
@@ -126,17 +126,17 @@ export default function Page() {
 
           <section className="mt-20 grid gap-10 lg:grid-cols-[1fr_1fr]">
             <div className="space-y-6">
-              <h2 className="font-display text-4xl text-white">Três interfaces. Um único motor.</h2>
+              <h2 className="font-display text-4xl text-white">Tres interfaces. Um unico motor.</h2>
               <p className="text-slate-300">
-                Controle centralizado com experiências específicas para cada canal. Tudo conversa com o mesmo core,
-                com visão instantânea de estoque, pedidos e clientes.
+                Controle centralizado com experiencias especificas para cada canal. Tudo conversa com o mesmo core,
+                com visao instantanea de estoque, pedidos e clientes.
               </p>
               <div className="grid gap-4 md:grid-cols-2">
                 {[
-                  { title: "PDV inteligente", text: "Vendas rápidas no balcão com baixa fricção." },
+                  { title: "PDV inteligente", text: "Vendas rapidas no balcao com baixa friccao." },
                   { title: "E-commerce premium", text: "Vitrine e checkout alinhados com a marca." },
-                  { title: "WhatsApp autônomo", text: "IA treinada para responder, vender e confirmar." },
-                  { title: "Painel executivo", text: "Indicadores em tempo real para decisões instantâneas." },
+                  { title: "WhatsApp autonomo", text: "IA treinada para responder, vender e confirmar." },
+                  { title: "Painel executivo", text: "Indicadores em tempo real para decisoes instantaneas." },
                 ].map((card) => (
                   <div key={card.title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                     <p className="text-white font-semibold">{card.title}</p>
@@ -167,9 +167,9 @@ export default function Page() {
 
           <section className="mt-20 grid gap-6 lg:grid-cols-3">
             {[
-              { title: "Segurança de operação", text: "JWT, auditoria completa e rastreio de eventos por usuário." },
-              { title: "Performance tática", text: "Cache de alto desempenho e filas inteligentes." },
-              { title: "Expansão imediata", text: "Arquitetura multi-tenant pronta para escala." },
+              { title: "Seguranca de operacao", text: "JWT, auditoria completa e rastreio de eventos por usuario." },
+              { title: "Performance tatica", text: "Cache de alto desempenho e filas inteligentes." },
+              { title: "Expansao imediata", text: "Arquitetura multi-tenant pronta para escala." },
             ].map((item) => (
               <div key={item.title} className="rounded-2xl border border-white/10 bg-slate-900/40 p-6">
                 <h3 className="text-lg font-semibold text-white">{item.title}</h3>
@@ -182,9 +182,9 @@ export default function Page() {
             <div className="glass-card rounded-[32px] px-8 py-10 md:flex md:items-center md:justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Pronto para dominar</p>
-                <h2 className="font-display text-4xl text-white mt-3">Sua marca no centro do comércio unificado.</h2>
+                <h2 className="font-display text-4xl text-white mt-3">Sua marca no centro do comercio unificado.</h2>
                 <p className="mt-4 text-slate-300 max-w-xl">
-                  Ative novos canais sem fricção, mantenha o estoque blindado e transforme atendimento em vendas.
+                  Ative novos canais sem friccao, mantenha o estoque blindado e transforme atendimento em vendas.
                 </p>
               </div>
               <div className="mt-6 flex flex-wrap gap-3 md:mt-0">
@@ -206,8 +206,8 @@ export default function Page() {
 
           <footer className="mt-16 border-t border-white/10 pt-6 text-sm text-slate-400">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p>UCM Platform • Versão 1.0</p>
-              <p>Operacional, auditável, pronto para escala.</p>
+              <p>UCM Platform - Versao 1.0</p>
+              <p>Operacional, auditavel, pronto para escala.</p>
             </div>
           </footer>
         </div>
