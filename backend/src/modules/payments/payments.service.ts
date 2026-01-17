@@ -265,35 +265,44 @@ export class PaymentsService {
         throw new BadRequestException('Mercado Pago nao configurado');
       }
 
-      const pixResult = await this.mercadoPagoProvider.createPixPayment(
-        Number(pagamento.amount),
-        `Pedido ${pedido.order_no}`,
-        pedido.order_no,
-        context.payerEmail,
-        this.buildMercadoPagoMetadata(pagamento, pedido),
-      );
+      try {
+        const pixResult = await this.mercadoPagoProvider.createPixPayment(
+          Number(pagamento.amount),
+          `Pedido ${pedido.order_no}`,
+          pedido.order_no,
+          context.payerEmail,
+          this.buildMercadoPagoMetadata(pagamento, pedido),
+        );
 
-      const qrCodeDataUrl = pixResult.qr_code_base64
-        ? `data:image/png;base64,${pixResult.qr_code_base64}`
-        : pixResult.qr_code;
+        const qrCodeDataUrl = pixResult.qr_code_base64
+          ? `data:image/png;base64,${pixResult.qr_code_base64}`
+          : pixResult.qr_code;
 
-      pagamento.status = PagamentoStatus.PENDING;
-      pagamento.transaction_id = pixResult.transaction_id;
-      pagamento.metadata = {
-        provider: 'mercadopago',
-        pix_qr_code: qrCodeDataUrl,
-        pix_qr_code_url: undefined,
-        pix_copy_paste: pixResult.copy_paste,
-      };
+        pagamento.status = PagamentoStatus.PENDING;
+        pagamento.transaction_id = pixResult.transaction_id;
+        pagamento.metadata = {
+          provider: 'mercadopago',
+          pix_qr_code: qrCodeDataUrl,
+          pix_qr_code_url: undefined,
+          pix_copy_paste: pixResult.copy_paste,
+        };
 
-      await this.db.getRepository(Pagamento).save(pagamento);
+        await this.db.getRepository(Pagamento).save(pagamento);
 
-      return {
-        pagamento,
-        qr_code: qrCodeDataUrl,
-        copy_paste: pixResult.copy_paste,
-        message: this.generatePixMessage(pedido, pagamento, pixResult.copy_paste),
-      };
+        return {
+          pagamento,
+          qr_code: qrCodeDataUrl,
+          copy_paste: pixResult.copy_paste,
+          message: this.generatePixMessage(pedido, pagamento, pixResult.copy_paste),
+        };
+      } catch (error) {
+        if (process.env.NODE_ENV === 'production') {
+          throw error;
+        }
+        this.logger.warn('Mercado Pago falhou em dev. Usando pix mock.', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     // Mock (desenvolvimento).
