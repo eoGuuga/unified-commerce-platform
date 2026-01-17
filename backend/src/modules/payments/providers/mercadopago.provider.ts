@@ -37,6 +37,7 @@ export class MercadoPagoProvider {
   private readonly logger = new Logger(MercadoPagoProvider.name);
   private client: MercadoPagoConfig | null = null;
   private accessToken: string;
+  private readonly isProd = process.env.NODE_ENV === 'production';
 
   constructor(private configService: ConfigService) {
     this.accessToken = this.configService.get<string>('MERCADOPAGO_ACCESS_TOKEN') || '';
@@ -100,10 +101,15 @@ export class MercadoPagoProvider {
         transaction_id: String(result.id || ''),
       };
     } catch (error: any) {
-      this.logger.error('Erro ao criar pagamento Pix no Mercado Pago', {
-        error: error.message,
-        stack: error.stack,
-      });
+      const payload = {
+        error: error?.message,
+        stack: error?.stack,
+      };
+      if (this.isProd) {
+        this.logger.error('Erro ao criar pagamento Pix no Mercado Pago', payload);
+      } else {
+        this.logger.warn('Erro ao criar pagamento Pix no Mercado Pago', payload);
+      }
       throw error;
     }
   }
@@ -147,10 +153,15 @@ export class MercadoPagoProvider {
         payment_method_id: result.payment_method_id || 'credit_card',
       };
     } catch (error: any) {
-      this.logger.error('Erro ao criar pagamento com cartao no Mercado Pago', {
-        error: error.message,
-        stack: error.stack,
-      });
+      const payload = {
+        error: error?.message,
+        stack: error?.stack,
+      };
+      if (this.isProd) {
+        this.logger.error('Erro ao criar pagamento com cartao no Mercado Pago', payload);
+      } else {
+        this.logger.warn('Erro ao criar pagamento com cartao no Mercado Pago', payload);
+      }
       throw error;
     }
   }
@@ -200,10 +211,15 @@ export class MercadoPagoProvider {
         date_of_expiration: expireDate,
       };
     } catch (error: any) {
-      this.logger.error('Erro ao criar pagamento com boleto no Mercado Pago', {
-        error: error.message,
-        stack: error.stack,
-      });
+      const payload = {
+        error: error?.message,
+        stack: error?.stack,
+      };
+      if (this.isProd) {
+        this.logger.error('Erro ao criar pagamento com boleto no Mercado Pago', payload);
+      } else {
+        this.logger.warn('Erro ao criar pagamento com boleto no Mercado Pago', payload);
+      }
       throw error;
     }
   }
@@ -225,10 +241,15 @@ export class MercadoPagoProvider {
         payment_method_id: result.payment_method_id || undefined,
       };
     } catch (error: any) {
-      this.logger.error('Erro ao buscar status do pagamento no Mercado Pago', {
-        error: error.message,
+      const payload = {
+        error: error?.message,
         paymentId,
-      });
+      };
+      if (this.isProd) {
+        this.logger.error('Erro ao buscar status do pagamento no Mercado Pago', payload);
+      } else {
+        this.logger.warn('Erro ao buscar status do pagamento no Mercado Pago', payload);
+      }
       throw error;
     }
   }
