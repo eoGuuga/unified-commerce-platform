@@ -1,21 +1,22 @@
-﻿"use client"
+"use client"
 
 export default function Page() {
   return (
-    <main className="hero-bg min-h-screen text-slate-100">
+    <main className="hero-signal min-h-screen text-slate-100">
       <div className="relative overflow-hidden">
-        <div className="pointer-events-none absolute -top-48 right-[-10%] h-[520px] w-[520px] rounded-full glow-coral blur-3xl" />
-        <div className="pointer-events-none absolute top-20 left-[-20%] h-[460px] w-[460px] rounded-full glow-teal blur-3xl" />
-        <div className="pointer-events-none absolute bottom-[-20%] right-[-15%] h-[480px] w-[480px] rounded-full glow-teal blur-[140px]" />
+        <div className="pointer-events-none absolute -top-40 right-[-12%] h-[480px] w-[480px] rounded-full glow-ember blur-[140px]" />
+        <div className="pointer-events-none absolute top-8 left-[-18%] h-[420px] w-[420px] rounded-full glow-ice blur-[140px]" />
+        <div className="pointer-events-none absolute bottom-[-20%] right-[10%] h-[520px] w-[520px] rounded-full glow-aurora blur-[160px]" />
+        <div className="pointer-events-none absolute inset-0 hero-grid opacity-70" />
 
-        <div className="mx-auto max-w-6xl px-6 pb-20 pt-10 md:pt-16">
-          <header className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-sm font-semibold">
+        <div className="mx-auto max-w-6xl px-6 pb-24 pt-10 md:pt-16">
+          <header className="flex flex-wrap items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-sm font-semibold tracking-[0.2em]">
                 GT
               </span>
               <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">GTSOFT HUB</p>
+                <p className="text-xs uppercase tracking-[0.4em] text-slate-400">GTSOFT HUB</p>
                 <p className="text-sm font-semibold text-slate-200">Unified Commerce Platform</p>
               </div>
             </div>
@@ -29,94 +30,90 @@ export default function Page() {
             </div>
           </header>
 
-          <section className="mt-16 grid gap-12 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="space-y-8">
-              <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs uppercase tracking-[0.25em] text-slate-300">
-                <span className="h-2 w-2 rounded-full bg-[var(--accent-coral)]" />
-                Vendas sincronizadas em tempo real
+          <section className="mt-16 grid gap-12 lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="space-y-10">
+              <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs uppercase tracking-[0.3em] text-slate-300">
+                <span className="h-2 w-2 rounded-full bg-[var(--signal-amber)]" />
+                Controle de vendas em estado de alerta
               </div>
 
               <div className="space-y-6">
-                <h1 className="font-display text-[clamp(3.2rem,8vw,5.6rem)] leading-[0.95] text-white animate-fade-up">
-                  O comando absoluto da sua operacao de vendas.
+                <h1 className="font-display text-[clamp(3.4rem,8.8vw,5.9rem)] leading-[0.94] text-white animate-fade-up">
+                  A torre de comando que sincroniza cada venda.
                 </h1>
                 <p className="text-lg text-slate-300 max-w-xl animate-fade-up-delay">
-                  Unifique PDV, e-commerce e WhatsApp em uma so orquestra. Estoque blindado, pedidos fluindo,
-                  automacao de atendimento e dados que antecipam o proximo movimento.
+                  Estoque, pagamentos e atendimento rodando em um so plano de voo. Menos ruina, mais escala, e uma
+                  operacao que nunca perde o ritmo.
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-4">
                 <a
                   href="/login"
-                  className="rounded-full bg-[var(--accent-coral)] px-6 py-3 text-sm font-semibold text-slate-950 transition hover:translate-y-[-1px] hover:bg-[#ff9a66]"
+                  className="rounded-full bg-[var(--signal-amber)] px-7 py-3 text-sm font-semibold text-slate-950 transition hover:translate-y-[-1px] hover:bg-[#ffc96b]"
                 >
-                  Acessar o sistema
+                  Entrar no sistema
                 </a>
                 <a
                   href="/loja"
-                  className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-slate-100 transition hover:border-white/50"
+                  className="rounded-full border border-white/20 px-7 py-3 text-sm font-semibold text-slate-100 transition hover:border-white/50"
                 >
-                  Ver vitrine ao vivo
+                  Vitrine ao vivo
                 </a>
               </div>
 
-              <div className="flex flex-wrap gap-6 text-sm text-slate-400">
-                <div>
-                  <p className="text-white font-semibold">99.99%</p>
-                  <p>Tempo de atividade</p>
-                </div>
-                <div>
-                  <p className="text-white font-semibold">3 canais</p>
-                  <p>PDV + E-commerce + WhatsApp</p>
-                </div>
-                <div>
-                  <p className="text-white font-semibold">-40%</p>
-                  <p>Reducao de rupturas</p>
-                </div>
+              <div className="grid gap-4 sm:grid-cols-3 text-sm text-slate-400">
+                {[
+                  { label: "Disponibilidade", value: "99.99%" },
+                  { label: "Pedidos/dia", value: "+2.4k" },
+                  { label: "Rupturas", value: "-46%" },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-white font-semibold">{item.value}</p>
+                    <p className="mt-1">{item.label}</p>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div className="glass-card rounded-3xl p-8 animate-fade-up-delay">
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Controle em tempo real</p>
-                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-slate-200">Ao vivo</span>
-                </div>
+            <div className="signal-panel rounded-[32px] p-8 animate-fade-up-delay">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Mission Control</p>
+                <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-slate-200">Live sync</span>
+              </div>
 
-                <div className="space-y-4">
-                  {[
-                    { label: "Pedidos sincronizados", value: "1.284", delta: "+18% 24h" },
-                    { label: "Estoque critico", value: "12", delta: "Ajuste automatico" },
-                    { label: "Atendimento WhatsApp", value: "3.2s", delta: "Resposta media" },
-                  ].map((metric) => (
-                    <div key={metric.label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <p className="text-xs text-slate-400">{metric.label}</p>
-                      <div className="mt-2 flex items-baseline justify-between">
-                        <p className="text-2xl font-semibold text-white">{metric.value}</p>
-                        <p className="text-xs text-slate-300">{metric.delta}</p>
-                      </div>
+              <div className="mt-8 space-y-4">
+                {[
+                  { label: "Pedidos em fluxo", value: "1.284", delta: "+18% 24h" },
+                  { label: "Estoque critico", value: "12", delta: "Reposicao inteligente" },
+                  { label: "WhatsApp", value: "3.2s", delta: "Resposta media" },
+                ].map((metric) => (
+                  <div key={metric.label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-xs text-slate-400">{metric.label}</p>
+                    <div className="mt-2 flex items-baseline justify-between">
+                      <p className="text-2xl font-semibold text-white">{metric.value}</p>
+                      <p className="text-xs text-slate-300">{metric.delta}</p>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
+              </div>
 
-                <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
-                  <p className="text-xs text-slate-400">Alertas inteligentes</p>
-                  <p className="mt-2 text-sm text-slate-200">
-                    Sugestoes de reposicao baseadas em velocidade de venda, sazonalidade e campanhas.
-                  </p>
-                </div>
+              <div className="mt-6 rounded-2xl border border-white/10 bg-slate-900/60 p-4">
+                <p className="text-xs text-slate-400">Previsao operacional</p>
+                <p className="mt-2 text-sm text-slate-200">
+                  Alertas de reposicao, previsao de demanda e status por canal em segundos.
+                </p>
               </div>
             </div>
           </section>
 
           <section className="mt-16 grid gap-6 md:grid-cols-3">
             {[
-              { title: "Estoque impenetravel", text: "Transacoes ACID e reserva inteligente para nunca vender o que nao existe." },
-              { title: "Checkout sem atrito", text: "Pagamentos e confirmacoes fluem com integracao imediata." },
-              { title: "Automacao em cadeia", text: "WhatsApp e notificacoes em um fluxo unificado que nao perde pedidos." },
+              { title: "Estoque blindado", text: "Transacoes ACID e reservas inteligentes para zerar overselling." },
+              { title: "Pagamentos sem atrito", text: "PIX, cartao e boleto em um fluxo unificado." },
+              { title: "Atendimento em escala", text: "WhatsApp, notificacoes e bot prontos para vender." },
             ].map((item) => (
-              <div key={item.title} className="glass-card rounded-2xl p-6">
+              <div key={item.title} className="signal-card rounded-2xl p-6">
                 <div className="h-1 w-12 rounded-full accent-line mb-4" />
                 <h3 className="text-lg font-semibold text-white">{item.title}</h3>
                 <p className="mt-3 text-sm text-slate-300">{item.text}</p>
@@ -124,19 +121,19 @@ export default function Page() {
             ))}
           </section>
 
-          <section className="mt-20 grid gap-10 lg:grid-cols-[1fr_1fr]">
+          <section className="mt-20 grid gap-12 lg:grid-cols-[1fr_1fr]">
             <div className="space-y-6">
-              <h2 className="font-display text-4xl text-white">Tres interfaces. Um unico motor.</h2>
+              <h2 className="font-display text-4xl text-white">Tres interfaces. Um unico pulso.</h2>
               <p className="text-slate-300">
-                Controle centralizado com experiencias especificas para cada canal. Tudo conversa com o mesmo core,
-                com visao instantanea de estoque, pedidos e clientes.
+                PDV, e-commerce e WhatsApp nao competem entre si. Eles obedecem o mesmo motor, com estoque central e
+                dados em tempo real.
               </p>
               <div className="grid gap-4 md:grid-cols-2">
                 {[
-                  { title: "PDV inteligente", text: "Vendas rapidas no balcao com baixa friccao." },
-                  { title: "E-commerce premium", text: "Vitrine e checkout alinhados com a marca." },
-                  { title: "WhatsApp autonomo", text: "IA treinada para responder, vender e confirmar." },
-                  { title: "Painel executivo", text: "Indicadores em tempo real para decisoes instantaneas." },
+                  { title: "PDV express", text: "Checkout imediato, sem friccao." },
+                  { title: "Storefront premium", text: "Vitrine pronta para conversao." },
+                  { title: "Bot autonomo", text: "Atendimento que fecha pedidos." },
+                  { title: "Painel executivo", text: "KPIs e alertas em uma tela." },
                 ].map((card) => (
                   <div key={card.title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                     <p className="text-white font-semibold">{card.title}</p>
@@ -146,15 +143,15 @@ export default function Page() {
               </div>
             </div>
 
-            <div className="glass-card rounded-3xl p-8 space-y-6">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Blueprint operacional</p>
+            <div className="signal-panel rounded-[32px] p-8">
+              <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Ciclo de dominio</p>
               {[
-                { step: "01", title: "Capture", text: "Pedido chega de qualquer canal." },
-                { step: "02", title: "Sincronize", text: "Estoque atualizado e reservado." },
-                { step: "03", title: "Confirme", text: "Pagamento validado em segundos." },
-                { step: "04", title: "Entregue", text: "Fulfillment orquestrado." },
+                { step: "01", title: "Capture", text: "Venda chega de qualquer canal." },
+                { step: "02", title: "Sincronize", text: "Reserva e atualiza estoque." },
+                { step: "03", title: "Confirme", text: "Pagamento aprovado em segundos." },
+                { step: "04", title: "Entregue", text: "Fluxo de fulfillment orquestrado." },
               ].map((item) => (
-                <div key={item.step} className="flex items-start gap-4 border-b border-white/10 pb-4 last:border-b-0 last:pb-0">
+                <div key={item.step} className="mt-6 flex items-start gap-4 border-b border-white/10 pb-4 last:border-b-0 last:pb-0">
                   <span className="text-sm text-slate-400">{item.step}</span>
                   <div>
                     <p className="text-white font-semibold">{item.title}</p>
@@ -167,9 +164,9 @@ export default function Page() {
 
           <section className="mt-20 grid gap-6 lg:grid-cols-3">
             {[
-              { title: "Seguranca de operacao", text: "JWT, auditoria completa e rastreio de eventos por usuario." },
-              { title: "Performance tatica", text: "Cache de alto desempenho e filas inteligentes." },
-              { title: "Expansao imediata", text: "Arquitetura multi-tenant pronta para escala." },
+              { title: "Seguranca operacional", text: "Auditoria total, controles de acesso e logs por usuario." },
+              { title: "Performance tatica", text: "Cache distribuido e idempotencia critica." },
+              { title: "Escala imediata", text: "Multi-tenant pronto para growth e franquias." },
             ].map((item) => (
               <div key={item.title} className="rounded-2xl border border-white/10 bg-slate-900/40 p-6">
                 <h3 className="text-lg font-semibold text-white">{item.title}</h3>
@@ -179,12 +176,12 @@ export default function Page() {
           </section>
 
           <section className="mt-20">
-            <div className="glass-card rounded-[32px] px-8 py-10 md:flex md:items-center md:justify-between">
+            <div className="signal-card rounded-[36px] px-8 py-10 md:flex md:items-center md:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Pronto para dominar</p>
+                <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Pronto para liderar</p>
                 <h2 className="font-display text-4xl text-white mt-3">Sua marca no centro do comercio unificado.</h2>
                 <p className="mt-4 text-slate-300 max-w-xl">
-                  Ative novos canais sem friccao, mantenha o estoque blindado e transforme atendimento em vendas.
+                  Ative canais, mantenha estoque blindado e transforme atendimento em receita real.
                 </p>
               </div>
               <div className="mt-6 flex flex-wrap gap-3 md:mt-0">

@@ -44,6 +44,10 @@
   --accent-coral: #ff7a3d;
   --accent-teal: #25b7a7;
   --accent-gold: #f2c14e;
+  --signal-amber: #ffb347;
+  --signal-cyan: #5fe0ff;
+  --signal-ice: #c3f4ff;
+  --signal-ember: #ff7b45;
   --line: rgba(255, 255, 255, 0.08);
 }
 
@@ -159,11 +163,41 @@ body {
     linear-gradient(135deg, var(--ink-900) 0%, var(--ink-850) 45%, var(--ink-800) 100%);
 }
 
+.hero-signal {
+  background:
+    radial-gradient(1200px 700px at 8% -10%, rgba(18, 58, 78, 0.55), transparent 60%),
+    radial-gradient(900px 600px at 92% 8%, rgba(31, 130, 138, 0.28), transparent 60%),
+    radial-gradient(800px 500px at 40% 120%, rgba(255, 123, 69, 0.18), transparent 65%),
+    linear-gradient(150deg, #081018 0%, #0d1522 45%, #111d2a 100%);
+}
+
+.hero-grid {
+  background-image:
+    linear-gradient(transparent 0%, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(circle at 20% 0%, rgba(0, 0, 0, 0.8), transparent 70%);
+}
+
 .glass-card {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
   border: 1px solid var(--line);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(8px);
+}
+
+.signal-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(10, 20, 30, 0.1));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+}
+
+.signal-panel {
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.14), rgba(12, 20, 30, 0.4));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
 }
 
 .accent-line {
@@ -176,6 +210,18 @@ body {
 
 .glow-teal {
   background: radial-gradient(circle, rgba(37, 183, 167, 0.35) 0%, transparent 65%);
+}
+
+.glow-ember {
+  background: radial-gradient(circle, rgba(255, 123, 69, 0.35) 0%, transparent 65%);
+}
+
+.glow-ice {
+  background: radial-gradient(circle, rgba(95, 224, 255, 0.28) 0%, transparent 70%);
+}
+
+.glow-aurora {
+  background: radial-gradient(circle, rgba(78, 214, 199, 0.25) 0%, transparent 70%);
 }
 
 .animate-fade-up {

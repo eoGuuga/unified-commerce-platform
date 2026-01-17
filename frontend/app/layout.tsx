@@ -18,7 +18,7 @@ const bebasNeue = Bebas_Neue({
 
 export const metadata: Metadata = {
   title: "Unified Commerce Platform",
-  description: "Plataforma SaaS para unificação de vendas multi-canal",
+  description: "Plataforma SaaS para unificacao de vendas multi-canal",
 }
 
 export default function RootLayout({
