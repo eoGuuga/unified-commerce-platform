@@ -106,19 +106,26 @@ export class PaymentsService {
     }
 
     const totalAmount = Number(pedido.total_amount);
-    if (createPaymentDto.amount !== totalAmount) {
-      const diff = Math.abs(createPaymentDto.amount - totalAmount);
+    let requestedAmount = Number(createPaymentDto.amount);
+    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+      requestedAmount = totalAmount;
+    }
+
+    if (requestedAmount !== totalAmount) {
+      const diff = Math.abs(requestedAmount - totalAmount);
       if (diff > 0.01) {
         throw new BadRequestException(
-          `Valor do pagamento (R$ ${createPaymentDto.amount.toFixed(2)}) nao confere com o total do pedido (R$ ${totalAmount.toFixed(2)})`,
+          `Valor do pagamento (R$ ${requestedAmount.toFixed(2)}) nao confere com o total do pedido (R$ ${totalAmount.toFixed(2)})`,
         );
       }
     }
 
-    let valorFinal = createPaymentDto.amount;
+    let valorFinal = requestedAmount;
     if (createPaymentDto.method === MetodoPagamento.PIX) {
-      valorFinal = createPaymentDto.amount * 0.95;
-      this.logger.log(`Pix discount applied: R$ ${createPaymentDto.amount} -> R$ ${valorFinal.toFixed(2)}`);
+      valorFinal = requestedAmount * 0.95;
+      this.logger.log(
+        `Pix discount applied: R$ ${requestedAmount.toFixed(2)} -> R$ ${valorFinal.toFixed(2)}`,
+      );
     }
 
     const pagamentoRepo = this.db.getRepository(Pagamento);
