@@ -8,6 +8,30 @@ TENANT="00000000-0000-0000-0000-000000000000"
 EMAIL="scan+$(date +%s)@exemplo.com"
 PASS="12345678"
 
+wait_for_health() {
+  local url="$1"
+  local name="$2"
+  local attempts="${3:-30}"
+  local delay="${4:-2}"
+  local i code body
+
+  for i in $(seq 1 "$attempts"); do
+    body="$(mktemp)"
+    code="$(curl -s -o "$body" -w "%{http_code}" "$url" || true)"
+    if [ "$code" = "200" ]; then
+      cat "$body"
+      rm -f "$body"
+      return 0
+    fi
+    echo "Attempt $i/$attempts $name returned $code; retrying in ${delay}s"
+    rm -f "$body"
+    sleep "$delay"
+  done
+
+  echo "ERROR: $name failed after $attempts attempts"
+  return 1
+}
+
 cd "$ROOT_DIR"
 git pull
 
@@ -21,6 +45,7 @@ echo "Scan started: $(date -Is)" >> "$LOG"
 {
   echo
   echo "==> Health endpoints"
+  wait_for_health "$BASE/health" "health"
   curl -i "$BASE/health"
   curl -i "$BASE/health/ready"
   curl -i "$BASE/health/live"
