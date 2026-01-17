@@ -37,7 +37,7 @@ git pull
 
 docker compose --env-file "$ROOT_DIR/deploy/.env" \
   -f "$ROOT_DIR/deploy/docker-compose.test.yml" \
-  --project-name ucmtest up -d --build --force-recreate backend
+  --project-name ucmtest up -d --build --force-recreate backend frontend
 
 : > "$LOG"
 echo "Scan started: $(date -Is)" >> "$LOG"
