@@ -176,7 +176,7 @@ body {
     linear-gradient(transparent 0%, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
     linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
   background-size: 60px 60px;
-  mask-image: radial-gradient(circle at 20% 0%, rgba(0, 0, 0, 0.8), transparent 70%);
+  mask-image: radial-gradient(circle at 30% 0%, rgba(0, 0, 0, 0.9), transparent 70%);
 }
 
 .glass-card {
@@ -184,6 +184,24 @@ body {
   border: 1px solid var(--line);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(8px);
+}
+
+.signal-pill {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.45rem 1rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  color: rgba(226, 232, 240, 0.85);
+}
+
+.signal-surface {
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.12), rgba(10, 18, 28, 0.2));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
 }
 
 .signal-card {
@@ -198,6 +216,23 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(12px);
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1rem 1.1rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mini-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 179, 71, 0.9), rgba(95, 224, 255, 0.9));
 }
 
 .accent-line {
