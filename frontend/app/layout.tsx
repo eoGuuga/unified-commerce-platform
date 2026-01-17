@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Sora, Bebas_Neue } from "next/font/google"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
+import "./globals.css"
 
 const sora = Sora({
   subsets: ["latin"],
