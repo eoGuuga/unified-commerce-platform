@@ -18,7 +18,12 @@ export class CouponsController {
     if (process.env.NODE_ENV === 'production') {
       throw new NotFoundException();
     }
-    return await this.couponsService.upsertDevCoupon(tenantId, body?.code);
+    return await this.couponsService.upsertDevCoupon(
+      tenantId,
+      body?.code,
+      body?.discount_type,
+      body?.discount_value,
+    );
   }
 }
 

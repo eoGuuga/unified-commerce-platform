@@ -188,7 +188,7 @@ describe('OrdersService', () => {
       id: 'pedido-id',
       tenant_id: tenantId,
       order_no: 'PED-20260107-001',
-      status: PedidoStatus.ENTREGUE,
+      status: PedidoStatus.PENDENTE_PAGAMENTO,
       channel: CanalVenda.PDV,
       customer_name: 'João Silva',
       subtotal: 112.5,
@@ -228,7 +228,7 @@ describe('OrdersService', () => {
       // Assert
       expect(result).toBeDefined();
       expect(result.total_amount).toBe(112.5); // (5 * 10.5) + (3 * 20.0) = 52.5 + 60 = 112.5
-      expect(result.status).toBe(PedidoStatus.ENTREGUE); // PDV = ENTREGUE
+      expect(result.status).toBe(PedidoStatus.PENDENTE_PAGAMENTO);
       expect(mockDbContextService.runInTransaction).toHaveBeenCalled();
       expect(queryBuilder.setLock).toHaveBeenCalledWith('pessimistic_write');
       expect(queryBuilder.getMany).toHaveBeenCalled();
@@ -386,7 +386,7 @@ describe('OrdersService', () => {
       expect(result.total_amount).toBe(107.5); // 112.5 - 10 + 5
     });
 
-    it('deve definir status correto baseado no canal (PDV = ENTREGUE, outros = CONFIRMADO)', async () => {
+    it('deve definir status correto baseado no canal (sempre PENDENTE_PAGAMENTO)', async () => {
       // Arrange
       const queryBuilder = {
         where: jest.fn().mockReturnThis(),
@@ -411,16 +411,16 @@ describe('OrdersService', () => {
 
       // Test PDV
       const resultPDV = await service.create(createOrderDto, tenantId);
-      expect(resultPDV.status).toBe(PedidoStatus.ENTREGUE);
+      expect(resultPDV.status).toBe(PedidoStatus.PENDENTE_PAGAMENTO);
 
       // Test E-commerce
       const orderEcommerce = { ...createOrderDto, channel: CanalVenda.ECOMMERCE };
-      const pedidoEcommerce = { ...mockPedido, status: PedidoStatus.CONFIRMADO };
+      const pedidoEcommerce = { ...mockPedido, status: PedidoStatus.PENDENTE_PAGAMENTO };
       mockManager.create = jest.fn().mockReturnValue(pedidoEcommerce);
       mockManager.save = jest.fn().mockResolvedValue(pedidoEcommerce);
 
       const resultEcommerce = await service.create(orderEcommerce, tenantId);
-      expect(resultEcommerce.status).toBe(PedidoStatus.CONFIRMADO);
+      expect(resultEcommerce.status).toBe(PedidoStatus.PENDENTE_PAGAMENTO);
     });
   });
 });

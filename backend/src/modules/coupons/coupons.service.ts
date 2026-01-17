@@ -99,11 +99,22 @@ export class CouponsService {
     };
   }
 
-  async upsertDevCoupon(tenantId: string, code?: string): Promise<CupomDesconto> {
+  async upsertDevCoupon(
+    tenantId: string,
+    code?: string,
+    discountType?: TipoDesconto,
+    discountValue?: number,
+  ): Promise<CupomDesconto> {
     const normalized = (code || 'DEV10').trim().toUpperCase();
     if (!normalized) {
       throw new BadRequestException('Código de cupom inválido');
     }
+
+    const resolvedType = discountType || TipoDesconto.PERCENTAGE;
+    const resolvedValue =
+      discountValue != null && !Number.isNaN(Number(discountValue))
+        ? Number(discountValue)
+        : 10;
 
     const couponsRepo = this.db.getRepository(CupomDesconto);
     let existing = await couponsRepo.findOne({
@@ -115,8 +126,8 @@ export class CouponsService {
       existing = couponsRepo.create({
         tenant_id: tenantId,
         code: normalized,
-        discount_type: TipoDesconto.PERCENTAGE,
-        discount_value: 10,
+        discount_type: resolvedType,
+        discount_value: resolvedValue,
         min_purchase_amount: null,
         max_discount_amount: null,
         usage_limit: null,
@@ -127,8 +138,8 @@ export class CouponsService {
       });
     } else {
       existing.is_active = true;
-      existing.discount_type = TipoDesconto.PERCENTAGE;
-      existing.discount_value = 10;
+      existing.discount_type = resolvedType;
+      existing.discount_value = resolvedValue;
       existing.valid_until = null;
     }
 

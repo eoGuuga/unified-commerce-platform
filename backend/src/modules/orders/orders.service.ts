@@ -173,17 +173,8 @@ export class OrdersService {
 
       // 6. Criar pedido
       const orderNo = await this.generateOrderNumber(tenantId);
-      // PDV = ENTREGUE (pagamento no ato)
-      // WHATSAPP = PENDENTE_PAGAMENTO (aguarda confirmação)
-      // ECOMMERCE = CONFIRMADO (pagamento online já processado)
-      let initialStatus: PedidoStatus;
-      if (createOrderDto.channel === CanalVenda.PDV) {
-        initialStatus = PedidoStatus.ENTREGUE;
-      } else if (createOrderDto.channel === CanalVenda.WHATSAPP) {
-        initialStatus = PedidoStatus.PENDENTE_PAGAMENTO;
-      } else {
-        initialStatus = PedidoStatus.CONFIRMADO;
-      }
+      // Todos os canais comecam em PENDENTE_PAGAMENTO para fluxo de pagamento consistente.
+      const initialStatus: PedidoStatus = PedidoStatus.PENDENTE_PAGAMENTO;
 
       const pedido = manager.getRepository(Pedido).create();
       pedido.tenant_id = tenantId;
@@ -365,6 +356,9 @@ export class OrdersService {
   ): Promise<Pedido> {
     const pedido = await this.findOne(id, tenantId);
     const oldStatus = pedido.status;
+    if (oldStatus !== status) {
+      this.assertStatusTransition(oldStatus, status);
+    }
     pedido.status = status;
     const updatedPedido = await this.db.getRepository(Pedido).save(pedido);
 
@@ -412,6 +406,41 @@ export class OrdersService {
 
     const fallback = randomBytes(4).toString('hex').toUpperCase();
     return `${prefix}${fallback}`;
+  }
+
+  private assertStatusTransition(from: PedidoStatus, to: PedidoStatus): void {
+    const allowed: Record<PedidoStatus, PedidoStatus[]> = {
+      [PedidoStatus.PENDENTE_PAGAMENTO]: [
+        PedidoStatus.CONFIRMADO,
+        PedidoStatus.CANCELADO,
+      ],
+      [PedidoStatus.CONFIRMADO]: [
+        PedidoStatus.EM_PRODUCAO,
+        PedidoStatus.CANCELADO,
+      ],
+      [PedidoStatus.EM_PRODUCAO]: [
+        PedidoStatus.PRONTO,
+        PedidoStatus.CANCELADO,
+      ],
+      [PedidoStatus.PRONTO]: [
+        PedidoStatus.EM_TRANSITO,
+        PedidoStatus.ENTREGUE,
+      ],
+      [PedidoStatus.EM_TRANSITO]: [PedidoStatus.ENTREGUE],
+      [PedidoStatus.ENTREGUE]: [],
+      [PedidoStatus.CANCELADO]: [],
+    };
+
+    if (from === to) {
+      return;
+    }
+
+    const next = allowed[from] || [];
+    if (!next.includes(to)) {
+      throw new BadRequestException(
+        `Transicao de status invalida: ${from} -> ${to}`,
+      );
+    }
   }
 
   async getSalesReport(tenantId: string): Promise<any> {
