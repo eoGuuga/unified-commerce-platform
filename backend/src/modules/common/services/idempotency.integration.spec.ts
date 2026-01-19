@@ -23,7 +23,6 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
   let tenantRepository: Repository<Tenant>;
   let dbContext: DbContextService;
   let queryRunner: QueryRunner;
-  let tenantAvailable = false;
   const tenantId = '00000000-0000-0000-0000-000000000000';
 
   beforeAll(async () => {
@@ -48,22 +47,8 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
 
       // Validar tenant de teste (evita violar RLS com INSERT)
       const testTenant = await tenantRepository.findOne({ where: { id: tenantId } });
-      tenantAvailable = Boolean(testTenant);
-
-      if (!tenantAvailable) {
-        try {
-          await queryRunner.query('SET LOCAL row_security = off');
-          await queryRunner.query(
-            `INSERT INTO "tenants"("id", "name", "slug", "settings", "is_active")
-             VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT ("id") DO NOTHING`,
-            [tenantId, 'Test Tenant', 'test-tenant', '{}', true],
-          );
-          tenantAvailable = true;
-        } catch (seedError) {
-          console.warn('⚠️ Tenant seed bloqueado por RLS, pulando testes de idempotência.');
-          tenantAvailable = false;
-        }
+      if (!testTenant) {
+        throw new Error('Tenant de teste ausente. Rode deploy/scripts/seed-test-tenant.sh');
       }
     } catch (error) {
       console.error('❌ Erro ao inicializar testes:', error);
@@ -82,9 +67,6 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
 
   beforeEach(async () => {
     // Limpar chaves de idempotência de testes anteriores via service
-    if (!tenantAvailable) {
-      return;
-    }
     try {
       await dbContext.runWithManager(queryRunner.manager, async () => {
         await service.remove(tenantId, 'test-race-condition-key', 'test-operation');
@@ -98,10 +80,6 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
 
   describe('checkAndSet - Race Condition', () => {
     it('deve lidar com race condition quando dois requests simultâneos tentam criar a mesma chave', async () => {
-      if (!tenantAvailable) {
-        console.log('⏭️ Pulando teste - tenant não disponível');
-        return;
-      }
       const operationType = 'test-operation';
       const key = 'test-race-condition-key';
 
@@ -129,10 +107,6 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
     });
 
     it('deve retornar registro existente quando chave já foi criada', async () => {
-      if (!tenantAvailable) {
-        console.log('⏭️ Pulando teste - tenant não disponível');
-        return;
-      }
       const operationType = 'test-operation-existing';
       const key = 'test-existing-key';
 
@@ -163,10 +137,6 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
     });
 
     it('não deve lançar erro PostgreSQL 23505 (unique_violation)', async () => {
-      if (!tenantAvailable) {
-        console.log('⏭️ Pulando teste - tenant não disponível');
-        return;
-      }
       const operationType = 'test-operation-no-error';
       const key = 'test-no-error-key';
 
