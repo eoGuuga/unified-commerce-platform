@@ -10,8 +10,7 @@ import { CommonModule } from '../common/common.module';
 import { databaseConfig } from '../../config/database.config';
 import { JwtService } from '@nestjs/jwt';
 import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { TenantDbContextInterceptor } from '../../common/interceptors/tenant-db-context.interceptor';
 

@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
-import { EntityManager } from 'typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { Pedido, PedidoStatus } from '../../database/entities/Pedido.entity';
@@ -17,7 +16,6 @@ import { CouponsService } from '../coupons/coupons.service';
 
 describe('OrdersService', () => {
   let service: OrdersService;
-  let manager: EntityManager;
 
   const mockPedidoRepository = {
     create: jest.fn().mockReturnValue({}),
@@ -132,7 +130,6 @@ describe('OrdersService', () => {
     }).compile();
 
     service = module.get<OrdersService>(OrdersService);
-    manager = mockManager as unknown as EntityManager;
   });
 
   afterEach(() => {
