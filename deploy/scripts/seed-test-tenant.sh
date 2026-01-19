@@ -37,7 +37,11 @@ BEGIN;
 SET LOCAL row_security = off;
 INSERT INTO "tenants"("id", "name", "slug", "settings", "is_active")
 VALUES ('${TENANT_ID}', 'Test Tenant', 'test-tenant', '{}', true)
-ON CONFLICT ("id") DO NOTHING;
+ON CONFLICT ("id") DO UPDATE
+SET "name" = EXCLUDED."name",
+    "slug" = EXCLUDED."slug",
+    "settings" = EXCLUDED."settings",
+    "is_active" = EXCLUDED."is_active";
 COMMIT;
 SQL
 
