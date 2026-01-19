@@ -46,8 +46,25 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
       tenantRepository = queryRunner.manager.getRepository<Tenant>(Tenant);
 
       // Validar tenant de teste (evita violar RLS com INSERT)
-      const testTenant = await tenantRepository.findOne({ where: { id: tenantId } });
-      if (!testTenant) {
+      let tenantRows: Array<{ id: string }> = [];
+      try {
+        await queryRunner.query('BEGIN');
+        await queryRunner.query('SET LOCAL row_security = off');
+        tenantRows = await queryRunner.query(
+          'SELECT id FROM tenants WHERE id = $1 LIMIT 1',
+          [tenantId],
+        );
+        await queryRunner.query('COMMIT');
+      } catch (seedCheckError) {
+        try {
+          await queryRunner.query('ROLLBACK');
+        } catch {
+          // ignore
+        }
+        throw seedCheckError;
+      }
+
+      if (!tenantRows.length) {
         throw new Error('Tenant de teste ausente. Rode deploy/scripts/seed-test-tenant.sh');
       }
     } catch (error) {
