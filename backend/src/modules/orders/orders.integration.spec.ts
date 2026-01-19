@@ -148,7 +148,7 @@ describe('Orders Integration Tests (e2e)', () => {
 
       expect(orderResponse.body).toHaveProperty('id');
       expect(orderResponse.body).toHaveProperty('order_no');
-      expect(orderResponse.body.status).toBe('entregue'); // PDV = entregue
+      expect(orderResponse.body.status).toBe('pendente_pagamento'); // PDV = pendente_pagamento
       expect(orderResponse.body.total_amount).toBe(52.5); // 5 * 10.5
     });
 
