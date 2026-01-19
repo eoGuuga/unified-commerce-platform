@@ -49,6 +49,17 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
       // Validar tenant de teste (evita violar RLS com INSERT)
       const testTenant = await tenantRepository.findOne({ where: { id: tenantId } });
       tenantAvailable = Boolean(testTenant);
+
+      if (!tenantAvailable) {
+        await queryRunner.query('SET LOCAL row_security = off');
+        await queryRunner.query(
+          `INSERT INTO "tenants"("id", "name", "slug", "settings", "is_active")
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT ("id") DO NOTHING`,
+          [tenantId, 'Test Tenant', 'test-tenant', '{}', true],
+        );
+        tenantAvailable = true;
+      }
     } catch (error) {
       console.error('❌ Erro ao inicializar testes:', error);
       throw error;

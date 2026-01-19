@@ -77,9 +77,14 @@ export class TenantDbContextInterceptor implements NestInterceptor {
       } catch {
         // ignore
       }
-      this.logger.error('Erro no contexto transacional do tenant (RLS)', {
-        error: err instanceof Error ? err.message : String(err),
-      });
+      const suppressLogs =
+        process.env.NODE_ENV === 'test' ||
+        process.env.SUPPRESS_TENANT_RLS_LOGS === 'true';
+      if (!suppressLogs) {
+        this.logger.error('Erro no contexto transacional do tenant (RLS)', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
       throw err;
     } finally {
       try {
