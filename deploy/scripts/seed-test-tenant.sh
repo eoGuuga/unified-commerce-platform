@@ -33,10 +33,12 @@ PG_USER="${POSTGRES_USER:-postgres}"
 PG_DB="${POSTGRES_DB:-ucm}"
 
 docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -v ON_ERROR_STOP=1 <<SQL
+BEGIN;
 SET LOCAL row_security = off;
 INSERT INTO "tenants"("id", "name", "slug", "settings", "is_active")
 VALUES ('${TENANT_ID}', 'Test Tenant', 'test-tenant', '{}', true)
 ON CONFLICT ("id") DO NOTHING;
+COMMIT;
 SQL
 
 echo "Tenant de teste garantido: ${TENANT_ID}"
