@@ -24,6 +24,8 @@ async function bootstrap() {
   });
 
   const app = await NestFactory.create(AppModule);
+  // Evita respostas 304/ETag em APIs (especialmente em dev/test).
+  app.disable('etag');
 
   const isProd = process.env.NODE_ENV === 'production';
   const enableSwagger = !isProd || process.env.ENABLE_SWAGGER === 'true';
@@ -168,6 +170,14 @@ async function bootstrap() {
   }
 
   app.setGlobalPrefix('api/v1');
+  if (!isProd) {
+    app.use((req, res, next) => {
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      next();
+    });
+  }
 
   const shouldSeedDevUser = process.env.SEED_DEV_USER !== 'false';
   if (shouldSeedDevUser) {
