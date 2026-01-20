@@ -122,10 +122,16 @@ export class PaymentsService {
 
     let valorFinal = requestedAmount;
     if (createPaymentDto.method === MetodoPagamento.PIX) {
-      valorFinal = requestedAmount * 0.95;
+      valorFinal = Number((requestedAmount * 0.95).toFixed(2));
       this.logger.log(
         `Pix discount applied: R$ ${requestedAmount.toFixed(2)} -> R$ ${valorFinal.toFixed(2)}`,
       );
+    }
+
+    // Garantir 2 casas decimais para evitar erro "Invalid transaction_amount"
+    valorFinal = Number(valorFinal.toFixed(2));
+    if (!Number.isFinite(valorFinal) || valorFinal <= 0) {
+      throw new BadRequestException('Valor do pagamento inválido');
     }
 
     const pagamentoRepo = this.db.getRepository(Pagamento);
