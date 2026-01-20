@@ -115,6 +115,7 @@ services:
       - backend
     networks:
       - ucm-net
+      - ucmtest-net
 
 volumes:
   postgres_data:
@@ -123,4 +124,7 @@ volumes:
 networks:
   ucm-net:
     driver: bridge
+  ucmtest-net:
+    external: true
+    name: ucmtest_ucm-test-net
 
