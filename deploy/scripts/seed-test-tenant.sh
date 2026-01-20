@@ -32,6 +32,14 @@ fi
 PG_USER="${POSTGRES_USER:-postgres}"
 PG_DB="${POSTGRES_DB:-ucm}"
 
+if [[ -n "${DATABASE_URL:-}" ]]; then
+  DB_FROM_URL="${DATABASE_URL##*/}"
+  DB_FROM_URL="${DB_FROM_URL%%\?*}"
+  if [[ -n "$DB_FROM_URL" ]]; then
+    PG_DB="$DB_FROM_URL"
+  fi
+fi
+
 docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -v ON_ERROR_STOP=1 <<SQL
 BEGIN;
 SET LOCAL row_security = off;
