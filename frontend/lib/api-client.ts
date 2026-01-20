@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './config';
+import { API_BASE_URL, TENANT_ID } from './config';
 
 // ⚠️ REMOVIDO: Credenciais hardcoded - devem vir do contexto JWT ou variáveis de ambiente
 
@@ -26,8 +26,13 @@ class ApiClient {
       url += `?${searchParams.toString()}`;
     }
 
+    const storedTenantId =
+      typeof window !== 'undefined' ? localStorage.getItem('tenant_id') : null;
+    const effectiveTenantId = storedTenantId || TENANT_ID;
+
     const headers = {
       'Content-Type': 'application/json',
+      ...(effectiveTenantId && { 'x-tenant-id': effectiveTenantId }),
       ...(token && { Authorization: `Bearer ${token}` }),
       ...fetchOptions.headers,
     };
@@ -48,7 +53,9 @@ class ApiClient {
   // Auth endpoints
   async login(email: string, password: string, tenantId?: string) {
     const tid =
-      tenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenant_id') : null);
+      tenantId ||
+      (typeof window !== 'undefined' ? localStorage.getItem('tenant_id') : null) ||
+      TENANT_ID;
     return this.request('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
@@ -58,7 +65,9 @@ class ApiClient {
 
   async register(data: { email: string; password: string; full_name: string }, tenantId?: string) {
     const tid =
-      tenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenant_id') : null);
+      tenantId ||
+      (typeof window !== 'undefined' ? localStorage.getItem('tenant_id') : null) ||
+      TENANT_ID;
     return this.request('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),

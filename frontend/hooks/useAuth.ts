@@ -119,7 +119,7 @@ export function useAuth() {
 
   const login = useCallback(async (email: string, password: string, tenantId?: string) => {
     try {
-      const response = await api.login(email, password);
+        const response = await api.login(email, password, tenantId);
       
       if (response.access_token && typeof window !== 'undefined') {
         localStorage.setItem('token', response.access_token);
@@ -132,7 +132,8 @@ export function useAuth() {
           throw new Error('Tenant ID não encontrado no token JWT');
         }
 
-        await loadUser(response.access_token);
+          localStorage.setItem('tenant_id', extractedTenantId);
+          await loadUser(response.access_token);
 
         return { success: true, tenantId: extractedTenantId };
       }
