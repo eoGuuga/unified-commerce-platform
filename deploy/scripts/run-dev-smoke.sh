@@ -13,7 +13,7 @@ set -a
 source "$ENV_FILE"
 set +a
 
-BASE_URL="${FRONTEND_URL:-https://dev.gtsofthub.com.br}"
+BASE_URL="${DEV_API_BASE_URL:-${FRONTEND_URL:-https://dev.gtsofthub.com.br}}"
 API_BASE="${BASE_URL%/}/api/v1"
 TENANT_ID="${DEV_TENANT_ID:-00000000-0000-0000-0000-000000000000}"
 DEV_EMAIL="${DEV_USER_EMAIL:-dev@gtsofthub.com.br}"
@@ -39,6 +39,16 @@ wait_for_health() {
 }
 
 if ! wait_for_health; then
+  for fallback in "http://127.0.0.1:8080" "http://localhost:8080"; do
+    API_BASE="${fallback%/}/api/v1"
+    if wait_for_health; then
+      echo "Usando API local: ${API_BASE}"
+      break
+    fi
+  done
+fi
+
+if ! curl -fsS "${API_BASE}/health" >/dev/null 2>&1; then
   echo "Health check falhou: ${API_BASE}/health" >&2
   exit 1
 fi
