@@ -4,6 +4,10 @@
  */
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+export const TENANT_ID =
+  process.env.NEXT_PUBLIC_TENANT_ID ||
+  process.env.NEXT_PUBLIC_DEV_TENANT_ID ||
+  '00000000-0000-0000-0000-000000000000';
 
 /**
  * ⚠️ DEPRECATED: Em desenvolvimento, usar credenciais apenas se configuradas via env

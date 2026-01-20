@@ -1,10 +1,11 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+import { API_BASE_URL, TENANT_ID } from './config';
 
 export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   const token = localStorage.getItem('token');
 
   const headers = {
     'Content-Type': 'application/json',
+    'x-tenant-id': TENANT_ID,
     ...(token && { Authorization: `Bearer ${token}` }),
     ...options.headers,
   };
