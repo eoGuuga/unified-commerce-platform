@@ -80,62 +80,58 @@ class ApiClient {
   }
 
   // Products endpoints
-  async getProducts(tenantId: string) {
-    return this.request('/products', { params: { tenantId } });
+  async getProducts(_tenantId: string) {
+    return this.request('/products');
   }
 
-  async getProduct(id: string, tenantId: string) {
-    return this.request(`/products/${id}`, { params: { tenantId } });
+  async getProduct(id: string, _tenantId: string) {
+    return this.request(`/products/${id}`);
   }
 
-  async searchProducts(query: string, tenantId: string) {
-    return this.request('/products/search', { params: { q: query, tenantId } });
+  async searchProducts(query: string, _tenantId: string) {
+    return this.request('/products/search', { params: { q: query } });
   }
 
-  async createProduct(product: any, tenantId: string) {
+  async createProduct(product: any, _tenantId: string) {
     return this.request('/products', {
       method: 'POST',
-      params: { tenantId },
       body: JSON.stringify(product),
     });
   }
 
-  async updateProduct(id: string, product: any, tenantId: string) {
+  async updateProduct(id: string, product: any, _tenantId: string) {
     return this.request(`/products/${id}`, {
       method: 'PATCH',
-      params: { tenantId },
       body: JSON.stringify(product),
     });
   }
 
   // Orders endpoints
-  async createOrder(order: any, tenantId: string) {
+  async createOrder(order: any, _tenantId: string) {
     return this.request('/orders', {
       method: 'POST',
-      params: { tenantId },
       body: JSON.stringify(order),
     });
   }
 
-  async getOrders(tenantId: string) {
-    return this.request('/orders', { params: { tenantId } });
+  async getOrders(_tenantId: string) {
+    return this.request('/orders');
   }
 
-  async getOrder(id: string, tenantId: string) {
-    return this.request(`/orders/${id}`, { params: { tenantId } });
+  async getOrder(id: string, _tenantId: string) {
+    return this.request(`/orders/${id}`);
   }
 
-  async updateOrderStatus(id: string, status: string, tenantId: string) {
+  async updateOrderStatus(id: string, status: string, _tenantId: string) {
     return this.request(`/orders/${id}`, {
       method: 'PATCH',
-      params: { tenantId },
       body: JSON.stringify({ status }),
     });
   }
 
-  async getSalesReport(tenantId: string) {
+  async getSalesReport(_tenantId: string) {
     try {
-      return await this.request('/orders/reports/sales', { params: { tenantId } });
+      return await this.request('/orders/reports/sales');
     } catch (error: any) {
       if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
         // ⚠️ REMOVIDO: Login automático com credenciais hardcoded
@@ -147,11 +143,10 @@ class ApiClient {
   }
 
   // Stock reservation endpoints
-  async reserveStock(productId: string, quantity: number, tenantId: string) {
+  async reserveStock(productId: string, quantity: number, _tenantId: string) {
     try {
       return await this.request(`/products/${productId}/reserve`, {
         method: 'POST',
-        params: { tenantId },
         body: JSON.stringify({ quantity }),
       });
     } catch (error: any) {
@@ -164,11 +159,10 @@ class ApiClient {
     }
   }
 
-  async releaseStock(productId: string, quantity: number, tenantId: string) {
+  async releaseStock(productId: string, quantity: number, _tenantId: string) {
     try {
       return await this.request(`/products/${productId}/release`, {
         method: 'POST',
-        params: { tenantId },
         body: JSON.stringify({ quantity }),
       });
     } catch (error: any) {
@@ -181,22 +175,20 @@ class ApiClient {
   }
 
   // Stock management endpoints
-  async getStockSummary(tenantId: string) {
-    return this.request('/products/stock-summary', { params: { tenantId } });
+  async getStockSummary(_tenantId: string) {
+    return this.request('/products/stock-summary');
   }
 
-  async adjustStock(productId: string, quantity: number, tenantId: string, reason?: string) {
+  async adjustStock(productId: string, quantity: number, _tenantId: string, reason?: string) {
     return this.request(`/products/${productId}/adjust-stock`, {
       method: 'POST',
-      params: { tenantId },
       body: JSON.stringify({ quantity, reason }),
     });
   }
 
-  async setMinStock(productId: string, minStock: number, tenantId: string) {
+  async setMinStock(productId: string, minStock: number, _tenantId: string) {
     return this.request(`/products/${productId}/min-stock`, {
       method: 'PATCH',
-      params: { tenantId },
       body: JSON.stringify({ min_stock: minStock }),
     });
   }
