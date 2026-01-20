@@ -158,8 +158,15 @@ export class AuthService {
   }
 
   async validateUser(payload: JwtPayload): Promise<Usuario> {
+    const tenantId = (payload.tenant_id || '').trim();
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!tenantId || !uuidRegex.test(tenantId)) {
+      throw new UnauthorizedException('Tenant invalido');
+    }
+
     const usuario = await this.db.getRepository(Usuario).findOne({
-      where: { id: payload.sub, tenant_id: payload.tenant_id },
+      where: { id: payload.sub, tenant_id: tenantId },
     });
 
     if (!usuario || !usuario.is_active) {
