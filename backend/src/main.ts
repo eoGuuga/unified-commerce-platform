@@ -169,7 +169,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
 
-  const shouldSeedDevUser = !isProd && process.env.SEED_DEV_USER !== 'false';
+  const shouldSeedDevUser = process.env.SEED_DEV_USER !== 'false';
   if (shouldSeedDevUser) {
     const devTenantId =
       process.env.DEV_TENANT_ID || '00000000-0000-0000-0000-000000000000';
@@ -182,6 +182,7 @@ async function bootstrap() {
       ? (String(devRoleRaw).toLowerCase() as UserRole)
       : UserRole.ADMIN;
 
+    const forceReset = process.env.SEED_DEV_USER_FORCE_RESET !== 'false';
     const dataSource = app.get(DataSource);
     const runner = dataSource.createQueryRunner();
     await runner.connect();
@@ -196,7 +197,7 @@ async function bootstrap() {
         where: { email: devEmail, tenant_id: devTenantId },
       });
 
-      if (!existing) {
+      if (!existing || forceReset) {
         const defaultHash =
           '$2b$10$lOraQx936asTk3b8crguZOLmW/zZQSN1sGX.ViNgfFx8zy4EXK9wa'; // 12345678
         const devPasswordHash =
@@ -208,18 +209,31 @@ async function bootstrap() {
           );
         }
 
-        const user = repo.create({
-          email: devEmail,
-          encrypted_password: devPasswordHash,
-          full_name: devName,
-          tenant_id: devTenantId,
-          role: devRole,
-          is_active: true,
-        });
-        await repo.save(user);
-        console.log(`[DEV] Usuario de teste criado: ${devEmail}`);
-      } else {
-        console.log(`[DEV] Usuario de teste ja existe: ${devEmail}`);
+        if (!existing) {
+          const user = repo.create({
+            email: devEmail,
+            encrypted_password: devPasswordHash,
+            full_name: devName,
+            tenant_id: devTenantId,
+            role: devRole,
+            is_active: true,
+          });
+          await repo.save(user);
+          console.log(`[DEV] Usuario de teste criado: ${devEmail}`);
+        } else if (forceReset) {
+          await repo.update(
+            { id: existing.id },
+            {
+              encrypted_password: devPasswordHash,
+              full_name: devName,
+              role: devRole,
+              is_active: true,
+            },
+          );
+          console.log(`[DEV] Usuario de teste atualizado: ${devEmail}`);
+        } else {
+          console.log(`[DEV] Usuario de teste ja existe: ${devEmail}`);
+        }
       }
 
       await runner.commitTransaction();
