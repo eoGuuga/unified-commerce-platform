@@ -14,6 +14,12 @@ chmod +x deploy/scripts/seed-test-tenant.sh \
 ./deploy/scripts/bootstrap-dev.sh
 ```
 
+## Atalho (1 comando)
+
+```
+./deploy/scripts/dev-up.sh
+```
+
 ## Scripts
 
 - `deploy/scripts/seed-test-tenant.sh`:
