@@ -168,10 +168,11 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   const port = process.env.PORT || 3001;
-  await app.listen(port);
+  const host = process.env.HOST || '0.0.0.0';
+  await app.listen(port, host);
 
-  console.log(`Backend running on http://localhost:${port}/api/v1`);
-  console.log(`Swagger documentation: http://localhost:${port}/api/docs`);
+  console.log(`Backend running on http://${host}:${port}/api/v1`);
+  console.log(`Swagger documentation: http://${host}:${port}/api/docs`);
 }
 
 bootstrap();
