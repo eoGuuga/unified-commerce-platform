@@ -4,7 +4,6 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { DataSource } from 'typeorm';
-import * as bcrypt from 'bcrypt';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { CsrfGuard } from './common/guards/csrf.guard';
 import { AppModule } from './app.module';
@@ -175,7 +174,6 @@ async function bootstrap() {
     const devTenantId =
       process.env.DEV_TENANT_ID || '00000000-0000-0000-0000-000000000000';
     const devEmail = process.env.DEV_USER_EMAIL || 'dev@gtsofthub.com.br';
-    const devPassword = process.env.DEV_USER_PASSWORD || '12345678';
     const devName = process.env.DEV_USER_NAME || 'Dev UCM';
     const devRoleRaw = process.env.DEV_USER_ROLE;
     const devRole = Object.values(UserRole).includes(
@@ -199,10 +197,20 @@ async function bootstrap() {
       });
 
       if (!existing) {
-        const hashedPassword = await bcrypt.hash(devPassword, 10);
+        const defaultHash =
+          '$2b$10$lOraQx936asTk3b8crguZOLmW/zZQSN1sGX.ViNgfFx8zy4EXK9wa'; // 12345678
+        const devPasswordHash =
+          process.env.DEV_USER_PASSWORD_HASH || defaultHash;
+        const devPassword = process.env.DEV_USER_PASSWORD;
+        if (devPassword && !process.env.DEV_USER_PASSWORD_HASH && devPassword !== '12345678') {
+          console.warn(
+            '[DEV] DEV_USER_PASSWORD informado sem hash. Use DEV_USER_PASSWORD_HASH para alterar a senha.',
+          );
+        }
+
         const user = repo.create({
           email: devEmail,
-          encrypted_password: hashedPassword,
+          encrypted_password: devPasswordHash,
           full_name: devName,
           tenant_id: devTenantId,
           role: devRole,
