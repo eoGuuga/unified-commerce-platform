@@ -23,6 +23,24 @@ login_json="$(mktemp)"
 products_json="$(mktemp)"
 trap 'rm -f "$login_json" "$products_json"' EXIT
 
+wait_for_health() {
+  local max_attempts=20
+  local attempt=1
+  while (( attempt <= max_attempts )); do
+    if curl -fsS "${API_BASE}/health" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
+if ! wait_for_health; then
+  echo "Health check falhou: ${API_BASE}/health" >&2
+  exit 1
+fi
+
 curl -sS -X POST "${API_BASE}/auth/login" \
   -H "Content-Type: application/json" \
   -H "x-tenant-id: ${TENANT_ID}" \
@@ -31,13 +49,17 @@ curl -sS -X POST "${API_BASE}/auth/login" \
 
 TOKEN="$(LOGIN_JSON="$login_json" python3 - <<'PY'
 import json, os
-data=json.load(open(os.environ["LOGIN_JSON"]))
-print(data.get("access_token",""))
+try:
+  data=json.load(open(os.environ["LOGIN_JSON"]))
+  print(data.get("access_token",""))
+except Exception:
+  print("")
 PY
 )"
 
 if [[ -z "$TOKEN" ]]; then
   echo "Falha ao obter token do dev user. Verifique SEED_DEV_USER e credenciais." >&2
+  head -c 500 "$login_json" >&2 || true
   exit 1
 fi
 
