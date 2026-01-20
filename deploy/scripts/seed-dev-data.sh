@@ -29,8 +29,7 @@ curl -sS -X POST "${API_BASE}/auth/login" \
   -H "Cache-Control: no-store" \
   -d "{\"email\":\"${DEV_EMAIL}\",\"password\":\"${DEV_PASSWORD}\"}" > "$login_json"
 
-LOGIN_JSON="$login_json"
-TOKEN="$(python3 - <<'PY'
+TOKEN="$(LOGIN_JSON="$login_json" python3 - <<'PY'
 import json, os
 data=json.load(open(os.environ["LOGIN_JSON"]))
 print(data.get("access_token",""))
@@ -58,8 +57,7 @@ PRODUCTS=(
 for entry in "${PRODUCTS[@]}"; do
   IFS='|' read -r name price stock min_stock description <<< "$entry"
 
-  PRODUCTS_JSON="$products_json" PRODUCT_NAME="$name"
-  existing_id="$(python3 - <<'PY'
+  existing_id="$(PRODUCTS_JSON="$products_json" PRODUCT_NAME="$name" python3 - <<'PY'
 import json, os, sys
 data=json.load(open(os.environ["PRODUCTS_JSON"]))
 name=os.environ["PRODUCT_NAME"].strip().lower()
@@ -92,8 +90,7 @@ PY
       -H "Content-Type: application/json" \
       -d "$payload")"
 
-    CREATED_JSON="$created"
-    existing_id="$(python3 - <<'PY'
+    existing_id="$(CREATED_JSON="$created" python3 - <<'PY'
 import json, os
 data=json.loads(os.environ["CREATED_JSON"])
 print(data.get("id",""))
