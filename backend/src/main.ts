@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import type { Request, Response, NextFunction } from 'express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -24,8 +25,6 @@ async function bootstrap() {
   });
 
   const app = await NestFactory.create(AppModule);
-  // Evita respostas 304/ETag em APIs (especialmente em dev/test).
-  app.disable('etag');
 
   const isProd = process.env.NODE_ENV === 'production';
   const enableSwagger = !isProd || process.env.ENABLE_SWAGGER === 'true';
@@ -34,6 +33,8 @@ async function bootstrap() {
   try {
     const instance = app.getHttpAdapter().getInstance() as any;
     instance?.disable?.('x-powered-by');
+    // Evita respostas 304/ETag em APIs (especialmente em dev/test).
+    instance?.disable?.('etag');
   } catch {
     // ignore
   }
@@ -171,7 +172,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
   if (!isProd) {
-    app.use((req, res, next) => {
+    app.use((req: Request, res: Response, next: NextFunction) => {
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
