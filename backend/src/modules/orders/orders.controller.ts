@@ -67,9 +67,12 @@ export class OrdersController {
   })
   findAll(
     @CurrentTenant() tenantId: string,
-    @Query() pagination?: PaginationDto,
+    @Query() pagination: PaginationDto,
+    @Request() req: TypedRequest,
   ) {
-    return this.ordersService.findAll(tenantId, pagination);
+    const hasPagination =
+      typeof req?.query?.page !== 'undefined' || typeof req?.query?.limit !== 'undefined';
+    return this.ordersService.findAll(tenantId, hasPagination ? pagination : undefined);
   }
 
   @Get('reports/sales')
