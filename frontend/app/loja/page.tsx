@@ -147,10 +147,10 @@ export default function LojaPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="app-shell">
       <Toaster position="top-right" />
       <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+        <div className="w-full px-6 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Loja Chocola Velha</h1>
           <button
             onClick={() => setShowCart(true)}
@@ -166,7 +166,7 @@ export default function LojaPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-4">
+      <main className="w-full px-6 py-6">
         <h2 className="text-3xl font-bold mb-8 text-center">Nossos Produtos</h2>
         
         {loading ? (

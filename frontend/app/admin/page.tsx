@@ -117,9 +117,9 @@ export default function AdminDashboard() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      pendente_pagamento: 'bg-yellow-100 text-yellow-800',
+      pendente_pagamento: 'bg-amber-100 text-amber-800',
       confirmado: 'bg-blue-100 text-blue-800',
-      em_producao: 'bg-purple-100 text-purple-800',
+      em_producao: 'bg-teal-100 text-teal-800',
       pronto: 'bg-green-100 text-green-800',
       entregue: 'bg-gray-100 text-gray-800',
       cancelado: 'bg-red-100 text-red-800',
@@ -141,22 +141,22 @@ export default function AdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="app-shell full-bleed flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando dashboard...</p>
+          <p className="text-slate-200">Carregando dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="app-shell">
       <Toaster position="top-right" />
       
       {/* Header */}
       <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+        <div className="w-full px-6 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Dashboard Admin</h1>
           <div className="flex gap-3">
             <button
@@ -176,7 +176,7 @@ export default function AdminDashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="w-full px-6 py-8">
         <div className="space-y-6">
           {/* Main Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -190,7 +190,7 @@ export default function AdminDashboard() {
               <div className="text-3xl font-bold">{formatCurrency(salesReport?.avgTicket || 0)}</div>
               <div className="text-sm opacity-75 mt-2">por pedido</div>
             </div>
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 text-white">
+            <div className="bg-gradient-to-br from-teal-500 to-emerald-500 rounded-lg shadow-lg p-6 text-white">
               <div className="text-sm opacity-90 mb-2">Vendas Hoje</div>
               <div className="text-3xl font-bold">{formatCurrency(salesReport?.salesByPeriod?.today || 0)}</div>
               <div className="text-sm opacity-75 mt-2">últimas 24h</div>

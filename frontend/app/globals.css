@@ -154,11 +154,55 @@ body {
   background: var(--ink-900);
   color: var(--ice-100);
   font-family: var(--font-body), "Sora", sans-serif;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .font-display {
   font-family: var(--font-display), "Bebas Neue", sans-serif;
   letter-spacing: 0.02em;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 720px at 8% -10%, rgba(14, 65, 85, 0.5), transparent 60%),
+    radial-gradient(900px 620px at 88% 8%, rgba(26, 140, 132, 0.28), transparent 60%),
+    linear-gradient(150deg, #071018 0%, #0b1421 45%, #101c2a 100%);
+}
+
+.page-wrap {
+  padding: clamp(1.5rem, 2.5vw, 3.5rem);
+}
+
+.page-wrap-tight {
+  padding: clamp(1.25rem, 2vw, 2.75rem);
+}
+
+.full-bleed {
+  width: 100%;
+  min-height: 100vh;
+}
+
+.signal-grid {
+  background-image:
+    linear-gradient(transparent 0%, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(circle at 30% 0%, rgba(0, 0, 0, 0.9), transparent 70%);
+}
+
+.signal-halo {
+  background: radial-gradient(circle, rgba(95, 224, 255, 0.28) 0%, transparent 70%);
+}
+
+.signal-ember {
+  background: radial-gradient(circle, rgba(255, 123, 69, 0.3) 0%, transparent 70%);
+}
+
+.signal-teal {
+  background: radial-gradient(circle, rgba(37, 183, 167, 0.32) 0%, transparent 70%);
 }
 
 .hero-bg {

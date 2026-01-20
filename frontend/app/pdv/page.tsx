@@ -678,14 +678,14 @@ export default function PDVPage() {
   // Evitar renderização até montar no cliente e ter tenantId
   if (!mounted || authLoading || !tenantId) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4 flex items-center justify-center">
+      <div className="app-shell full-bleed flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin text-4xl mb-4">🔄</div>
-          <p className="text-gray-600">
+          <p className="text-slate-200">
             {authLoading ? 'Carregando autenticação...' : !tenantId ? 'Aguardando tenant ID...' : 'Carregando PDV...'}
           </p>
           {!tenantId && !authLoading && (
-            <p className="text-sm text-red-500 mt-2">
+            <p className="text-sm text-rose-200 mt-2">
               Tenant ID não disponível. Verifique se está autenticado.
             </p>
           )}
@@ -695,7 +695,7 @@ export default function PDVPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="app-shell page-wrap-tight">
       <Toaster 
         position="top-right"
         toastOptions={{
@@ -722,7 +722,7 @@ export default function PDVPage() {
       />
       
       {/* Dashboard de Estatísticas Melhorado */}
-      <div className="max-w-7xl mx-auto mb-4">
+      <div className="w-full mb-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
             <div className="flex items-center justify-between">
@@ -742,10 +742,10 @@ export default function PDVPage() {
               <div className="text-4xl opacity-80">📊</div>
             </div>
           </div>
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
+          <div className="bg-gradient-to-br from-teal-500 to-emerald-500 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-purple-100 text-sm font-medium mb-1">🎫 Ticket Médio</p>
+                <p className="text-emerald-100 text-sm font-medium mb-1">🎫 Ticket Médio</p>
                 <p className="text-3xl font-bold">R$ {stats.avgTicket.toFixed(2)}</p>
               </div>
               <div className="text-4xl opacity-80">📈</div>
@@ -768,7 +768,7 @@ export default function PDVPage() {
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-3">
               <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-600 to-emerald-500 bg-clip-text text-transparent">
                   PDV - Loja Chocola Velha
                 </h1>
                 <p className="text-sm text-gray-500 mt-1">
