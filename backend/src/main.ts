@@ -3,9 +3,12 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import { DataSource } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { CsrfGuard } from './common/guards/csrf.guard';
 import { AppModule } from './app.module';
+import { Usuario, UserRole } from './database/entities/Usuario.entity';
 
 async function bootstrap() {
   // Tratamento de erros nao capturados para evitar crashes.
@@ -166,6 +169,59 @@ async function bootstrap() {
   }
 
   app.setGlobalPrefix('api/v1');
+
+  const shouldSeedDevUser = !isProd && process.env.SEED_DEV_USER !== 'false';
+  if (shouldSeedDevUser) {
+    const devTenantId =
+      process.env.DEV_TENANT_ID || '00000000-0000-0000-0000-000000000000';
+    const devEmail = process.env.DEV_USER_EMAIL || 'dev@gtsofthub.com.br';
+    const devPassword = process.env.DEV_USER_PASSWORD || '12345678';
+    const devName = process.env.DEV_USER_NAME || 'Dev UCM';
+    const devRoleRaw = process.env.DEV_USER_ROLE;
+    const devRole = Object.values(UserRole).includes(
+      String(devRoleRaw || '').toLowerCase() as UserRole,
+    )
+      ? (String(devRoleRaw).toLowerCase() as UserRole)
+      : UserRole.ADMIN;
+
+    const dataSource = app.get(DataSource);
+    const runner = dataSource.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      await runner.manager.query(
+        `SELECT set_config('app.current_tenant_id', $1, true)`,
+        [devTenantId],
+      );
+      const repo = runner.manager.getRepository(Usuario);
+      const existing = await repo.findOne({
+        where: { email: devEmail, tenant_id: devTenantId },
+      });
+
+      if (!existing) {
+        const hashedPassword = await bcrypt.hash(devPassword, 10);
+        const user = repo.create({
+          email: devEmail,
+          encrypted_password: hashedPassword,
+          full_name: devName,
+          tenant_id: devTenantId,
+          role: devRole,
+          is_active: true,
+        });
+        await repo.save(user);
+        console.log(`[DEV] Usuario de teste criado: ${devEmail}`);
+      } else {
+        console.log(`[DEV] Usuario de teste ja existe: ${devEmail}`);
+      }
+
+      await runner.commitTransaction();
+    } catch (error) {
+      await runner.rollbackTransaction();
+      console.error('[DEV] Falha ao criar usuario de teste', error);
+    } finally {
+      await runner.release();
+    }
+  }
 
   const port = process.env.PORT || 3001;
   const host = process.env.HOST || '0.0.0.0';
