@@ -144,6 +144,20 @@ class ApiClient {
     }
   }
 
+  // Payments endpoints
+  async createPayment(payload: { pedido_id: string; method: string; amount?: number; payerEmail?: string; cardToken?: string; installments?: number }, _tenantId: string) {
+    return this.request('/payments', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async confirmPayment(paymentId: string, _tenantId: string) {
+    return this.request(`/payments/${paymentId}/confirm`, {
+      method: 'POST',
+    });
+  }
+
   // Stock reservation endpoints
   async reserveStock(productId: string, quantity: number, _tenantId: string) {
     try {

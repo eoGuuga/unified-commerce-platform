@@ -32,6 +32,22 @@ interface Order {
   created_at: string;
 }
 
+type PaymentMethod = 'pix' | 'dinheiro';
+
+interface PaymentResult {
+  pagamento: {
+    id: string;
+    status: string;
+    method: PaymentMethod;
+    amount: number | string;
+    metadata?: Record<string, unknown>;
+  };
+  qr_code?: string;
+  qr_code_url?: string;
+  copy_paste?: string;
+  message?: string;
+}
+
 // ⚠️ REMOVIDO: TENANT_ID hardcoded - deve vir do contexto JWT
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
@@ -102,6 +118,14 @@ export default function PDVPage() {
   const [showHelp, setShowHelp] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
+  const [cashReceived, setCashReceived] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [orderData, setOrderData] = useState<{ id: string; total: number; orderNo?: string } | null>(null);
+  const [paymentData, setPaymentData] = useState<PaymentResult | null>(null);
 
   const debouncedSearch = useDebounce(searchTerm, 300);
 
@@ -622,6 +646,33 @@ export default function PDVPage() {
       return;
     }
 
+    setPaymentError(null);
+    setPaymentData(null);
+    setOrderData(null);
+    setShowPayment(true);
+  };
+
+  const handleCreateOrderAndPayment = async () => {
+    if (!tenantId) {
+      toast.error('Tenant ID não disponível. Faça login novamente.');
+      return;
+    }
+    if (cart.length === 0) {
+      toast.error('Carrinho vazio!');
+      return;
+    }
+    if (paymentMethod === 'dinheiro') {
+      const received = Number(cashReceived.replace(',', '.'));
+      if (!Number.isFinite(received) || received <= 0) {
+        toast.error('Informe o valor recebido.');
+        return;
+      }
+      if (received < total) {
+        toast.error('Valor recebido menor que o total.');
+        return;
+      }
+    }
+
     const order = {
       channel: 'pdv',
       items: cart.map(item => ({
@@ -631,27 +682,69 @@ export default function PDVPage() {
       })),
       discount_amount: 0,
       shipping_amount: 0,
+      coupon_code: couponCode ? couponCode.trim().toUpperCase() : undefined,
     };
 
+    setPaymentLoading(true);
     setIsSelling(true);
+    setPaymentError(null);
     try {
-      const loadingToast = toast.loading('Processando venda...');
-      await api.createOrder(order, tenantId);
+      const loadingToast = toast.loading('Criando pedido...');
+      const createdOrder = await api.createOrder(order, tenantId);
       toast.dismiss(loadingToast);
-      toast.success('🎉 Venda realizada com sucesso!', {
-        duration: 3000,
+
+      const createdTotal = typeof createdOrder.total_amount === 'string'
+        ? parseFloat(createdOrder.total_amount)
+        : Number(createdOrder.total_amount);
+
+      setOrderData({
+        id: createdOrder.id,
+        total: Number.isFinite(createdTotal) ? createdTotal : total,
+        orderNo: createdOrder.order_no,
       });
-      
-      // Limpar carrinho (as reservas já foram convertidas em venda pelo backend)
+
+      const paymentResult: PaymentResult = await api.createPayment(
+        {
+          pedido_id: createdOrder.id,
+          method: paymentMethod,
+          amount: createdTotal || total,
+        },
+        tenantId,
+      );
+
+      setPaymentData(paymentResult);
       setCart([]);
       setSearchTerm('');
-      
-      // Atualizar produtos para refletir novo estoque (com revalidação completa após venda)
+      await mutate();
+      toast.success('Pedido criado. Pagamento gerado!');
+    } catch (error: any) {
+      const message = error.message || 'Não foi possível criar o pedido/pagamento';
+      setPaymentError(message);
+      toast.error(message);
+    } finally {
+      setPaymentLoading(false);
+      setIsSelling(false);
+    }
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!tenantId || !paymentData?.pagamento?.id) return;
+    setPaymentLoading(true);
+    try {
+      await api.confirmPayment(paymentData.pagamento.id, tenantId);
+      toast.success('Pagamento confirmado!');
+      setShowPayment(false);
+      setPaymentData(null);
+      setOrderData(null);
+      setCashReceived('');
+      setCouponCode('');
       await mutate();
     } catch (error: any) {
-      toast.error(error.message || 'Não foi possível realizar a venda');
+      const message = error.message || 'Erro ao confirmar pagamento';
+      setPaymentError(message);
+      toast.error(message);
     } finally {
-      setIsSelling(false);
+      setPaymentLoading(false);
     }
   };
 
@@ -1136,6 +1229,122 @@ export default function PDVPage() {
           </div>
         </div>
       </div>
+
+      {showPayment && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Pagamento</h2>
+                <p className="text-sm text-gray-500">Total: R$ {total.toFixed(2)}</p>
+                {orderData?.orderNo && (
+                  <p className="text-xs text-gray-400">Pedido: {orderData.orderNo}</p>
+                )}
+              </div>
+              <button
+                onClick={() => setShowPayment(false)}
+                disabled={paymentLoading}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <button
+                onClick={() => setPaymentMethod('pix')}
+                className={`rounded-xl border-2 px-4 py-3 text-left ${paymentMethod === 'pix' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'}`}
+              >
+                <p className="font-semibold">PIX</p>
+                <p className="text-xs text-gray-500">QR code e copia/cola</p>
+              </button>
+              <button
+                onClick={() => setPaymentMethod('dinheiro')}
+                className={`rounded-xl border-2 px-4 py-3 text-left ${paymentMethod === 'dinheiro' ? 'border-emerald-600 bg-emerald-50' : 'border-gray-200'}`}
+              >
+                <p className="font-semibold">Dinheiro</p>
+                <p className="text-xs text-gray-500">Troco calculado</p>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="text-xs text-gray-500">Cupom</label>
+                <input
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
+                  placeholder="EX: PROMO10"
+                  className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              {paymentMethod === 'dinheiro' && (
+                <div>
+                  <label className="text-xs text-gray-500">Valor recebido</label>
+                  <input
+                    value={cashReceived}
+                    onChange={(e) => setCashReceived(e.target.value)}
+                    placeholder="0,00"
+                    className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
+                  />
+                  {cashReceived && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Troco: R$ {Math.max(0, Number(cashReceived.replace(',', '.')) - total).toFixed(2)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {paymentError && (
+              <div className="mb-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                {paymentError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3">
+              <button
+                onClick={handleCreateOrderAndPayment}
+                disabled={paymentLoading}
+                className="flex-1 bg-blue-600 text-white rounded-xl py-3 font-semibold hover:bg-blue-700 disabled:bg-gray-300"
+              >
+                {paymentLoading ? 'Processando...' : 'Gerar pagamento'}
+              </button>
+              {paymentData?.pagamento?.id && (
+                <button
+                  onClick={handleConfirmPayment}
+                  disabled={paymentLoading}
+                  className="flex-1 bg-emerald-600 text-white rounded-xl py-3 font-semibold hover:bg-emerald-700 disabled:bg-gray-300"
+                >
+                  Confirmar pagamento
+                </button>
+              )}
+            </div>
+
+            {paymentData && (
+              <div className="mt-4 border-t pt-4">
+                {paymentData.message && (
+                  <p className="text-sm text-gray-600 whitespace-pre-line mb-3">{paymentData.message}</p>
+                )}
+                {paymentMethod === 'pix' && paymentData.qr_code && (
+                  <div className="flex flex-col items-center gap-3">
+                    <img src={paymentData.qr_code} alt="QR Code Pix" className="w-48 h-48" />
+                    {paymentData.copy_paste && (
+                      <div className="w-full">
+                        <label className="text-xs text-gray-500">Copia e cola</label>
+                        <textarea
+                          readOnly
+                          className="w-full border rounded-lg p-2 text-xs mt-1"
+                          value={paymentData.copy_paste}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes slideIn {
