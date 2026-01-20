@@ -3,7 +3,7 @@
  * ⚠️ CRÍTICO: Credenciais devem vir sempre de variáveis de ambiente
  */
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 /**
  * ⚠️ DEPRECATED: Em desenvolvimento, usar credenciais apenas se configuradas via env
