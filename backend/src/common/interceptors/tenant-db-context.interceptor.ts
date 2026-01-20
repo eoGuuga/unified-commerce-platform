@@ -31,10 +31,19 @@ export class TenantDbContextInterceptor implements NestInterceptor {
 
     if (allowNonJwtTenant) {
       const headerTenant = request.headers?.['x-tenant-id'];
-      if (typeof headerTenant === 'string' && headerTenant.trim()) return headerTenant.trim();
+      const normalizedHeaderTenant = Array.isArray(headerTenant)
+        ? headerTenant[0]
+        : headerTenant;
+      if (typeof normalizedHeaderTenant === 'string' && normalizedHeaderTenant.trim()) {
+        return normalizedHeaderTenant.trim();
+      }
 
       const bodyTenant = request.body?.tenantId || request.body?.tenant_id;
       if (typeof bodyTenant === 'string' && bodyTenant.trim()) return bodyTenant.trim();
+
+      const queryTenant =
+        request.query?.tenantId || request.query?.tenant_id || request.query?.['tenant-id'];
+      if (typeof queryTenant === 'string' && queryTenant.trim()) return queryTenant.trim();
     }
 
     return null;
