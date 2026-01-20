@@ -14,6 +14,7 @@ import { IdempotencyRecord, toIdempotencyRecord } from './types/orders.types';
 import { PaginatedResult, createPaginatedResult } from '../common/types/pagination.types';
 import { PaginationDto } from './dto/pagination.dto';
 import { CouponsService } from '../coupons/coupons.service';
+import { CacheService } from '../common/services/cache.service';
 import { CupomDesconto } from '../../database/entities/CupomDesconto.entity';
 import { DbContextService } from '../common/services/db-context.service';
 
@@ -34,6 +35,7 @@ export class OrdersService {
     private idempotencyService: IdempotencyService,
     private auditLogService: AuditLogService,
     private couponsService: CouponsService,
+    private cacheService: CacheService,
     @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
   ) {}
@@ -268,6 +270,20 @@ export class OrdersService {
           pedidoId: pedido.id,
         });
       }
+    }
+
+    // ✅ CACHE: invalidar cache de produtos/estoque após venda (estoque foi abatido)
+    try {
+      await this.cacheService.invalidateProductsCache(tenantId);
+      for (const item of createOrderDto.items) {
+        await this.cacheService.invalidateStockCache(tenantId, item.produto_id);
+      }
+    } catch (error) {
+      this.logger.warn('Erro ao invalidar cache de produtos após venda', {
+        error: error instanceof Error ? error.message : String(error),
+        tenantId,
+        orderId: pedido.id,
+      });
     }
 
     // ✅ NOVO: Notificar cliente sobre criação do pedido (especialmente para WhatsApp)
