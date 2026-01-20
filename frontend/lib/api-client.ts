@@ -32,6 +32,7 @@ class ApiClient {
 
     const headers = {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
       ...(effectiveTenantId && { 'x-tenant-id': effectiveTenantId }),
       ...(token && { Authorization: `Bearer ${token}` }),
       ...fetchOptions.headers,
@@ -40,6 +41,7 @@ class ApiClient {
     const response = await fetch(url, {
       ...fetchOptions,
       headers,
+      cache: 'no-store',
     });
 
     if (!response.ok) {
