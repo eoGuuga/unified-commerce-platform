@@ -35,9 +35,10 @@ curl -sS -X POST "${API_BASE}/auth/login" \
   -H "Cache-Control: no-store" \
   -d "{\"email\":\"${DEV_EMAIL}\",\"password\":\"${DEV_PASSWORD}\"}" > "$login_json"
 
+LOGIN_JSON="$login_json"
 TOKEN="$(python3 - <<'PY'
-import json
-data=json.load(open("'$login_json'"))
+import json, os
+data=json.load(open(os.environ["LOGIN_JSON"]))
 print(data.get("access_token",""))
 PY
 )"
@@ -52,9 +53,10 @@ echo "-> auth/me"
 curl -sS -H "Authorization: Bearer ${TOKEN}" -H "x-tenant-id: ${TENANT_ID}" \
   -H "Cache-Control: no-store" "${API_BASE}/auth/me" > "$me_json"
 
+ME_JSON="$me_json"
 python3 - <<'PY'
-import json, sys
-data=json.load(open("'$me_json'"))
+import json, os, sys
+data=json.load(open(os.environ["ME_JSON"]))
 if "id" not in data:
   print("auth/me invalido", data)
   sys.exit(1)
@@ -64,9 +66,10 @@ echo "-> products"
 curl -sS -H "Authorization: Bearer ${TOKEN}" -H "x-tenant-id: ${TENANT_ID}" \
   -H "Cache-Control: no-store" "${API_BASE}/products" > "$products_json"
 
+PRODUCTS_JSON="$products_json"
 python3 - <<'PY'
-import json, sys
-data=json.load(open("'$products_json'"))
+import json, os, sys
+data=json.load(open(os.environ["PRODUCTS_JSON"]))
 if isinstance(data, dict) and "data" in data:
   data=data["data"]
 if not isinstance(data, list):
@@ -78,9 +81,10 @@ echo "-> orders (list)"
 curl -sS -H "Authorization: Bearer ${TOKEN}" -H "x-tenant-id: ${TENANT_ID}" \
   -H "Cache-Control: no-store" "${API_BASE}/orders" > "$orders_json"
 
+ORDERS_JSON="$orders_json"
 python3 - <<'PY'
-import json, sys
-data=json.load(open("'$orders_json'"))
+import json, os, sys
+data=json.load(open(os.environ["ORDERS_JSON"]))
 if isinstance(data, dict) and "data" in data:
   data=data["data"]
 if not isinstance(data, list):
