@@ -53,20 +53,19 @@ export class IdempotencyService {
       expires_at: expiresAt,
     });
 
-    try {
-      return await idempotencyRepository.save(idempotencyKey);
-    } catch (error: any) {
-      // Race condition: outro request criou a chave antes (unique_violation)
-      if (error && error.code === '23505') {
-        const raced = await idempotencyRepository.findOne({
-          where: { tenant_id: tenantId, operation_type: operationType, key_hash: keyHash },
-        });
-        if (raced) {
-          return raced;
-        }
-      }
-      throw error;
-    }
+    // Evita unique_violation em transacoes concorrentes (race condition).
+    await idempotencyRepository
+      .createQueryBuilder()
+      .insert()
+      .values(idempotencyKey)
+      .onConflict('("tenant_id","operation_type","key_hash") DO NOTHING')
+      .execute();
+
+    const createdOrExisting = await idempotencyRepository.findOne({
+      where: { tenant_id: tenantId, operation_type: operationType, key_hash: keyHash },
+    });
+
+    return createdOrExisting ?? null;
   }
 
   async markCompleted<T = unknown>(

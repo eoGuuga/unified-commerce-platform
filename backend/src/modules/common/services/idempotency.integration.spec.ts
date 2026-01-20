@@ -21,7 +21,7 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
   let module: TestingModule;
   let service: IdempotencyService;
   let dbContext: DbContextService;
-  let queryRunner: QueryRunner;
+  let dataSource: DataSource;
   const tenantId = '00000000-0000-0000-0000-000000000000';
 
   beforeAll(async () => {
@@ -38,10 +38,7 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
       service = module.get<IdempotencyService>(IdempotencyService);
       dbContext = module.get<DbContextService>(DbContextService);
 
-      const dataSource = module.get<DataSource>(DataSource);
-      queryRunner = dataSource.createQueryRunner();
-      await queryRunner.connect();
-      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      dataSource = module.get<DataSource>(DataSource);
     } catch (error) {
       console.error('❌ Erro ao inicializar testes:', error);
       throw error;
@@ -52,15 +49,36 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
     if (module) {
       await module.close();
     }
-    if (queryRunner) {
-      await queryRunner.release();
-    }
   });
 
+  const runWithTenantManager = async <T>(fn: () => Promise<T>): Promise<T> => {
+    const runner: QueryRunner = dataSource.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      await runner.manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [tenantId]);
+      const result = await dbContext.runWithManager(runner.manager, fn);
+      await runner.commitTransaction();
+      return result;
+    } catch (error) {
+      try {
+        await runner.rollbackTransaction();
+      } catch {
+        // ignore
+      }
+      throw error;
+    } finally {
+      try {
+        await runner.release();
+      } catch {
+        // ignore
+      }
+    }
+  };
   beforeEach(async () => {
     // Limpar chaves de idempotência de testes anteriores via service
     try {
-      await dbContext.runWithManager(queryRunner.manager, async () => {
+      await runWithTenantManager(async () => {
         await service.remove(tenantId, 'test-race-condition-key', 'test-operation');
         await service.remove(tenantId, 'test-existing-key', 'test-operation-existing');
         await service.remove(tenantId, 'test-no-error-key', 'test-operation-no-error');
@@ -75,14 +93,10 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
       const operationType = 'test-operation';
       const key = 'test-race-condition-key';
 
-      const results = await dbContext.runWithManager(queryRunner.manager, async () => {
-        // Simular dois requests simultâneos
-        const promises = [
-          service.checkAndSet(tenantId, operationType, key, 3600),
-          service.checkAndSet(tenantId, operationType, key, 3600),
-        ];
-        return await Promise.all(promises);
-      });
+      const results = await Promise.all([
+        runWithTenantManager(() => service.checkAndSet(tenantId, operationType, key, 3600)),
+        runWithTenantManager(() => service.checkAndSet(tenantId, operationType, key, 3600)),
+      ]);
 
       // Ambos devem retornar um resultado (não deve lançar erro)
       expect(results[0]).toBeDefined();
@@ -103,7 +117,7 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
       const key = 'test-existing-key';
 
       // Criar primeira chave
-      const firstResult = await dbContext.runWithManager(queryRunner.manager, async () => {
+      const firstResult = await runWithTenantManager(async () => {
         return await service.checkAndSet(tenantId, operationType, key, 3600);
       });
       expect(firstResult).toBeDefined();
@@ -113,7 +127,7 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
         expect(firstResult.status).toBe('pending');
 
         // Tentar criar novamente (simula segundo request que chega depois)
-        const secondResult = await dbContext.runWithManager(queryRunner.manager, async () => {
+        const secondResult = await runWithTenantManager(async () => {
           return await service.checkAndSet(tenantId, operationType, key, 3600);
         });
         expect(secondResult).toBeDefined();
@@ -133,16 +147,14 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
       const key = 'test-no-error-key';
 
       // Criar múltiplas tentativas simultâneas (simula race condition real)
-      const results = await dbContext.runWithManager(queryRunner.manager, async () => {
-        const promises = Array(5).fill(null).map(() => 
-          service.checkAndSet(tenantId, operationType, key, 3600)
-        );
+      const promises = Array(5).fill(null).map(() =>
+        runWithTenantManager(() => service.checkAndSet(tenantId, operationType, key, 3600))
+      );
 
-        // Não deve lançar erro
-        await expect(Promise.all(promises)).resolves.toBeDefined();
+      // Não deve lançar erro
+      await expect(Promise.all(promises)).resolves.toBeDefined();
 
-        return await Promise.all(promises);
-      });
+      const results = await Promise.all(promises);
 
       // Todos devem ter o mesmo ID
       if (results[0]) {
