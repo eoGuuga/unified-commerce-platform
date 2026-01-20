@@ -165,8 +165,12 @@ export class AuthService {
       throw new UnauthorizedException('Tenant invalido');
     }
 
-    const usuario = await this.db.getRepository(Usuario).findOne({
-      where: { id: payload.sub, tenant_id: tenantId },
+    const usuario = await this.db.runInTransaction(async (manager) => {
+      // Garantir RLS antes de validar o usuario no guard (mesmo sem interceptor).
+      await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [tenantId]);
+      return await manager.getRepository(Usuario).findOne({
+        where: { id: payload.sub, tenant_id: tenantId },
+      });
     });
 
     if (!usuario || !usuario.is_active) {
