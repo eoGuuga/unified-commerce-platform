@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
-import { DataSource, QueryRunner, Repository } from 'typeorm';
+import { DataSource, QueryRunner } from 'typeorm';
 import { CommonModule } from '../common.module';
 import { IdempotencyService } from './idempotency.service';
 import { databaseConfig } from '../../../config/database.config';
@@ -20,7 +20,6 @@ import { DbContextService } from './db-context.service';
 describe('IdempotencyService - Race Condition Fix (Integration)', () => {
   let module: TestingModule;
   let service: IdempotencyService;
-  let tenantRepository: Repository<Tenant>;
   let dbContext: DbContextService;
   let queryRunner: QueryRunner;
   const tenantId = '00000000-0000-0000-0000-000000000000';
@@ -43,14 +42,6 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
       queryRunner = dataSource.createQueryRunner();
       await queryRunner.connect();
       await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
-      tenantRepository = queryRunner.manager.getRepository<Tenant>(Tenant);
-
-      // Validar tenant de teste (evita violar RLS com INSERT)
-      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
-      const testTenant = await tenantRepository.findOne({ where: { id: tenantId } });
-      if (!testTenant) {
-        throw new Error('Tenant de teste ausente. Rode deploy/scripts/seed-test-tenant.sh');
-      }
     } catch (error) {
       console.error('❌ Erro ao inicializar testes:', error);
       throw error;
@@ -167,3 +158,4 @@ describe('IdempotencyService - Race Condition Fix (Integration)', () => {
     });
   });
 });
+
