@@ -13,7 +13,7 @@ import { databaseConfig } from '../../config/database.config';
 import { JwtService } from '@nestjs/jwt';
 import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
 import { DataSource } from 'typeorm';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { TenantDbContextInterceptor } from '../../common/interceptors/tenant-db-context.interceptor';
 
 describe('Orders Integration Tests (e2e)', () => {
