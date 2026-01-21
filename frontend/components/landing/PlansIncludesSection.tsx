@@ -1,4 +1,4 @@
-import { ShieldCheck, Zap, Headphones } from "lucide-react";
+Ôªøimport { ShieldCheck, Zap, Headphones } from "lucide-react";
 
 const items = [
   {
@@ -8,11 +8,11 @@ const items = [
   },
   {
     title: "Sync Tempo Real",
-    description: "AtualizaÁ„o instant‚nea entre canais",
+    description: "Atualiza√ß√£o instant√¢nea entre canais",
     icon: Zap,
   },
   {
-    title: "Suporte TÈcnico",
+    title: "Suporte T√©cnico",
     description: "Time especializado para ajudar",
     icon: Headphones,
   },
@@ -40,3 +40,4 @@ export function PlansIncludesSection() {
     </section>
   );
 }
+

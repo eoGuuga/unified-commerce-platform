@@ -1,4 +1,4 @@
-import { ShoppingCart, Lock, CreditCard, Truck, Search, Zap, Bell } from "lucide-react";
+Ôªøimport { ShoppingCart, Lock, CreditCard, Truck, Search, Zap, Bell } from "lucide-react";
 
 const steps = [
   {
@@ -10,7 +10,7 @@ const steps = [
       { icon: ShoppingCart, title: "Adiciona ao carrinho", text: "Cliente seleciona produto em qualquer canal" },
       { icon: Search, title: "Consulta disponibilidade", text: "Sistema verifica estoque em tempo real" },
     ],
-    footer: "Tempo mÈdio: 2-5s",
+    footer: "Tempo m√©dio: 2-5s",
   },
   {
     step: "2",
@@ -18,21 +18,21 @@ const steps = [
     subtitle: "Produto bloqueado",
     accent: "border-amber-400",
     items: [
-      { icon: Lock, title: "Lock atÙmico", text: "Produto reservado exclusivamente para este cliente" },
-      { icon: Zap, title: "Sync instant‚neo", text: "Todos os canais atualizam: ìindisponÌvelî" },
+      { icon: Lock, title: "Lock at√¥mico", text: "Produto reservado exclusivamente para este cliente" },
+      { icon: Zap, title: "Sync instant√¢neo", text: "Todos os canais atualizam: ‚Äúindispon√≠vel‚Äù" },
     ],
     footer: "Tempo de lock: <100ms",
   },
   {
     step: "3",
-    title: "ConfirmaÁ„o",
+    title: "Confirma√ß√£o",
     subtitle: "Pagamento validado",
     accent: "border-emerald-400",
     items: [
-      { icon: CreditCard, title: "Processa pagamento", text: "Pix, cart„o ou outro mÈtodo validado" },
+      { icon: CreditCard, title: "Processa pagamento", text: "Pix, cart√£o ou outro m√©todo validado" },
       { icon: ShoppingCart, title: "Confirma pedido", text: "Venda finalizada, estoque deduzido" },
     ],
-    footer: "Tempo mÈdio: 5-30s",
+    footer: "Tempo m√©dio: 5-30s",
   },
   {
     step: "4",
@@ -40,8 +40,8 @@ const steps = [
     subtitle: "Ciclo completo",
     accent: "border-slate-400",
     items: [
-      { icon: Truck, title: "Prepara envio", text: "LogÌstica acionada automaticamente" },
-      { icon: Bell, title: "Notifica cliente", text: "ConfirmaÁ„o e tracking enviados" },
+      { icon: Truck, title: "Prepara envio", text: "Log√≠stica acionada automaticamente" },
+      { icon: Bell, title: "Notifica cliente", text: "Confirma√ß√£o e tracking enviados" },
     ],
     footer: "Status: Completo",
   },
@@ -54,9 +54,9 @@ export function OperationalFlowSection() {
         <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-1 text-xs font-semibold text-blue-600">
           <span className="h-2 w-2 rounded-full bg-blue-500" />Fluxo Operacional
         </span>
-        <h2 className="mt-4 text-3xl font-semibold text-slate-900 sm:text-4xl">Como funciona na pr·tica</h2>
+        <h2 className="mt-4 text-3xl font-semibold text-slate-900 sm:text-4xl">Como funciona na pr√°tica</h2>
         <p className="mt-3 text-base text-slate-600">
-          Do momento que o cliente escolhe o produto atÈ a entrega. Cada etapa È rastreada, validada e sincronizada.
+          Do momento que o cliente escolhe o produto at√© a entrega. Cada etapa √© rastreada, validada e sincronizada.
         </p>
       </div>
 
@@ -90,3 +90,4 @@ export function OperationalFlowSection() {
     </section>
   );
 }
+

@@ -1,4 +1,4 @@
-import { ShieldCheck, Zap, CheckCircle, BarChart3 } from "lucide-react";
+ï»¿import { ShieldCheck, Zap, CheckCircle, BarChart3 } from "lucide-react";
 
 const metrics = [
   {
@@ -9,8 +9,8 @@ const metrics = [
   },
   {
     value: "<100ms",
-    label: "Latência",
-    description: "Sincronização entre canais em tempo real",
+    label: "LatÃªncia",
+    description: "SincronizaÃ§Ã£o entre canais em tempo real",
     icon: Zap,
   },
   {
@@ -21,7 +21,7 @@ const metrics = [
   },
   {
     value: "2.4M+",
-    label: "Transações/Mês",
+    label: "TransaÃ§Ãµes/MÃªs",
     description: "Processadas com sucesso",
     icon: BarChart3,
   },
@@ -32,10 +32,10 @@ export function MetricsSection() {
     <section className="bg-white py-20 text-slate-900">
       <div className="mx-auto w-full max-w-6xl px-6 text-center lg:px-10">
         <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1 text-xs font-semibold text-emerald-600">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />Prova e Confiança
+          <span className="h-2 w-2 rounded-full bg-emerald-500" />Prova e ConfianÃ§a
         </span>
-        <h2 className="mt-4 text-3xl font-semibold text-slate-900 sm:text-4xl">Números que provam confiabilidade</h2>
-        <p className="mt-3 text-base text-slate-600">Não é promessa. São métricas reais de operação.</p>
+        <h2 className="mt-4 text-3xl font-semibold text-slate-900 sm:text-4xl">NÃºmeros que provam confiabilidade</h2>
+        <p className="mt-3 text-base text-slate-600">NÃ£o Ã© promessa. SÃ£o mÃ©tricas reais de operaÃ§Ã£o.</p>
 
         <div className="mt-10 grid gap-6 lg:grid-cols-4">
           {metrics.map((metric) => (
@@ -64,3 +64,4 @@ export function MetricsSection() {
     </section>
   );
 }
+

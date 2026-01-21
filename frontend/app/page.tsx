@@ -1,4 +1,4 @@
-import { HeroSection } from "@/components/landing/HeroSection";
+﻿import { HeroSection } from "@/components/landing/HeroSection";
 import { ProblemSection } from "@/components/landing/ProblemSection";
 import { TestimonialHighlight } from "@/components/landing/TestimonialHighlight";
 import { SolutionIntro } from "@/components/landing/SolutionIntro";
@@ -35,3 +35,4 @@ export default function Page() {
     </main>
   );
 }
+

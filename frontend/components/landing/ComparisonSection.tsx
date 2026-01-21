@@ -1,40 +1,40 @@
-import { CheckCircle, XCircle } from "lucide-react";
+Ôªøimport { CheckCircle, XCircle } from "lucide-react";
 
 const without = [
   {
-    title: "Cada canal tem seu prÛprio estoque",
-    description: "AtualizaÁ„o manual e propensa a erros",
+    title: "Cada canal tem seu pr√≥prio estoque",
+    description: "Atualiza√ß√£o manual e propensa a erros",
   },
   {
-    title: "SincronizaÁ„o por planilhas ou APIs fr·geis",
+    title: "Sincroniza√ß√£o por planilhas ou APIs fr√°geis",
     description: "Atrasos de minutos ou horas",
   },
   {
     title: "Overselling frequente",
-    description: "Clientes frustrados e prejuÌzo financeiro",
+    description: "Clientes frustrados e preju√≠zo financeiro",
   },
   {
     title: "Dados conflitantes entre sistemas",
-    description: "ImpossÌvel ter vis„o unificada do negÛcio",
+    description: "Imposs√≠vel ter vis√£o unificada do neg√≥cio",
   },
 ];
 
 const withUcm = [
   {
-    title: "Uma ˙nica fonte da verdade",
+    title: "Uma √∫nica fonte da verdade",
     description: "Todos os canais consultam o mesmo backend",
   },
   {
-    title: "SincronizaÁ„o em tempo real",
-    description: "AtualizaÁ„o instant‚nea em todos os canais",
+    title: "Sincroniza√ß√£o em tempo real",
+    description: "Atualiza√ß√£o instant√¢nea em todos os canais",
   },
   {
     title: "Zero overselling garantido",
-    description: "Reserva atÙmica impede vendas duplicadas",
+    description: "Reserva at√¥mica impede vendas duplicadas",
   },
   {
-    title: "Vis„o unificada e confi·vel",
-    description: "Dados consistentes para tomada de decis„o",
+    title: "Vis√£o unificada e confi√°vel",
+    description: "Dados consistentes para tomada de decis√£o",
   },
 ];
 
@@ -93,3 +93,4 @@ export function ComparisonSection() {
     </section>
   );
 }
+

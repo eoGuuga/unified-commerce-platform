@@ -1,26 +1,26 @@
-import { ShieldAlert, AlertTriangle, Brain } from "lucide-react";
+ï»¿import { ShieldAlert, AlertTriangle, Brain } from "lucide-react";
 
 const problems = [
   {
     title: "Overselling",
     description:
-      "Cliente compra no site. Vendedor vende a última unidade no PDV. Dois pedidos para um produto que não existe mais.",
-    consequences: ["Pedido cancelado", "Cliente frustrado", "Reputação prejudicada"],
+      "Cliente compra no site. Vendedor vende a Ãºltima unidade no PDV. Dois pedidos para um produto que nÃ£o existe mais.",
+    consequences: ["Pedido cancelado", "Cliente frustrado", "ReputaÃ§Ã£o prejudicada"],
     accent: "border-rose-200 bg-rose-50/60",
     icon: ShieldAlert,
   },
   {
     title: "Dessincronia",
     description:
-      "Cada sistema tem seu próprio estoque. Você atualiza manualmente. Mas sempre tem um atraso. Sempre tem um erro.",
-    consequences: ["Horas perdidas em conferência", "Dados conflitantes", "Decisões erradas"],
+      "Cada sistema tem seu prÃ³prio estoque. VocÃª atualiza manualmente. Mas sempre tem um atraso. Sempre tem um erro.",
+    consequences: ["Horas perdidas em conferÃªncia", "Dados conflitantes", "DecisÃµes erradas"],
     accent: "border-amber-200 bg-amber-50/60",
     icon: AlertTriangle,
   },
   {
     title: "Carga Mental",
     description:
-      "Você não dorme tranquilo. Sempre tem o medo de ter vendido algo que não tem. Sempre conferindo, sempre ajustando.",
+      "VocÃª nÃ£o dorme tranquilo. Sempre tem o medo de ter vendido algo que nÃ£o tem. Sempre conferindo, sempre ajustando.",
     consequences: ["Estresse operacional constante", "Tempo gasto em controle manual", "Crescimento limitado"],
     accent: "border-slate-200 bg-slate-50/60",
     icon: Brain,
@@ -36,11 +36,11 @@ export function ProblemSection() {
             <span className="h-2 w-2 rounded-full bg-rose-500" />O Problema Real
           </span>
           <h2 className="mt-4 text-3xl font-semibold text-slate-900 sm:text-4xl">
-            Vender em múltiplos canais deveria ser simples. <span className="text-rose-500">Mas não é.</span>
+            Vender em mÃºltiplos canais deveria ser simples. <span className="text-rose-500">Mas nÃ£o Ã©.</span>
           </h2>
           <p className="mt-3 text-base text-slate-600">
-            Quando você vende no PDV, no site e pelo WhatsApp ao mesmo tempo, o estoque vira um campo de batalha. E quem
-            perde é você.
+            Quando vocÃª vende no PDV, no site e pelo WhatsApp ao mesmo tempo, o estoque vira um campo de batalha. E quem
+            perde Ã© vocÃª.
           </p>
         </div>
 
@@ -53,7 +53,7 @@ export function ProblemSection() {
               <h3 className="mt-4 text-lg font-semibold text-slate-900">{item.title}</h3>
               <p className="mt-2 text-sm text-slate-600">{item.description}</p>
               <div className="mt-4 rounded-xl border border-white/80 bg-white/70 p-4">
-                <p className="text-xs font-semibold text-slate-500">Consequência Real:</p>
+                <p className="text-xs font-semibold text-slate-500">ConsequÃªncia Real:</p>
                 <ul className="mt-3 space-y-2 text-xs text-slate-600">
                   {item.consequences.map((text) => (
                     <li key={text} className="flex items-center gap-2">
@@ -70,3 +70,4 @@ export function ProblemSection() {
     </section>
   );
 }
+

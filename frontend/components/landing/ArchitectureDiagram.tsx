@@ -1,25 +1,25 @@
-import { Database, ShieldCheck, Zap, Lock } from "lucide-react";
+ï»¿import { Database, ShieldCheck, Zap, Lock } from "lucide-react";
 
 const systemCards = [
   {
-    title: "Transações ACID",
-    description: "Garantia de consistência em todas as operações",
+    title: "TransaÃ§Ãµes ACID",
+    description: "Garantia de consistÃªncia em todas as operaÃ§Ãµes",
     icon: ShieldCheck,
   },
   {
     title: "Tempo Real",
-    description: "Sincronização instantânea entre canais",
+    description: "SincronizaÃ§Ã£o instantÃ¢nea entre canais",
     icon: Zap,
   },
   {
-    title: "Reserva Atômica",
+    title: "Reserva AtÃ´mica",
     description: "Bloqueio imediato de estoque vendido",
     icon: Lock,
   },
 ];
 
 const channelCards = [
-  { title: "PDV Físico", subtitle: "Terminal de vendas presencial" },
+  { title: "PDV FÃ­sico", subtitle: "Terminal de vendas presencial" },
   { title: "E-commerce", subtitle: "Loja virtual online" },
   { title: "WhatsApp Bot", subtitle: "Vendas por mensagem" },
 ];
@@ -41,7 +41,7 @@ export function ArchitectureDiagram() {
                 <Database className="h-6 w-6" aria-hidden="true" />
               </div>
               <h3 className="mt-4 text-xl font-semibold text-slate-900">Backend Central UCM</h3>
-              <p className="text-sm text-slate-500">Fonte Única da Verdade</p>
+              <p className="text-sm text-slate-500">Fonte Ãšnica da Verdade</p>
             </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -71,7 +71,7 @@ export function ArchitectureDiagram() {
                   <p className="text-sm font-semibold text-slate-900">99.99%</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Latência Média</p>
+                  <p className="text-xs text-slate-500">LatÃªncia MÃ©dia</p>
                   <p className="text-sm font-semibold text-slate-900">23ms</p>
                 </div>
               </div>
@@ -85,7 +85,7 @@ export function ArchitectureDiagram() {
                 <h4 className="text-sm font-semibold text-slate-900">{card.title}</h4>
                 <p className="mt-1 text-xs text-slate-500">{card.subtitle}</p>
                 <div className="mt-4 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
-                  Status · Sincronizado
+                  Status Â· Sincronizado
                 </div>
               </div>
             ))}
@@ -95,3 +95,4 @@ export function ArchitectureDiagram() {
     </section>
   );
 }
+

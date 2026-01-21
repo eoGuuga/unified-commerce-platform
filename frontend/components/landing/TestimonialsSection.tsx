@@ -1,4 +1,4 @@
-const testimonials = [
+Ôªøconst testimonials = [
   {
     name: "Marina Silva",
     role: "Dona, Boutique Fashion",
@@ -14,10 +14,10 @@ const testimonials = [
     name: "Carlos Mendes",
     role: "Gestor, Tech Store",
     quote:
-      "O WhatsApp Bot mudou meu negÛcio. Cliente pede, o bot valida estoque, processa pagamento. Eu sÛ preparo o envio.",
+      "O WhatsApp Bot mudou meu neg√≥cio. Cliente pede, o bot valida estoque, processa pagamento. Eu s√≥ preparo o envio.",
     stats: [
       { value: "70%", label: "Vendas WhatsApp" },
-      { value: "24/7", label: "OperaÁ„o" },
+      { value: "24/7", label: "Opera√ß√£o" },
       { value: "-80%", label: "Tempo atendimento" },
     ],
   },
@@ -37,7 +37,7 @@ export function TestimonialsSection() {
                   <p className="text-xs text-slate-500">{item.role}</p>
                 </div>
               </div>
-              <p className="mt-4 text-sm text-slate-600">ì{item.quote}î</p>
+              <p className="mt-4 text-sm text-slate-600">‚Äú{item.quote}‚Äù</p>
 
               <div className="mt-6 grid grid-cols-3 gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-xs">
                 {item.stats.map((stat) => (
@@ -54,3 +54,4 @@ export function TestimonialsSection() {
     </section>
   );
 }
+

@@ -1,33 +1,33 @@
-import { ShieldCheck, MessageCircle, Infinity } from "lucide-react";
+Ôªøimport { ShieldCheck, MessageCircle, Infinity } from "lucide-react";
 
 const cards = [
   {
     title: "Zero Overselling",
     description:
-      "N„o È marketing. … garantia tÈcnica. TransaÁıes ACID e reserva atÙmica impedem que o mesmo produto seja vendido duas vezes.",
+      "N√£o √© marketing. √â garantia t√©cnica. Transa√ß√µes ACID e reserva at√¥mica impedem que o mesmo produto seja vendido duas vezes.",
     items: [
-      "Bloqueio instant‚neo no momento da venda",
-      "Rollback autom·tico se pagamento falhar",
-      "SincronizaÁ„o em menos de 100ms",
+      "Bloqueio instant√¢neo no momento da venda",
+      "Rollback autom√°tico se pagamento falhar",
+      "Sincroniza√ß√£o em menos de 100ms",
     ],
     icon: ShieldCheck,
   },
   {
     title: "WhatsApp Bot Inteligente",
     description:
-      "N„o È chatbot genÈrico. … vendedor automatizado que consulta estoque real, processa pagamentos e confirma pedidos.",
+      "N√£o √© chatbot gen√©rico. √â vendedor automatizado que consulta estoque real, processa pagamentos e confirma pedidos.",
     items: [
       "Consulta estoque em tempo real",
-      "Processa pagamentos via Pix/cart„o",
+      "Processa pagamentos via Pix/cart√£o",
       "Confirma pedido e reserva produto",
     ],
     icon: MessageCircle,
   },
   {
-    title: "OperaÁ„o ContÌnua",
+    title: "Opera√ß√£o Cont√≠nua",
     description:
-      "Venda 24/7 em todos os canais simultaneamente. O sistema nunca trava porque uma venda est· sendo processada em outro lugar.",
-    items: ["99,99% de uptime garantido", "Processamento paralelo de vendas", "Failover autom·tico"],
+      "Venda 24/7 em todos os canais simultaneamente. O sistema nunca trava porque uma venda est√° sendo processada em outro lugar.",
+    items: ["99,99% de uptime garantido", "Processamento paralelo de vendas", "Failover autom√°tico"],
     icon: Infinity,
   },
 ];
@@ -41,10 +41,10 @@ export function DifferentialsSection() {
             <span className="h-2 w-2 rounded-full bg-emerald-400" />Diferenciais Absolutos
           </span>
           <h2 className="mt-4 text-3xl font-semibold text-white sm:text-4xl">
-            Por que a UCM È diferente de tudo que vocÍ j· viu
+            Por que a UCM √© diferente de tudo que voc√™ j√° viu
           </h2>
           <p className="mt-3 text-base text-slate-300">
-            N„o È sÛ mais um sistema. … infraestrutura crÌtica para operaÁıes omnichannel.
+            N√£o √© s√≥ mais um sistema. √â infraestrutura cr√≠tica para opera√ß√µes omnichannel.
           </p>
         </div>
 
@@ -75,3 +75,4 @@ export function DifferentialsSection() {
     </section>
   );
 }
+

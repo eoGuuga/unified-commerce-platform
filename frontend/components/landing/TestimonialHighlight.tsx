@@ -1,4 +1,4 @@
-import { Quote } from "lucide-react";
+Ôªøimport { Quote } from "lucide-react";
 
 export function TestimonialHighlight() {
   return (
@@ -11,8 +11,8 @@ export function TestimonialHighlight() {
             </div>
             <div className="flex-1 space-y-4">
               <p className="text-lg text-slate-700">
-                "Era sexta-feira, 18h. Cliente comprou no site. Vendedor acabou de vender a ˙ltima peÁa na loja. Eu sÛ descobri
-                no s·bado de manh„. Tive que ligar pro cliente explicando que n„o tinha mais."
+                "Era sexta-feira, 18h. Cliente comprou no site. Vendedor acabou de vender a √∫ltima pe√ßa na loja. Eu s√≥ descobri
+                no s√°bado de manh√£. Tive que ligar pro cliente explicando que n√£o tinha mais."
                 <span className="text-rose-500"> Ele nunca mais voltou.</span>
               </p>
               <div className="flex items-center gap-3">
@@ -29,7 +29,7 @@ export function TestimonialHighlight() {
             <p className="text-xs font-semibold text-slate-500">Esse problema tem nome:</p>
             <h3 className="mt-2 text-lg font-semibold text-rose-500">OVERSELLING</h3>
             <p className="mt-2 text-sm text-slate-600">
-              Ele acontece toda vez que seus sistemas n„o conversam entre si em tempo real.
+              Ele acontece toda vez que seus sistemas n√£o conversam entre si em tempo real.
             </p>
           </div>
         </div>
@@ -37,3 +37,4 @@ export function TestimonialHighlight() {
     </section>
   );
 }
+

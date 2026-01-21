@@ -1,13 +1,13 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 const menuItems = [
   { label: "Problema", href: "#problema" },
-  { label: "Solução", href: "#solucao" },
+  { label: "SoluÃ§Ã£o", href: "#solucao" },
   { label: "Como Funciona", href: "#fluxo" },
   { label: "Planos", href: "#planos" },
 ];
 
-const trustBadges = ["Transações ACID", "Sync em Tempo Real", "99,99% Uptime"];
+const trustBadges = ["TransaÃ§Ãµes ACID", "Sync em Tempo Real", "99,99% Uptime"];
 
 export function HeroSection() {
   return (
@@ -23,7 +23,7 @@ export function HeroSection() {
             </span>
           </div>
 
-          <nav className="hidden items-center gap-6 text-sm text-slate-600 lg:flex" aria-label="Navegação">
+          <nav className="hidden items-center gap-6 text-sm text-slate-600 lg:flex" aria-label="NavegaÃ§Ã£o">
             {menuItems.map((item) => (
               <Link key={item.href} href={item.href} className="transition hover:text-slate-900">
                 {item.label}
@@ -39,7 +39,7 @@ export function HeroSection() {
               href="#contato"
               className="rounded-xl bg-slate-900 px-4 py-2 font-semibold text-white transition hover:-translate-y-[1px] hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
             >
-              Ver Demo ao Vivo →
+              Ver Demo ao Vivo â†’
             </Link>
           </div>
         </header>
@@ -58,7 +58,7 @@ export function HeroSection() {
               </h1>
               <p className="text-lg text-slate-600">
                 Backend centralizado que sincroniza estoque em tempo real entre PDV, e-commerce e WhatsApp.{" "}
-                <strong className="font-semibold text-slate-900">Uma única fonte da verdade.</strong>
+                <strong className="font-semibold text-slate-900">Uma Ãºnica fonte da verdade.</strong>
               </p>
             </div>
 
@@ -68,7 +68,7 @@ export function HeroSection() {
                 className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-[1px] hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
               >
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20">
-                  ▶
+                  â–¶
                 </span>
                 Ver Demo ao Vivo
               </Link>
@@ -105,11 +105,11 @@ export function HeroSection() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-                      ●
+                      â—
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-slate-900">Backend Central</p>
-                      <p className="text-xs text-slate-500">Fonte única da verdade</p>
+                      <p className="text-xs text-slate-500">Fonte Ãºnica da verdade</p>
                     </div>
                   </div>
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -117,7 +117,7 @@ export function HeroSection() {
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   {[
-                    { label: "PDV Físico", status: "Sincronizado" },
+                    { label: "PDV FÃ­sico", status: "Sincronizado" },
                     { label: "E-commerce", status: "Sincronizado" },
                     { label: "WhatsApp", status: "Sincronizado" },
                   ].map((item) => (
@@ -132,9 +132,9 @@ export function HeroSection() {
               <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-xs text-slate-600">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                   <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-200 text-emerald-700">
-                    ✓
+                    âœ“
                   </span>
-                  Última Transação
+                  Ãšltima TransaÃ§Ã£o
                 </div>
                 <div className="mt-3 grid gap-2">
                   <div className="flex justify-between">
@@ -167,3 +167,4 @@ export function HeroSection() {
     </section>
   );
 }
+

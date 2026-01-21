@@ -1,23 +1,23 @@
-import { Database, Repeat2, Lock, RefreshCw } from "lucide-react";
+Ôªøimport { Database, Repeat2, Lock, RefreshCw } from "lucide-react";
 
 const cards = [
   {
-    title: "TransaÁıes ACID",
+    title: "Transa√ß√µes ACID",
     description:
-      "Atomicidade, consistÍncia, isolamento e durabilidade. Cada venda È uma transaÁ„o completa ou nada acontece.",
+      "Atomicidade, consist√™ncia, isolamento e durabilidade. Cada venda √© uma transa√ß√£o completa ou nada acontece.",
     code: ["BEGIN TRANSACTION", "CHECK_STOCK", "RESERVE_ITEM", "PROCESS_PAYMENT", "COMMIT"],
     icon: Database,
   },
   {
     title: "Event-Driven Sync",
-    description: "Toda mudanÁa de estoque dispara eventos instant‚neos para todos os canais conectados.",
+    description: "Toda mudan√ßa de estoque dispara eventos instant√¢neos para todos os canais conectados.",
     code: ["STOCK_UPDATED", "? PDV: sync", "? E-commerce: sync", "? WhatsApp: sync", "[23ms total]"],
     icon: Repeat2,
   },
   {
     title: "Pessimistic Locking",
     description:
-      "Produto em processo de venda È bloqueado imediatamente. Outros canais veem ìindisponÌvelî em tempo real.",
+      "Produto em processo de venda √© bloqueado imediatamente. Outros canais veem ‚Äúindispon√≠vel‚Äù em tempo real.",
     code: ["LOCK product_id=42", "STATUS: reserved", "TIMEOUT: 10min", "AUTO_RELEASE: if unpaid"],
     icon: Lock,
   },
@@ -35,9 +35,9 @@ export function TechnicalArchitectureSection() {
       <div className="mx-auto w-full max-w-6xl px-6 lg:px-10">
         <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-10">
           <div className="text-center">
-            <h2 className="text-3xl font-semibold text-white sm:text-4xl">Arquitetura TÈcnica que Importa</h2>
+            <h2 className="text-3xl font-semibold text-white sm:text-4xl">Arquitetura T√©cnica que Importa</h2>
             <p className="mt-2 text-sm text-slate-300">
-              N„o È buzzword. … engenharia real que garante confiabilidade.
+              N√£o √© buzzword. √â engenharia real que garante confiabilidade.
             </p>
           </div>
 
@@ -67,3 +67,4 @@ export function TechnicalArchitectureSection() {
     </section>
   );
 }
+

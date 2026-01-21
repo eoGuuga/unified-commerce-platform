@@ -1,14 +1,14 @@
-import { CheckCircle, AlertTriangle } from "lucide-react";
+Ôªøimport { CheckCircle, AlertTriangle } from "lucide-react";
 
 const scenarios = [
   {
-    title: "Venda Simult‚nea",
-    subtitle: "⁄ltima unidade em estoque",
+    title: "Venda Simult√¢nea",
+    subtitle: "√öltima unidade em estoque",
     items: [
-      "Cliente A adiciona produto no e-commerce ‡s 14:32:15",
-      "Cliente B pede no WhatsApp ‡s 14:32:17 (2s depois)",
+      "Cliente A adiciona produto no e-commerce √†s 14:32:15",
+      "Cliente B pede no WhatsApp √†s 14:32:17 (2s depois)",
       "Cliente A reserva o produto (chegou primeiro)",
-      "Cliente B recebe: ìProduto indisponÌvel no momentoî",
+      "Cliente B recebe: ‚ÄúProduto indispon√≠vel no momento‚Äù",
       "Cliente A finaliza compra. Zero overselling.",
     ],
     accent: "bg-emerald-50/60 border-emerald-200",
@@ -16,13 +16,13 @@ const scenarios = [
   },
   {
     title: "Pagamento Falhou",
-    subtitle: "Rollback autom·tico",
+    subtitle: "Rollback autom√°tico",
     items: [
       "Cliente reserva produto no PDV",
       "Produto fica bloqueado por 10 minutos",
-      "Cart„o recusado ou cliente desiste",
-      "Sistema faz rollback autom·tico",
-      "Produto volta ao estoque e fica disponÌvel em todos os canais",
+      "Cart√£o recusado ou cliente desiste",
+      "Sistema faz rollback autom√°tico",
+      "Produto volta ao estoque e fica dispon√≠vel em todos os canais",
     ],
     accent: "bg-amber-50/60 border-amber-200",
     icon: AlertTriangle,
@@ -33,7 +33,7 @@ export function RealScenariosSection() {
   return (
     <section className="bg-white py-16 text-slate-900">
       <div className="mx-auto w-full max-w-6xl px-6 lg:px-10">
-        <h2 className="text-center text-3xl font-semibold text-slate-900">Cen·rios Reais de OperaÁ„o</h2>
+        <h2 className="text-center text-3xl font-semibold text-slate-900">Cen√°rios Reais de Opera√ß√£o</h2>
 
         <div className="mt-10 grid gap-6 lg:grid-cols-2">
           {scenarios.map((scenario) => (
@@ -65,3 +65,4 @@ export function RealScenariosSection() {
     </section>
   );
 }
+

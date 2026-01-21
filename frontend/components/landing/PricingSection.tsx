@@ -1,53 +1,53 @@
-const plans = [
+ï»¿const plans = [
   {
     name: "Essencial",
     price: "R$299",
-    subtitle: "Para quem está começando no omnichannel",
+    subtitle: "Para quem estÃ¡ comeÃ§ando no omnichannel",
     features: [
-      "Até 2 canais ativos",
-      "1.000 transações/mês",
-      "Sincronização tempo real",
+      "AtÃ© 2 canais ativos",
+      "1.000 transaÃ§Ãµes/mÃªs",
+      "SincronizaÃ§Ã£o tempo real",
       "Zero overselling garantido",
       "Suporte por e-mail",
     ],
-    cta: "Começar Agora",
+    cta: "ComeÃ§ar Agora",
   },
   {
     name: "Crescimento",
     price: "R$599",
-    subtitle: "Para operações em expansão",
+    subtitle: "Para operaÃ§Ãµes em expansÃ£o",
     features: [
-      "Até 4 canais ativos",
-      "5.000 transações/mês",
-      "WhatsApp Bot incluído",
-      "Relatórios avançados",
-      "Suporte prioritário",
+      "AtÃ© 4 canais ativos",
+      "5.000 transaÃ§Ãµes/mÃªs",
+      "WhatsApp Bot incluÃ­do",
+      "RelatÃ³rios avanÃ§ados",
+      "Suporte prioritÃ¡rio",
     ],
-    cta: "Começar Agora",
+    cta: "ComeÃ§ar Agora",
   },
   {
     name: "Escala",
     price: "R$999",
-    subtitle: "Para operações consolidadas",
+    subtitle: "Para operaÃ§Ãµes consolidadas",
     features: [
       "Canais ilimitados",
-      "20.000 transações/mês",
-      "Multi-loja (até 5)",
+      "20.000 transaÃ§Ãµes/mÃªs",
+      "Multi-loja (atÃ© 5)",
       "API completa",
       "Suporte 24/7",
     ],
-    cta: "Começar Agora",
+    cta: "ComeÃ§ar Agora",
     highlight: true,
   },
   {
     name: "Enterprise",
     price: "Custom",
-    subtitle: "Para grandes operações",
+    subtitle: "Para grandes operaÃ§Ãµes",
     features: [
       "Tudo do Escala, mais:",
       "SLA customizado",
       "Onboarding dedicado",
-      "Integrações customizadas",
+      "IntegraÃ§Ãµes customizadas",
       "Account Manager",
     ],
     cta: "Falar com Vendas",
@@ -62,7 +62,7 @@ export function PricingSection() {
           <span className="h-2 w-2 rounded-full bg-blue-500" />Planos
         </span>
         <h2 className="mt-4 text-3xl font-semibold text-slate-900 sm:text-4xl">Escolha o plano ideal para o seu momento</h2>
-        <p className="mt-3 text-base text-slate-600">Comece pequeno. Cresça sem trocar de sistema.</p>
+        <p className="mt-3 text-base text-slate-600">Comece pequeno. CresÃ§a sem trocar de sistema.</p>
 
         <div className="mt-12 grid gap-6 lg:grid-cols-4">
           {plans.map((plan) => (
@@ -86,7 +86,7 @@ export function PricingSection() {
               </div>
               <p className={`mt-3 text-3xl font-semibold ${plan.highlight ? "text-white" : "text-slate-900"}`}>
                 {plan.price}
-                <span className={`text-sm font-medium ${plan.highlight ? "text-blue-100" : "text-slate-500"}`}>/mês</span>
+                <span className={`text-sm font-medium ${plan.highlight ? "text-blue-100" : "text-slate-500"}`}>/mÃªs</span>
               </p>
               <p className={`mt-2 text-xs ${plan.highlight ? "text-blue-100" : "text-slate-500"}`}>
                 {plan.subtitle}
@@ -116,3 +116,4 @@ export function PricingSection() {
     </section>
   );
 }
+
