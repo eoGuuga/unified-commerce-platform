@@ -2,12 +2,12 @@ import Link from "next/link";
 
 const menu = [
   { label: "Problema", href: "#problema" },
-  { label: "Solução", href: "#solucao" },
+  { label: "SoluÃ§Ã£o", href: "#solucao" },
   { label: "Como Funciona", href: "#fluxo" },
   { label: "Planos", href: "#planos" },
 ];
 
-const trustBadges = ["Transações ACID", "Sync em Tempo Real", "99,99% Uptime"];
+const trustBadges = ["TransaÃ§Ãµes ACID", "Sync em Tempo Real", "99,99% Uptime"];
 
 export function HeroSection() {
   return (
@@ -23,7 +23,7 @@ export function HeroSection() {
             </span>
           </div>
 
-          <nav className="hidden items-center gap-6 text-sm text-slate-500 lg:flex" aria-label="Navegação">
+          <nav className="hidden items-center gap-6 text-sm text-slate-500 lg:flex" aria-label="NavegaÃ§Ã£o">
             {menu.map((item) => (
               <Link key={item.href} href={item.href} className="transition hover:text-slate-900">
                 {item.label}
@@ -57,7 +57,7 @@ export function HeroSection() {
               </h1>
               <p className="text-lg text-slate-600">
                 Backend centralizado que sincroniza estoque em tempo real entre PDV, e-commerce e WhatsApp.{' '}
-                <strong className="font-semibold text-slate-900">Uma única fonte da verdade.</strong>
+                <strong className="font-semibold text-slate-900">Uma Ãºnica fonte da verdade.</strong>
               </p>
             </div>
 
@@ -108,7 +108,7 @@ export function HeroSection() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-slate-900">Backend Central</p>
-                      <p className="text-xs text-slate-500">Fonte única da verdade</p>
+                      <p className="text-xs text-slate-500">Fonte Ãºnica da verdade</p>
                     </div>
                   </div>
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -116,7 +116,7 @@ export function HeroSection() {
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   {[
-                    { label: "PDV Físico", status: "Sincronizado" },
+                    { label: "PDV FÃ­sico", status: "Sincronizado" },
                     { label: "E-commerce", status: "Sincronizado" },
                     { label: "WhatsApp", status: "Sincronizado" },
                   ].map((item) => (
@@ -133,7 +133,7 @@ export function HeroSection() {
                   <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-200 text-emerald-700">
                     ?
                   </span>
-                  Última Transação
+                  Ãšltima TransaÃ§Ã£o
                 </div>
                 <div className="mt-3 grid gap-2">
                   <div className="flex justify-between">
