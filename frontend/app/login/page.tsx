@@ -87,12 +87,7 @@ export default function LoginPage() {
 
         <div className="mt-6 text-center">
           <p className="text-sm text-slate-300">
-            Usuario de teste:{' '}
-            <span className="font-mono text-xs text-slate-100">dev@gtsofthub.com.br</span>
-          </p>
-          <p className="mt-2 text-sm text-slate-300">
-            Senha:{' '}
-            <span className="font-mono text-xs text-slate-100">12345678</span>
+            Precisa de acesso? Fale com a equipe para liberar seu teste.
           </p>
         </div>
       </div>

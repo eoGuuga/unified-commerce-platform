@@ -150,6 +150,24 @@ html {
   scroll-behavior: smooth;
 }
 
+body::-webkit-scrollbar {
+  width: 12px;
+}
+
+body::-webkit-scrollbar-track {
+  background: #0b1119;
+}
+
+body::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(255, 122, 61, 0.9), rgba(95, 224, 255, 0.9));
+  border-radius: 999px;
+  border: 3px solid #0b1119;
+}
+
+body::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(255, 123, 69, 1), rgba(37, 183, 167, 1));
+}
+
 body {
   background: var(--ink-900);
   color: var(--ice-100);
@@ -393,6 +411,79 @@ body {
 
 .flip-card-back {
   transform: rotateY(180deg);
+}
+
+.btn-primary {
+  border-radius: 999px;
+  background: linear-gradient(120deg, rgba(255, 122, 61, 0.95), rgba(255, 179, 71, 0.92));
+  color: #0b1119;
+  padding: 0.85rem 2rem;
+  font-weight: 600;
+  box-shadow: 0 18px 40px rgba(255, 122, 61, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 50px rgba(255, 122, 61, 0.45);
+}
+
+.btn-outline {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #e2e8f0;
+  padding: 0.85rem 2rem;
+  font-weight: 600;
+  background: rgba(15, 23, 42, 0.2);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.btn-outline:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+}
+
+.btn-glow {
+  position: relative;
+  isolation: isolate;
+}
+
+.btn-glow::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 122, 61, 0.45), transparent 70%);
+  z-index: -1;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.btn-glow:hover::after {
+  opacity: 1;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(26px) scale(0.98);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.reveal-delay-1 {
+  transition-delay: 0.1s;
+}
+
+.reveal-delay-2 {
+  transition-delay: 0.2s;
+}
+
+.reveal-delay-3 {
+  transition-delay: 0.3s;
 }
 
 .accent-line {

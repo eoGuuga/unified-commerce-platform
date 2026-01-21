@@ -1,5 +1,7 @@
 "use client"
 
+import { useEffect } from "react"
+
 const stats = [
   { label: "Disponibilidade", value: "99.99%" },
   { label: "Pedidos/dia", value: "+2.4k" },
@@ -40,14 +42,16 @@ const pricing = [
     name: "Start",
     price: "R$ 149/mês",
     installment: "12x de R$ 14,90",
-    description: "Base essencial para comecar a vender.",
+    description: "Para quem precisa ativar o PDV com controle total.",
+    ideal: "Ideal para lojas fisicas e operacao enxuta.",
     features: ["PDV completo", "Estoque centralizado", "Relatorios basicos"],
   },
   {
     name: "Pro",
     price: "R$ 349/mês",
     installment: "12x de R$ 34,90",
-    description: "WhatsApp como canal principal de vendas.",
+    description: "Transforma o WhatsApp no seu canal mais forte.",
+    ideal: "Ideal para quem quer vender no automatico.",
     features: [
       "Tudo do Start",
       "Bot WhatsApp (pedido, pagamento, status)",
@@ -59,7 +63,8 @@ const pricing = [
     name: "Scale",
     price: "R$ 749/mês",
     installment: "12x de R$ 74,90",
-    description: "Operacao multi-loja e integracoes avancadas.",
+    description: "Para operacao multi-loja com processos maduros.",
+    ideal: "Ideal para redes e franquias em crescimento.",
     features: [
       "Tudo do Pro",
       "Multi-lojas e equipes",
@@ -71,12 +76,37 @@ const pricing = [
     name: "Enterprise",
     price: "Sob consulta",
     installment: "Condicoes personalizadas",
-    description: "SLA, compliance e integrações especiais.",
+    description: "SLA, compliance e integracoes criticas.",
+    ideal: "Ideal para operacoes complexas e alto volume.",
     features: ["SLA dedicado", "Onboarding premium", "Roadmap conjunto"],
   },
 ]
 
 export default function Page() {
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const elements = Array.from(document.querySelectorAll(".reveal"))
+    if (!("IntersectionObserver" in window)) {
+      elements.forEach((el) => el.classList.add("reveal-visible"))
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("reveal-visible")
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.2 },
+    )
+
+    elements.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <main className="app-shell full-bleed text-slate-100">
       <div className="relative overflow-hidden">
@@ -97,11 +127,11 @@ export default function Page() {
               </div>
             </div>
             <div className="flex items-center gap-3 text-sm">
-              <a href="/login" className="rounded-full border border-white/20 px-4 py-2 text-slate-100 transition hover:border-white/40">
+              <a href="/login" className="btn-outline">
                 Entrar
               </a>
-              <a href="/admin" className="rounded-full bg-white px-4 py-2 font-semibold text-slate-900 transition hover:bg-slate-100">
-                Console
+              <a href="/login" className="btn-primary btn-glow">
+                Comecar teste
               </a>
             </div>
           </header>
@@ -109,7 +139,7 @@ export default function Page() {
 
         <section className="page-wrap pb-16 pt-10">
           <div className="grid min-h-[80svh] items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="space-y-8 animate-fade-up">
+            <div className="space-y-8 animate-fade-up reveal">
               <div className="signal-pill inline-flex items-center gap-3">
                 <span className="h-2 w-2 rounded-full bg-[var(--signal-cyan)]" />
                 Operacao sincronizada em tempo real
@@ -120,27 +150,27 @@ export default function Page() {
                   A torre de comando que sincroniza cada venda.
                 </h1>
                 <p className="text-lg text-slate-200 max-w-2xl">
-                  Estoque, pagamentos e atendimento rodando no mesmo pulso. Menos ruptura, mais escala e uma operacao
-                  que nunca perde o ritmo.
+                  PDV, estoque e pagamentos rodando no mesmo pulso. O bot do WhatsApp atende, vende, valida pagamento
+                  e acompanha o pedido sem voce precisar tocar em nada.
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-4">
                 <a
                   href="/login"
-                  className="rounded-full bg-[var(--accent-coral)] px-7 py-3 text-sm font-semibold text-slate-950 transition hover:translate-y-[-1px] hover:bg-[var(--signal-ember)]"
+                  className="btn-primary btn-glow"
                 >
-                  Entrar no sistema
+                  Comecar teste
                 </a>
                 <a
                   href="/loja"
-                  className="rounded-full border border-white/20 px-7 py-3 text-sm font-semibold text-white transition hover:border-white/40"
+                  className="btn-outline"
                 >
                   Ver vitrine ao vivo
                 </a>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-3 reveal reveal-delay-1">
                 {stats.map((item) => (
                   <div key={item.label} className="signal-card rounded-2xl p-4">
                     <p className="text-xl font-semibold text-white">{item.value}</p>
@@ -150,7 +180,7 @@ export default function Page() {
               </div>
             </div>
 
-            <div className="signal-panel rounded-[32px] p-8 animate-fade-up-delay">
+            <div className="signal-panel rounded-[32px] p-8 animate-fade-up-delay reveal">
               <div className="flex items-center justify-between">
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-300">Mission control</p>
                 <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-900">Live sync</span>
@@ -188,7 +218,7 @@ export default function Page() {
           </div>
         </section>
 
-        <section className="page-wrap pt-2">
+        <section className="page-wrap pt-2 reveal">
           <div className="flex flex-wrap items-center gap-6 text-xs uppercase tracking-[0.3em] text-slate-400">
             <span>Operacao confiavel</span>
             <span>Dados auditaveis</span>
@@ -197,7 +227,7 @@ export default function Page() {
           </div>
         </section>
 
-        <section className="page-wrap mt-6 grid gap-6 md:grid-cols-3">
+        <section className="page-wrap mt-6 grid gap-6 md:grid-cols-3 reveal">
           {capabilities.map((item) => (
             <div key={item.title} className="glass-card rounded-2xl p-6">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Core</p>
@@ -207,7 +237,7 @@ export default function Page() {
           ))}
         </section>
 
-        <section className="page-wrap mt-8 grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+        <section className="page-wrap mt-8 grid gap-10 lg:grid-cols-[1.1fr_0.9fr] reveal">
           <div className="space-y-6">
             <h2 className="text-3xl font-semibold text-white">Um combo completo para vender sem friccao.</h2>
             <p className="text-slate-200">
@@ -239,7 +269,7 @@ export default function Page() {
         </section>
 
         <section className="page-wrap mt-10">
-          <div className="flex items-end justify-between gap-6 flex-wrap">
+          <div className="flex items-end justify-between gap-6 flex-wrap reveal">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Planos</p>
               <h2 className="mt-3 text-3xl font-semibold text-white">Escolha o ritmo da sua operacao.</h2>
@@ -249,12 +279,12 @@ export default function Page() {
             </div>
             <a
               href="/login"
-              className="rounded-full bg-[var(--accent-coral)] px-6 py-3 text-sm font-semibold text-slate-950 transition hover:translate-y-[-1px] hover:bg-[var(--signal-ember)]"
+              className="btn-primary btn-glow"
             >
               Comecar teste
             </a>
           </div>
-          <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4 reveal reveal-delay-1">
             {pricing.map((plan) => (
               <div key={plan.name} className="flip-card">
                 <div className="flip-card-inner">
@@ -264,9 +294,18 @@ export default function Page() {
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{plan.name}</p>
                     <p className="mt-4 text-3xl font-semibold text-white">{plan.price}</p>
                     <p className="mt-2 text-sm text-slate-200">{plan.description}</p>
+                    <p className="mt-3 text-xs text-slate-300">{plan.ideal}</p>
+                    <ul className="mt-4 space-y-2 text-sm text-slate-200">
+                      {plan.features.slice(0, 2).map((feature) => (
+                        <li key={feature} className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-[var(--signal-cyan)]" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
                     <div className="mt-6 flex items-center justify-between text-xs text-slate-300">
-                      <span>Deslize para detalhes</span>
-                      <span className="rounded-full border border-white/20 px-2 py-1">?</span>
+                      <span>Hover para detalhes completos</span>
+                      <span className="rounded-full border border-white/20 px-2 py-1">+</span>
                     </div>
                   </div>
 
@@ -287,9 +326,7 @@ export default function Page() {
                     <a
                       href="/login"
                       className={`mt-5 inline-flex w-full items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${
-                        plan.highlight
-                          ? "bg-white text-slate-900 hover:bg-slate-100"
-                          : "border border-white/20 text-white hover:border-white/40"
+                        plan.highlight ? "btn-primary" : "btn-outline"
                       }`}
                     >
                       Comecar teste
@@ -301,7 +338,7 @@ export default function Page() {
           </div>
         </section>
 
-        <section className="page-wrap mt-8">
+        <section className="page-wrap mt-8 reveal">
           <div className="signal-panel rounded-[36px] px-8 py-10 md:flex md:items-center md:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-slate-300">Pronto para operar</p>
@@ -315,13 +352,13 @@ export default function Page() {
             <div className="mt-6 flex flex-wrap gap-3 md:mt-0">
               <a
                 href="/login"
-                className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+                className="btn-primary btn-glow"
               >
-                Entrar agora
+                Comecar teste
               </a>
               <a
                 href="/pdv"
-                className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white transition hover:border-white/40"
+                className="btn-outline"
               >
                 Ver PDV
               </a>
@@ -329,7 +366,7 @@ export default function Page() {
           </div>
         </section>
 
-        <section className="page-wrap mt-10">
+        <section className="page-wrap mt-10 reveal">
           <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-4">
               <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Contato</p>
