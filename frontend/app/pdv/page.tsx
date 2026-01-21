@@ -1266,6 +1266,9 @@ export default function PDVPage() {
                 <p className="text-xs text-gray-500">Troco calculado</p>
               </button>
             </div>
+            <p className="mb-4 text-xs text-gray-500">
+              Ambiente de teste: o Pix so funciona com comprador de teste do Mercado Pago.
+            </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
