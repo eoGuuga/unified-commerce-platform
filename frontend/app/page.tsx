@@ -107,12 +107,28 @@ export default function Page() {
     return () => observer.disconnect()
   }, [])
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const root = document.documentElement
+    const handleMove = (event: MouseEvent) => {
+      const centerX = window.innerWidth / 2
+      const centerY = window.innerHeight / 2
+      root.style.setProperty("--mouse-x", `${event.clientX - centerX}px`)
+      root.style.setProperty("--mouse-y", `${event.clientY - centerY}px`)
+      root.style.setProperty("--cursor-x", `${event.clientX}px`)
+      root.style.setProperty("--cursor-y", `${event.clientY}px`)
+    }
+    window.addEventListener("mousemove", handleMove)
+    return () => window.removeEventListener("mousemove", handleMove)
+  }, [])
+
   return (
     <main className="app-shell full-bleed text-slate-100">
       <div className="relative overflow-hidden">
-        <div className="pointer-events-none absolute -top-48 right-[-12%] h-[520px] w-[520px] rounded-full signal-halo blur-[180px]" />
-        <div className="pointer-events-none absolute top-16 left-[-16%] h-[520px] w-[520px] rounded-full signal-ember blur-[200px]" />
-        <div className="pointer-events-none absolute bottom-[-30%] right-[25%] h-[540px] w-[540px] rounded-full signal-teal blur-[200px]" />
+        <div className="cursor-glow" />
+        <div className="pointer-events-none absolute -top-48 right-[-12%] h-[520px] w-[520px] rounded-full signal-halo blur-[180px] parallax-slow" />
+        <div className="pointer-events-none absolute top-16 left-[-16%] h-[520px] w-[520px] rounded-full signal-ember blur-[200px] parallax-fast" />
+        <div className="pointer-events-none absolute bottom-[-30%] right-[25%] h-[540px] w-[540px] rounded-full signal-teal blur-[200px] parallax-slow" />
         <div className="pointer-events-none absolute inset-0 signal-grid opacity-70" />
 
         <div className="page-wrap">
@@ -172,15 +188,15 @@ export default function Page() {
 
               <div className="grid gap-4 sm:grid-cols-3 reveal reveal-delay-1">
                 {stats.map((item) => (
-                  <div key={item.label} className="signal-card rounded-2xl p-4">
-                    <p className="text-xl font-semibold text-white">{item.value}</p>
-                    <p className="mt-1 text-sm text-slate-300">{item.label}</p>
-                  </div>
-                ))}
+              <div key={item.label} className="signal-card rounded-2xl p-4 tilt-card">
+                <p className="text-xl font-semibold text-white">{item.value}</p>
+                <p className="mt-1 text-sm text-slate-300">{item.label}</p>
+              </div>
+            ))}
               </div>
             </div>
 
-            <div className="signal-panel rounded-[32px] p-8 animate-fade-up-delay reveal">
+            <div className="signal-panel rounded-[32px] p-8 animate-fade-up-delay reveal tilt-card">
               <div className="flex items-center justify-between">
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-300">Mission control</p>
                 <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-900">Live sync</span>
@@ -229,7 +245,7 @@ export default function Page() {
 
         <section className="page-wrap mt-6 grid gap-6 md:grid-cols-3 reveal">
           {capabilities.map((item) => (
-            <div key={item.title} className="glass-card rounded-2xl p-6">
+            <div key={item.title} className="glass-card rounded-2xl p-6 tilt-card">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Core</p>
               <h3 className="mt-3 text-lg font-semibold text-white">{item.title}</h3>
               <p className="mt-3 text-sm text-slate-200">{item.text}</p>
@@ -246,7 +262,7 @@ export default function Page() {
             </p>
             <div className="grid gap-4 md:grid-cols-2">
               {channels.map((card) => (
-                <div key={card.title} className="signal-card rounded-2xl p-4">
+                <div key={card.title} className="signal-card rounded-2xl p-4 tilt-card">
                   <p className="text-white font-semibold">{card.title}</p>
                   <p className="mt-2 text-sm text-slate-200">{card.text}</p>
                 </div>
@@ -287,7 +303,7 @@ export default function Page() {
           <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4 reveal reveal-delay-1">
             {pricing.map((plan) => (
               <div key={plan.name} className="flip-card">
-                <div className="flip-card-inner">
+                <div className="flip-card-inner tilt-card">
                   <div
                     className={`flip-card-face rounded-2xl p-6 ${plan.highlight ? "signal-panel border border-white/20" : "glass-card border border-white/10"}`}
                   >

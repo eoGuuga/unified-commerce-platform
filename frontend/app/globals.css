@@ -168,6 +168,40 @@ body::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, rgba(255, 123, 69, 1), rgba(37, 183, 167, 1));
 }
 
+.cursor-glow {
+  position: fixed;
+  width: 420px;
+  height: 420px;
+  border-radius: 999px;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(95, 224, 255, 0.18), rgba(255, 122, 61, 0.08) 45%, transparent 70%);
+  transform: translate(calc(var(--cursor-x, 50vw) - 210px), calc(var(--cursor-y, 50vh) - 210px));
+  mix-blend-mode: screen;
+  opacity: 0.7;
+  transition: transform 0.08s ease-out, opacity 0.2s ease;
+  z-index: 1;
+}
+
+.parallax-slow {
+  transform: translate3d(calc(var(--mouse-x, 0px) * 0.02), calc(var(--mouse-y, 0px) * 0.02), 0);
+  transition: transform 0.2s ease;
+}
+
+.parallax-fast {
+  transform: translate3d(calc(var(--mouse-x, 0px) * 0.04), calc(var(--mouse-y, 0px) * 0.04), 0);
+  transition: transform 0.2s ease;
+}
+
+.tilt-card {
+  transform-style: preserve-3d;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.tilt-card:hover {
+  transform: translateY(-6px) rotateX(2deg) rotateY(-2deg);
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.45);
+}
+
 body {
   background: var(--ink-900);
   color: var(--ice-100);
