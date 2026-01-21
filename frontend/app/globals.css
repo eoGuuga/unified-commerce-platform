@@ -151,33 +151,33 @@ html {
 }
 
 body::-webkit-scrollbar {
-  width: 12px;
+  width: 10px;
 }
 
 body::-webkit-scrollbar-track {
-  background: #0b1119;
+  background: rgba(12, 18, 28, 0.6);
 }
 
 body::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(255, 122, 61, 0.9), rgba(95, 224, 255, 0.9));
+  background: rgba(255, 255, 255, 0.14);
   border-radius: 999px;
-  border: 3px solid #0b1119;
+  border: 2px solid rgba(12, 18, 28, 0.8);
 }
 
 body::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(255, 123, 69, 1), rgba(37, 183, 167, 1));
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .cursor-glow {
   position: fixed;
-  width: 420px;
-  height: 420px;
+  width: 220px;
+  height: 220px;
   border-radius: 999px;
   pointer-events: none;
-  background: radial-gradient(circle, rgba(95, 224, 255, 0.18), rgba(255, 122, 61, 0.08) 45%, transparent 70%);
-  transform: translate(calc(var(--cursor-x, 50vw) - 210px), calc(var(--cursor-y, 50vh) - 210px));
+  background: radial-gradient(circle, rgba(95, 224, 255, 0.12), rgba(255, 122, 61, 0.06) 45%, transparent 70%);
+  transform: translate(calc(var(--cursor-x, 50vw) - 110px), calc(var(--cursor-y, 50vh) - 110px));
   mix-blend-mode: screen;
-  opacity: 0.7;
+  opacity: 0.45;
   transition: transform 0.08s ease-out, opacity 0.2s ease;
   z-index: 1;
 }

@@ -39,36 +39,43 @@ const flow = [
 
 const pricing = [
   {
-    name: "Start",
+    name: "Essencial",
     price: "R$ 149/mês",
     installment: "12x de R$ 14,90",
-    description: "Para quem precisa ativar o PDV com controle total.",
-    ideal: "Ideal para lojas fisicas e operacao enxuta.",
-    features: ["PDV completo", "Estoque centralizado", "Relatorios basicos"],
+    description: "Ative o PDV e controle estoque sem friccao.",
+    ideal: "Para quem quer sair do improviso com rapidez.",
+    features: [
+      "PDV completo com atalhos",
+      "Estoque em tempo real",
+      "Relatorios essenciais",
+      "Cadastro rapido de produtos",
+    ],
   },
   {
-    name: "Pro",
+    name: "Crescimento",
     price: "R$ 349/mês",
     installment: "12x de R$ 34,90",
-    description: "Transforma o WhatsApp no seu canal mais forte.",
-    ideal: "Ideal para quem quer vender no automatico.",
+    description: "WhatsApp virando sua maquina de vendas.",
+    ideal: "Para escalar atendimento e fechar pedidos 24/7.",
     features: [
       "Tudo do Start",
       "Bot WhatsApp (pedido, pagamento, status)",
-      "Cupons e regras promocionais",
+      "Cupons e campanhas",
+      "Fluxo de pagamento automatizado",
     ],
     highlight: true,
   },
   {
-    name: "Scale",
+    name: "Expansao",
     price: "R$ 749/mês",
     installment: "12x de R$ 74,90",
-    description: "Para operacao multi-loja com processos maduros.",
-    ideal: "Ideal para redes e franquias em crescimento.",
+    description: "Multi-lojas, equipes e operacao distribuida.",
+    ideal: "Para redes e franquias que precisam de controle.",
     features: [
       "Tudo do Pro",
-      "Multi-lojas e equipes",
+      "Multi-lojas e permissoes",
       "Integracoes sob demanda",
+      "Relatorios avancados",
       "Suporte prioritario",
     ],
   },
@@ -76,9 +83,14 @@ const pricing = [
     name: "Enterprise",
     price: "Sob consulta",
     installment: "Condicoes personalizadas",
-    description: "SLA, compliance e integracoes criticas.",
-    ideal: "Ideal para operacoes complexas e alto volume.",
-    features: ["SLA dedicado", "Onboarding premium", "Roadmap conjunto"],
+    description: "SLA, compliance e integrares sob medida.",
+    ideal: "Para operacoes de alto volume e requisitos strict.",
+    features: [
+      "SLA dedicado",
+      "Onboarding premium",
+      "Roadmap conjunto",
+      "Stack de seguranca",
+    ],
   },
 ]
 
@@ -163,11 +175,13 @@ export default function Page() {
 
               <div className="space-y-5">
                 <h1 className="font-display text-[clamp(3rem,8vw,6rem)] leading-[0.95] text-white">
-                  A torre de comando que sincroniza cada venda.
+                  Sincronize vendas, estoque, pagamentos e atendimento.
                 </h1>
                 <p className="text-lg text-slate-200 max-w-2xl">
-                  PDV, estoque e pagamentos rodando no mesmo pulso. O bot do WhatsApp atende, vende, valida pagamento
-                  e acompanha o pedido sem voce precisar tocar em nada.
+                  Uma plataforma unificada para operar tudo em segundos, com dados em tempo real e execucao sem ruido.
+                </p>
+                <p className="text-sm text-slate-300 max-w-xl">
+                  O bot do WhatsApp atende, vende, valida pagamento e acompanha o pedido com linguagem natural.
                 </p>
               </div>
 
@@ -179,20 +193,26 @@ export default function Page() {
                   Comecar teste
                 </a>
                 <a
-                  href="/loja"
+                  href="#planos"
                   className="btn-outline"
                 >
-                  Ver vitrine ao vivo
+                  Ver planos
+                </a>
+                <a
+                  href="/pdv"
+                  className="btn-outline"
+                >
+                  Ver PDV ao vivo
                 </a>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3 reveal reveal-delay-1">
                 {stats.map((item) => (
-              <div key={item.label} className="signal-card rounded-2xl p-4 tilt-card">
-                <p className="text-xl font-semibold text-white">{item.value}</p>
-                <p className="mt-1 text-sm text-slate-300">{item.label}</p>
-              </div>
-            ))}
+                  <div key={item.label} className="signal-card rounded-2xl p-4 tilt-card">
+                    <p className="text-xl font-semibold text-white">{item.value}</p>
+                    <p className="mt-1 text-sm text-slate-300">{item.label}</p>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -243,6 +263,40 @@ export default function Page() {
           </div>
         </section>
 
+        <section className="page-wrap mt-6 reveal">
+          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="glass-card rounded-2xl p-6 tilt-card">
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Prova social</p>
+              <h3 className="mt-3 text-xl font-semibold text-white">Operacoes que confiam no UCM.</h3>
+              <p className="mt-2 text-sm text-slate-200">
+                Historias reais de quem migrou para uma operacao unificada e passou a vender com previsibilidade.
+              </p>
+              <div className="mt-5 grid grid-cols-2 gap-3 text-xs text-slate-300">
+                {["Loja Aurora", "Grupo Vitrine", "Rede Cafe", "Studio Dock"].map((logo) => (
+                  <div key={logo} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                    {logo}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="signal-panel rounded-2xl p-6 tilt-card">
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-300">Depoimentos</p>
+              <div className="mt-4 space-y-4 text-sm text-slate-200">
+                <p>
+                  "O bot do WhatsApp virou nosso melhor vendedor. Ele atende, confirma e libera o pedido sem
+                  gargalo."
+                </p>
+                <p className="text-xs text-slate-400">Mariana S. - Operacoes Omnichannel</p>
+                <div className="h-px w-full bg-white/10" />
+                <p>
+                  "Estoque parou de estourar. Tudo sincronizado, do PDV ao WhatsApp, em tempo real."
+                </p>
+                <p className="text-xs text-slate-400">Lucas A. - Rede de lojas</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="page-wrap mt-6 grid gap-6 md:grid-cols-3 reveal">
           {capabilities.map((item) => (
             <div key={item.title} className="glass-card rounded-2xl p-6 tilt-card">
@@ -284,7 +338,7 @@ export default function Page() {
           </div>
         </section>
 
-        <section className="page-wrap mt-10">
+        <section className="page-wrap mt-10" id="planos">
           <div className="flex items-end justify-between gap-6 flex-wrap reveal">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Planos</p>
