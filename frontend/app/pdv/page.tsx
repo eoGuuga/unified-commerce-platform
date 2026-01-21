@@ -713,6 +713,30 @@ export default function PDVPage() {
       );
 
       setPaymentData(paymentResult);
+      const isDevHost =
+        typeof window !== 'undefined' &&
+        (['localhost', '127.0.0.1'].includes(window.location.hostname) ||
+          window.location.hostname.startsWith('dev.'));
+
+      if (paymentMethod === 'pix' && isDevHost && paymentResult?.pagamento?.id) {
+        try {
+          await api.confirmPayment(paymentResult.pagamento.id, tenantId);
+          toast.success('Pagamento Pix simulado no DEV.');
+          setShowPayment(false);
+          setPaymentData(null);
+          setOrderData(null);
+          setCashReceived('');
+          setCouponCode('');
+          await mutate();
+          setCart([]);
+          setSearchTerm('');
+          return;
+        } catch (confirmError: any) {
+          const message = confirmError?.message || 'Falha ao simular pagamento Pix no DEV.';
+          setPaymentError(message);
+          toast.error(message);
+        }
+      }
       setCart([]);
       setSearchTerm('');
       await mutate();
