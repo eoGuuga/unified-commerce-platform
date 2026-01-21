@@ -369,6 +369,32 @@ body {
   background: linear-gradient(90deg, rgba(255, 179, 71, 0.9), rgba(95, 224, 255, 0.9));
 }
 
+.flip-card {
+  perspective: 1200px;
+}
+
+.flip-card-inner {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.7s ease;
+  min-height: 340px;
+}
+
+.flip-card:hover .flip-card-inner,
+.flip-card:focus-within .flip-card-inner {
+  transform: rotateY(180deg);
+}
+
+.flip-card-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+.flip-card-back {
+  transform: rotateY(180deg);
+}
+
 .accent-line {
   background: linear-gradient(90deg, var(--accent-coral), var(--accent-gold));
 }

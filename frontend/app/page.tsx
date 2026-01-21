@@ -39,12 +39,14 @@ const pricing = [
   {
     name: "Start",
     price: "R$ 149/mês",
+    installment: "12x de R$ 14,90",
     description: "Base essencial para comecar a vender.",
     features: ["PDV completo", "Estoque centralizado", "Relatorios basicos"],
   },
   {
     name: "Pro",
     price: "R$ 349/mês",
+    installment: "12x de R$ 34,90",
     description: "WhatsApp como canal principal de vendas.",
     features: [
       "Tudo do Start",
@@ -56,6 +58,7 @@ const pricing = [
   {
     name: "Scale",
     price: "R$ 749/mês",
+    installment: "12x de R$ 74,90",
     description: "Operacao multi-loja e integracoes avancadas.",
     features: [
       "Tudo do Pro",
@@ -67,6 +70,7 @@ const pricing = [
   {
     name: "Enterprise",
     price: "Sob consulta",
+    installment: "Condicoes personalizadas",
     description: "SLA, compliance e integrações especiais.",
     features: ["SLA dedicado", "Onboarding premium", "Roadmap conjunto"],
   },
@@ -252,31 +256,46 @@ export default function Page() {
           </div>
           <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
             {pricing.map((plan) => (
-              <div
-                key={plan.name}
-                className={`rounded-2xl p-6 ${plan.highlight ? "signal-panel border border-white/20" : "glass-card border border-white/10"}`}
-              >
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{plan.name}</p>
-                <p className="mt-3 text-2xl font-semibold text-white">{plan.price}</p>
-                <p className="mt-2 text-sm text-slate-200">{plan.description}</p>
-                <ul className="mt-4 space-y-2 text-sm text-slate-200">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-[var(--signal-cyan)]" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                <a
-                  href="/login"
-                  className={`mt-5 inline-flex w-full items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${
-                    plan.highlight
-                      ? "bg-white text-slate-900 hover:bg-slate-100"
-                      : "border border-white/20 text-white hover:border-white/40"
-                  }`}
-                >
-                  Comecar teste
-                </a>
+              <div key={plan.name} className="flip-card">
+                <div className="flip-card-inner">
+                  <div
+                    className={`flip-card-face rounded-2xl p-6 ${plan.highlight ? "signal-panel border border-white/20" : "glass-card border border-white/10"}`}
+                  >
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{plan.name}</p>
+                    <p className="mt-4 text-3xl font-semibold text-white">{plan.price}</p>
+                    <p className="mt-2 text-sm text-slate-200">{plan.description}</p>
+                    <div className="mt-6 flex items-center justify-between text-xs text-slate-300">
+                      <span>Deslize para detalhes</span>
+                      <span className="rounded-full border border-white/20 px-2 py-1">?</span>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`flip-card-face flip-card-back rounded-2xl p-6 ${plan.highlight ? "signal-panel border border-white/20" : "glass-card border border-white/10"}`}
+                  >
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{plan.name}</p>
+                    <p className="mt-2 text-2xl font-semibold text-white">{plan.price}</p>
+                    <p className="text-xs text-slate-300">{plan.installment}</p>
+                    <ul className="mt-4 space-y-2 text-sm text-slate-200">
+                      {plan.features.map((feature) => (
+                        <li key={feature} className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-[var(--signal-cyan)]" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                    <a
+                      href="/login"
+                      className={`mt-5 inline-flex w-full items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${
+                        plan.highlight
+                          ? "bg-white text-slate-900 hover:bg-slate-100"
+                          : "border border-white/20 text-white hover:border-white/40"
+                      }`}
+                    >
+                      Comecar teste
+                    </a>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
