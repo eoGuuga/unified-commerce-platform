@@ -1,12 +1,33 @@
-export default function Page() {
+import { Header } from "@/components/landing/Header"
+import { Hero } from "@/components/landing/Hero"
+import { Logos } from "@/components/landing/Logos"
+import { Problems } from "@/components/landing/Problems"
+import { Solution } from "@/components/landing/Solution"
+import { Differentials } from "@/components/landing/Differentials"
+import { HowItWorks } from "@/components/landing/HowItWorks"
+import { Metrics } from "@/components/landing/Metrics"
+import { Testimonials } from "@/components/landing/Testimonials"
+import { Pricing } from "@/components/landing/Pricing"
+import { FinalCTA } from "@/components/landing/FinalCTA"
+import { Footer } from "@/components/landing/Footer"
+
+export default function HomePage() {
   return (
-    <main className="min-h-screen bg-white">
-      <div className="mx-auto flex min-h-[60vh] w-full max-w-5xl items-center justify-center px-6 py-20 text-center">
-        <div className="space-y-3">
-          <h1 className="text-3xl font-semibold text-slate-900">Home zerada</h1>
-          <p className="text-sm text-slate-500">Pronto para refazer do zero com Tailwind.</p>
-        </div>
-      </div>
-    </main>
-  );
+    <>
+      <Header />
+      <main>
+        <Hero />
+        <Logos />
+        <Problems />
+        <Solution />
+        <Differentials />
+        <HowItWorks />
+        <Metrics />
+        <Testimonials />
+        <Pricing />
+        <FinalCTA />
+      </main>
+      <Footer />
+    </>
+  )
 }

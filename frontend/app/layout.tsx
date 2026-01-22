@@ -1,42 +1,44 @@
-import type React from "react"
-import type { Metadata } from "next"
-import { Sora, Bebas_Neue } from "next/font/google"
-import { ErrorBoundary } from "@/components/ErrorBoundary"
-import "./globals.css"
+import React from "react"
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/next'
+import './globals.css'
 
-const sora = Sora({
-  subsets: ["latin"],
-  variable: "--font-body",
-  display: "swap",
-})
-
-const bebasNeue = Bebas_Neue({
-  subsets: ["latin"],
-  weight: "400",
-  variable: "--font-display",
-  display: "swap",
-})
+const _inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Unified Commerce Platform",
-  description: "Plataforma SaaS para unificacao de vendas multi-canal",
+  title: 'UCM - Unified Commerce Platform | Zero Overselling',
+  description: 'Backend centralizado que sincroniza estoque em tempo real entre PDV, e-commerce e WhatsApp. Zero overselling garantido.',
+  generator: 'v0.app',
+  icons: {
+    icon: [
+      {
+        url: '/icon-light-32x32.png',
+        media: '(prefers-color-scheme: light)',
+      },
+      {
+        url: '/icon-dark-32x32.png',
+        media: '(prefers-color-scheme: dark)',
+      },
+      {
+        url: '/icon.svg',
+        type: 'image/svg+xml',
+      },
+    ],
+    apple: '/apple-icon.png',
+  },
 }
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode
-}) {
+}>) {
   return (
     <html lang="pt-BR">
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-      </head>
-      <body className={`${sora.variable} ${bebasNeue.variable} font-body`}>
-        <ErrorBoundary>
-          {children}
-        </ErrorBoundary>
+      <body className={`font-sans antialiased`}>
+        {children}
+        <Analytics />
       </body>
     </html>
   )
