@@ -3,6 +3,7 @@ import { Hero } from "@/components/landing/Hero"
 import { Logos } from "@/components/landing/Logos"
 import { Problems } from "@/components/landing/Problems"
 import { Solution } from "@/components/landing/Solution"
+import { SystemFlow } from "@/components/landing/SystemFlow"
 import { Differentials } from "@/components/landing/Differentials"
 import { HowItWorks } from "@/components/landing/HowItWorks"
 import { Metrics } from "@/components/landing/Metrics"
@@ -20,6 +21,7 @@ export default function HomePage() {
         <Logos />
         <Problems />
         <Solution />
+        <SystemFlow />
         <Differentials />
         <HowItWorks />
         <Metrics />

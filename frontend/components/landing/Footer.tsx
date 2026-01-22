@@ -1,21 +1,21 @@
-import { Container } from "./Container"
+﻿import { Container } from "./Container"
 import Link from "next/link"
 
 const footerLinks = {
   produto: [
     { label: "Recursos", href: "#" },
-    { label: "Integracoes", href: "#" },
-    { label: "Precos", href: "#precos" },
+    { label: "Integra��es", href: "#" },
+    { label: "Pre�os", href: "#precos" },
     { label: "Changelog", href: "#" },
   ],
   empresa: [
-    { label: "Sobre nos", href: "#" },
+    { label: "Sobre n�s", href: "#" },
     { label: "Blog", href: "#" },
     { label: "Carreiras", href: "#" },
     { label: "Contato", href: "#" },
   ],
   recursos: [
-    { label: "Documentacao", href: "#" },
+    { label: "Documenta��o", href: "#" },
     { label: "API Reference", href: "#" },
     { label: "Status", href: "#" },
     { label: "Suporte", href: "#" },
@@ -30,18 +30,18 @@ const footerLinks = {
 export function Footer() {
   return (
     <footer className="border-t border-border/30">
-      <Container className="py-20">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-10 lg:gap-12">
+      <Container className="py-16 md:py-20 lg:py-24 xl:py-28">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8 lg:gap-6 xl:gap-8">
           {/* Brand */}
           <div className="col-span-2 mb-4 lg:mb-0">
-            <Link href="/" className="flex items-center gap-3 mb-6 group">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center shadow-lg shadow-accent/20">
-                <span className="text-accent-foreground font-bold text-lg">U</span>
+            <Link href="/" className="flex items-center gap-3 mb-5">
+              <div className="w-8 h-8 rounded-lg bg-foreground flex items-center justify-center">
+                <span className="text-background font-semibold text-sm">U</span>
               </div>
-              <span className="font-semibold text-xl text-foreground tracking-tight">ucm</span>
+              <span className="font-semibold text-foreground tracking-tight">ucm</span>
             </Link>
-            <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mb-8">
-              Unified Commerce Platform. A solucao definitiva para sincronizacao de estoque multicanal.
+            <p className="small-text leading-relaxed max-w-xs mb-6">
+              Unified Commerce Platform. A solu��o definitiva para sincroniza��o de estoque multicanal.
             </p>
             
             {/* Social */}
@@ -54,7 +54,7 @@ export function Footer() {
                 <Link
                   key={social.label}
                   href="#"
-                  className="w-10 h-10 rounded-xl bg-secondary/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-300"
+                  className="w-9 h-9 rounded-lg bg-secondary/30 flex items-center justify-center text-muted-foreground transition-colors hover:text-foreground hover:bg-secondary/50"
                   aria-label={social.label}
                 >
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -68,11 +68,11 @@ export function Footer() {
           {/* Links */}
           {Object.entries(footerLinks).map(([category, links]) => (
             <div key={category}>
-              <h4 className="font-semibold text-foreground mb-5 capitalize">{category}</h4>
-              <ul className="space-y-3">
+              <h4 className="text-sm font-medium text-foreground mb-4 capitalize">{category}</h4>
+              <ul className="space-y-2.5">
                 {links.map((link) => (
                   <li key={link.label}>
-                    <Link href={link.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-300">
+                    <Link href={link.href} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
                       {link.label}
                     </Link>
                   </li>
@@ -83,14 +83,14 @@ export function Footer() {
         </div>
 
         {/* Bottom */}
-        <div className="mt-20 pt-8 border-t border-border/30 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
-            2026 UCM. Todos os direitos reservados.
+        <div className="mt-10 lg:mt-12 xl:mt-14 pt-6 border-t border-border/30 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-xs text-muted-foreground">
+            � 2026 UCM. Todos os direitos reservados.
           </p>
-          <div className="flex items-center gap-6 text-sm text-muted-foreground">
-            <Link href="#" className="hover:text-foreground transition-colors duration-300">Privacidade</Link>
-            <Link href="#" className="hover:text-foreground transition-colors duration-300">Termos</Link>
-            <Link href="#" className="hover:text-foreground transition-colors duration-300">Cookies</Link>
+          <div className="flex items-center gap-5 text-xs text-muted-foreground">
+            <Link href="#" className="transition-colors hover:text-foreground">Privacidade</Link>
+            <Link href="#" className="transition-colors hover:text-foreground">Termos</Link>
+            <Link href="#" className="transition-colors hover:text-foreground">Cookies</Link>
           </div>
         </div>
       </Container>
