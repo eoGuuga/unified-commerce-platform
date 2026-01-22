@@ -93,7 +93,7 @@ function ConflictResolutionDemo() {
     switch (phase) {
       case "dual-entry":
         return {
-          status: "Eventos simultaneos detectados",
+          status: "Eventos simultâneos detectados",
           statusColor: "text-amber-400",
           bgPulse: "bg-amber-500/5",
           events: [
@@ -137,8 +137,8 @@ function ConflictResolutionDemo() {
           statusColor: "text-accent",
           bgPulse: "bg-accent/5",
           events: [
-            { channel: "PDV Centro", action: "Conclu�do", qty: "-1 un", state: "done" },
-            { channel: "Shopify", action: "Conclu�do", qty: "-1 un", state: "done" },
+            { channel: "PDV Centro", action: "Concluído", qty: "-1 un", state: "done" },
+            { channel: "Shopify", action: "Concluído", qty: "-1 un", state: "done" },
           ]
         }
       default:
@@ -265,7 +265,7 @@ export function Hero() {
                 Novo
               </span>
               <span className="text-sm text-muted-foreground">
-                Integra��o nativa com WhatsApp Business API
+                Integração nativa com WhatsApp Business API
               </span>
             </div>
           </div>
@@ -291,7 +291,7 @@ export function Hero() {
           {/* CTA Buttons */}
           <div className="animate-slide-up opacity-0 stagger-5 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-12 lg:mb-14">
             <Link
-              href="#"
+              href="#demo"
               className="group btn-primary h-12 px-7 text-base"
             >
               <span>Ver demo ao vivo</span>
@@ -301,10 +301,10 @@ export function Hero() {
             </Link>
             
             <Link
-              href="#"
+              href="#precos"
               className="btn-ghost h-12 px-7 text-base"
             >
-              <span>Come�ar teste gratuito</span>
+              <span>Começar teste gratuito</span>
             </Link>
           </div>
 
@@ -312,8 +312,8 @@ export function Hero() {
           <div className="animate-slide-up opacity-0 stagger-6 flex flex-wrap items-center justify-center lg:justify-start gap-6 lg:gap-8 mb-16 lg:mb-20 text-sm text-muted-foreground">
             {[
               "Setup em 5 minutos",
-              "Sem cart�o de cr�dito",
-              "14 dias gr�tis"
+              "Sem cartão de crédito",
+              "14 dias grátis"
             ].map((item) => (
               <div key={item} className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -384,7 +384,7 @@ export function Hero() {
                     </div>
                     
                     {[
-                      { name: "PDV Loja F�sica", orders: "127", status: "Sync: agora", color: "bg-blue-500" },
+                      { name: "PDV Loja F?sica", orders: "127", status: "Sync: agora", color: "bg-blue-500" },
                       { name: "E-commerce Shopify", orders: "89", status: "Sync: 1s", color: "bg-emerald-500" },
                       { name: "WhatsApp Business", orders: "43", status: "Sync: 2s", color: "bg-green-500" },
                     ].map((channel) => (
@@ -419,3 +419,7 @@ export function Hero() {
     </section>
   )
 }
+
+
+
+

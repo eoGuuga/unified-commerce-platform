@@ -7,28 +7,28 @@ const steps = [
   {
     step: "01",
     title: "Captura",
-    description: "Pedido entra por qualquer canal e � capturado instantaneamente pelo backend central.",
+    description: "Pedido entra por qualquer canal e é capturado instantaneamente pelo backend central.",
     icon: "M9 3.75H6.912a2.25 2.25 0 00-2.15 1.588L2.35 13.177a2.25 2.25 0 00-.1.661V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859M12 3v8.25m0 0l-3-3m3 3l3-3",
     state: "incoming"
   },
   {
     step: "02",
     title: "Reserva",
-    description: "Estoque � reservado atomicamente antes de qualquer confirma��o. Bloqueio imediato e seguro.",
+    description: "Estoque é reservado atomicamente antes de qualquer confirmação. Bloqueio imediato e seguro.",
     icon: "M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z",
     state: "locked"
   },
   {
     step: "03",
-    title: "Confirma��o",
-    description: "Transa��o validada com sucesso. Estoque atualizado em todos os canais simultaneamente.",
+    title: "Confirmação",
+    description: "Transação validada com sucesso. Estoque atualizado em todos os canais simultaneamente.",
     icon: "M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
     state: "confirmed"
   },
   {
     step: "04",
-    title: "Sincroniza��o",
-    description: "Todos os canais recebem a atualiza��o em milissegundos. Consist�ncia garantida.",
+    title: "Sincronização",
+    description: "Todos os canais recebem a atualização em milissegundos. Consistência garantida.",
     icon: "M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99",
     state: "synced"
   },
@@ -154,7 +154,7 @@ function StepCard({ step, index, activeStep, progress }: { step: typeof steps[0]
           </span>
           {isPast && (
             <span className="badge-accent text-[10px]">
-              Conclu�do
+              Concluído
             </span>
           )}
           {isActive && (
@@ -248,7 +248,7 @@ export function HowItWorks() {
           </h2>
           
           <p className="body-text-lg mx-auto">
-            Do pedido � entrega em quatro etapas automatizadas. Sem interven��o manual, sem erros humanos.
+            Do pedido à entrega em quatro etapas automatizadas. Sem intervenção manual, sem erros humanos.
           </p>
         </div>
 
@@ -292,3 +292,6 @@ export function HowItWorks() {
     </section>
   )
 }
+
+
+

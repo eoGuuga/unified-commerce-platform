@@ -8,14 +8,14 @@ const metrics = [
     value: 99.9,
     suffix: "%",
     label: "Uptime projetado",
-    description: "Arquitetura com redund�ncia",
+    description: "Arquitetura com redundância",
   },
   {
     value: 100,
     prefix: "<",
     suffix: "ms",
-    label: "Lat�ncia alvo",
-    description: "Sincroniza��o entre canais",
+    label: "Latência alvo",
+    description: "Sincronização entre canais",
   },
   {
     value: 0,
@@ -143,8 +143,8 @@ export function Metrics() {
           </h2>
           
           <p className="body-text-lg mx-auto">
-            Infraestrutura desenhada para alta disponibilidade e baixa lat�ncia. 
-            M�tricas em valida��o cont�nua.
+            Infraestrutura desenhada para alta disponibilidade e baixa laténcia. 
+            Métricas em validação contínua.
           </p>
         </div>
 
@@ -186,10 +186,13 @@ export function Metrics() {
         <div className="mt-10 lg:mt-12 xl:mt-14 text-center">
           <span className="inline-flex items-center gap-2 text-xs text-muted-foreground font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-            Sistema em fase de valida��o | M�tricas monitoradas continuamente
+            Sistema em fase de validação | Métricas monitoradas continuamente
           </span>
         </div>
       </Container>
     </section>
   )
 }
+
+
+

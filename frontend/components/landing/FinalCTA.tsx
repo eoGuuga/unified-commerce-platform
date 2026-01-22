@@ -30,17 +30,17 @@ export function FinalCTA() {
               
               <h2 className="text-3xl sm:text-4xl lg:text-5xl xl:text-[3.5rem] font-semibold tracking-tight leading-tight mb-6 text-background">
                 Traga previsibilidade
-                <span className="block text-background/50 mt-1">para sua opera��o.</span>
+                <span className="block text-background/50 mt-1">para sua operação.</span>
               </h2>
               
               <p className="text-base text-background/50 mb-10 max-w-lg mx-auto leading-[1.6]">
-                Comece hoje mesmo e elimine o overselling da sua opera��o. 
-                Teste gr�tis por 14 dias, sem compromisso.
+                Comece hoje mesmo e elimine o overselling da sua operação. 
+                Teste grátis por 14 dias, sem compromisso.
               </p>
               
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
                 <Link
-                  href="#"
+                  href="#demo"
                   className="inline-flex items-center justify-center gap-2.5 h-12 px-7 text-sm font-medium bg-background text-foreground rounded-lg transition-colors hover:bg-background/90"
                 >
                   Ver demo ao vivo
@@ -60,7 +60,7 @@ export function FinalCTA() {
               <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-background/40">
                 {[
                   "Setup em 5 minutos",
-                  "Sem cart�o de cr�dito",
+                  "Sem cartão de crédito",
                   "Cancele quando quiser"
                 ].map((item) => (
                   <span key={item} className="flex items-center gap-2">
@@ -78,3 +78,5 @@ export function FinalCTA() {
     </section>
   )
 }
+
+

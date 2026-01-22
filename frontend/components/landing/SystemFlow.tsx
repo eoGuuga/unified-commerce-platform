@@ -315,7 +315,7 @@ export function SystemFlow() {
           <div className="badge-base mb-6">
             <SyncPulse active={!!currentEvent && currentEvent.state !== "idle"} variant={pulseVariant} />
             <span>
-              {currentEvent?.state === "locked" ? "Lock Ativo" : "Sistema em Opera��o"}
+              {currentEvent?.state === "locked" ? "Lock Ativo" : "Sistema em Operação"}
             </span>
           </div>
           
@@ -325,7 +325,7 @@ export function SystemFlow() {
           </h2>
           
           <p className="body-text-lg mx-auto">
-            Observe como cada evento � processado atomicamente. Reserva, confirma��o e sincroniza��o em milissegundos.
+            Observe como cada evento é processado atomicamente. Reserva, confirmação e sincronização em milissegundos.
           </p>
         </div>
 
@@ -479,7 +479,7 @@ export function SystemFlow() {
                   </div>
                 </>
               ) : (
-                <div className="text-muted-foreground/50">Aguardando pr�ximo evento...</div>
+                <div className="text-muted-foreground/50">Aguardando próximo evento...</div>
               )}
             </div>
           </div>
@@ -488,3 +488,6 @@ export function SystemFlow() {
     </section>
   )
 }
+
+
+

@@ -7,7 +7,7 @@ const differentials = [
   {
     icon: "M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z",
     title: "Zero overselling",
-    description: "Transa��es ACID com reserva at�mica. Cada venda bloqueia o estoque instantaneamente, impossibilitando vendas duplicadas.",
+    description: "Transações ACID com reserva atômica. Cada venda bloqueia o estoque instantaneamente, impossibilitando vendas duplicadas.",
     highlight: "Garantido por contrato",
     stat: "0",
     statLabel: "meta",
@@ -18,12 +18,12 @@ const differentials = [
     description: "Bot integrado que consulta estoque em tempo real, processa pedidos e atualiza disponibilidade automaticamente.",
     highlight: "Vendas 24/7",
     stat: "24/7",
-    statLabel: "dispon�vel",
+    statLabel: "disponível",
   },
   {
     icon: "M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z",
-    title: "Opera��o cont�nua",
-    description: "Infraestrutura redundante com failover autom�tico. Arquitetura projetada para alta disponibilidade.",
+    title: "Operação contínua",
+    description: "Infraestrutura redundante com failover autom?tico. Arquitetura projetada para alta disponibilidade.",
     highlight: "Alta disponibilidade",
     stat: "<100",
     statLabel: "ms alvo",
@@ -113,7 +113,7 @@ export function Differentials() {
           </div>
           
           <p className="body-text-lg lg:text-right lg:max-w-md">
-            Tecnologia projetada para opera��es que n�o podem falhar. Garantias reais em contrato.
+            Tecnologia projetada para operações que não podem falhar. Garantias reais em contrato.
           </p>
         </div>
 
@@ -127,3 +127,5 @@ export function Differentials() {
     </section>
   )
 }
+
+

@@ -3,27 +3,27 @@ import Link from "next/link"
 
 const footerLinks = {
   produto: [
-    { label: "Recursos", href: "#" },
-    { label: "Integra��es", href: "#" },
-    { label: "Pre�os", href: "#precos" },
-    { label: "Changelog", href: "#" },
+    { label: "Recursos", href: "#solucao" },
+    { label: "Integrações", href: "#solucao" },
+    { label: "Preços", href: "#precos" },
+    { label: "Changelog", href: "/info/changelog" },
   ],
   empresa: [
-    { label: "Sobre n�s", href: "#" },
-    { label: "Blog", href: "#" },
-    { label: "Carreiras", href: "#" },
-    { label: "Contato", href: "#" },
+    { label: "Sobre nós", href: "/info/sobre" },
+    { label: "Blog", href: "/info/blog" },
+    { label: "Carreiras", href: "/info/carreiras" },
+    { label: "Contato", href: "/info/contato" },
   ],
   recursos: [
-    { label: "Documenta��o", href: "#" },
-    { label: "API Reference", href: "#" },
-    { label: "Status", href: "#" },
-    { label: "Suporte", href: "#" },
+    { label: "Documentação", href: "/info/documentacao" },
+    { label: "API Reference", href: "/info/api" },
+    { label: "Status", href: "/info/status" },
+    { label: "Suporte", href: "/info/suporte" },
   ],
   legal: [
-    { label: "Privacidade", href: "#" },
-    { label: "Termos", href: "#" },
-    { label: "Cookies", href: "#" },
+    { label: "Privacidade", href: "/info/privacidade" },
+    { label: "Termos", href: "/info/termos" },
+    { label: "Cookies", href: "/info/cookies" },
   ],
 }
 
@@ -41,7 +41,7 @@ export function Footer() {
               <span className="font-semibold text-foreground tracking-tight">ucm</span>
             </Link>
             <p className="small-text leading-relaxed max-w-xs mb-6">
-              Unified Commerce Platform. A solu��o definitiva para sincroniza��o de estoque multicanal.
+              Unified Commerce Platform. A solução definitiva para sincronização de estoque multicanal.
             </p>
             
             {/* Social */}
@@ -53,7 +53,13 @@ export function Footer() {
               ].map((social) => (
                 <Link
                   key={social.label}
-                  href="#"
+                  href={
+                    social.label === "LinkedIn"
+                      ? "https://www.linkedin.com/"
+                      : social.label === "X"
+                      ? "https://x.com/"
+                      : "https://github.com/"
+                  }
                   className="w-9 h-9 rounded-lg bg-secondary/30 flex items-center justify-center text-muted-foreground transition-colors hover:text-foreground hover:bg-secondary/50"
                   aria-label={social.label}
                 >
@@ -85,15 +91,18 @@ export function Footer() {
         {/* Bottom */}
         <div className="mt-10 lg:mt-12 xl:mt-14 pt-6 border-t border-border/30 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            � 2026 UCM. Todos os direitos reservados.
+            © 2026 UCM. Todos os direitos reservados.
           </p>
           <div className="flex items-center gap-5 text-xs text-muted-foreground">
-            <Link href="#" className="transition-colors hover:text-foreground">Privacidade</Link>
-            <Link href="#" className="transition-colors hover:text-foreground">Termos</Link>
-            <Link href="#" className="transition-colors hover:text-foreground">Cookies</Link>
+            <Link href="/info/privacidade" className="transition-colors hover:text-foreground">Privacidade</Link>
+            <Link href="/info/termos" className="transition-colors hover:text-foreground">Termos</Link>
+            <Link href="/info/cookies" className="transition-colors hover:text-foreground">Cookies</Link>
           </div>
         </div>
       </Container>
     </footer>
   )
 }
+
+
+

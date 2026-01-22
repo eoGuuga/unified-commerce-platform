@@ -17,7 +17,7 @@ export function Header() {
   const navItems = [
     { label: "Produto", href: "#solucao" },
     { label: "Como funciona", href: "#como-funciona" },
-    { label: "Pre�os", href: "#precos" },
+    { label: "Preços", href: "#precos" },
   ]
 
   return (
@@ -62,13 +62,13 @@ export function Header() {
           {/* CTA Buttons */}
           <div className="hidden lg:flex items-center gap-4">
             <Link
-              href="#"
+              href="/login"
               className="text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               Login
             </Link>
             <Link
-              href="#"
+              href="#demo"
               className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-lg bg-foreground text-background text-sm font-medium transition-all duration-200 hover:bg-foreground/90 hover:scale-[1.02] active:scale-100"
             >
               <span>Agendar demo</span>
@@ -110,11 +110,11 @@ export function Header() {
               ))}
             </div>
             <div className="mt-4 pt-4 border-t border-border/30 flex flex-col gap-3">
-              <Link href="#" className="px-4 py-2 text-muted-foreground transition-colors hover:text-foreground">
+              <Link href="/login" className="px-4 py-2 text-muted-foreground transition-colors hover:text-foreground">
                 Login
               </Link>
               <Link 
-                href="#" 
+                href="#demo" 
                 className="mx-4 py-3 bg-foreground text-background rounded-lg text-center text-sm font-medium"
               >
                 Agendar demo
@@ -126,3 +126,5 @@ export function Header() {
     </header>
   )
 }
+
+

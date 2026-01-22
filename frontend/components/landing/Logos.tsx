@@ -14,7 +14,7 @@ export function Logos() {
         
         <div className="max-w-xl mx-auto text-center">
           <p className="small-text leading-relaxed mb-5">
-            Estamos em fase de implanta��o com um grupo selecionado de varejistas. 
+            Estamos em fase de implantação com um grupo selecionado de varejistas. 
             Vagas limitadas para novos pilotos.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
@@ -32,3 +32,5 @@ export function Logos() {
     </section>
   )
 }
+
+
