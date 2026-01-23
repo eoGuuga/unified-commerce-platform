@@ -1,5 +1,7 @@
 import { Header } from "@/components/landing/Header"
 import { Hero } from "@/components/landing/Hero"
+import { Explainer } from "@/components/landing/Explainer"
+import { ExplainerCTA } from "@/components/landing/ExplainerCTA"
 import { Logos } from "@/components/landing/Logos"
 import { Problems } from "@/components/landing/Problems"
 import { Solution } from "@/components/landing/Solution"
@@ -16,8 +18,10 @@ export default function HomePage() {
   return (
     <>
       <Header />
+      <ExplainerCTA />
       <main>
         <Hero />
+        <Explainer />
         <Logos />
         <Problems />
         <Solution />

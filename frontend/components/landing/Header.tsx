@@ -15,6 +15,7 @@ export function Header() {
   }, [])
 
   const navItems = [
+    { label: "Explicação", href: "#explicacao" },
     { label: "Produto", href: "#solucao" },
     { label: "Como funciona", href: "#como-funciona" },
     { label: "Preços", href: "#precos" },

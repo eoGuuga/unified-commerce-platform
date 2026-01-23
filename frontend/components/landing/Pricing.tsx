@@ -8,68 +8,66 @@ import { useState } from "react"
 const plans = [
   {
     name: "Essencial",
-    price: "297",
+    price: "Em definição",
     period: "/mês",
-    description: "Para pequenos negócios começando a vender em múltiplos canais.",
+    description: "Para começar com o básico da operação unificada.",
     features: [
-      "Até 500 pedidos/mês",
-      "2 canais de venda",
-      "Sincronização em tempo real",
-      "Suporte por e-mail",
+      "PDV, e-commerce e WhatsApp conectados",
+      "Estoque sempre consistente",
+      "Indicadores essenciais",
+      "Suporte humano",
     ],
-    cta: "Começar teste",
+    cta: "Agendar demonstração",
     popular: false,
     underTheHood: {
-      transactions: "500/mês",
-      lockType: "Otimista",
-      channels: "2 canais",
-      syncLatency: "<200ms (alvo)",
-      guarantee: "Suporte básico",
+      transactions: "Sob medida",
+      lockType: "Proteção automática",
+      channels: "Canais essenciais",
+      syncLatency: "Em tempo real",
+      guarantee: "Suporte padrão",
     },
   },
   {
     name: "Crescimento",
-    price: "597",
+    price: "Em definição",
     period: "/mês",
-    description: "Para negócios em expansão que precisam de mais recursos.",
+    description: "Para quem precisa crescer sem perder controle.",
     features: [
-      "Até 2.000 pedidos/mês",
-      "4 canais de venda",
-      "WhatsApp Bot básico",
-      "Relatórios avançados",
+      "Automação no WhatsApp",
+      "Alertas de ruptura",
+      "Relatórios completos",
       "Suporte prioritário",
     ],
-    cta: "Começar teste",
+    cta: "Agendar demonstração",
     popular: false,
     underTheHood: {
-      transactions: "2.000/mês",
-      lockType: "Pessimista",
-      channels: "4 canais",
-      syncLatency: "<150ms (alvo)",
+      transactions: "Sob medida",
+      lockType: "Proteção avançada",
+      channels: "Canais ampliados",
+      syncLatency: "Em tempo real",
       guarantee: "Suporte prioritário",
     },
   },
   {
     name: "Escala",
-    price: "997",
+    price: "Em definição",
     period: "/mês",
-    description: "Para operações maduras com alto volume de vendas.",
+    description: "Para operações consolidadas e alto volume.",
     features: [
-      "Até 10.000 pedidos/mês",
-      "Canais ilimitados",
-      "WhatsApp Bot completo",
-      "API personalizada",
+      "Fluxos avançados no WhatsApp",
+      "Integrações sob medida",
+      "Acesso a API",
       "Onboarding dedicado",
       "SLA contratual",
     ],
-    cta: "Começar teste",
+    cta: "Agendar demonstração",
     popular: true,
     underTheHood: {
-      transactions: "10.000/mês",
-      lockType: "Pessimista + Fila",
-      channels: "Ilimitados",
-      syncLatency: "<100ms (alvo)",
-      guarantee: "SLA contratual",
+      transactions: "Sob medida",
+      lockType: "Fila inteligente",
+      channels: "Canais ilimitados",
+      syncLatency: "Tempo mínimo",
+      guarantee: "SLA dedicado",
     },
   },
   {
@@ -81,17 +79,17 @@ const plans = [
       "Volume ilimitado",
       "Infraestrutura dedicada",
       "Integrações customizadas",
-      "Gerente de conta",
+      "Gerente de sucesso",
       "SLA personalizado",
       "Suporte 24/7",
     ],
     cta: "Falar com vendas",
     popular: false,
     underTheHood: {
-      transactions: "Ilimitado",
+      transactions: "Sob medida",
       lockType: "Estratégia personalizada",
       channels: "Ilimitados",
-      syncLatency: "<50ms (alvo)",
+      syncLatency: "Tempo mínimo",
       guarantee: "SLA personalizado",
     },
   },
@@ -161,16 +159,16 @@ function FlipCard({ plan }: { plan: typeof plans[0] }) {
                 {plan.name}
               </h3>
               <div className="flex items-baseline gap-0.5">
-                {plan.price !== "Sob medida" && (
+                {!["Sob medida", "Em definição"].includes(plan.price) && (
                   <span className={`text-sm ${plan.popular ? "opacity-50" : "text-muted-foreground"}`}>R$</span>
                 )}
                 <span className="text-3xl font-semibold tracking-[-0.02em]">{plan.price}</span>
-                {plan.period && (
-                  <span className={`text-sm ${plan.popular ? "opacity-40" : "text-muted-foreground"}`}>
-                    {plan.period}
-                  </span>
-                )}
-              </div>
+              {plan.period && !["Sob medida", "Em definição"].includes(plan.price) && (
+                <span className={`text-sm ${plan.popular ? "opacity-40" : "text-muted-foreground"}`}>
+                  {plan.period}
+                </span>
+              )}
+            </div>
               <p className={`mt-3 text-sm leading-relaxed ${plan.popular ? "opacity-60" : "text-muted-foreground"}`}>
                 {plan.description}
               </p>
@@ -250,22 +248,22 @@ function FlipCard({ plan }: { plan: typeof plans[0] }) {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
                 </svg>
                 <h3 className={`text-sm font-semibold uppercase tracking-wider ${plan.popular ? "" : "text-foreground"}`}>
-                  Detalhes técnicos
+                  Detalhes do plano
                 </h3>
               </div>
               <p className={`text-xs ${plan.popular ? "opacity-50" : "text-muted-foreground"}`}>
-                Especificações técnicas do plano {plan.name}
+                O que está incluído no plano {plan.name}
               </p>
             </div>
             
             {/* Technical Specs */}
             <div className="flex-1 space-y-4">
               {[
-                { label: "Transações", value: plan.underTheHood.transactions, icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
-                { label: "Estratégia de lock", value: plan.underTheHood.lockType, icon: "M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" },
+                { label: "Volume mensal", value: plan.underTheHood.transactions, icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
+                { label: "Proteção de estoque", value: plan.underTheHood.lockType, icon: "M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" },
                 { label: "Canais", value: plan.underTheHood.channels, icon: "M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" },
-                { label: "Latência de sincronização", value: plan.underTheHood.syncLatency, icon: "M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" },
-                { label: "SLA", value: plan.underTheHood.guarantee, icon: "M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" },
+                { label: "Atualização", value: plan.underTheHood.syncLatency, icon: "M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" },
+                { label: "Suporte", value: plan.underTheHood.guarantee, icon: "M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" },
               ].map((spec) => (
                 <div 
                   key={spec.label} 
@@ -330,7 +328,7 @@ export function Pricing() {
           </p>
           
           <p className="text-xs text-muted-foreground/60">
-            Clique em qualquer card para ver as especificações técnicas
+            Clique em qualquer card para ver os detalhes do plano
           </p>
         </div>
 
