@@ -116,8 +116,8 @@ function FlipCard({ plan }: { plan: typeof plans[0] }) {
   return (
     <div 
       className={`group relative ${plan.popular ? "lg:-mt-3 lg:mb-3" : ""}`}
-      style={{ perspective: "1200px" }}
     >
+      <div className="relative min-h-[560px] h-full" style={{ perspective: "1200px" }}>
       {/* Popular badge */}
       {plan.popular && (
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
@@ -128,22 +128,20 @@ function FlipCard({ plan }: { plan: typeof plans[0] }) {
       )}
 
       {/* Card Container with 3D transform */}
-      <div
-        className="relative h-full transition-transform duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]"
-        style={{
-          transformStyle: "preserve-3d",
-          transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
-        }}
-      >
-        {/* Front Face */}
         <div
-          className={`flex flex-col p-6 rounded-xl transition-colors ${
-            isFlipped ? "absolute inset-0" : "relative"
-          } ${
+          className="relative h-full transition-transform duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]"
+          style={{
+            transformStyle: "preserve-3d",
+            transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+          }}
+        >
+        {/* Front Face */}
+          <div
+            className={`absolute inset-0 flex flex-col p-6 rounded-xl transition-colors ${
             plan.popular
               ? "bg-foreground text-background border-2 border-foreground"
               : "border border-border/40 bg-card/20 hover:border-border/60 hover:bg-card/30"
-          }`}
+            } ${isFlipped ? "pointer-events-none" : ""}`}
           style={{
             backfaceVisibility: "hidden",
             WebkitBackfaceVisibility: "hidden",
@@ -225,12 +223,12 @@ function FlipCard({ plan }: { plan: typeof plans[0] }) {
         </div>
 
         {/* Back Face - Under the Hood */}
-        <div
-          className={`absolute inset-0 flex flex-col p-7 lg:p-8 rounded-xl ${
+          <div
+            className={`absolute inset-0 flex flex-col p-7 lg:p-8 rounded-xl ${
             plan.popular
               ? "bg-foreground text-background border-2 border-foreground"
               : "border border-border/40 bg-card/30"
-          }`}
+            } ${!isFlipped ? "pointer-events-none" : ""}`}
           style={{
             backfaceVisibility: "hidden",
             WebkitBackfaceVisibility: "hidden",
@@ -299,6 +297,7 @@ function FlipCard({ plan }: { plan: typeof plans[0] }) {
               Voltar aos recursos
             </button>
           </div>
+        </div>
         </div>
       </div>
     </div>

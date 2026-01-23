@@ -1,11 +1,11 @@
-import React from "react"
+﻿import React from "react"
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
 const inter = Inter({ 
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   display: 'swap',
   variable: '--font-inter'
 })
@@ -37,3 +37,4 @@ export default function RootLayout({
     </html>
   )
 }
+

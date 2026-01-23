@@ -65,13 +65,13 @@ export function Header() {
               href="/login"
               className="text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
-              Login
+              Entrar
             </Link>
             <Link
               href="#demo"
               className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-lg bg-foreground text-background text-sm font-medium transition-all duration-200 hover:bg-foreground/90 hover:scale-[1.02] active:scale-100"
             >
-              <span>Agendar demo</span>
+              <span>Agendar demonstração</span>
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
               </svg>
@@ -111,13 +111,13 @@ export function Header() {
             </div>
             <div className="mt-4 pt-4 border-t border-border/30 flex flex-col gap-3">
               <Link href="/login" className="px-4 py-2 text-muted-foreground transition-colors hover:text-foreground">
-                Login
+                Entrar
               </Link>
               <Link 
                 href="#demo" 
                 className="mx-4 py-3 bg-foreground text-background rounded-lg text-center text-sm font-medium"
               >
-                Agendar demo
+                Agendar demonstração
               </Link>
             </div>
           </div>

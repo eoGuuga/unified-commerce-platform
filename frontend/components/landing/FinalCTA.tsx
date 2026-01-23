@@ -43,7 +43,7 @@ export function FinalCTA() {
                   href="#demo"
                   className="inline-flex items-center justify-center gap-2.5 h-12 px-7 text-sm font-medium bg-background text-foreground rounded-lg transition-colors hover:bg-background/90"
                 >
-                  Ver demo ao vivo
+                  Ver demonstração ao vivo
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                   </svg>
@@ -78,5 +78,6 @@ export function FinalCTA() {
     </section>
   )
 }
+
 
 

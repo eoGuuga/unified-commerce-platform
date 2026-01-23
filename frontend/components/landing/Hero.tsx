@@ -265,7 +265,7 @@ export function Hero() {
                 Novo
               </span>
               <span className="text-sm text-muted-foreground">
-                Integração nativa com WhatsApp Business API
+                Integração nativa com a API do WhatsApp Business
               </span>
             </div>
           </div>
@@ -294,7 +294,7 @@ export function Hero() {
               href="#demo"
               className="group btn-primary h-12 px-7 text-base"
             >
-              <span>Ver demo ao vivo</span>
+              <span>Ver demonstração ao vivo</span>
               <svg className="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
               </svg>
@@ -353,8 +353,8 @@ export function Hero() {
                 {/* Top Stats Row */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
                   {[
-                    { label: "SKUs Ativos", value: 847, suffix: "", change: "demo" },
-                    { label: "Pedidos/Hora", value: 59, suffix: "", change: "demo" },
+                    { label: "SKUs Ativos", value: 847, suffix: "", change: "amostra" },
+                    { label: "Pedidos/Hora", value: 59, suffix: "", change: "amostra" },
                     { label: "Tempo de sincronização", value: 92, suffix: "ms", change: "alvo" },
                     { label: "Overselling", value: 0, suffix: "", change: "meta", accent: true },
                   ].map((stat) => (
@@ -419,6 +419,7 @@ export function Hero() {
     </section>
   )
 }
+
 
 
 
