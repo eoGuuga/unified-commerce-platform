@@ -7,7 +7,7 @@ const problems = [
   {
     number: "01",
     title: "Overselling constante",
-    description: "Vendas simult?neas em múltiplos canais causam promessas imposs?veis. Clientes frustrados, reembolsos e reputação destru?da.",
+    description: "Vendas simultâneas em múltiplos canais causam promessas impossíveis. Clientes frustrados, reembolsos e reputação destruída.",
     icon: "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z",
     stat: "comum",
     statLabel: "no varejo",
@@ -23,7 +23,7 @@ const problems = [
   {
     number: "03",
     title: "Carga mental excessiva",
-    description: "Equipe gastando horas apagando incêndios. Confer?ncias manuais, clientes insatisfeitos e operação sempre no limite.",
+    description: "Equipe gastando horas apagando incêndios. Conferências manuais, clientes insatisfeitos e operação sempre no limite.",
     icon: "M15.182 16.318A4.486 4.486 0 0012.016 15a4.486 4.486 0 00-3.198 1.318M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z",
     stat: "alto",
     statLabel: "risco burnout",
@@ -125,6 +125,8 @@ export function Problems() {
     </section>
   )
 }
+
+
 
 
 

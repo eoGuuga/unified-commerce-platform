@@ -355,7 +355,7 @@ export function Hero() {
                   {[
                     { label: "SKUs Ativos", value: 847, suffix: "", change: "demo" },
                     { label: "Pedidos/Hora", value: 59, suffix: "", change: "demo" },
-                    { label: "Sync Time", value: 92, suffix: "ms", change: "alvo" },
+                    { label: "Tempo de sincronização", value: 92, suffix: "ms", change: "alvo" },
                     { label: "Overselling", value: 0, suffix: "", change: "meta", accent: true },
                   ].map((stat) => (
                     <div key={stat.label} className="p-4 rounded-lg bg-secondary/20 border border-border/20">
@@ -384,9 +384,9 @@ export function Hero() {
                     </div>
                     
                     {[
-                      { name: "PDV Loja F?sica", orders: "127", status: "Sync: agora", color: "bg-blue-500" },
-                      { name: "E-commerce Shopify", orders: "89", status: "Sync: 1s", color: "bg-emerald-500" },
-                      { name: "WhatsApp Business", orders: "43", status: "Sync: 2s", color: "bg-green-500" },
+                      { name: "PDV Loja Física", orders: "127", status: "Sincr.: agora", color: "bg-blue-500" },
+                      { name: "E-commerce Shopify", orders: "89", status: "Sincr.: 1s", color: "bg-emerald-500" },
+                      { name: "WhatsApp Business", orders: "43", status: "Sincr.: 2s", color: "bg-green-500" },
                     ].map((channel) => (
                       <div key={channel.name} className="flex items-center gap-3 p-3.5 rounded-lg bg-secondary/15 border border-border/20">
                         <div className={`w-9 h-9 rounded-lg ${channel.color} flex items-center justify-center`}>
@@ -419,6 +419,8 @@ export function Hero() {
     </section>
   )
 }
+
+
 
 
 

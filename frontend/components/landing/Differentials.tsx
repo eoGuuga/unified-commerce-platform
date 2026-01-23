@@ -23,7 +23,7 @@ const differentials = [
   {
     icon: "M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z",
     title: "Operação contínua",
-    description: "Infraestrutura redundante com failover autom?tico. Arquitetura projetada para alta disponibilidade.",
+    description: "Infraestrutura redundante com failover automático. Arquitetura projetada para alta disponibilidade.",
     highlight: "Alta disponibilidade",
     stat: "<100",
     statLabel: "ms alvo",
@@ -127,5 +127,6 @@ export function Differentials() {
     </section>
   )
 }
+
 
 
