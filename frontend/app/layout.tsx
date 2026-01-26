@@ -11,8 +11,8 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'GTSoftHub - Unified Commerce Platform | Zero Overselling Garantido',
-  description: 'Backend centralizado que sincroniza estoque em tempo real entre PDV, e-commerce e WhatsApp. Transações ACID, reserva atômica, zero overselling. A solução definitiva para comércio multicanal.',
+  title: 'GTSoftHub | Estoque único para varejo omnichannel',
+  description: 'Plataforma para varejistas omnichannel com estoque único entre loja física, e-commerce e WhatsApp — sem risco de overselling.',
   keywords: ['estoque', 'omnichannel', 'e-commerce', 'pdv', 'whatsapp', 'sincronização', 'varejo'],
   generator: 'v0.app'
 }

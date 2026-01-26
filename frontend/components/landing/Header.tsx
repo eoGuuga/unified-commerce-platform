@@ -38,12 +38,12 @@ export function Header() {
         <nav className="flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-lg bg-foreground flex items-center justify-center">
-              <span className="text-background font-semibold text-base">U</span>
+            <div className="w-10 h-10 rounded-xl bg-foreground/90 border border-border/40 flex items-center justify-center shadow-sm">
+              <span className="text-background font-semibold text-sm tracking-[0.2em]">GT</span>
             </div>
             <div className="flex flex-col">
               <span className="text-foreground font-semibold text-lg tracking-tight leading-none">GTSoftHub</span>
-              <span className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mt-0.5">unified commerce</span>
+              <span className="text-[10px] text-muted-foreground tracking-[0.18em] mt-0.5">Varejo omnichannel sem overselling</span>
             </div>
           </Link>
 

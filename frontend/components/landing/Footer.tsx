@@ -5,7 +5,7 @@ const footerLinks = {
   produto: [
     { label: "Recursos", href: "#solucao" },
     { label: "Integrações", href: "#solucao" },
-    { label: "Preços", href: "#precos" },
+    { label: "Planos piloto", href: "#precos" },
     { label: "Changelog", href: "/info/changelog" },
   ],
   empresa: [
@@ -16,7 +16,7 @@ const footerLinks = {
   ],
   recursos: [
     { label: "Documentação", href: "/info/documentacao" },
-    { label: "API Reference", href: "/info/api" },
+    { label: "Referência da API", href: "/info/api" },
     { label: "Status", href: "/info/status" },
     { label: "Suporte", href: "/info/suporte" },
   ],
@@ -35,13 +35,13 @@ export function Footer() {
           {/* Brand */}
           <div className="col-span-2 mb-4 lg:mb-0">
             <Link href="/" className="flex items-center gap-3 mb-5">
-              <div className="w-8 h-8 rounded-lg bg-foreground flex items-center justify-center">
-                <span className="text-background font-semibold text-sm">U</span>
+              <div className="w-9 h-9 rounded-xl bg-foreground/90 border border-border/40 flex items-center justify-center shadow-sm">
+                <span className="text-background font-semibold text-xs tracking-[0.2em]">GT</span>
               </div>
               <span className="font-semibold text-foreground tracking-tight">GTSoftHub</span>
             </Link>
             <p className="small-text leading-relaxed max-w-xs mb-6">
-              Unified Commerce Platform. A solução definitiva para sincronização de estoque multicanal.
+              Plataforma para varejistas omnichannel com estoque único entre loja física, e-commerce e WhatsApp.
             </p>
             
             {/* Social */}
