@@ -284,8 +284,8 @@ export function Hero() {
 
           {/* Subheadline */}
           <p className="animate-slide-up opacity-0 stagger-4 text-lg xl:text-xl text-muted-foreground max-w-xl xl:max-w-2xl mx-auto lg:mx-0 mb-10 lg:mb-12 leading-[1.6] text-center lg:text-left text-balance">
-            Backend centralizado que sincroniza estoque em tempo real entre PDV, e-commerce e WhatsApp. 
-            <span className="text-foreground/70"> Arquitetura projetada para atualizar todos os canais em milissegundos.</span>
+            Para varejistas omnichannel que compartilham o mesmo estoque entre loja física, e-commerce e WhatsApp — sem risco de overselling.
+            <span className="text-foreground/70"> Tudo sincronizado em um só lugar.</span>
           </p>
 
           {/* CTA Buttons */}
@@ -294,26 +294,26 @@ export function Hero() {
               href="#demo"
               className="group btn-primary h-12 px-7 text-base"
             >
-              <span>Ver demonstração ao vivo</span>
+              <span>Agendar demonstração</span>
               <svg className="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
               </svg>
             </Link>
             
             <Link
-              href="#precos"
+              href="#explicacao"
               className="btn-ghost h-12 px-7 text-base"
             >
-              <span>Começar teste gratuito</span>
+              <span>Entender em 1 minuto</span>
             </Link>
           </div>
 
           {/* Trust Indicators */}
           <div className="animate-slide-up opacity-0 stagger-6 flex flex-wrap items-center justify-center lg:justify-start gap-6 lg:gap-8 mb-16 lg:mb-20 text-sm text-muted-foreground">
             {[
-              "Setup em 5 minutos",
-              "Sem cartão de crédito",
-              "14 dias grátis"
+              "Produto em fase piloto",
+              "Planos definidos após diagnóstico",
+              "Demonstração guiada"
             ].map((item) => (
               <div key={item} className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

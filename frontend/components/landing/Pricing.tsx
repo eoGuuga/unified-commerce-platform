@@ -7,10 +7,10 @@ import { useState } from "react"
 // Plan data with "under the hood" details
 const plans = [
   {
-    name: "Essencial",
-    price: "Em definição",
-    period: "/mês",
-    description: "Para começar com o básico da operação unificada.",
+    name: "Piloto Essencial",
+    price: "Piloto",
+    period: "",
+    description: "Plano definido após diagnóstico da operação.",
     features: [
       "PDV, e-commerce e WhatsApp conectados",
       "Estoque sempre consistente",
@@ -20,18 +20,18 @@ const plans = [
     cta: "Agendar demonstração",
     popular: false,
     underTheHood: {
-      transactions: "Sob medida",
+      transactions: "Sob diagnóstico",
       lockType: "Proteção automática",
-      channels: "Canais essenciais",
+      channels: "Loja + e-commerce + WhatsApp",
       syncLatency: "Em tempo real",
       guarantee: "Suporte padrão",
     },
   },
   {
-    name: "Crescimento",
-    price: "Em definição",
-    period: "/mês",
-    description: "Para quem precisa crescer sem perder controle.",
+    name: "Piloto Crescimento",
+    price: "Piloto",
+    period: "",
+    description: "Plano definido após diagnóstico da operação.",
     features: [
       "Automação no WhatsApp",
       "Alertas de ruptura",
@@ -41,7 +41,7 @@ const plans = [
     cta: "Agendar demonstração",
     popular: false,
     underTheHood: {
-      transactions: "Sob medida",
+      transactions: "Sob diagnóstico",
       lockType: "Proteção avançada",
       channels: "Canais ampliados",
       syncLatency: "Em tempo real",
@@ -49,10 +49,10 @@ const plans = [
     },
   },
   {
-    name: "Escala",
-    price: "Em definição",
-    period: "/mês",
-    description: "Para operações consolidadas e alto volume.",
+    name: "Piloto Escala",
+    price: "Piloto",
+    period: "",
+    description: "Plano definido após diagnóstico da operação.",
     features: [
       "Fluxos avançados no WhatsApp",
       "Integrações sob medida",
@@ -63,18 +63,18 @@ const plans = [
     cta: "Agendar demonstração",
     popular: true,
     underTheHood: {
-      transactions: "Sob medida",
+      transactions: "Sob diagnóstico",
       lockType: "Fila inteligente",
       channels: "Canais ilimitados",
-      syncLatency: "Tempo mínimo",
+      syncLatency: "Em tempo real",
       guarantee: "SLA dedicado",
     },
   },
   {
     name: "Enterprise",
-    price: "Sob medida",
+    price: "Sob diagnóstico",
     period: "",
-    description: "Para grandes operações com necessidades específicas.",
+    description: "Plano definido após diagnóstico da operação.",
     features: [
       "Volume ilimitado",
       "Infraestrutura dedicada",
@@ -83,13 +83,13 @@ const plans = [
       "SLA personalizado",
       "Suporte 24/7",
     ],
-    cta: "Falar com vendas",
+    cta: "Agendar demonstração",
     popular: false,
     underTheHood: {
-      transactions: "Sob medida",
+      transactions: "Sob diagnóstico",
       lockType: "Estratégia personalizada",
       channels: "Ilimitados",
-      syncLatency: "Tempo mínimo",
+      syncLatency: "Em tempo real",
       guarantee: "SLA personalizado",
     },
   },
@@ -159,11 +159,11 @@ function FlipCard({ plan }: { plan: typeof plans[0] }) {
                 {plan.name}
               </h3>
               <div className="flex items-baseline gap-0.5">
-                {!["Sob medida", "Em definição"].includes(plan.price) && (
+                {!["Sob medida", "Em definição", "Piloto", "Sob diagnóstico"].includes(plan.price) && (
                   <span className={`text-sm ${plan.popular ? "opacity-50" : "text-muted-foreground"}`}>R$</span>
                 )}
-                <span className="text-3xl font-semibold tracking-[-0.02em]">{plan.price}</span>
-              {plan.period && !["Sob medida", "Em definição"].includes(plan.price) && (
+              <span className="text-3xl font-semibold tracking-[-0.02em]">{plan.price}</span>
+              {plan.period && !["Sob medida", "Em definição", "Piloto", "Sob diagnóstico"].includes(plan.price) && (
                 <span className={`text-sm ${plan.popular ? "opacity-40" : "text-muted-foreground"}`}>
                   {plan.period}
                 </span>
@@ -203,7 +203,7 @@ function FlipCard({ plan }: { plan: typeof plans[0] }) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              Ver especificações técnicas
+              Ver detalhes do plano
             </button>
             
             {/* CTA */}
@@ -315,20 +315,21 @@ export function Pricing() {
               <span className="w-1.5 h-1.5 rounded-full bg-accent" />
               <span className="absolute w-1.5 h-1.5 rounded-full bg-accent animate-ping opacity-30" style={{ animationDuration: "3s" }} />
             </span>
-            <span>Preços</span>
+            <span>Piloto</span>
           </div>
           
           <h2 className="mb-5">
-            <span className="text-foreground">Planos para cada</span>
-            <span className="block text-muted-foreground mt-1">momento.</span>
+            <span className="text-foreground">Produto em fase piloto.</span>
+            <span className="block text-muted-foreground mt-1">Planos após diagnóstico.</span>
           </h2>
           
           <p className="body-text-lg mx-auto mb-3">
-            Escale conforme seu negócio cresce. Sem surpresas, sem taxas ocultas.
+            Não exibimos preços públicos neste estágio. Cada operação é avaliada
+            para definir o plano ideal e os limites adequados.
           </p>
           
           <p className="text-xs text-muted-foreground/60">
-            Clique em qualquer card para ver os detalhes do plano
+            Clique em qualquer card para ver o que está incluído
           </p>
         </div>
 
@@ -341,9 +342,9 @@ export function Pricing() {
         {/* Trust badges */}
         <div className="mt-10 lg:mt-12 xl:mt-14 flex flex-wrap items-center justify-center gap-6 lg:gap-8 text-sm text-muted-foreground">
           {[
-            { icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z", text: "14 dias grátis" },
-            { icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z", text: "Sem cartão de crédito" },
-            { icon: "M6 18L18 6M6 6l12 12", text: "Cancele quando quiser" },
+            { icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z", text: "Produto em fase piloto" },
+            { icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z", text: "Planos após diagnóstico" },
+            { icon: "M6 18L18 6M6 6l12 12", text: "Demonstração técnica" },
           ].map((item) => (
             <div key={item.text} className="flex items-center gap-2">
               <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

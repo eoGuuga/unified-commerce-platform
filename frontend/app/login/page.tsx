@@ -87,7 +87,7 @@ export default function LoginPage() {
 
         <div className="mt-6 text-center">
           <p className="text-sm text-slate-300">
-            Precisa de acesso? Fale com a equipe para liberar seu teste.
+            Precisa de acesso? Fale com a equipe para liberar sua demonstração.
           </p>
         </div>
       </div>
