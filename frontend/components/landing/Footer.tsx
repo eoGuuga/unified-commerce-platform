@@ -38,7 +38,7 @@ export function Footer() {
               <div className="w-8 h-8 rounded-lg bg-foreground flex items-center justify-center">
                 <span className="text-background font-semibold text-sm">U</span>
               </div>
-              <span className="font-semibold text-foreground tracking-tight">ucm</span>
+              <span className="font-semibold text-foreground tracking-tight">GTSoftHub</span>
             </Link>
             <p className="small-text leading-relaxed max-w-xs mb-6">
               Unified Commerce Platform. A solução definitiva para sincronização de estoque multicanal.
@@ -91,7 +91,7 @@ export function Footer() {
         {/* Bottom */}
         <div className="mt-10 lg:mt-12 xl:mt-14 pt-6 border-t border-border/30 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            © 2026 UCM. Todos os direitos reservados.
+            © 2026 GTSoftHub. Todos os direitos reservados.
           </p>
           <div className="flex items-center gap-5 text-xs text-muted-foreground">
             <Link href="/info/privacidade" className="transition-colors hover:text-foreground">Privacidade</Link>
@@ -103,6 +103,8 @@ export function Footer() {
     </footer>
   )
 }
+
+
 
 
 

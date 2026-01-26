@@ -234,7 +234,7 @@ function CentralHub({ event }: { event?: SystemEvent }) {
             <span className={`text-[10px] font-semibold mt-1 uppercase tracking-[0.06em] transition-colors duration-500 ${
               isLocked ? "text-amber-400" : "text-foreground"
             }`}>
-              {isLocked ? "LOCK" : "UCM"}
+              {isLocked ? "LOCK" : "GTSoftHub"}
             </span>
           </div>
         </div>
@@ -488,6 +488,7 @@ export function SystemFlow() {
     </section>
   )
 }
+
 
 
 

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -35,7 +35,7 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md signal-panel rounded-3xl p-8">
         <div className="text-center mb-8">
           <p className="text-xs uppercase tracking-[0.35em] text-slate-300">GTSOFT HUB</p>
-          <h1 className="text-3xl font-semibold text-white mt-3">UCM Platform</h1>
+          <h1 className="text-3xl font-semibold text-white mt-3">GTSoftHub Platform</h1>
           <p className="text-slate-200 mt-2">Entre com suas credenciais</p>
         </div>
 
@@ -87,10 +87,11 @@ export default function LoginPage() {
 
         <div className="mt-6 text-center">
           <p className="text-sm text-slate-300">
-            Precisa de acesso? Fale com a equipe para liberar sua demonstração.
+            Precisa de acesso? Fale com a equipe para liberar sua demonstraÃ§Ã£o.
           </p>
         </div>
       </div>
     </div>
   );
 }
+

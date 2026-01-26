@@ -42,7 +42,7 @@ export function Header() {
               <span className="text-background font-semibold text-base">U</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-foreground font-semibold text-lg tracking-tight leading-none">ucm</span>
+              <span className="text-foreground font-semibold text-lg tracking-tight leading-none">GTSoftHub</span>
               <span className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mt-0.5">unified commerce</span>
             </div>
           </Link>
@@ -127,5 +127,7 @@ export function Header() {
     </header>
   )
 }
+
+
 
 

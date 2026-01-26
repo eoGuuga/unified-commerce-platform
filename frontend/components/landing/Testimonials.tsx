@@ -30,7 +30,7 @@ export function Testimonials() {
         <div className="text-center max-w-3xl mx-auto section-header-gap">
           <div className="badge-base mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-            <span>Por que UCM</span>
+            <span>Por que GTSoftHub</span>
           </div>
           
           <h2 className="mb-5">
@@ -40,7 +40,7 @@ export function Testimonials() {
           
           <p className="body-text-lg mx-auto">
             Se você vende em múltiplos canais, provavelmente já enfrentou essas situações. 
-            A UCM foi projetada para eliminá-las.
+            A GTSoftHub foi projetada para eliminá-las.
           </p>
         </div>
 
@@ -71,7 +71,7 @@ export function Testimonials() {
         {/* CTA */}
         <div className="mt-10 lg:mt-12 xl:mt-14 text-center">
           <p className="small-text mb-6">
-            Quer entender como a UCM pode ajudar sua operação?
+            Quer entender como a GTSoftHub pode ajudar sua operação?
           </p>
           <a 
             href="#demo" 
@@ -87,6 +87,7 @@ export function Testimonials() {
     </section>
   )
 }
+
 
 
 

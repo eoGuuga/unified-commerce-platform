@@ -108,7 +108,7 @@ export function Differentials() {
             
             <h2>
               <span className="text-foreground">Por que escolher</span>
-              <span className="block text-muted-foreground mt-1">a UCM.</span>
+              <span className="block text-muted-foreground mt-1">a GTSoftHub.</span>
             </h2>
           </div>
           
@@ -127,6 +127,7 @@ export function Differentials() {
     </section>
   )
 }
+
 
 
 

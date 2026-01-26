@@ -34,7 +34,7 @@ export function FinalCTA() {
               </h2>
               
               <p className="text-base text-background/50 mb-10 max-w-lg mx-auto leading-[1.6]">
-                Agende uma demonstração e veja como a UCM mantém seu estoque
+                Agende uma demonstração e veja como a GTSoftHub mantém seu estoque
                 alinhado em todos os canais, sem retrabalho e sem risco.
               </p>
               
@@ -78,6 +78,7 @@ export function FinalCTA() {
     </section>
   )
 }
+
 
 
 
