@@ -43,20 +43,29 @@ if [[ -n "${DATABASE_URL:-}" ]]; then
   fi
 fi
 
-for f in \
-  "001-initial-schema.sql" \
-  "002-security-and-performance.sql" \
-  "003-whatsapp-conversations.sql" \
-  "004-audit-log-metadata.sql" \
-  "005-audit-action-enum-values.sql" \
-  "006-idempotency.sql" \
-  "007-add-coupon-code-to-pedidos.sql" \
-  "008-usuarios-email-unique-por-tenant.sql" \
-  "009-rls-force-and-extra-policies.sql" \
-  "010-idempotency-unique-tenant-operation.sql" \
-  "011-create-pagamentos-table.sql" \
+TABLE_EXISTS="$(docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -tAc "SELECT to_regclass('public.tenants') IS NOT NULL;")"
+
+MIGRATIONS=(
+  "001-initial-schema.sql"
+  "002-security-and-performance.sql"
+  "003-whatsapp-conversations.sql"
+  "004-audit-log-metadata.sql"
+  "005-audit-action-enum-values.sql"
+  "006-idempotency.sql"
+  "007-add-coupon-code-to-pedidos.sql"
+  "008-usuarios-email-unique-por-tenant.sql"
+  "009-rls-force-and-extra-policies.sql"
+  "010-idempotency-unique-tenant-operation.sql"
+  "011-create-pagamentos-table.sql"
   "012-tenants-rls-policy.sql"
-do
+)
+
+if [[ "$TABLE_EXISTS" == "t" ]]; then
+  MIGRATIONS=("${MIGRATIONS[@]:1}")
+  echo "Schema existente detectado; pulando 001-initial-schema.sql."
+fi
+
+for f in "${MIGRATIONS[@]}"; do
   path="${MIG_DIR}/${f}"
   if [[ -f "${path}" ]]; then
     echo "Aplicando ${f}..."
