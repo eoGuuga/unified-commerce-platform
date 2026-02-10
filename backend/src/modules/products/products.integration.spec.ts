@@ -21,6 +21,7 @@ describe('Products Integration Tests (e2e)', () => {
 
   beforeAll(async () => {
     try {
+      process.env.SUPPRESS_TENANT_RLS_LOGS = 'true';
       const moduleFixture: TestingModule = await Test.createTestingModule({
         imports: [
           ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),

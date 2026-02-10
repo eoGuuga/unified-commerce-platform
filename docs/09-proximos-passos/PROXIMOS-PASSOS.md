@@ -1,11 +1,22 @@
-# 🚀 Próximos Passos - Continuidade do Projeto
+# 🚀 Proximos Passos - Continuidade do Projeto
 
-> **Data:** 07/01/2025  
-> **Status:** FASE 0 em progresso | Scripts criados | Aguardando validação manual
+> **Data:** 2026-02-10  
+> **Status:** Fase 3.3 em correcao | Backend operacional | Proximo foco: fluxo completo WhatsApp
 
 ---
 
-## ✅ O QUE FOI FEITO AGORA
+## ✅ ESTADO ATUAL (RESUMO CONSOLIDADO)
+
+- Backend operacional com RLS, audit log, idempotencia, cache e health checks.
+- Frontend com PDV completo e dashboard admin basico.
+- Bot WhatsApp com fases 3.1 e 3.2 completas.
+- Fase 3.3 com pagamentos e notificacoes implementados, mas faltam fluxo de confirmacao e dados do cliente.
+- E-commerce completo ainda pendente (estrutura basica existe).
+- Dashboard avancado pendente (confirmar escopo exato).
+
+---
+
+## ✅ O QUE JA FOI FEITO (ULTIMAS ENTREGAS)
 
 ### 1. Scripts Criados
 
@@ -56,7 +67,41 @@ npm run seed:mae
 
 ---
 
-## ⚠️ O QUE PRECISA SER FEITO AGORA
+## ⚠️ O QUE PRECISA SER FEITO AGORA (PRIORIDADE)
+
+### 1. Estabilizar Backend e Testes
+
+**Objetivo:** garantir build limpo e testes passando.
+
+Checklist rapido:
+- Limpar `dist/` e cache
+- Rebuild completo
+- Testar `/api/v1/health`
+- Rodar `npm run test:unit`, `npm run test:integration`, `npm run test:acid`
+
+---
+
+### 2. Concluir Fase 3.3 (Fluxo Completo WhatsApp)
+
+**Falta entregar:**
+- Coletar dados do cliente (nome, endereco, telefone, observacoes)
+- Estado de conversa para sequencia de coleta
+- Confirmacao explicita antes de gerar pagamento
+- Atualizar pedido com dados completos
+
+---
+
+### 3. Testes E2E do Bot
+
+**Cenarios minimos:**
+- Pedido -> confirmacao -> pagamento -> notificacao
+- Cancelamento no meio do fluxo
+- Dados invalidos
+- Timeout sem resposta
+
+---
+
+## ✅ VALIDACOES RECOMENDADAS (CURTO PRAZO)
 
 ### 1. Validar Setup Completo (MANUAL)
 
@@ -99,7 +144,7 @@ npm run dev
 
 ---
 
-### 2. Testar Transações ACID (AUTOMÁTICO)
+### 2. Testar Transacoes ACID (AUTOMATICO)
 
 **Após backend rodando:**
 ```bash
@@ -120,7 +165,7 @@ npm run test:acid
 
 ---
 
-### 3. Cadastrar Produtos Reais (AUTOMÁTICO)
+### 3. Cadastrar Produtos Reais (AUTOMATICO)
 
 **Após backend rodando:**
 ```bash
@@ -164,74 +209,39 @@ npm run seed:mae
 
 ---
 
-## 🎯 PRÓXIMAS FASES (Após Validação)
+## 🎯 PROXIMAS FASES (APOS A 3.3)
 
-### FASE 1: PDV Perfeito (Próxima Semana)
+### FASE 3.4: Bot WhatsApp (IA)
+- Integracao com Ollama
+- Contexto de conversa mais inteligente
+- Respostas naturais com fallback
 
-**Prioridade 1: Validações de Estoque**
-- [ ] Validar estoque ao adicionar ao carrinho
-- [ ] Bloquear se estoque = 0
-- [ ] Validar quantidade máxima disponível
-- [ ] Mostrar erro claro
+### FASE 4: E-commerce
+- Carrinho completo
+- Checkout
+- Integracao de pagamento
 
-**Prioridade 2: Estoque em Tempo Real**
-- [ ] SWR com polling (5-10s)
-- [ ] Atualizar estoque após venda
-- [ ] Alertas visuais (verde/amarelo/vermelho)
-
-**Prioridade 3: UX Otimizada**
-- [ ] Autocomplete na busca
-- [ ] Toast notifications
-- [ ] Atalhos de teclado
-
-**Documento:** `docs/06-implementacoes/SUCESSO-PDV-FUNCIONANDO.md`
+### FASE 5: Dashboard Admin (Avancado)
+- Analytics avancado
+- Gestao de clientes
+- Exportacao de relatorios
 
 ---
 
-### FASE 2: Gestão de Estoque (Semana 4)
-
-- [ ] Página `/admin/estoque`
-- [ ] Lista de produtos com estoque
-- [ ] Ajustes de estoque (adicionar/reduzir)
-- [ ] Alertas de estoque baixo
-
----
-
-### FASE 3: Dashboard (Semana 5)
-
-- [ ] Melhorar página `/admin`
-- [ ] Cards de métricas
-- [ ] Gráfico de vendas
-- [ ] Lista de produtos mais vendidos
-
----
-
-### FASE 4: Bot WhatsApp (Semanas 6-8)
-
-- [ ] Respostas automáticas
-- [ ] Processamento de pedidos simples
-- [ ] Fluxo de encomendas
-- [ ] Integração com Ollama
-
----
-
-## 📝 ORDEM DE EXECUÇÃO RECOMENDADA
+## 📝 ORDEM DE EXECUCAO RECOMENDADA
 
 ### HOJE:
-1. ✅ Validar setup (backend + frontend rodando)
-2. ✅ Testar ACID (`npm run test:acid`)
-3. ✅ Cadastrar produtos (`npm run seed:mae`)
-4. ✅ Testar PDV com produtos reais
+1. Validar backend e rodar testes base
+2. Validar scripts (acid + seed)
+3. Confirmar PDV com produtos reais
 
-### AMANHÃ:
-5. ✅ Começar FASE 1: Validações de estoque no PDV
-6. ✅ Implementar validação ao adicionar ao carrinho
-7. ✅ Implementar validação ao atualizar quantidade
+### AMANHA:
+4. Implementar coleta de dados do cliente no WhatsApp
+5. Implementar confirmacao do pedido
 
-### PRÓXIMA SEMANA:
-8. ✅ Estoque em tempo real (SWR polling)
-9. ✅ Alertas visuais
-10. ✅ UX otimizada (autocomplete, toast, atalhos)
+### PROXIMA SEMANA:
+6. Testes E2E do bot
+7. Ajustes finos no fluxo de pagamento e notificacoes
 
 ---
 
@@ -257,30 +267,26 @@ npm run seed:mae
 
 ---
 
-## 📚 DOCUMENTAÇÃO RELEVANTE
+## 📚 DOCUMENTACAO RELEVANTE
 
 - **`BACKEND-OPERACIONAL.md`** - Estado atual do backend
 - **`VALIDACAO-SETUP.md`** - Checklist de validação
 - **`scripts/README.md`** - Guia de uso dos scripts
-- **`docs/03-implementacao/ROADMAP-EXECUCAO-PERFEITA.md`** - Roadmap técnico completo
+- **`docs/02-implementacao/ROADMAP-EXECUCAO-PERFEITA.md`** - Roadmap tecnico completo
+- **`docs/06-implementacoes/PLANO-FASE-3-3-PERFEITO.md`** - Plano fase 3.3
+- **`docs/06-implementacoes/STATUS-ATUAL-FASE-3-3.md`** - Status fase 3.3
 
 ---
 
-## ✅ CRITÉRIOS DE SUCESSO (FASE 0)
+## ✅ CRITERIOS DE SUCESSO (FASE 3.3)
 
-### Validação Técnica:
-- ✅ Backend e frontend rodando
-- ✅ Transações ACID testadas e funcionando
-- ✅ Produtos reais cadastrados
-- ✅ PDV mostra produtos e estoque
-
-### Pronto para FASE 1:
-- ✅ Base sólida validada
-- ✅ Dados reais no sistema
-- ✅ ACID garantido
-- ✅ Pronto para melhorar PDV
+### Validacao Tecnica:
+- Backend e frontend rodando
+- Testes unit, integration e acid passando
+- Fluxo completo WhatsApp funcionando
+- Pagamento e notificacoes enviados corretamente
 
 ---
 
-**Última atualização:** 07/01/2025  
-**Status:** ✅ Scripts criados | ⚠️ Aguardando validação manual | 🚀 Pronto para continuar
+**Ultima atualizacao:** 2026-02-10  
+**Status:** Fase 3.3 em correcao | Proximo passo: fluxo completo WhatsApp

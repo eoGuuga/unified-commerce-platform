@@ -119,6 +119,14 @@ export class WhatsappService {
     return 10;
   }
 
+  private getPhonePrompt(): string {
+    return (
+      '📱 *Para finalizar, preciso do seu telefone de contato:*
+' +
+      'Exemplo: (11) 98765-4321 ou 11987654321'
+    );
+  }
+
   private extractCouponCode(message: string): string | null {
     const text = (message || '').trim();
     if (!text) return null;
@@ -736,6 +744,11 @@ export class WhatsappService {
           `💬 Por favor, envie seu endereço completo:\n` +
           `Rua, número, complemento (se houver), bairro, cidade, estado e CEP.\n\n` +
           `Exemplo: "Rua das Flores, 123, Apto 45, Centro, São Paulo, SP, 01234-567"`;
+      }
+
+      if (!customerData.phone) {
+        await this.conversationService.updateState(conversation.id, 'collecting_phone');
+        return this.getPhonePrompt();
       }
 
       await this.conversationService.updateState(conversation.id, 'confirming_order');
@@ -1829,6 +1842,10 @@ export class WhatsappService {
           Number(pendingOrder.subtotal || 0) - Number(pendingOrder.discount_amount || 0) + Number(pendingOrder.shipping_amount || 0);
         await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
       }
+      if (!conversation.context?.customer_data?.phone) {
+        await this.conversationService.updateState(conversation.id, 'collecting_phone');
+        return this.getPhonePrompt();
+      }
       await this.conversationService.updateState(conversation.id, 'confirming_order');
       return await this.showOrderConfirmation(tenantId, conversation);
     }
@@ -1864,7 +1881,11 @@ export class WhatsappService {
       address: addressParts,
     });
 
-    // Ir para confirmação
+    if (!conversation.context?.customer_data?.phone) {
+      await this.conversationService.updateState(conversation.id, 'collecting_phone');
+      return this.getPhonePrompt();
+    }
+
     await this.conversationService.updateState(conversation.id, 'confirming_order');
     return await this.showOrderConfirmation(tenantId, conversation);
   }
@@ -1972,9 +1993,11 @@ export class WhatsappService {
     if (!conversation) {
       return '❌ Erro ao processar. Tente novamente.';
     }
+    const refreshed = await this.conversationService.findById(conversation.id);
+    const activeConversation = refreshed ? toTypedConversation(refreshed) : conversation;
 
-    const pendingOrder = conversation.context?.pending_order;
-    const customerData = conversation.context?.customer_data as CustomerData | undefined;
+    const pendingOrder = activeConversation.context?.pending_order;
+    const customerData = activeConversation.context?.customer_data as CustomerData | undefined;
 
     if (!pendingOrder) {
       return '❌ Pedido não encontrado. Por favor, faça um novo pedido.';
@@ -2015,6 +2038,11 @@ export class WhatsappService {
       }
       message += `\n   ${customerData.address.neighborhood}, ${customerData.address.city} - ${customerData.address.state}\n`;
     } else if (customerData?.delivery_type === 'pickup') {
+
+      if (!customerData.phone) {
+        await this.conversationService.updateState(conversation.id, 'collecting_phone');
+        return this.getPhonePrompt();
+      }
       message += `📍 *Retirada* (cliente busca)\n`;
     }
 
@@ -2082,6 +2110,11 @@ export class WhatsappService {
     // ✅ NOVO: Validar dados obrigatórios do cliente
     if (!customerData?.name) {
       return '❌ Nome do cliente não encontrado. Por favor, faça um novo pedido.';
+    }
+
+    if (!customerData?.phone) {
+      await this.conversationService.updateState(conversation.id, 'collecting_phone');
+      return this.getPhonePrompt();
     }
 
     const nameValidation = this.validateName(customerData.name);

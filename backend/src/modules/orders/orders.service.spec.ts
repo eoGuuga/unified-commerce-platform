@@ -13,6 +13,7 @@ import { AuditLogService } from '../common/services/audit-log.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { DbContextService } from '../common/services/db-context.service';
 import { CouponsService } from '../coupons/coupons.service';
+import { CacheService } from '../common/services/cache.service';
 
 describe('OrdersService', () => {
   let service: OrdersService;
@@ -80,6 +81,19 @@ describe('OrdersService', () => {
     }),
   };
 
+  const mockCacheService = {
+    get: jest.fn(),
+    set: jest.fn(),
+    delete: jest.fn(),
+    deletePattern: jest.fn(),
+    cacheProducts: jest.fn(),
+    getCachedProducts: jest.fn(),
+    invalidateProductsCache: jest.fn(),
+    cacheStock: jest.fn(),
+    getCachedStock: jest.fn(),
+    invalidateStockCache: jest.fn(),
+  };
+
   const mockCouponsService = {
     findActiveByCode: jest.fn().mockResolvedValue(null),
     validateCoupon: jest.fn().mockReturnValue({ valid: false, reason: 'Cupom não encontrado' }),
@@ -125,6 +139,10 @@ describe('OrdersService', () => {
         {
           provide: CouponsService,
           useValue: mockCouponsService,
+        },
+        {
+          provide: CacheService,
+          useValue: mockCacheService,
         },
       ],
     }).compile();

@@ -30,6 +30,13 @@ describe('AuthService', () => {
 
   const mockDbContextService = {
     getRepository: jest.fn(() => mockUsuariosRepository),
+    runInTransaction: jest.fn(async (callback) => {
+      const mockManager = {
+        query: jest.fn().mockResolvedValue(undefined),
+        getRepository: jest.fn(() => mockUsuariosRepository),
+      };
+      return callback(mockManager as any);
+    }),
   };
 
   beforeEach(async () => {

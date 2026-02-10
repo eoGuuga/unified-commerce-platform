@@ -1,48 +1,42 @@
-# 🎯 Plano de Próximos Passos - Buscando a PERFEIÇÃO
+# 🎯 Plano de Proximos Passos - Buscando a PERFEICAO
 
-> **Data:** 07/01/2025  
-> **Status:** ✅ FASE 0, 1 e 2 COMPLETAS | 🚀 Próximo: FASE 3 (Bot WhatsApp)  
-> **Foco:** Sistema 100% perfeito para produção  
+> **Data:** 2026-02-10  
+> **Status:** Fase 3.3 em correcao | Proximo: concluir fluxo completo WhatsApp  
+> **Foco:** Sistema consistente e pronto para producao  
 > **📊 Ver [BACKEND-OPERACIONAL.md](../04-status/BACKEND-OPERACIONAL.md) para status consolidado**
 
 ---
 
-## ✅ O QUE JÁ ESTÁ PERFEITO
+## ✅ O QUE JA ESTA IMPLEMENTADO (STATUS CONSOLIDADO)
 
 ### PDV (Ponto de Venda)
-- ✅ Validações críticas de estoque (frontend + backend)
-- ✅ Estoque em tempo real (SWR polling 3s + revalidação imediata)
-- ✅ Sistema de reserva de estoque (reservar ao adicionar, liberar ao remover)
-- ✅ UX otimizada (autocomplete, toast notifications, atalhos de teclado)
-- ✅ Dashboard de estatísticas em tempo real
-- ✅ Transações ACID com FOR UPDATE locks (ZERO overselling garantido)
+- ✅ Fluxo principal completo
+- ✅ Reserva e liberacao de estoque
+- ✅ Validacoes criticas no backend
+- ✅ Recomendado validar UX e estoque em tempo real
 
 ### Backend
-- ✅ Transações ACID perfeitas
-- ✅ Endpoints de reserva/liberação de estoque
-- ✅ Validações robustas
+- ✅ Transacoes ACID
+- ✅ Endpoints de reserva/liberacao de estoque
+- ✅ Validacoes robustas
 - ✅ Estrutura WhatsApp preparada
-- ✅ Swagger/OpenAPI configurado
-- ✅ Exception Filters globais
-- ✅ Rate Limiting implementado
-- ✅ Health Checks completos
-- ✅ Testes Unitários e de Integração
+- ✅ Swagger/OpenAPI, rate limiting e health checks
+- ✅ Testes unitarios e de integracao (validar execucao)
 
-### Gestão de Estoque
-- ✅ Página `/admin/estoque` completa
+### Gestao de Estoque
+- ✅ Pagina `/admin/estoque` completa
 - ✅ Ajustes de estoque (adicionar/reduzir)
 - ✅ Alertas visuais (estoque baixo)
-- ✅ Backend endpoints completos
+- ✅ Endpoints completos
 
 ### Dashboard Admin
-- ✅ Dashboard melhorado com métricas visuais
-- ✅ Gráficos de vendas (Chart.js)
-- ✅ Relatórios avançados (período, canal, status)
-- ✅ Top produtos mais vendidos
+- 🟡 Dashboard basico completo
+- ⏳ Analytics avancado pendente
+- ⏳ Gestao de clientes pendente
 
 ---
 
-## ✅ FASE 0: INFRAESTRUTURA PERFEITA (COMPLETA)
+## ✅ FASE 0: INFRAESTRUTURA (COMPLETA)
 
 **Status:** ✅ **100% COMPLETA**
 
@@ -83,7 +77,7 @@
 
 ---
 
-## ✅ FASE 1: GESTÃO DE ESTOQUE (COMPLETA)
+## ✅ FASE 1: GESTAO DE ESTOQUE (COMPLETA)
 
 **Status:** ✅ **100% COMPLETA**
 
@@ -111,9 +105,9 @@
 
 ---
 
-## ✅ FASE 2: DASHBOARD ADMIN MELHORADO (COMPLETA)
+## 🟡 FASE 2: DASHBOARD ADMIN (PARCIAL)
 
-**Status:** ✅ **100% COMPLETA**
+**Status:** 🟡 **PARCIAL**
 
 ### 2.1 Dashboard Principal ✅
 - ✅ Cards de métricas grandes e visuais
@@ -122,7 +116,7 @@
 - ✅ Lista de vendas recentes
 - ✅ Atualização em tempo real (SWR)
 
-### 2.2 Relatórios Avançados ✅
+### 2.2 Relatorios Avancados ✅
 - ✅ `GET /orders/reports/sales` (relatório completo)
 - ✅ `GET /orders/reports/sales-by-period`
 - ✅ `GET /orders/reports/top-selling-products`
@@ -136,9 +130,9 @@
 
 ---
 
-## 🎯 PRÓXIMOS PASSOS (ORDEM DE PRIORIDADE)
+## 🎯 PROXIMOS PASSOS (ORDEM DE PRIORIDADE)
 
-### FASE 3: Bot WhatsApp Básico (PRIORIDADE MÁXIMA) ⭐⭐⭐
+### FASE 3: Bot WhatsApp (PRIORIDADE MAXIMA) ⭐⭐⭐
 
 **Objetivo:** Bot que automatiza 80% das mensagens e coleta encomendas.
 
@@ -146,11 +140,11 @@
 
 ---
 
-### FASE 3: Bot WhatsApp Básico (MVP) ⭐⭐⭐
+### FASE 3: Bot WhatsApp (MVP) ⭐⭐⭐
 
 **Objetivo:** Bot que automatiza 80% das mensagens e coleta encomendas.
 
-#### 3.1 Respostas Automáticas para Perguntas Comuns
+#### 3.1 Respostas Automaticas para Perguntas Comuns (CONCLUIDO)
 
 **Comandos:**
 - [ ] "Cardápio" → Lista produtos disponíveis
@@ -170,7 +164,7 @@
 
 ---
 
-#### 3.2 Processamento de Pedidos Simples
+#### 3.2 Processamento de Pedidos Simples (CONCLUIDO)
 
 **Fluxo:**
 ```
@@ -198,7 +192,7 @@ Bot: "Pedido criado! Código: #1234. Aguarde confirmação."
 
 ---
 
-#### 3.3 Fluxo de Encomendas Personalizadas
+#### 3.3 Fluxo de Confirmacao e Dados do Cliente (PENDENTE)
 
 **Fluxo:**
 ```
@@ -238,7 +232,7 @@ Bot: "Encomenda coletada! Valor: R$ 80,00. Aguarde aprovação."
 
 ---
 
-### FASE 4: Integração Ollama (IA Local) ⭐⭐
+### FASE 4: Integracao Ollama (IA Local) ⭐⭐
 
 **Objetivo:** Bot mais inteligente usando IA local (gratuita).
 
@@ -251,7 +245,7 @@ Bot: "Encomenda coletada! Valor: R$ 80,00. Aguarde aprovação."
 
 **Arquivo:** `backend/src/modules/whatsapp/services/ollama.service.ts`
 
-**Documento:** `docs/02-tecnico/14-ADAPTACAO-OLLAMA.md`
+**Documento:** `docs/01-tecnico/14-ADAPTACAO-OLLAMA.md`
 
 **Tempo estimado:** 1 dia
 
@@ -270,34 +264,34 @@ Bot: "Encomenda coletada! Valor: R$ 80,00. Aguarde aprovação."
 
 ## 📅 TIMELINE RECOMENDADA (ATUALIZADA)
 
-### ✅ CONCLUÍDO:
-- ✅ **FASE 0:** Infraestrutura Perfeita (Swagger, Exception Filters, Rate Limiting, Error Boundaries, Health Checks, Testes)
-- ✅ **FASE 1:** Gestão de Estoque Completa (Página `/admin/estoque`, ajustes, alertas)
-- ✅ **FASE 2:** Dashboard Admin Melhorado (Métricas, gráficos, relatórios)
+### ✅ CONCLUIDO:
+- ✅ **FASE 0:** Infraestrutura (Swagger, Exception Filters, Rate Limiting, Error Boundaries, Health Checks, Testes)
+- ✅ **FASE 1:** Gestao de Estoque (pagina `/admin/estoque`, ajustes, alertas)
+- 🟡 **FASE 2:** Dashboard Admin (basico concluido, avancado pendente)
 
 ---
 
-### Esta Semana (Dias 1-3): BOT WHATSAPP BÁSICO
+### Esta Semana (Dias 1-3): BOT WHATSAPP (FASE 3.3)
 1. **Respostas Automáticas**
    - Comandos: "Cardápio", "Preço", "Estoque", "Horário"
    - Integrar com ProductsService
    - Formatação bonita de mensagens
 
-### Próxima Semana (Dias 4-6): PROCESSAMENTO DE PEDIDOS
+### Proxima Semana (Dias 4-6): PROCESSAMENTO E CONFIRMACAO
 2. **Processamento de Pedidos Simples**
    - Extrair produto e quantidade da mensagem
    - Validar estoque
    - Criar pedido pendente
    - Confirmar com cliente
 
-### Semana 3 (Dias 7-10): FLUXO DE ENCOMENDAS
+### Semana 3 (Dias 7-10): FLUXO COMPLETO E TESTES
 3. **Fluxo de Encomendas**
    - Estado de conversa (contexto)
    - Coleta sequencial de informações
    - Criação de encomenda pendente
    - Página `/admin/encomendas` para aprovar
 
-### Semana 4 (Dias 11-14): INTEGRAÇÃO OLLAMA
+### Semana 4 (Dias 11-14): INTEGRACAO OLLAMA
 4. **Integração Ollama**
    - Instalar e configurar Ollama
    - Criar `OllamaService`
@@ -306,7 +300,7 @@ Bot: "Encomenda coletada! Valor: R$ 80,00. Aguarde aprovação."
 
 ---
 
-## 🎯 CRITÉRIOS DE PERFEIÇÃO
+## 🎯 CRITERIOS DE PERFEICAO
 
 ### Gestão de Estoque:
 - ✅ Visual profissional e intuitivo
@@ -328,19 +322,19 @@ Bot: "Encomenda coletada! Valor: R$ 80,00. Aguarde aprovação."
 
 ---
 
-## 🚀 PRÓXIMO PASSO IMEDIATO (ATUALIZADO)
+## 🚀 PROXIMO PASSO IMEDIATO (ATUALIZADO)
 
-**Começar pela FASE 3: Bot WhatsApp Básico**
+**Comecar pela FASE 3.3: Fluxo completo WhatsApp**
 
 1. **Respostas Automáticas** (comandos básicos)
 2. **Processamento de Pedidos** (extrair intenção, validar estoque)
 3. **Fluxo de Encomendas** (coleta de informações, aprovação)
 
-**Depois:** FASE 4 - Integração Ollama (IA local)
+**Depois:** FASE 4 - Integracao Ollama (IA local)
 
 ---
 
-## ✅ CRITÉRIOS DE PERFEIÇÃO (ATUALIZADOS)
+## ✅ CRITERIOS DE PERFEICAO (ATUALIZADOS)
 
 ### Infraestrutura:
 - ✅ API 100% documentada (Swagger)
@@ -369,6 +363,6 @@ Bot: "Encomenda coletada! Valor: R$ 80,00. Aguarde aprovação."
 
 ---
 
-**Última atualização:** 07/01/2025  
-**Status:** ✅ FASE 0, 1 e 2 COMPLETAS | 🚀 Pronto para FASE 3 (Bot WhatsApp)  
+**Ultima atualizacao:** 2026-02-10  
+**Status:** Fase 3.3 em correcao | Proximo: fluxo completo WhatsApp  
 **📊 Ver [BACKEND-OPERACIONAL.md](../04-status/BACKEND-OPERACIONAL.md) para status consolidado**
