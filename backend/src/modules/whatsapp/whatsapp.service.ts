@@ -120,12 +120,8 @@ export class WhatsappService {
   }
 
   private getPhonePrompt(): string {
-' +
-    return (
-      `📱 *Para finalizar, preciso do seu telefone de contato:*
-` +
-      `Exemplo: (11) 98765-4321 ou 11987654321`
-    );
+    return `📱 *Para finalizar, preciso do seu telefone de contato:*\n` +
+      `Exemplo: (11) 98765-4321 ou 11987654321`;
   }
 
   private extractCouponCode(message: string): string | null {
