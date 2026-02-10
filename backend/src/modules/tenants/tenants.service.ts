@@ -1,22 +1,18 @@
 import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { Tenant } from '../../database/entities/Tenant.entity';
+import { DbContextService } from '../common/services/db-context.service';
 
 @Injectable()
 export class TenantsService {
   private readonly logger = new Logger(TenantsService.name);
 
-  constructor(
-    @InjectRepository(Tenant)
-    private readonly tenantsRepository: Repository<Tenant>,
-  ) {}
+  constructor(private readonly dbContext: DbContextService) {}
 
   /**
    * Busca um tenant por ID e valida se está ativo
    */
   async findOneById(tenantId: string): Promise<Tenant> {
-    const tenant = await this.tenantsRepository.findOne({
+    const tenant = await this.dbContext.getRepository(Tenant).findOne({
       where: { id: tenantId },
     });
 

@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { TenantsService } from './tenants.service';
 import { Tenant } from '../../database/entities/Tenant.entity';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { DbContextService } from '../common/services/db-context.service';
 
 describe('TenantsService', () => {
   let service: TenantsService;
@@ -26,13 +26,17 @@ describe('TenantsService', () => {
     findOne: jest.fn(),
   };
 
+  const mockDbContextService = {
+    getRepository: jest.fn(() => mockRepository),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TenantsService,
         {
-          provide: getRepositoryToken(Tenant),
-          useValue: mockRepository,
+          provide: DbContextService,
+          useValue: mockDbContextService,
         },
       ],
     }).compile();
