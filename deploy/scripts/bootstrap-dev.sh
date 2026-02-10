@@ -13,10 +13,18 @@ set -a
 source "$ENV_FILE"
 set +a
 
-echo "==> Subindo containers dev/test"
+echo "==> Subindo postgres/redis (dev/test)"
 docker compose --env-file "$ENV_FILE" \
   -f "${ROOT_DIR}/deploy/docker-compose.test.yml" \
-  --project-name ucmtest up -d --build --force-recreate postgres redis backend frontend nginx
+  --project-name ucmtest up -d --build --force-recreate postgres redis
+
+echo "==> Aplicando migrations (dev/test)"
+"${ROOT_DIR}/deploy/scripts/run-migrations-test.sh"
+
+echo "==> Subindo app (dev/test)"
+docker compose --env-file "$ENV_FILE" \
+  -f "${ROOT_DIR}/deploy/docker-compose.test.yml" \
+  --project-name ucmtest up -d --build --force-recreate backend frontend nginx
 
 echo "==> Garantindo tenant de teste"
 "${ROOT_DIR}/deploy/scripts/seed-test-tenant.sh"

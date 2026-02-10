@@ -16,7 +16,9 @@ for f in \
   "007-add-coupon-code-to-pedidos.sql" \
   "008-usuarios-email-unique-por-tenant.sql" \
   "009-rls-force-and-extra-policies.sql" \
-  "010-idempotency-unique-tenant-operation.sql"
+  "010-idempotency-unique-tenant-operation.sql" \
+  "011-create-pagamentos-table.sql" \
+  "012-tenants-rls-policy.sql"
 do
   path="${MIG_DIR}/${f}"
   if [[ -f "${path}" ]]; then
