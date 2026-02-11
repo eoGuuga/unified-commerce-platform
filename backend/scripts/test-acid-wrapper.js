@@ -3,7 +3,10 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const backendDir = path.resolve(__dirname, '..');
-const scriptsDir = path.resolve(__dirname, '../../scripts');
+const rootDir = process.env.UCM_ROOT
+  ? path.resolve(process.env.UCM_ROOT)
+  : path.resolve(__dirname, '../..');
+const scriptsDir = path.join(rootDir, 'scripts');
 const nodeModulesPath = path.join(backendDir, 'node_modules');
 
 // Definir NODE_PATH para encontrar módulos

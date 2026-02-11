@@ -29,8 +29,10 @@ TEST_CMD="npm ci && npm run test:unit && npm run test:integration -- --runInBand
 
 docker run --rm \
   -v "${ROOT_DIR}/backend:/app" \
+  -v "${ROOT_DIR}:/repo" \
   -w /app \
   --network "$NET" \
   -e DATABASE_URL="$DATABASE_URL" \
   -e REDIS_URL="$REDIS_URL" \
+  -e UCM_ROOT="/repo" \
   node:20-alpine sh -lc "$TEST_CMD"
