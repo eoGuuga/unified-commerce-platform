@@ -14,6 +14,7 @@ chmod +x \
   "$ROOT_DIR/deploy/scripts/seed-test-tenant.sh" \
   "$ROOT_DIR/deploy/scripts/seed-dev-data.sh" \
   "$ROOT_DIR/deploy/scripts/run-dev-smoke.sh" \
+  "$ROOT_DIR/deploy/scripts/run-backend-all-tests.sh" \
   "$ROOT_DIR/deploy/scripts/run-dev-whatsapp-e2e.sh"
 
 echo "==> Bootstrap dev"

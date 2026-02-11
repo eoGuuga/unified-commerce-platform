@@ -12,6 +12,7 @@ chmod +x deploy/scripts/seed-test-tenant.sh \
   deploy/scripts/seed-dev-data.sh \
   deploy/scripts/run-dev-smoke.sh \
   deploy/scripts/run-dev-whatsapp-e2e.sh \
+  deploy/scripts/run-backend-all-tests.sh \
   deploy/scripts/bootstrap-dev.sh
 
 ./deploy/scripts/bootstrap-dev.sh
@@ -37,6 +38,8 @@ chmod +x deploy/scripts/seed-test-tenant.sh \
   valida health, login, auth/me, products e orders.
 - `deploy/scripts/run-dev-whatsapp-e2e.sh`:
   valida o fluxo completo do WhatsApp no dominio dev.
+- `deploy/scripts/run-backend-all-tests.sh`:
+  roda unit + integration + acid no backend usando o stack test.
 - `deploy/scripts/bootstrap-dev.sh`:
   orquestra tudo (up + seed + smoke).
 
@@ -46,4 +49,10 @@ Para pular o E2E do WhatsApp:
 
 ```
 SKIP_WA_E2E=true ./deploy/scripts/bootstrap-dev.sh
+```
+
+Para rodar todos os testes do backend:
+
+```
+./deploy/scripts/run-backend-all-tests.sh
 ```
