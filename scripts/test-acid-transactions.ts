@@ -292,8 +292,10 @@ async function testACIDTransactions() {
     }
 
     // Verificar estoque final
-    const estoqueFinal = await estoqueRepo.findOne({
-      where: { tenant_id: TENANT_ID, produto_id: produto.id },
+    const estoqueFinal = await runWithTenant(async (manager) => {
+      return await manager.getRepository(MovimentacaoEstoque).findOne({
+        where: { tenant_id: TENANT_ID, produto_id: produto.id },
+      });
     });
 
     console.log(`✅ Estoque final: ${estoqueFinal?.current_stock} unidades\n`);
