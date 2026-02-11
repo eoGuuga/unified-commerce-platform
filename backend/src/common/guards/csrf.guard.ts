@@ -14,6 +14,15 @@ export class CsrfGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<Request>();
+    const path = (request.originalUrl || request.url || '').toString();
+
+    // Webhooks externos não têm cookie/header CSRF.
+    if (
+      path.includes('/api/v1/whatsapp/webhook') ||
+      path.includes('/api/v1/payments/webhook/mercadopago')
+    ) {
+      return true;
+    }
 
     // Skip para metodos seguros (GET, HEAD, OPTIONS)
     if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {

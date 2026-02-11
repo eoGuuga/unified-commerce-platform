@@ -27,9 +27,9 @@ import { CommonModule } from '../common/common.module';
 
         return {
           secret: jwtSecret,
-        signOptions: {
-          expiresIn: config.get<string>('JWT_EXPIRATION', '15m'),
-        },
+          signOptions: {
+            expiresIn: config.get<string>('JWT_EXPIRATION', '15m') as any,
+          },
         };
       },
     }),

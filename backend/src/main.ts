@@ -180,7 +180,10 @@ async function bootstrap() {
     });
   }
 
-  const shouldSeedDevUser = process.env.SEED_DEV_USER !== 'false';
+  const shouldSeedDevUser = !isProd && process.env.SEED_DEV_USER !== 'false';
+  if (isProd && process.env.SEED_DEV_USER === 'true') {
+    console.warn('[SECURITY] SEED_DEV_USER=true em produção. Desative imediatamente.');
+  }
   if (shouldSeedDevUser) {
     const devTenantId =
       process.env.DEV_TENANT_ID || '00000000-0000-0000-0000-000000000000';

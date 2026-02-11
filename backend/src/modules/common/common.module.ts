@@ -11,6 +11,7 @@ import { DbContextService } from './services/db-context.service';
 import { UsageLog } from '../../database/entities/UsageLog.entity';
 import { IdempotencyKey } from '../../database/entities/IdempotencyKey.entity';
 import { AuditLog } from '../../database/entities/AuditLog.entity';
+import { CsrfController } from './controllers/csrf.controller';
 
 @Global() // Torna módulo global para não precisar importar em todos os lugares
 @Module({
@@ -18,6 +19,7 @@ import { AuditLog } from '../../database/entities/AuditLog.entity';
     TypeOrmModule.forFeature([UsageLog, IdempotencyKey, AuditLog]),
     ConfigModule,
   ],
+  controllers: [CsrfController],
   providers: [
     CacheService,
     UsageLogService,

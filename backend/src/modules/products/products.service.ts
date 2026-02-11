@@ -318,6 +318,10 @@ export class ProductsService {
     quantity: number,
     tenantId: string,
   ): Promise<{ success: boolean; available_stock: number }> {
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new BadRequestException('Quantidade inválida para reserva');
+    }
+
     const estoqueRepo = this.db.getRepository(MovimentacaoEstoque);
     const estoque = await estoqueRepo.findOne({
       where: { tenant_id: tenantId, produto_id: produtoId },
@@ -327,20 +331,34 @@ export class ProductsService {
       throw new NotFoundException(`Estoque não encontrado para produto ${produtoId}`);
     }
 
-    const availableStock = estoque.current_stock - estoque.reserved_stock;
+    const result = await estoqueRepo
+      .createQueryBuilder()
+      .update(MovimentacaoEstoque)
+      .set({ reserved_stock: () => 'reserved_stock + :quantity' })
+      .where('tenant_id = :tenantId', { tenantId })
+      .andWhere('produto_id = :produtoId', { produtoId })
+      .andWhere('current_stock - reserved_stock >= :quantity', { quantity })
+      .setParameters({ quantity })
+      .execute();
 
-    if (availableStock < quantity) {
+    if (!result.affected || result.affected < 1) {
+      const availableStock = estoque.current_stock - estoque.reserved_stock;
       throw new BadRequestException(
         `Estoque insuficiente: disponível ${availableStock}, solicitado ${quantity}`,
       );
     }
 
-    estoque.reserved_stock += quantity;
-    await estoqueRepo.save(estoque);
+    const updated = await estoqueRepo.findOne({
+      where: { tenant_id: tenantId, produto_id: produtoId },
+    });
+
+    if (!updated) {
+      throw new NotFoundException(`Estoque não encontrado para produto ${produtoId}`);
+    }
 
     return {
       success: true,
-      available_stock: estoque.current_stock - estoque.reserved_stock,
+      available_stock: updated.current_stock - updated.reserved_stock,
     };
   }
 
@@ -352,6 +370,10 @@ export class ProductsService {
     quantity: number,
     tenantId: string,
   ): Promise<{ success: boolean; available_stock: number }> {
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new BadRequestException('Quantidade inválida para liberação');
+    }
+
     const estoqueRepo = this.db.getRepository(MovimentacaoEstoque);
     const estoque = await estoqueRepo.findOne({
       where: { tenant_id: tenantId, produto_id: produtoId },
@@ -361,12 +383,26 @@ export class ProductsService {
       throw new NotFoundException(`Estoque não encontrado para produto ${produtoId}`);
     }
 
-    estoque.reserved_stock = Math.max(0, estoque.reserved_stock - quantity);
-    await estoqueRepo.save(estoque);
+    await estoqueRepo
+      .createQueryBuilder()
+      .update(MovimentacaoEstoque)
+      .set({ reserved_stock: () => 'GREATEST(0, reserved_stock - :quantity)' })
+      .where('tenant_id = :tenantId', { tenantId })
+      .andWhere('produto_id = :produtoId', { produtoId })
+      .setParameters({ quantity })
+      .execute();
+
+    const updated = await estoqueRepo.findOne({
+      where: { tenant_id: tenantId, produto_id: produtoId },
+    });
+
+    if (!updated) {
+      throw new NotFoundException(`Estoque não encontrado para produto ${produtoId}`);
+    }
 
     return {
       success: true,
-      available_stock: estoque.current_stock - estoque.reserved_stock,
+      available_stock: updated.current_stock - updated.reserved_stock,
     };
   }
 

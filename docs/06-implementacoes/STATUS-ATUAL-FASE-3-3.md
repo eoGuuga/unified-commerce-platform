@@ -1,7 +1,7 @@
 # 📊 STATUS ATUAL - FASE 3.3
 
-> **Data:** 08/01/2025  
-> **Status:** ⚠️ **EM CORREÇÃO** | 🔧 **Resolvendo dependências circulares**
+> **Data:** 2026-02-11  
+> **Status:** 🟡 **EM ANDAMENTO** | ✅ **Backend/testes OK em dev/test** | 🎯 **Foco: fluxo completo WhatsApp**
 
 ---
 
@@ -21,9 +21,9 @@
 - ✅ Índices para performance
 
 ### 3. Testes
-- ✅ Testes unitários corrigidos (mocks atualizados)
-- ✅ Teste ACID funcionando (locks FOR UPDATE, zero overselling)
-- ⚠️ Testes de integração precisam de ConfigModule mockado
+- ✅ Testes unitários (dev/test)
+- ✅ Testes de integração (dev/test)
+- ✅ Teste ACID (dev/test)
 
 ### 4. Commits
 - ✅ 13 commits criados (separados, em inglês, objetivos)
@@ -31,26 +31,16 @@
 
 ---
 
-## ⚠️ PROBLEMAS IDENTIFICADOS
+## ⚠️ PONTOS DE ATENÇÃO (ATUAIS)
 
-### 1. Dependência Circular (CRÍTICO)
-**Problema:** `WhatsappModule ↔ OrdersModule ↔ NotificationsModule`
+### 1. Fluxo Completo do WhatsApp (PENDENTE)
+Ainda falta concluir:
+- Coleta de dados do cliente (nome, endereco, telefone, observacoes)
+- Confirmacao explicita antes de gerar pagamento
+- Atualizacao do pedido com dados completos
 
-**Causa:**
-- `WhatsappModule` importa `OrdersModule` e `PaymentsModule`
-- `OrdersModule` importa `NotificationsModule`
-- `PaymentsModule` importa `NotificationsModule`
-- `NotificationsModule` importa `WhatsappModule` (para usar `ConversationService`)
-
-**Solução em andamento:**
-- Usar `forwardRef()` em todos os módulos envolvidos
-- Remover dependência direta do `ConversationService` no `NotificationsService`
-- Salvar mensagens diretamente usando repository
-
-### 2. Query SQL Incorreta
-**Problema:** `ProductsService.findAll()` estava passando array de IDs como se fosse um único ID
-
-**Solução:** Corrigido para usar `IN (:...produtoIds)` com query builder
+### 2. Alinhamento Documental
+Relatorios antigos indicavam dependencia circular, mas o ambiente dev/test foi validado em 2026-02-10. Documentacao precisa refletir o estado atual.
 
 ---
 
@@ -74,29 +64,26 @@
 ### 4. Integration Tests Corrigidos
 - ✅ Import `supertest` corrigido (default import)
 - ✅ `ConfigModule` adicionado aos testes
-- ⚠️ Ainda precisa rodar com sucesso
+- ✅ Executados com sucesso em dev/test
 
 ---
 
 ## 🎯 PRÓXIMAS AÇÕES (Ordem de Prioridade)
 
-### 1. Validar Backend (URGENTE)
-- [ ] Limpar completamente `dist/` e `node_modules/.cache`
+### 1. Validar Backend (MANUAL, quando necessario)
 - [ ] Rebuild completo
 - [ ] Testar health endpoint
 - [ ] Testar bot WhatsApp (pedido → pagamento)
 
-### 2. Commits e Push
-- [ ] Commit migration 003
-- [ ] Commit correções de dependência circular
-- [ ] Commit correção de ProductsService
-- [ ] Commit correções de testes
-- [ ] Push para GitHub
+### 2. Fluxo Completo WhatsApp (PRIORIDADE)
+- [ ] Coletar dados do cliente
+- [ ] Confirmacao antes do pagamento
+- [ ] Persistir dados completos no pedido
 
-### 3. Validação Completa
-- [ ] Rodar `npm run test:unit` (deve passar)
-- [ ] Rodar `npm run test:integration` (deve passar)
-- [ ] Rodar `npm run test:acid` (já passou ✅)
+### 3. Validacao Completa
+- [ ] Rodar `npm run test:unit`
+- [ ] Rodar `npm run test:integration`
+- [ ] Rodar `npm run test:acid`
 - [ ] Testar fluxo E2E do bot
 
 ### 4. npm audit (Depois de tudo estável)
@@ -106,35 +93,24 @@
 
 ---
 
-## 📊 ESTATÍSTICAS
+## 📊 ESTATISTICAS
 
 - **Arquivos criados:** 8
 - **Arquivos modificados:** 15+
 - **Linhas de código:** ~1500
 - **Migrations:** 3 (001, 002, 003)
 - **Commits:** 13 (todos em inglês, objetivos)
-- **Testes unitários:** ✅ PASSOU
-- **Teste ACID:** ✅ PASSOU
-- **Testes integração:** ⚠️ PENDENTE
-- **Backend:** ⚠️ EM CORREÇÃO
+- **Testes unitarios:** ✅ PASSOU (dev/test)
+- **Teste ACID:** ✅ PASSOU (dev/test)
+- **Testes integracao:** ✅ PASSOU (dev/test)
+- **Backend:** ✅ OPERACIONAL (dev/test)
 
 ---
 
-## 🔍 DIAGNÓSTICO ATUAL
+## 🔍 DIAGNOSTICO ATUAL
 
-### Problema Principal
-Dependência circular complexa entre módulos causando falhas ao iniciar o backend.
-
-### Root Cause
-Arquitetura de módulos com dependências bidirecionais:
-- `NotificationsService` precisa de `ConversationService` (do `WhatsappModule`)
-- `WhatsappModule` precisa de `OrdersModule` e `PaymentsModule`
-- `OrdersModule` e `PaymentsModule` precisam de `NotificationsModule`
-
-### Solução Aplicada
-- forwardRef() em todas as importações circulares
-- Remoção de dependência de `ConversationService` do `NotificationsService`
-- Uso direto de repositories
+### Foco Principal
+Finalizar o fluxo completo do WhatsApp (coleta, confirmacao, pagamento, notificacao).
 
 ---
 
@@ -142,12 +118,11 @@ Arquitetura de módulos com dependências bidirecionais:
 
 1. ✅ Backend rodando sem erros
 2. ✅ Testes (unit + integration + ACID) passando
-3. ✅ npm audit sem vulnerabilidades críticas
-4. ✅ Fluxo E2E testado e funcionando
-5. ✅ Documentação atualizada
-6. ✅ Commits e push realizados
+3. ✅ Fluxo E2E testado e funcionando
+4. ✅ Documentacao atualizada
+5. ⏳ npm audit sem vulnerabilidades criticas
 
 ---
 
-**Última atualização:** 08/01/2025 15:42  
-**Status:** ⚠️ **EM CORREÇÃO** | 🔧 **Resolvendo dependências circulares**
+**Ultima atualizacao:** 2026-02-11  
+**Status:** 🟡 **EM ANDAMENTO** | ✅ **Backend/testes OK em dev/test** | 🎯 **Foco: fluxo completo WhatsApp**

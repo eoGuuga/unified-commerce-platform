@@ -85,31 +85,11 @@ export class OrdersService {
       throw new BadRequestException('delivery_address é obrigatório quando delivery_type=delivery');
     }
 
-    // Cálculo de subtotal
-    const subtotal = createOrderDto.items.reduce(
-      (sum, item) => sum + item.unit_price * item.quantity,
-      0,
-    );
-
     const shipping = createOrderDto.shipping_amount || 0;
 
-    // Cupom: recalcular desconto no momento da criação (regra única e proteção contra corrida)
-    let couponCode = (createOrderDto.coupon_code || '').trim().toUpperCase() || null;
-    let discount = createOrderDto.discount_amount || 0;
-    if (couponCode) {
-      const coupon = await this.couponsService.findActiveByCode(tenantId, couponCode);
-      if (!coupon) {
-        throw new BadRequestException(`Cupom inválido/inativo: ${couponCode}`);
-      }
-      const validation = this.couponsService.validateCoupon(subtotal, coupon);
-      if (!validation.valid) {
-        throw new BadRequestException(`Cupom inválido: ${validation.reason}`);
-      }
-      discount = validation.discountAmount;
-      couponCode = validation.code;
+    if (createOrderDto.discount_amount && !createOrderDto.coupon_code) {
+      throw new BadRequestException('discount_amount so é permitido quando coupon_code é informado');
     }
-
-    const total = subtotal - discount + shipping;
 
     // Inicia transação CRÍTICA
     const pedido = await this.db.runInTransaction(async (manager) => {
@@ -138,6 +118,56 @@ export class OrdersService {
           `Produtos não encontrados ou inativos: ${produtosNaoEncontrados.join(', ')}`,
         );
       }
+
+      const produtoMap = new Map(produtos.map((produto) => [produto.id, produto]));
+      const itemsWithPrice = createOrderDto.items.map((item) => {
+        const produto = produtoMap.get(item.produto_id);
+        if (!produto) {
+          throw new NotFoundException(`Produto ${item.produto_id} não encontrado`);
+        }
+        const unitPrice = Number(produto.price);
+        if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+          throw new BadRequestException(`Preço inválido para produto ${produto.id}`);
+        }
+
+        const providedPrice = Number(item.unit_price);
+        if (Number.isFinite(providedPrice)) {
+          const diff = Math.abs(providedPrice - unitPrice);
+          if (diff > 0.01) {
+            throw new BadRequestException(
+              `Preço do produto divergente para ${produto.id}. Preço atual: ${unitPrice.toFixed(2)}`,
+            );
+          }
+        }
+
+        return {
+          ...item,
+          unit_price: unitPrice,
+        };
+      });
+
+      const subtotal = itemsWithPrice.reduce(
+        (sum, item) => sum + item.unit_price * item.quantity,
+        0,
+      );
+
+      // Cupom: recalcular desconto no momento da criação (regra única e proteção contra corrida)
+      let couponCode = (createOrderDto.coupon_code || '').trim().toUpperCase() || null;
+      let discount = createOrderDto.discount_amount || 0;
+      if (couponCode) {
+        const coupon = await this.couponsService.findActiveByCode(tenantId, couponCode);
+        if (!coupon) {
+          throw new BadRequestException(`Cupom inválido/inativo: ${couponCode}`);
+        }
+        const validation = this.couponsService.validateCoupon(subtotal, coupon);
+        if (!validation.valid) {
+          throw new BadRequestException(`Cupom inválido: ${validation.reason}`);
+        }
+        discount = validation.discountAmount;
+        couponCode = validation.code;
+      }
+
+      const total = subtotal - discount + shipping;
 
       // 3. Verificar se todos os produtos têm estoque cadastrado
       const produtosMap = new Map(estoques.map((e) => [e.produto_id, e]));
@@ -197,7 +227,7 @@ export class OrdersService {
       const savedPedido = await manager.save(pedido);
 
       // 7. Criar itens do pedido
-      const itens = createOrderDto.items.map((item) =>
+      const itens = itemsWithPrice.map((item) =>
         manager.create(ItemPedido, {
           pedido_id: savedPedido.id,
           produto_id: item.produto_id,
