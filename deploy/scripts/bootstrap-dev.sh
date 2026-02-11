@@ -26,6 +26,9 @@ docker compose --env-file "$ENV_FILE" \
   -f "${ROOT_DIR}/deploy/docker-compose.test.yml" \
   --project-name ucmtest up -d --build --force-recreate backend frontend nginx
 
+echo "==> Garantindo roteamento dev"
+"${ROOT_DIR}/deploy/scripts/ensure-dev-routing.sh"
+
 echo "==> Garantindo tenant de teste"
 "${ROOT_DIR}/deploy/scripts/seed-test-tenant.sh"
 
@@ -34,5 +37,12 @@ echo "==> Seed de dados basicos"
 
 echo "==> Smoke test"
 "${ROOT_DIR}/deploy/scripts/run-dev-smoke.sh"
+
+if [[ "${SKIP_WA_E2E:-}" == "true" ]]; then
+  echo "==> WhatsApp E2E (pulando)"
+else
+  echo "==> WhatsApp E2E"
+  "${ROOT_DIR}/deploy/scripts/run-dev-whatsapp-e2e.sh"
+fi
 
 echo "Bootstrap dev OK."

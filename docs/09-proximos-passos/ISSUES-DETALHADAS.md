@@ -6,6 +6,11 @@
 Observacoes:
 - Em PDV, o status inicial esperado e `pendente_pagamento` (alinhado com o backend atual).
 
+Status atual (2026-02-10):
+- Separacao perfeita entre dev (dev.gtsofthub.com.br) e prod (gtsofthub.com.br) validada.
+- Fluxo WhatsApp E2E validado no dominio dev (pedido -> dados -> confirmacao -> pix).
+- RLS para tenants corrigido via migration e runner do stack test idempotente.
+
 ---
 
 ## UCP-001 - Estabilizar build e testes do backend
@@ -26,6 +31,7 @@ Criterios de aceite:
 ## UCP-002 - Implementar coleta de dados do cliente no WhatsApp
 
 Tipo: Feature
+Status: concluido (validado no dev)
 Estimativa: 2-3 dias
 Dependencias: UCP-001
 Descricao: coletar nome, endereco, telefone e observacoes no fluxo de conversa.
@@ -39,6 +45,7 @@ Criterios de aceite:
 ## UCP-003 - Confirmacao do pedido e atualizacao no OrdersService
 
 Tipo: Feature
+Status: concluido (validado no dev)
 Estimativa: 1-2 dias
 Dependencias: UCP-002
 Descricao: confirmar pedido com dados completos e atualizar registro do pedido.
@@ -52,6 +59,7 @@ Criterios de aceite:
 ## UCP-004 - Testes E2E do fluxo WhatsApp
 
 Tipo: Task
+Status: concluido (validado no dev)
 Estimativa: 2-3 dias
 Dependencias: UCP-003
 Descricao: validar o fluxo completo do bot com cenarios principais.
