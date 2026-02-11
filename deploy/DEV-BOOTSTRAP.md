@@ -13,6 +13,7 @@ chmod +x deploy/scripts/seed-test-tenant.sh \
   deploy/scripts/run-dev-smoke.sh \
   deploy/scripts/run-dev-whatsapp-e2e.sh \
   deploy/scripts/run-backend-all-tests.sh \
+  deploy/scripts/run-dev-full-check.sh \
   deploy/scripts/bootstrap-dev.sh
 
 ./deploy/scripts/bootstrap-dev.sh
@@ -40,6 +41,8 @@ chmod +x deploy/scripts/seed-test-tenant.sh \
   valida o fluxo completo do WhatsApp no dominio dev.
 - `deploy/scripts/run-backend-all-tests.sh`:
   roda unit + integration + acid no backend usando o stack test.
+- `deploy/scripts/run-dev-full-check.sh`:
+  executa bootstrap completo e todos os testes do backend.
 - `deploy/scripts/bootstrap-dev.sh`:
   orquestra tudo (up + seed + smoke).
 
@@ -55,4 +58,10 @@ Para rodar todos os testes do backend:
 
 ```
 ./deploy/scripts/run-backend-all-tests.sh
+```
+
+Para rodar o check completo (bootstrap + testes):
+
+```
+./deploy/scripts/run-dev-full-check.sh
 ```
