@@ -17,6 +17,7 @@ Status atual (2026-02-10):
 ## UCP-001 - Estabilizar build e testes do backend
 
 Tipo: Task
+Status: concluido (unit + integration + acid ok no dev/test)
 Estimativa: 1-2 dias
 Dependencias: nenhuma
 Descricao: garantir build limpo, sem dependencias circulares e testes passando.
