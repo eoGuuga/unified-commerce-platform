@@ -86,18 +86,24 @@ curl -I https://www.gtsofthub.com.br/
 
 ## Nginx (config e reload)
 ### Arquivo de configuração
-- `/opt/ucm/deploy/nginx/ucm.conf
+`/opt/ucm/deploy/nginx/ucm.conf`
+
 ### Aplicar config do repositorio
 ```bash
 sudo -i
 /opt/ucm/deploy/scripts/apply-nginx-config.sh
 ```
-`
 ### Dev domain (se ativo)
 - `https://dev.gtsofthub.com.br` aponta para o stack de teste.
-- O container `ucm-nginx` deve estar conectado na rede `ucm-test-net`:
+- O container `ucm-nginx` deve estar conectado na rede `ucmtest_ucm-test-net`:
 ```bash
-docker network connect ucm-test-net ucm-nginx 2>/dev/null || true
+docker network connect ucmtest_ucm-test-net ucm-nginx 2>/dev/null || true
+```
+
+### Script para garantir roteamento dev
+```bash
+sudo -i
+/opt/ucm/deploy/scripts/ensure-dev-routing.sh
 ```
 
 

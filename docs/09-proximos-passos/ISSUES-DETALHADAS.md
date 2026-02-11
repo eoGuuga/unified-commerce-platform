@@ -10,6 +10,7 @@ Status atual (2026-02-10):
 - Separacao perfeita entre dev (dev.gtsofthub.com.br) e prod (gtsofthub.com.br) validada.
 - Fluxo WhatsApp E2E validado no dominio dev (pedido -> dados -> confirmacao -> pix).
 - RLS para tenants corrigido via migration e runner do stack test idempotente.
+- Smoke test dev ok; suites `npm run test:unit`, `npm run test:integration`, `npm run test:acid` ainda pendentes no servidor.
 
 ---
 
