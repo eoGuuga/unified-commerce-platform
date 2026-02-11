@@ -6,6 +6,12 @@ set -euo pipefail
 
 MIG_DIR="./scripts/migrations"
 
+skip_001=0
+if docker exec -i ucm-postgres psql -U postgres -d ucm -tAc "SELECT 1 FROM information_schema.tables WHERE table_name='tenants'" | grep -q 1; then
+  echo "Schema detectado (tenants existe). Pulando 001-initial-schema.sql."
+  skip_001=1
+fi
+
 for f in \
   "001-initial-schema.sql" \
   "002-security-and-performance.sql" \
@@ -22,6 +28,9 @@ for f in \
 do
   path="${MIG_DIR}/${f}"
   if [[ -f "${path}" ]]; then
+    if [[ "${f}" == "001-initial-schema.sql" && "${skip_001}" -eq 1 ]]; then
+      continue
+    fi
     echo "Aplicando ${f}..."
     docker exec -i ucm-postgres psql -v ON_ERROR_STOP=1 -U postgres -d ucm < "${path}"
   fi
