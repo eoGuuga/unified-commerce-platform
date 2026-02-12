@@ -7,7 +7,7 @@ Escopo: servidor + aplicacao
 - Producao: health OK (gtsofthub.com.br)
 - Dev: health OK (dev.gtsofthub.com.br)
 - Testes backend: unit + integration + acid OK em dev/test
-- WhatsApp: fluxo E2E validado em dev/test
+- WhatsApp: fluxo E2E validado em dev/test (PIX confirmado)
 - PDV: venda real validada, estoque atualizado
 - npm audit: limpo em backend e frontend
 

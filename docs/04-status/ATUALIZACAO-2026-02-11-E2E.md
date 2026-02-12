@@ -81,6 +81,14 @@ Contexto: tentativa de executar o plano E2E WhatsApp/PDV/Estoque usando o VPS.
 - PIX retornou chave com valor atualizado (R$ 39,88 com desconto).
 - Mensagens apos o pagamento (ex.: "sim") sao tratadas como texto comum e nao fazem parte do fluxo.
 
+## Confirmacao de pagamento (TESTE)
+- Pagamento PIX confirmado via API: payment_id 4120edc0-603d-48eb-904a-0e9e8898a401.
+- Pedido PED-20260212-BD86 passou para status confirmado.
+
+## Health checks + snapshot (TESTE)
+- Health/ready/live OK via http://localhost:8080/api/v1/health.
+- Containers ativos: ucm-nginx-test, ucm-backend-test, ucm-frontend-test, ucm-postgres-test, ucm-redis-test.
+
 ## Resultado PDV (TESTE)
 - Pedido PDV criado com sucesso via API.
 - Pedido: PED-20260212-B194 (status pendente_pagamento)

@@ -28,7 +28,7 @@ Escopo: servidor (prod/dev) + aplicacao (backend/frontend/whatsapp)
 ### WhatsApp
 - Fase 3.1 e 3.2 concluidas.
 - Fluxo E2E validado em dev/test.
-- Fase 3.3 implementada com coleta, confirmacao e pagamento em teste.
+- Fase 3.3 implementada com coleta, confirmacao e pagamento em teste (PIX confirmado).
 
 ## Pendencias e riscos
 - E-commerce e dashboard avancado ainda nao finalizados.
