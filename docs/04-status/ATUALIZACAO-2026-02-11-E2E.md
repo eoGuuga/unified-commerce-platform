@@ -80,3 +80,13 @@ Contexto: tentativa de executar o plano E2E WhatsApp/PDV/Estoque usando o VPS.
 - Confirmacao do pedido gerou resposta de pagamento.
 - PIX retornou chave com valor atualizado (R$ 39,88 com desconto).
 - Mensagens apos o pagamento (ex.: "sim") sao tratadas como texto comum e nao fazem parte do fluxo.
+
+## Resultado PDV (TESTE)
+- Pedido PDV criado com sucesso via API.
+- Pedido: PED-20260212-B194 (status pendente_pagamento)
+- Estoque atualizado do produto usado (produto_id bd113ed7-3177-43c9-82a6-fa2eb83422a5).
+
+## Plano para continuar depois
+- Atualizar checklists/relatorios finais com a evidencia do PDV.
+- Opcional: simular confirmacao de pagamento (payments confirm) e validar transicao de status.
+- Rodar health checks finais e registrar snapshot do ambiente TESTE.
