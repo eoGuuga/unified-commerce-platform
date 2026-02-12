@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
+import type { StringValue } from 'ms';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { Usuario } from '../../database/entities/Usuario.entity';
@@ -25,10 +26,12 @@ import { CommonModule } from '../common/common.module';
           );
         }
 
+        const expiresIn = config.get<string>('JWT_EXPIRATION') ?? '15m';
+
         return {
           secret: jwtSecret,
           signOptions: {
-            expiresIn: config.get<string>('JWT_EXPIRATION', '15m') as any,
+            expiresIn: expiresIn as StringValue,
           },
         };
       },
