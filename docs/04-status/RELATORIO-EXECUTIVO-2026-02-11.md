@@ -5,7 +5,7 @@ Escopo: servidor (prod/dev) + aplicacao (backend/frontend/whatsapp)
 
 ## Visao geral
 - Status geral: producao operacional com deploy validado, backend estavel, PDV validado, WhatsApp E2E validado em dev/test.
-- Risco principal: fluxo completo do WhatsApp ainda pendente (coleta/confirmacao).
+- Risco principal: e-commerce e dashboard avancado ainda pendentes.
 
 ## Servidor (infra/ops)
 - Producao em VPS com stack completa em containers (nginx, backend, frontend, postgres, redis).
@@ -28,12 +28,11 @@ Escopo: servidor (prod/dev) + aplicacao (backend/frontend/whatsapp)
 ### WhatsApp
 - Fase 3.1 e 3.2 concluidas.
 - Fluxo E2E validado em dev/test.
-- Fase 3.3 implementada, mas pendente de fluxo completo de confirmacao/coleta de dados e alinhamento documental.
+- Fase 3.3 implementada com coleta, confirmacao e pagamento em teste.
 
 ## Pendencias e riscos
-- Fluxo completo do WhatsApp (coleta/confirmacao) ainda pendente.
 - E-commerce e dashboard avancado ainda nao finalizados.
 
 ## Proximos passos recomendados
-1. Concluir fluxo completo do WhatsApp (coleta, confirmacao, pagamento, notificacao).
-2. Priorizar melhorias do PDV (validacao de estoque/UX) e evolucao do e-commerce.
+1. Priorizar melhorias do PDV (validacao de estoque/UX) e evolucao do e-commerce.
+2. Consolidar comunicacao e monitoramento de pagamentos no WhatsApp.

@@ -31,5 +31,5 @@
 - [x] Indice atualizado
 
 ## Pendencias (produto)
-- [ ] Fluxo completo do WhatsApp (coleta/confirmacao)
+- [x] Fluxo completo do WhatsApp (coleta/confirmacao)
 - [ ] E-commerce e dashboard avancado
