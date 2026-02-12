@@ -38,6 +38,7 @@ export class WhatsappService {
   private readonly MIN_NAME_LENGTH = 3;
   private readonly MAX_ADDRESS_LENGTH = 500;
   private readonly MIN_ADDRESS_LENGTH = 10;
+  private readonly MAX_NOTES_LENGTH = 500;
   private readonly MAX_QUANTITY = 1000;
   private readonly MIN_QUANTITY = 1;
   private readonly MAX_PRICE = 1000000; // R$ 1.000.000,00
@@ -122,6 +123,12 @@ export class WhatsappService {
   private getPhonePrompt(): string {
     return `📱 *Para finalizar, preciso do seu telefone de contato:*\n` +
       `Exemplo: (11) 98765-4321 ou 11987654321`;
+  }
+
+  private getNotesPrompt(): string {
+    return `📝 *Quer deixar alguma observação?*\n` +
+      `Ex.: "Sem açúcar", "Entregar na portaria"\n\n` +
+      `💬 Se não tiver, digite *"sem"*.`;
   }
 
   private extractCouponCode(message: string): string | null {
@@ -353,6 +360,7 @@ export class WhatsappService {
       'collecting_name',
       'collecting_address',
       'collecting_phone',
+      'collecting_notes',
       'confirming_order',
       'waiting_payment',
       'order_confirmed',
@@ -534,14 +542,27 @@ export class WhatsappService {
     if (currentState === 'collecting_phone') {
       return await this.processCustomerPhone(message, tenantId, conversation);
     }
+
+    if (currentState === 'collecting_notes') {
+      return await this.processCustomerNotes(message, tenantId, conversation);
+    }
     
     if (currentState === 'confirming_order') {
       return await this.processOrderConfirmation(message, tenantId, conversation);
     }
 
     // IMPORTANTE: Verificar seleção de método de pagamento
-    if (this.isPaymentMethodSelection(message)) {
+    const isPaymentSelection = this.isPaymentMethodSelection(message);
+    const hasPaymentContext =
+      currentState === 'waiting_payment' ||
+      !!conversation?.pedido_id ||
+      !!conversation?.context?.pedido_id;
+    if (isPaymentSelection && hasPaymentContext) {
       return await this.processPaymentSelection(message, tenantId, conversation);
+    }
+    if (isPaymentSelection) {
+      return '❌ Não encontrei um pedido pendente para pagamento.\n\n' +
+        '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
     }
 
     // IMPORTANTE: Verificar pedidos (antes de outras respostas)
@@ -746,6 +767,11 @@ export class WhatsappService {
       if (!customerData.phone) {
         await this.conversationService.updateState(conversation.id, 'collecting_phone');
         return this.getPhonePrompt();
+      }
+
+      if (customerData.notes === undefined) {
+        await this.conversationService.updateState(conversation.id, 'collecting_notes');
+        return this.getNotesPrompt();
       }
 
       await this.conversationService.updateState(conversation.id, 'confirming_order');
@@ -977,6 +1003,10 @@ export class WhatsappService {
       
       // Se já tem todos os dados, confirmar pedido
       if (conversation) {
+        if (customerData.notes === undefined) {
+          await this.conversationService.updateState(conversation.id, 'collecting_notes');
+          return this.getNotesPrompt();
+        }
         await this.conversationService.updateState(conversation.id, 'confirming_order');
       }
       return await this.showOrderConfirmation(tenantId, conversation);
@@ -1843,8 +1873,8 @@ export class WhatsappService {
         await this.conversationService.updateState(conversation.id, 'collecting_phone');
         return this.getPhonePrompt();
       }
-      await this.conversationService.updateState(conversation.id, 'confirming_order');
-      return await this.showOrderConfirmation(tenantId, conversation);
+      await this.conversationService.updateState(conversation.id, 'collecting_notes');
+      return this.getNotesPrompt();
     }
     
     // ✅ NOVO: Validar endereço
@@ -1883,8 +1913,8 @@ export class WhatsappService {
       return this.getPhonePrompt();
     }
 
-    await this.conversationService.updateState(conversation.id, 'confirming_order');
-    return await this.showOrderConfirmation(tenantId, conversation);
+    await this.conversationService.updateState(conversation.id, 'collecting_notes');
+    return this.getNotesPrompt();
   }
 
   /**
@@ -1975,7 +2005,43 @@ export class WhatsappService {
     // Salvar telefone
     await this.conversationService.saveCustomerData(conversation.id, { phone: formattedPhone });
 
-    // Ir para confirmação
+    await this.conversationService.updateState(conversation.id, 'collecting_notes');
+    return this.getNotesPrompt();
+  }
+
+  private async processCustomerNotes(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+  ): Promise<string> {
+    if (!conversation) {
+      return '❌ Erro ao processar. Tente novamente.';
+    }
+
+    const stateValidation = this.validateConversationState(conversation);
+    if (!stateValidation.valid) {
+      return `❌ ${stateValidation.error}`;
+    }
+
+    const sanitizedMessage = this.sanitizeInput(message.trim());
+    const lowerMessage = sanitizedMessage.toLowerCase().trim();
+
+    const noNotes =
+      !lowerMessage ||
+      lowerMessage === 'sem' ||
+      lowerMessage === 'nao' ||
+      lowerMessage === 'não' ||
+      lowerMessage === 'nenhuma' ||
+      lowerMessage === 'nenhum';
+
+    if (!noNotes && sanitizedMessage.length > this.MAX_NOTES_LENGTH) {
+      return `❌ Observações devem ter no máximo ${this.MAX_NOTES_LENGTH} caracteres.`;
+    }
+
+    await this.conversationService.saveCustomerData(conversation.id, {
+      notes: noNotes ? '' : sanitizedMessage,
+    });
+
     await this.conversationService.updateState(conversation.id, 'confirming_order');
     return await this.showOrderConfirmation(tenantId, conversation);
   }
@@ -2027,6 +2093,9 @@ export class WhatsappService {
     }
     if (customerData?.phone) {
       message += `📱 *Telefone:* ${customerData.phone}\n`;
+    }
+    if (customerData?.notes && customerData.notes.trim()) {
+      message += `📝 *Observações:* ${customerData.notes.trim()}\n`;
     }
     if (customerData?.delivery_type === 'delivery' && customerData?.address) {
       message += `📍 *Endereço:* ${customerData.address.street}, ${customerData.address.number}`;
@@ -2141,6 +2210,7 @@ export class WhatsappService {
         channel: CanalVenda.WHATSAPP,
         customer_name: customerData.name,
         customer_phone: customerData.phone || conversation.customer_phone,
+        customer_notes: customerData.notes?.trim() || undefined,
         delivery_type: customerData.delivery_type,
         delivery_address:
           customerData.delivery_type === 'delivery' && customerData.address

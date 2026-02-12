@@ -78,6 +78,9 @@ export class Pedido {
   @Column({ length: 20, nullable: true })
   customer_phone?: string;
 
+  @Column({ length: 500, nullable: true })
+  customer_notes?: string;
+
   // Valores
   @Column('decimal', { precision: 10, scale: 2 })
   subtotal: number;

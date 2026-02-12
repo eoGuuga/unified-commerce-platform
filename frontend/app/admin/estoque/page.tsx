@@ -31,8 +31,7 @@ export default function EstoquePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'ok' | 'low' | 'out'>('all');
   const [adjustingProduct, setAdjustingProduct] = useState<string | null>(null);
-  const [adjustQuantity, setAdjustQuantity] = useState('');
-  const [adjustReason, setAdjustReason] = useState('');
+  const [adjustments, setAdjustments] = useState<Record<string, { quantity: string; reason: string }>>({});
 
   // ✅ CRÍTICO: Auto-login APENAS em desenvolvimento e se explicitamente habilitado
   useEffect(() => {
@@ -92,8 +91,11 @@ export default function EstoquePage() {
       await api.adjustStock(productId, quantity, tenantId, reason);
       toast.success(`Estoque ajustado com sucesso!`);
       setAdjustingProduct(null);
-      setAdjustQuantity('');
-      setAdjustReason('');
+      setAdjustments((prev) => {
+        const next = { ...prev };
+        delete next[productId];
+        return next;
+      });
       await mutate(); // Revalidar dados
     } catch (error: any) {
       toast.error(error.message || 'Erro ao ajustar estoque');
@@ -291,7 +293,16 @@ export default function EstoquePage() {
                   +1
                 </button>
                 <button
-                  onClick={() => setAdjustingProduct(adjustingProduct === product.id ? null : product.id)}
+                  onClick={() => {
+                    const isOpen = adjustingProduct === product.id;
+                    setAdjustingProduct(isOpen ? null : product.id);
+                    if (!isOpen) {
+                      setAdjustments((prev) => ({
+                        ...prev,
+                        [product.id]: prev[product.id] || { quantity: '', reason: '' },
+                      }));
+                    }
+                  }}
                   className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-medium"
                 >
                   {adjustingProduct === product.id ? 'Cancelar' : 'Ajustar'}
@@ -302,33 +313,46 @@ export default function EstoquePage() {
               {adjustingProduct === product.id && (
                 <div className="mt-3 pt-3 border-t border-gray-200">
                   <div className="space-y-2">
-                    <input
-                      type="number"
-                      placeholder="Quantidade (ex: +10 ou -5)"
-                      value={adjustQuantity}
-                      onChange={(e) => setAdjustQuantity(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Motivo (opcional)"
-                      value={adjustReason}
-                      onChange={(e) => setAdjustReason(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    />
-                    <button
-                      onClick={() => {
-                        const qty = parseInt(adjustQuantity);
-                        if (!isNaN(qty)) {
-                          handleAdjustStock(product.id, qty, adjustReason || undefined);
-                        } else {
-                          toast.error('Digite uma quantidade válida');
-                        }
-                      }}
-                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-                    >
-                      Confirmar Ajuste
-                    </button>
+                    {(() => {
+                      const adjustment = adjustments[product.id] || { quantity: '', reason: '' };
+                      return (
+                        <>
+                          <input
+                            type="number"
+                            placeholder="Quantidade (ex: +10 ou -5)"
+                            value={adjustment.quantity}
+                            onChange={(e) => setAdjustments((prev) => ({
+                              ...prev,
+                              [product.id]: { ...adjustment, quantity: e.target.value },
+                            }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Motivo (opcional)"
+                            value={adjustment.reason}
+                            onChange={(e) => setAdjustments((prev) => ({
+                              ...prev,
+                              [product.id]: { ...adjustment, reason: e.target.value },
+                            }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                          <button
+                            onClick={() => {
+                              const qty = parseInt(adjustment.quantity, 10);
+                              if (!Number.isFinite(qty) || qty === 0) {
+                                toast.error('Digite uma quantidade válida');
+                                return;
+                              }
+                              handleAdjustStock(product.id, qty, adjustment.reason || undefined);
+                            }}
+                            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                          >
+                            Confirmar Ajuste
+                          </button>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               )}

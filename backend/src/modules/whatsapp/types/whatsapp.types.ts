@@ -18,6 +18,7 @@ export type ConversationState =
   | 'collecting_name'         // Coletando nome do cliente
   | 'collecting_address'      // Coletando endereço (se entrega)
   | 'collecting_phone'        // Coletando telefone de contato
+  | 'collecting_notes'        // Coletando observações do cliente
   | 'confirming_order'        // Confirmando pedido completo antes de criar
   | 'waiting_payment'         // Aguardando seleção e processamento de pagamento
   | 'order_confirmed'         // Pedido confirmado e pago

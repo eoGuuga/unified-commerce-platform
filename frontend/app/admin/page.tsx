@@ -91,6 +91,13 @@ export default function AdminDashboard() {
     { refreshInterval: 30000, revalidateOnFocus: true },
   );
 
+  useEffect(() => {
+    if (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(msg || 'Erro ao carregar relatorio de vendas');
+    }
+  }, [error]);
+
   const products = productsData || [];
 
   const handleLogout = () => {
@@ -134,6 +141,15 @@ export default function AdminDashboard() {
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+  };
+
+  const getChannelLabel = (channel?: string) => {
+    const labels: Record<string, string> = {
+      pdv: 'PDV',
+      ecommerce: 'E-commerce',
+      whatsapp: 'WhatsApp',
+    };
+    return channel ? labels[channel] || channel : 'N/A';
   };
 
   // Calcular altura máxima do gráfico
@@ -207,28 +223,34 @@ export default function AdminDashboard() {
             {/* Sales Chart - Last 7 Days */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-bold mb-4">Vendas (Últimos 7 Dias)</h2>
-              <div className="h-64 flex items-end justify-between gap-2">
-                {salesReport?.salesByDay.map((day, index) => {
-                  const height = maxSalesValue > 0 ? (day.value / maxSalesValue) * 100 : 0;
-                  return (
-                    <div key={index} className="flex-1 flex flex-col items-center">
-                      <div className="w-full bg-gray-200 rounded-t relative" style={{ height: '200px' }}>
-                        <div
-                          className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all duration-500"
-                          style={{ height: `${height}%` }}
-                        >
-                          <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-medium text-gray-700">
-                            {formatCurrency(day.value)}
+              {salesReport?.salesByDay && salesReport.salesByDay.length > 0 ? (
+                <div className="h-64 flex items-end justify-between gap-2">
+                  {salesReport.salesByDay.map((day, index) => {
+                    const height = maxSalesValue > 0 ? (day.value / maxSalesValue) * 100 : 0;
+                    return (
+                      <div key={index} className="flex-1 flex flex-col items-center">
+                        <div className="w-full bg-gray-200 rounded-t relative" style={{ height: '200px' }}>
+                          <div
+                            className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all duration-500"
+                            style={{ height: `${height}%` }}
+                          >
+                            <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-medium text-gray-700">
+                              {formatCurrency(day.value)}
+                            </div>
                           </div>
                         </div>
+                        <div className="mt-2 text-xs text-gray-600 text-center">
+                          {formatDate(day.date)}
+                        </div>
                       </div>
-                      <div className="mt-2 text-xs text-gray-600 text-center">
-                        {formatDate(day.date)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="h-64 flex items-center justify-center text-gray-500">
+                  Sem dados suficientes
+                </div>
+              )}
             </div>
 
             {/* Sales by Channel */}
@@ -313,7 +335,7 @@ export default function AdminDashboard() {
                         <div>
                           <div className="font-mono text-sm font-medium text-gray-900">{order.order_no}</div>
                           <div className="text-xs text-gray-500 mt-1">
-                            {formatDate(order.created_at)} • {order.channel || 'N/A'}
+                            {formatDate(order.created_at)} • {getChannelLabel(order.channel)}
                           </div>
                         </div>
                         <div className="text-right">

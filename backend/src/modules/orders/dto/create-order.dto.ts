@@ -79,6 +79,12 @@ export class CreateOrderDto {
   @IsString()
   customer_phone?: string;
 
+  @ApiProperty({ description: 'Observacoes do cliente', required: false })
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
+  customer_notes?: string;
+
   @ApiProperty({ description: 'Tipo de entrega (delivery/pickup)', required: false })
   @IsOptional()
   @IsString()

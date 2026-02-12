@@ -61,6 +61,11 @@ export class NotificationsService {
     });
 
     conversation.status = 'order_placed';
+    conversation.context = {
+      ...(conversation.context || {}),
+      state: 'order_confirmed',
+      waiting_payment: false,
+    };
     await conversationRepository.save(conversation);
 
     this.logger.log(`Payment confirmation sent to ${conversation.customer_phone}`);
@@ -111,6 +116,14 @@ export class NotificationsService {
         new_status: newStatus,
       },
     });
+
+    if (newStatus === PedidoStatus.ENTREGUE) {
+      conversation.context = {
+        ...(conversation.context || {}),
+        state: 'order_completed',
+      };
+      await conversationRepository.save(conversation);
+    }
 
     this.logger.log(`Order status notification sent to ${conversation.customer_phone}`);
   }

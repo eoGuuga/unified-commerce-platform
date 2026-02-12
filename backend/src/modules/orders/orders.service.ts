@@ -216,6 +216,7 @@ export class OrdersService {
       pedido.customer_name = createOrderDto.customer_name;
       pedido.customer_email = createOrderDto.customer_email;
       pedido.customer_phone = createOrderDto.customer_phone;
+      pedido.customer_notes = createOrderDto.customer_notes;
       pedido.subtotal = subtotal;
       pedido.discount_amount = discount;
       pedido.shipping_amount = shipping;
