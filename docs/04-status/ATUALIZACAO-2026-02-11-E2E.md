@@ -36,5 +36,30 @@ Contexto: tentativa de executar o plano E2E WhatsApp/PDV/Estoque usando o VPS.
 - Buildar imagem backend dev com Dockerfile.dev e subir container separado.
 - Validar que producao continua intacta (containers prod rodando).
 
+## Execucao E2E (DEV no VPS)
+- Tenant DEV: 00000000-0000-0000-0000-000000000000
+- Produtos criados:
+	- Brigadeiro Teste ACID (id eb3ee7b3-a9b8-4699-86e2-fd3ff4e136a1)
+	- Bolo de Chocolate Teste (id 8a537d7c-3001-40ba-a155-d5b4f8feacc5)
+	- Brownie Teste (id c863fa26-9332-4e5e-ba0e-06030011a26d)
+- Estoque ajustado (DEV): 50/20/30 unidades respectivamente.
+
+## Resultado parcial WhatsApp
+- Fluxo completo ate confirmacao do pedido e coleta de observacoes OK.
+- Pedido criado com sucesso: PED-20260212-154F.
+- Falha ao selecionar pagamento ("pix"): resposta "Nao encontrei um pedido pendente para pagamento".
+
+## Resultado PDV
+- Pedido PDV falhou com 401 por token invalido/expirado (precisa login novo e header x-tenant-id em todas as chamadas dev).
+
+## Hipoteses
+- Conversa WhatsApp nao manteve pedido_id/estado waiting_payment entre mensagens.
+- Token usado no PDV expirou após restart do backend dev.
+
+## Proxima acao
+- Coletar logs do backend dev no momento do "pix".
+- Repetir pix logo apos o "sim" e validar context pedido_id.
+- Renovar token e repetir PDV com header x-tenant-id.
+
 ## Observacao de seguranca
 - Foi criado o usuario admin.e2e@gtsofthub.com.br em producao. Remover se nao for usar.
