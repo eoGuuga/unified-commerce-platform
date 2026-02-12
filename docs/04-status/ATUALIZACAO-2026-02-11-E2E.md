@@ -63,3 +63,20 @@ Contexto: tentativa de executar o plano E2E WhatsApp/PDV/Estoque usando o VPS.
 
 ## Observacao de seguranca
 - Foi criado o usuario admin.e2e@gtsofthub.com.br em producao. Remover se nao for usar.
+
+## Execucao E2E (TESTE via nginx-test:8080)
+- Ambiente usado: stack TESTE (ucm-backend-test + ucm-postgres-test) via http://localhost:8080
+- Ajuste de estoque (TESTE): Produto Teste com 10 unidades.
+- Fluxo WhatsApp completo com telefone novo: +5511998887781
+- Pedido criado: PED-20260212-BD86 (status pendente_pagamento)
+- Conversa vinculada ao pedido: waiting_payment com pedido_id f559191d-a556-495a-a3c7-43a3acbe7e92
+- Pagamento PIX gerado com sucesso (chave retornada pelo bot).
+
+## Falhas encontradas e correcoes aplicadas
+- Erro: coluna customer_notes nao existia no banco TESTE, causando falha na coleta de observacoes.
+- Correcoes: migration 013-add-customer-notes-to-pedidos.sql aplicada no ucm-postgres-test e backend reiniciado.
+
+## Resultado final WhatsApp (TESTE)
+- Confirmacao do pedido gerou resposta de pagamento.
+- PIX retornou chave com valor atualizado (R$ 39,88 com desconto).
+- Mensagens apos o pagamento (ex.: "sim") sao tratadas como texto comum e nao fazem parte do fluxo.
