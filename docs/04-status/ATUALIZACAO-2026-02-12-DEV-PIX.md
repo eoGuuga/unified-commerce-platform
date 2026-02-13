@@ -34,3 +34,8 @@ Contexto: no DEV, a selecao de pagamento (ex.: "pix") estava criando uma convers
 - Pagamento: e27fea30-22c7-4ea2-887d-604fd8750ea5 (metodo pix) -> status paid.
 - Pedido: PED-20260213-816B -> status confirmado.
 - Horario DB: 2026-02-13 02:14:34.043365.
+
+## Validacao adicional (rodada 2)
+- Pedido: PED-20260213-7CB3.
+- Pagamento: 88404300-a6d3-436f-b032-9efb20da802c (pix) -> status paid.
+- Status final DB: pedido confirmado (2026-02-13 02:37:31.555177).
