@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { In } from 'typeorm';
 import { WhatsappConversation } from '../../../database/entities/WhatsappConversation.entity';
 import { WhatsappMessage } from '../../../database/entities/WhatsappMessage.entity';
 import { DbContextService } from '../../common/services/db-context.service';
@@ -25,10 +24,21 @@ export class ConversationService {
       where: {
         tenant_id: tenantId,
         customer_phone: customerPhone,
-        status: In(['active', 'waiting_payment']),
+        status: 'waiting_payment',
       },
       order: { last_message_at: 'DESC' },
     });
+
+    if (!conversation) {
+      conversation = await conversationRepository.findOne({
+        where: {
+          tenant_id: tenantId,
+          customer_phone: customerPhone,
+          status: 'active',
+        },
+        order: { last_message_at: 'DESC' },
+      });
+    }
 
     if (!conversation) {
       conversation = conversationRepository.create({
