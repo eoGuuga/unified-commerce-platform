@@ -13,6 +13,12 @@ Fechar o E2E DEV/TESTE do WhatsApp PIX com evidencias e documentacao completa.
 - Pedido: PED-20260213-816B.
 - Pagamento: e27fea30-22c7-4ea2-887d-604fd8750ea5 (pix).
 - Status final DB: pagamento paid + pedido confirmado (2026-02-13 02:14:34.043365).
+  
+## Evidencias adicionais (rodada 2)
+- Health DEV: https://dev.gtsofthub.com.br/api/v1/health (2026-02-13T02:35:08.120Z).
+- Pedido: PED-20260213-7CB3.
+- Pagamento: 88404300-a6d3-436f-b032-9efb20da802c (pix).
+- Status final DB: pagamento paid + pedido confirmado (2026-02-13 02:37:31.555177).
 
 ## Documentos gerados
 - docs/04-status/ATUALIZACAO-2026-02-12-DEV-PIX.md
