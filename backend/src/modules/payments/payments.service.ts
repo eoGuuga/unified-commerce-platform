@@ -156,6 +156,20 @@ export class PaymentsService {
 
     this.logger.log(`Payment created: ${pagamento.id}, status: ${pagamento.status}`);
 
+    // ✅ Notificar pagamento pendente (evitar duplicar no fluxo WhatsApp)
+    if (pedido.channel !== 'whatsapp' &&
+        (pagamento.status === PagamentoStatus.PENDING || pagamento.status === PagamentoStatus.PROCESSING)) {
+      try {
+        await this.notificationsService.notifyPaymentPending(tenantId, pedido, pagamento);
+      } catch (error) {
+        this.logger.warn('Error sending payment pending notification', {
+          error: error instanceof Error ? error.message : String(error),
+          pagamentoId: pagamento.id,
+          pedidoId: pedido.id,
+        });
+      }
+    }
+
     return result;
   }
 
