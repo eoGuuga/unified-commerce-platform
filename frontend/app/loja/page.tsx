@@ -31,6 +31,9 @@ export default function LojaPage() {
   const [loading, setLoading] = useState(true);
   const [showCheckout, setShowCheckout] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'relevancia' | 'preco_asc' | 'preco_desc' | 'disponibilidade'>('relevancia');
+  const [hydrated, setHydrated] = useState(false);
   const [customerInfo, setCustomerInfo] = useState({
     name: '',
     email: '',
@@ -90,7 +93,56 @@ export default function LojaPage() {
     };
   }, [tenantId]);
 
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedCart = localStorage.getItem('loja_cart');
+    const storedCustomer = localStorage.getItem('loja_customer');
+    if (storedCart) {
+      try {
+        setCart(JSON.parse(storedCart));
+      } catch {
+        localStorage.removeItem('loja_cart');
+      }
+    }
+    if (storedCustomer) {
+      try {
+        setCustomerInfo(JSON.parse(storedCustomer));
+      } catch {
+        localStorage.removeItem('loja_customer');
+      }
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated || typeof window === 'undefined') return;
+    localStorage.setItem('loja_cart', JSON.stringify(cart));
+    localStorage.setItem('loja_customer', JSON.stringify(customerInfo));
+  }, [cart, customerInfo, hydrated]);
+
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const deliveryFee = customerInfo.deliveryType === 'delivery' ? 10 : 0;
+  const total = subtotal + deliveryFee;
+
+  const filteredProducts = products.filter((product) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+    return product.name.toLowerCase().includes(query) ||
+      (product.description || '').toLowerCase().includes(query);
+  });
+
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    const priceA = parseFloat(a.price);
+    const priceB = parseFloat(b.price);
+    if (sortBy === 'preco_asc') return priceA - priceB;
+    if (sortBy === 'preco_desc') return priceB - priceA;
+    if (sortBy === 'disponibilidade') {
+      const stockA = a.stock ?? Number.MAX_SAFE_INTEGER;
+      const stockB = b.stock ?? Number.MAX_SAFE_INTEGER;
+      return stockB - stockA;
+    }
+    return 0;
+  });
 
   const handleAddToCart = (product: Product) => {
     if (product.stock !== undefined && product.stock === 0) return;
@@ -124,9 +176,20 @@ export default function LojaPage() {
     ));
   };
 
+  const handleClearCart = () => {
+    setCart([]);
+    setShowCart(false);
+  };
+
   const handleCheckout = async () => {
     if (!customerInfo.name || !customerInfo.email || !customerInfo.phone) {
       toast.error('Preencha nome, email e telefone.');
+      return;
+    }
+
+    const phoneDigits = customerInfo.phone.replace(/\D/g, '');
+    if (!/^\d{10,11}$/.test(phoneDigits)) {
+      toast.error('Telefone inválido. Use DDD + número (10 ou 11 dígitos).');
       return;
     }
 
@@ -144,7 +207,7 @@ export default function LojaPage() {
         channel: 'ecommerce',
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
-        customer_phone: customerInfo.phone,
+        customer_phone: phoneDigits,
         customer_notes: customerInfo.notes?.trim() || undefined,
         delivery_type: customerInfo.deliveryType,
         delivery_address: customerInfo.deliveryType === 'delivery'
@@ -164,7 +227,7 @@ export default function LojaPage() {
           unit_price: item.price,
         })),
         discount_amount: 0,
-        shipping_amount: 0,
+        shipping_amount: deliveryFee,
       };
 
       if (!tenantId) {
@@ -224,18 +287,50 @@ export default function LojaPage() {
 
       <main className="w-full px-6 py-6">
         <h2 className="text-3xl font-bold mb-8 text-center">Nossos Produtos</h2>
+
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder="Buscar produto..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+            <div className="flex gap-2">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="px-4 py-2 border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="relevancia">Ordenar: relevancia</option>
+                <option value="preco_asc">Menor preco</option>
+                <option value="preco_desc">Maior preco</option>
+                <option value="disponibilidade">Disponibilidade</option>
+              </select>
+              <button
+                onClick={() => { setSearchQuery(''); setSortBy('relevancia'); }}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                Limpar
+              </button>
+            </div>
+          </div>
+        </div>
         
         {loading ? (
           <div className="text-center py-12">
             <p className="text-gray-500">Carregando produtos...</p>
           </div>
-        ) : products.length === 0 ? (
+        ) : sortedProducts.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500">Nenhum produto disponível</p>
+            <p className="text-gray-500">Nenhum produto encontrado</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {products.map(product => (
+          {sortedProducts.map(product => (
             <div
               key={product.id}
               className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
@@ -251,8 +346,10 @@ export default function LojaPage() {
                     <span className="text-2xl font-bold text-green-600">
                       R$ {parseFloat(product.price).toFixed(2)}
                     </span>
-                    {product.stock !== undefined && product.stock > 0 && (
-                      <p className="text-xs text-gray-500">Estoque: {product.stock}</p>
+                    {product.stock !== undefined && (
+                      <p className={`text-xs ${product.stock > 0 ? 'text-gray-500' : 'text-red-500'}`}>
+                        Estoque: {product.stock}
+                      </p>
                     )}
                   </div>
                   <button
@@ -316,14 +413,31 @@ export default function LojaPage() {
               </div>
             )}
 
-            <div className="border-t pt-4">
-              <p className="text-xl font-bold mb-4">Total: R$ {total.toFixed(2)}</p>
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Subtotal</span>
+                <span>R$ {subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Entrega</span>
+                <span>{customerInfo.deliveryType === 'delivery' ? `R$ ${deliveryFee.toFixed(2)}` : 'Retirada'}</span>
+              </div>
+              <div className="flex justify-between text-lg font-bold">
+                <span>Total</span>
+                <span>R$ {total.toFixed(2)}</span>
+              </div>
               <button
                 onClick={() => setShowCheckout(true)}
                 disabled={cart.length === 0}
                 className="w-full px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 Finalizar Compra
+              </button>
+              <button
+                onClick={handleClearCart}
+                className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                Limpar carrinho
               </button>
             </div>
           </div>
@@ -410,6 +524,9 @@ export default function LojaPage() {
                     Retirada
                   </label>
                 </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Entrega com taxa fixa de R$ {deliveryFee.toFixed(2)}.
+                </p>
               </div>
 
               <div>
@@ -552,7 +669,20 @@ export default function LojaPage() {
               )}
 
               <div className="border-t pt-4 mt-4">
-                <p className="text-xl font-bold mb-4">Total: R$ {total.toFixed(2)}</p>
+                <div className="space-y-2 mb-4 text-sm text-gray-600">
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span>R$ {subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Entrega</span>
+                    <span>{customerInfo.deliveryType === 'delivery' ? `R$ ${deliveryFee.toFixed(2)}` : 'Retirada'}</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold text-gray-900">
+                    <span>Total</span>
+                    <span>R$ {total.toFixed(2)}</span>
+                  </div>
+                </div>
                 <button
                   type="submit"
                   disabled={isSubmitting}

@@ -85,7 +85,7 @@ export default function AdminDashboard() {
   );
 
   // SWR para relatório de vendas
-  const { data: salesReport, error, isLoading } = useSWR<SalesReport>(
+  const { data: salesReport, error, isLoading, mutate: mutateSalesReport } = useSWR<SalesReport>(
     tenantId ? `sales-report:${tenantId}` : null,
     () => api.getSalesReport(tenantId!),
     { refreshInterval: 30000, revalidateOnFocus: true },
@@ -152,6 +152,18 @@ export default function AdminDashboard() {
     return channel ? labels[channel] || channel : 'N/A';
   };
 
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      pendente_pagamento: 'Pendente pagamento',
+      confirmado: 'Confirmado',
+      em_producao: 'Em producao',
+      pronto: 'Pronto',
+      entregue: 'Entregue',
+      cancelado: 'Cancelado',
+    };
+    return labels[status] || status;
+  };
+
   // Calcular altura máxima do gráfico
   const maxSalesValue = salesReport?.salesByDay.reduce((max, day) => Math.max(max, day.value), 0) || 0;
 
@@ -175,6 +187,12 @@ export default function AdminDashboard() {
         <div className="w-full px-6 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Dashboard Admin</h1>
           <div className="flex gap-3">
+            <button
+              onClick={() => mutateSalesReport()}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+            >
+              Atualizar
+            </button>
             <button
               onClick={() => router.push('/admin/estoque')}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -285,6 +303,36 @@ export default function AdminDashboard() {
                 })}
               </div>
             </div>
+          </div>
+
+          {/* Orders by Status */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-bold mb-4">Pedidos por Status</h2>
+            {salesReport?.ordersByStatus && Object.keys(salesReport.ordersByStatus).length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(salesReport.ordersByStatus).map(([status, value]) => {
+                  const total = salesReport?.totalOrders || 1;
+                  const percentage = (value / total) * 100;
+                  return (
+                    <div key={status} className="p-3 bg-gray-50 rounded-lg">
+                      <div className="flex justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">{getStatusLabel(status)}</span>
+                        <span className="text-sm font-bold text-gray-900">{value}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-2 rounded-full"
+                          style={{ width: `${percentage}%` }}
+                        ></div>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">{percentage.toFixed(1)}% dos pedidos</div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-center py-6">Sem dados suficientes</p>
+            )}
           </div>
 
           {/* Top Products & Recent Orders */}

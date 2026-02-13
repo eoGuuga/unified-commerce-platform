@@ -32,6 +32,7 @@ export default function EstoquePage() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'ok' | 'low' | 'out'>('all');
   const [adjustingProduct, setAdjustingProduct] = useState<string | null>(null);
   const [adjustments, setAdjustments] = useState<Record<string, { quantity: string; reason: string }>>({});
+  const [minStockEdits, setMinStockEdits] = useState<Record<string, string>>({});
 
   // ✅ CRÍTICO: Auto-login APENAS em desenvolvimento e se explicitamente habilitado
   useEffect(() => {
@@ -113,6 +114,29 @@ export default function EstoquePage() {
       await mutate();
     } catch (error: any) {
       toast.error(error.message || 'Erro ao ajustar estoque');
+    }
+  };
+
+  const handleSetMinStock = async (productId: string, value: number) => {
+    if (!tenantId) {
+      toast.error('Tenant ID não disponível.');
+      return;
+    }
+    if (value < 0 || Number.isNaN(value)) {
+      toast.error('Estoque mínimo inválido.');
+      return;
+    }
+    try {
+      await api.setMinStock(productId, value, tenantId);
+      toast.success('Estoque mínimo atualizado!');
+      setMinStockEdits((prev) => {
+        const next = { ...prev };
+        delete next[productId];
+        return next;
+      });
+      await mutate();
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao atualizar estoque mínimo');
     }
   };
 
@@ -350,6 +374,37 @@ export default function EstoquePage() {
                           >
                             Confirmar Ajuste
                           </button>
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <label className="block text-xs font-medium text-gray-600 mb-2">
+                              Estoque mínimo
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="number"
+                                min={0}
+                                placeholder="Ex: 5"
+                                value={minStockEdits[product.id] ?? ''}
+                                onChange={(e) => setMinStockEdits((prev) => ({
+                                  ...prev,
+                                  [product.id]: e.target.value,
+                                }))}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                              />
+                              <button
+                                onClick={() => {
+                                  const value = parseInt(minStockEdits[product.id] || '0', 10);
+                                  if (!Number.isFinite(value) || value < 0) {
+                                    toast.error('Digite um mínimo válido');
+                                    return;
+                                  }
+                                  handleSetMinStock(product.id, value);
+                                }}
+                                className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700"
+                              >
+                                Salvar
+                              </button>
+                            </div>
+                          </div>
                         </>
                       );
                     })()}
