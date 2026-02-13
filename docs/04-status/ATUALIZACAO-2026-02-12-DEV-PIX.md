@@ -28,3 +28,9 @@ Contexto: no DEV, a selecao de pagamento (ex.: "pix") estava criando uma convers
 - Pedido gerado: PED-20260213-816B.
 - Resposta PIX retornou chave e valor com desconto (R$ 39,88).
 - Conversa final em waiting_payment com pedido_id 23633cd1-9452-41c2-92f1-3a3613c0d74e.
+
+## Confirmacao de pagamento (DEV/TESTE)
+- Pagamento confirmado via endpoint /api/v1/payments/:id/confirm.
+- Pagamento: e27fea30-22c7-4ea2-887d-604fd8750ea5 (metodo pix) -> status paid.
+- Pedido: PED-20260213-816B -> status confirmado.
+- Horario DB: 2026-02-13 02:14:34.043365.
