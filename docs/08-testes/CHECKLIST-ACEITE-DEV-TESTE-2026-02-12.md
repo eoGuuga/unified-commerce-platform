@@ -8,19 +8,19 @@ Objetivo: validar o fluxo E2E do WhatsApp no stack DEV/TESTE com evidencias clar
 - Tenant DEV ativo: 00000000-0000-0000-0000-000000000000.
 
 ## Checklist
-- [ ] Health do DEV/TESTE retorna status ok.
-- [ ] Pedido criado via WhatsApp/test e conversa inicia coleta.
-- [ ] Coleta de dados concluida (nome, entrega, endereco, telefone, observacoes).
-- [ ] Pedido confirmado e codigo gerado.
-- [ ] PIX retornado com chave/copia e valor com desconto.
-- [ ] Pagamento confirmado via endpoint /api/v1/payments/:id/confirm.
-- [ ] DB confirma pagamento paid e pedido confirmado.
+- [x] Health do DEV/TESTE retorna status ok.
+- [x] Pedido criado via WhatsApp/test e conversa inicia coleta.
+- [x] Coleta de dados concluida (nome, entrega, endereco, telefone, observacoes).
+- [x] Pedido confirmado e codigo gerado.
+- [x] PIX retornado com chave/copia e valor com desconto.
+- [x] Pagamento confirmado via endpoint /api/v1/payments/:id/confirm.
+- [x] DB confirma pagamento paid e pedido confirmado.
 
 ## Evidencias (preencher apos execucao)
-- Health: URL + timestamp.
-- Pedido: order_no.
-- Pagamento: payment_id.
-- Status final DB: paid + confirmado.
+- Health: https://dev.gtsofthub.com.br/api/v1/health (2026-02-13T02:05:43.860Z).
+- Pedido: PED-20260213-816B.
+- Pagamento: e27fea30-22c7-4ea2-887d-604fd8750ea5 (pix).
+- Status final DB: pagamento paid + pedido confirmado (2026-02-13 02:14:34.043365).
 
 ## Observacoes
 - O endpoint /api/v1/whatsapp/test exige o campo "message".
