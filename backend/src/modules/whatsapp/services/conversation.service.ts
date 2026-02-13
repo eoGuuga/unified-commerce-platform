@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { In, LessThan } from 'typeorm';
 import { WhatsappConversation } from '../../../database/entities/WhatsappConversation.entity';
 import { WhatsappMessage } from '../../../database/entities/WhatsappMessage.entity';
 import { DbContextService } from '../../common/services/db-context.service';
@@ -9,7 +11,52 @@ export class ConversationService {
 
   constructor(
     private readonly db: DbContextService,
+    private readonly config: ConfigService,
   ) {}
+
+  private getConversationTtlHours(): number {
+    const raw = (this.config.get<string>('WHATSAPP_CONVERSATION_TTL_HOURS') || '').trim();
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    return 12;
+  }
+
+  private getActiveGraceMinutes(): number {
+    const raw = (this.config.get<string>('WHATSAPP_ACTIVE_GRACE_MINUTES') || '').trim();
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    return 30;
+  }
+
+  private isCollectingState(state?: string): boolean {
+    return [
+      'collecting_order',
+      'collecting_name',
+      'collecting_address',
+      'collecting_phone',
+      'collecting_notes',
+      'confirming_order',
+    ].includes(state || '');
+  }
+
+  private async finalizeStaleConversations(
+    tenantId: string,
+    customerPhone: string,
+  ): Promise<void> {
+    const conversationRepository = this.db.getRepository(WhatsappConversation);
+    const ttlHours = this.getConversationTtlHours();
+    const cutoff = new Date(Date.now() - ttlHours * 60 * 60 * 1000);
+
+    await conversationRepository.update(
+      {
+        tenant_id: tenantId,
+        customer_phone: customerPhone,
+        status: In(['active', 'waiting_payment']),
+        last_message_at: LessThan(cutoff),
+      },
+      { status: 'completed' },
+    );
+  }
 
   /**
    * Busca ou cria uma conversa
@@ -20,7 +67,10 @@ export class ConversationService {
     customerName?: string,
   ): Promise<WhatsappConversation> {
     const conversationRepository = this.db.getRepository(WhatsappConversation);
-    let conversation = await conversationRepository.findOne({
+
+    await this.finalizeStaleConversations(tenantId, customerPhone);
+
+    const waitingPaymentConversation = await conversationRepository.findOne({
       where: {
         tenant_id: tenantId,
         customer_phone: customerPhone,
@@ -29,16 +79,30 @@ export class ConversationService {
       order: { last_message_at: 'DESC' },
     });
 
-    if (!conversation) {
-      conversation = await conversationRepository.findOne({
-        where: {
-          tenant_id: tenantId,
-          customer_phone: customerPhone,
-          status: 'active',
-        },
-        order: { last_message_at: 'DESC' },
-      });
-    }
+    const activeConversation = await conversationRepository.findOne({
+      where: {
+        tenant_id: tenantId,
+        customer_phone: customerPhone,
+        status: 'active',
+      },
+      order: { last_message_at: 'DESC' },
+    });
+
+    const now = Date.now();
+    const activeState = activeConversation?.context?.state as string | undefined;
+    const activeAgeMs = activeConversation?.last_message_at
+      ? now - new Date(activeConversation.last_message_at).getTime()
+      : Number.POSITIVE_INFINITY;
+    const activeGraceMs = this.getActiveGraceMinutes() * 60 * 1000;
+
+    const preferActive =
+      !!activeConversation &&
+      this.isCollectingState(activeState) &&
+      activeAgeMs <= activeGraceMs;
+
+    let conversation = preferActive
+      ? activeConversation
+      : waitingPaymentConversation || activeConversation || null;
 
     if (!conversation) {
       conversation = conversationRepository.create({
