@@ -17,3 +17,8 @@ Contexto: no DEV, a selecao de pagamento (ex.: "pix") estava criando uma convers
 ## Proximos passos
 - Atualizar o backend DEV no VPS e reprocessar "pix" no mesmo chat.
 - Opcional: finalizar a conversa active criada indevidamente para evitar confusao futura.
+
+## Observacao de teste
+- O endpoint /api/v1/whatsapp/test espera o campo "message" (nao "body").
+- Exemplo (DEV/TESTE):
+	curl -s -X POST https://dev.gtsofthub.com.br/api/v1/whatsapp/test -H "Content-Type: application/json" -d '{"message":"pix","tenantId":"00000000-0000-0000-0000-000000000000","phoneNumber":"+5511998887790"}'
