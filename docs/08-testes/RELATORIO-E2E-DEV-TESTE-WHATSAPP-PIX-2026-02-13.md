@@ -16,6 +16,8 @@ Validar o fluxo completo do WhatsApp no DEV/TESTE: pedido -> coleta de dados -> 
 5) Banco confirmou pagamento paid e pedido confirmado.
 
 ## Evidencias
+- Deploy DEV/TESTE (pull + rebuild):
+	- Health: https://dev.gtsofthub.com.br/api/v1/health (2026-02-14T00:44:02.915Z)
 - Rodada 1:
 	- Health: https://dev.gtsofthub.com.br/api/v1/health (2026-02-13T02:35:14.983Z)
 	- Pedido: PED-20260213-A379
