@@ -571,21 +571,16 @@ export class WhatsappService {
     }
 
     // IMPORTANTE: Verificar pedidos (antes de outras respostas)
-    // Comando: Fazer Pedido (todas as variações)
-    const palavrasPedido = [
-      'quero', 'preciso', 'comprar', 'pedir', 'vou querer', 'gostaria de',
-      'desejo', 'vou comprar', 'preciso de', 'queria', 'ia querer',
-      'me manda', 'manda', 'pode ser', 'faz', 'me faz', 'faz pra mim',
-      'pode me enviar', 'tem como', 'dá pra', 'dá pra fazer', 'dá pra me enviar',
-      'seria possível', 'poderia', 'pode me mandar', 'me envia', 'envia',
-      'vou pedir', 'quero comprar', 'preciso comprar', 'quero pedir',
-      'preciso pedir', 'quero encomendar', 'preciso encomendar',
-      'quero fazer pedido', 'preciso fazer pedido', 'quero fazer um pedido',
-      'preciso fazer um pedido', 'quero fazer uma encomenda', 'preciso fazer uma encomenda',
-      'quero fazer encomenda', 'preciso fazer encomenda', 'quero fazer', 'preciso fazer'
-    ];
-    
-    if (palavrasPedido.some(palavra => lowerMessage.includes(palavra))) {
+    if (this.isOrderIntent(lowerMessage)) {
+      if (currentState === 'waiting_payment') {
+        await this.conversationService.clearPendingOrder(conversation.id);
+        await this.conversationService.clearPedido(conversation.id);
+        await this.conversationService.updateState(conversation.id, 'idle');
+        conversation.context = {
+          ...(conversation.context || {}),
+          state: 'idle',
+        };
+      }
       // ✅ NOVO: Pedido com 2+ itens na mesma frase (ex.: "quero 5 brigadeiros e 1 brownie")
       // Faz parse e cria pending_order com múltiplos itens de uma vez.
       if (this.looksLikeMultiItemOrder(message)) {
@@ -2220,6 +2215,17 @@ export class WhatsappService {
     // ✅ NOVO: Sanitizar mensagem
     const sanitizedMessage = this.sanitizeInput(message.trim());
     const lowerMessage = sanitizedMessage.toLowerCase().trim();
+
+    if (this.isOrderIntent(lowerMessage)) {
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      conversation.context = {
+        ...(conversation.context || {}),
+        state: 'idle',
+      };
+      return await this.processOrder(message, tenantId, conversation);
+    }
     
     // Verificar se é cancelamento
     if (lowerMessage.includes('cancelar') || (lowerMessage.includes('não') && !lowerMessage.includes('sim')) || lowerMessage.includes('nao')) {

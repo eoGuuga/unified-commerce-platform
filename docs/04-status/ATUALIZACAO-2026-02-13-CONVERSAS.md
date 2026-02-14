@@ -23,6 +23,7 @@ Contexto: conversas antigas em waiting_payment podiam interferir em novos pedido
 - Endereco informado sem escolha explicita assume entrega, aplica frete default e faz parse mais robusto.
 - Confirmacao de endereco nao exibe campos vazios (numero/complemento).
 - Selecao de pagamento por fallback usa ultimo pedido pendente do mesmo telefone.
+- Novo pedido durante confirmacao ou pagamento reinicia o fluxo de forma segura.
 
 ## Arquivos alterados
 - backend/src/modules/whatsapp/whatsapp.service.ts

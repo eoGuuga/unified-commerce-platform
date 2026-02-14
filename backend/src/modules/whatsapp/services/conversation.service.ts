@@ -283,6 +283,33 @@ export class ConversationService {
   }
 
   /**
+   * Limpa pedido associado e contexto de pagamento
+   */
+  async clearPedido(conversationId: string): Promise<void> {
+    const conversationRepository = this.db.getRepository(WhatsappConversation);
+    const conversation = await conversationRepository.findOne({
+      where: { id: conversationId },
+    });
+
+    if (!conversation) {
+      this.logger.warn(`Conversation ${conversationId} not found`);
+      return;
+    }
+
+    const {
+      pedido_id: _pedido_id,
+      waiting_payment: _waiting_payment,
+      ...restContext
+    } = conversation.context || {};
+
+    conversation.pedido_id = null as unknown as string;
+    conversation.status = 'active';
+    conversation.context = restContext;
+
+    await conversationRepository.save(conversation);
+  }
+
+  /**
    * Salva uma mensagem na conversa
    */
   async saveMessage(
