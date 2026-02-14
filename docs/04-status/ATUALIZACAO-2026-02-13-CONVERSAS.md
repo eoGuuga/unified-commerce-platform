@@ -34,6 +34,7 @@ Contexto: conversas antigas em waiting_payment podiam interferir em novos pedido
 - Deploy DEV/TESTE aplicado e health OK (2026-02-14T00:44:02.915Z).
 - DEV/TESTE atualizado via git pull --ff-only (25c15fb..b1be483).
 - DEV/TESTE atualizado via git pull --ff-only (b1be483..dfd3cf3).
+- DEV/TESTE atualizado via git pull --ff-only (dfd3cf3..c7201c2).
 
 ## Arquivos alterados
 - backend/src/modules/whatsapp/whatsapp.service.ts
