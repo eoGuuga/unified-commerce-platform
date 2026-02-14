@@ -184,6 +184,44 @@ export class WhatsappService {
     return m ? m[0] : null;
   }
 
+  private isCancelIntent(lowerMessage: string): boolean {
+    const lm = (lowerMessage || '').trim();
+    if (!lm) return false;
+    return (
+      lm.includes('cancelar') ||
+      lm.includes('cancelamento') ||
+      lm.includes('desistir') ||
+      lm.includes('anular')
+    );
+  }
+
+  private isReopenIntent(lowerMessage: string): boolean {
+    const lm = (lowerMessage || '').trim();
+    if (!lm) return false;
+    return (
+      lm.includes('reabrir') ||
+      lm.includes('reabre') ||
+      lm.includes('retomar') ||
+      lm.includes('reativar') ||
+      lm.includes('voltar pedido') ||
+      lm.includes('continuar pedido')
+    );
+  }
+
+  private getPaymentOptionsMessage(total: number): string {
+    const totalAmount = Number(total || 0);
+    const pixAmount = totalAmount > 0 ? totalAmount * 0.95 : 0;
+    return (
+      `💳 *ESCOLHA A FORMA DE PAGAMENTO:*\n\n` +
+      `1️⃣ *PIX* - Desconto de 5% (R$ ${this.formatCurrency(pixAmount)})\n` +
+      `2️⃣ *Cartão de Crédito*\n` +
+      `3️⃣ *Cartão de Débito*\n` +
+      `4️⃣ *Dinheiro* (retirada)\n\n` +
+      `💬 Digite o número ou o nome do método de pagamento.\n` +
+      `Exemplo: "1", "pix", "cartão de crédito"`
+    );
+  }
+
   private looksLikeOrderStatusQuery(lowerMessage: string): boolean {
     const lm = (lowerMessage || '').trim();
     if (!lm) return false;
@@ -232,6 +270,101 @@ export class WhatsappService {
       });
       return '❌ Não consegui buscar o status agora. Tente novamente em instantes.';
     }
+  }
+
+  private async handleCancelIntent(
+    tenantId: string,
+    conversation: TypedConversation | undefined,
+    currentState?: ConversationState,
+  ): Promise<string> {
+    if (!conversation) {
+      return '❌ Não encontrei um pedido para cancelar.';
+    }
+
+    const collectingStates: ConversationState[] = [
+      'collecting_order',
+      'collecting_name',
+      'collecting_address',
+      'collecting_phone',
+      'collecting_notes',
+      'collecting_cash_change',
+      'confirming_order',
+      'confirming_stock_adjustment',
+    ];
+
+    if (currentState && collectingStates.includes(currentState)) {
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.clearCustomerData(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return '❌ Pedido cancelado.\n\n💬 Como posso ajudar você?';
+    }
+
+    const pedidoId = conversation.pedido_id || conversation.context?.pedido_id;
+    if (!pedidoId) {
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.clearCustomerData(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return '❌ Não encontrei um pedido pendente para cancelar.';
+    }
+
+    const pedido = await this.ordersService.findOne(pedidoId, tenantId);
+
+    if (pedido.status === PedidoStatus.PENDENTE_PAGAMENTO) {
+      await this.ordersService.updateStatus(pedidoId, PedidoStatus.CANCELADO, tenantId);
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.clearCustomerData(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return `❌ Pedido *${pedido.order_no}* cancelado.`;
+    }
+
+    if (pedido.status === PedidoStatus.CANCELADO) {
+      await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return `ℹ️ Pedido *${pedido.order_no}* já estava cancelado.`;
+    }
+
+    return (
+      `⚠️ Pedido *${pedido.order_no}* já está em *${pedido.status}*.\n` +
+      'Para cancelar após confirmação, fale com o atendimento.'
+    );
+  }
+
+  private async handleReopenIntent(
+    tenantId: string,
+    conversation: TypedConversation | undefined,
+  ): Promise<string> {
+    if (!conversation) {
+      return '❌ Não encontrei um pedido para reabrir.';
+    }
+
+    const pedidoId = conversation.pedido_id || conversation.context?.pedido_id;
+    let pedido: Pedido | null = null;
+
+    if (pedidoId) {
+      pedido = await this.ordersService.findOne(pedidoId, tenantId);
+    }
+
+    if (!pedido || pedido.status !== PedidoStatus.PENDENTE_PAGAMENTO) {
+      pedido = await this.ordersService.findLatestPendingByCustomerPhone(
+        tenantId,
+        conversation.customer_phone,
+      );
+    }
+
+    if (!pedido) {
+      await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return '❌ Não encontrei pedido pendente para reabrir.\n\n💬 Faça um novo pedido digitando: "Quero X [produto]"';
+    }
+
+    await this.conversationService.setPedidoId(conversation.id, pedido.id);
+    await this.conversationService.updateState(conversation.id, 'waiting_payment');
+
+    return (
+      `♻️ Pedido *${pedido.order_no}* reaberto.\n\n` +
+      this.getPaymentOptionsMessage(Number(pedido.total_amount))
+    );
   }
 
   private async applyCouponToPendingOrder(
@@ -576,6 +709,14 @@ export class WhatsappService {
     const orderNo = this.extractOrderNo(message);
     if (this.looksLikeOrderStatusQuery(lowerMessage)) {
       return await this.handleOrderStatusQuery(tenantId, conversation, orderNo);
+    }
+
+    if (this.isCancelIntent(lowerMessage)) {
+      return await this.handleCancelIntent(tenantId, conversation, currentState);
+    }
+
+    if (this.isReopenIntent(lowerMessage)) {
+      return await this.handleReopenIntent(tenantId, conversation);
     }
 
     if (currentState === 'confirming_stock_adjustment') {
@@ -1661,7 +1802,9 @@ export class WhatsappService {
            '💰 *preço de [produto]* - Ver preço de um produto\n' +
            '📦 *estoque de [produto]* - Ver estoque disponível\n' +
            '🕐 *horário* - Ver horário de funcionamento\n' +
-           '🛒 *quero X [produto]* - Fazer um pedido\n\n' +
+           '🛒 *quero X [produto]* - Fazer um pedido\n' +
+           '❌ *cancelar pedido* - Cancelar pedido atual\n' +
+           '♻️ *reabrir pedido* - Retomar pedido pendente\n\n' +
            '💬 Exemplo: "Quero 10 brigadeiros"';
   }
 
