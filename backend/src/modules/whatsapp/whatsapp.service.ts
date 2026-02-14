@@ -136,9 +136,33 @@ export class WhatsappService {
   private extractCouponCode(message: string): string | null {
     const text = (message || '').trim();
     if (!text) return null;
-    const m = text.match(/^(cupom|coupon)\s+([A-Za-z0-9_-]{2,50})\s*$/i);
+    const m = text.match(/^(?:cupom|coupon|usar\s+cupom|aplicar\s+cupom|aplicar)\s+([A-Za-z0-9_-]{2,50})\s*$/i);
     if (!m) return null;
-    return (m[2] || '').trim().toUpperCase();
+    return (m[1] || '').trim().toUpperCase();
+  }
+
+  private extractStandaloneCouponCode(message: string): string | null {
+    const text = (message || '').trim();
+    if (!text) return null;
+    if (!/^[A-Za-z0-9_-]{2,50}$/.test(text)) return null;
+    const upper = text.toUpperCase();
+    const reserved = new Set([
+      'SIM',
+      'NAO',
+      'OK',
+      'CANCELAR',
+      'PIX',
+      'CARTAO',
+      'CREDITO',
+      'DEBITO',
+      'DINHEIRO',
+      'RETIRADA',
+      'ENTREGA',
+      'CUPOM',
+      'COUPON',
+    ]);
+    if (reserved.has(upper)) return null;
+    return upper;
   }
 
   private extractOrderNo(message: string): string | null {
@@ -519,19 +543,26 @@ export class WhatsappService {
   ): Promise<string> {
     const lowerMessage = message.toLowerCase().trim();
 
+    // ✅ NOVO: Verificar estado da conversa PRIMEIRO (antes de qualquer outra coisa)
+    const currentState = conversation?.context?.state as ConversationState | undefined;
+
     // ✅ ALTA PRIORIDADE: cupom e status do pedido devem funcionar em qualquer estado
     const couponCode = this.extractCouponCode(message);
     if (couponCode) {
       return await this.applyCouponToPendingOrder(tenantId, conversation, couponCode);
     }
 
+    if (currentState === 'confirming_order') {
+      const standaloneCoupon = this.extractStandaloneCouponCode(message);
+      if (standaloneCoupon) {
+        return await this.applyCouponToPendingOrder(tenantId, conversation, standaloneCoupon);
+      }
+    }
+
     const orderNo = this.extractOrderNo(message);
     if (this.looksLikeOrderStatusQuery(lowerMessage)) {
       return await this.handleOrderStatusQuery(tenantId, conversation, orderNo);
     }
-
-    // ✅ NOVO: Verificar estado da conversa PRIMEIRO (antes de qualquer outra coisa)
-    const currentState = conversation?.context?.state as ConversationState | undefined;
 
     if (currentState === 'confirming_stock_adjustment') {
       return await this.processStockAdjustment(message, tenantId, conversation);
