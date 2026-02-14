@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException, Inject, forwardRef, Logger } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, Not } from 'typeorm';
 import { randomBytes } from 'crypto';
 import { Pedido, PedidoStatus, CanalVenda } from '../../database/entities/Pedido.entity';
 import { ItemPedido } from '../../database/entities/ItemPedido.entity';
@@ -409,6 +409,24 @@ export class OrdersService {
         customer_phone: normalized,
         status: PedidoStatus.PENDENTE_PAGAMENTO,
       },
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async findLatestByCustomerPhone(
+    tenantId: string,
+    customerPhone: string,
+  ): Promise<Pedido | null> {
+    const normalized = (customerPhone || '').trim();
+    if (!normalized) return null;
+
+    return await this.db.getRepository(Pedido).findOne({
+      where: {
+        tenant_id: tenantId,
+        customer_phone: normalized,
+        status: Not(PedidoStatus.CANCELADO),
+      },
+      relations: ['itens', 'itens.produto'],
       order: { created_at: 'DESC' },
     });
   }

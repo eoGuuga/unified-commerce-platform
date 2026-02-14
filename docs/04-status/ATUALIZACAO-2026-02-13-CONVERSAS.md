@@ -28,6 +28,7 @@ Contexto: conversas antigas em waiting_payment podiam interferir em novos pedido
 - Cupom aceita comandos "usar cupom", "aplicar" e codigo direto durante confirmacao.
 - Pagamento em dinheiro agora coleta troco e registra no pagamento.
 - Cancelar pedido funciona em coleta e pendente de pagamento; reabrir retoma pedido pendente.
+- Pedido repetido recria o ultimo pedido a partir dos itens e estoque atual.
 
 ## Validacao
 - Ajuste de estoque confirmou 18 unidades a partir de pedido de 50.
@@ -42,6 +43,7 @@ Contexto: conversas antigas em waiting_payment podiam interferir em novos pedido
 - DEV/TESTE atualizado via git pull --ff-only (72f6511..933085e).
 - DEV/TESTE atualizado via git pull --ff-only (933085e..056fc74).
 - DEV/TESTE atualizado via git pull --ff-only (056fc74..285fb49).
+- DEV/TESTE atualizado via git pull --ff-only (285fb49..01e90e5).
 
 ## Arquivos alterados
 - backend/src/modules/whatsapp/whatsapp.service.ts

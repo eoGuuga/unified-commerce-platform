@@ -208,6 +208,17 @@ export class WhatsappService {
     );
   }
 
+  private isRepeatOrderIntent(lowerMessage: string): boolean {
+    const lm = (lowerMessage || '').trim();
+    if (!lm) return false;
+    return (
+      lm.includes('repetir pedido') ||
+      lm.includes('pedido repetido') ||
+      lm.includes('repetir meu pedido') ||
+      lm.includes('refazer pedido')
+    );
+  }
+
   private getPaymentOptionsMessage(total: number): string {
     const totalAmount = Number(total || 0);
     const pixAmount = totalAmount > 0 ? totalAmount * 0.95 : 0;
@@ -365,6 +376,98 @@ export class WhatsappService {
       `♻️ Pedido *${pedido.order_no}* reaberto.\n\n` +
       this.getPaymentOptionsMessage(Number(pedido.total_amount))
     );
+  }
+
+  private async handleRepeatOrderIntent(
+    tenantId: string,
+    conversation: TypedConversation | undefined,
+  ): Promise<string> {
+    if (!conversation) {
+      return '❌ Não encontrei um pedido para repetir.';
+    }
+
+    const latest = await this.ordersService.findLatestByCustomerPhone(
+      tenantId,
+      conversation.customer_phone,
+    );
+
+    if (!latest || !latest.itens || latest.itens.length === 0) {
+      return '❌ Não encontrei um pedido anterior para repetir.\n\n💬 Faça um novo pedido digitando: "Quero X [produto]"';
+    }
+
+    const produtosResult = await this.productsService.findAll(tenantId);
+    const produtos = Array.isArray(produtosResult) ? produtosResult : produtosResult.data;
+    const produtoMap = new Map(produtos.map((p) => [p.id, p]));
+
+    const missing: string[] = [];
+    const insufficient: Array<{ name: string; available: number; requested: number }> = [];
+    const items: PendingOrderItem[] = [];
+
+    for (const item of latest.itens) {
+      const produto = produtoMap.get(item.produto_id);
+      if (!produto || !produto.is_active) {
+        missing.push(produto?.name || item.produto_id);
+        continue;
+      }
+
+      const requestedQty = Number(item.quantity || 0);
+      if (produto.available_stock < requestedQty) {
+        insufficient.push({
+          name: produto.name,
+          available: produto.available_stock,
+          requested: requestedQty,
+        });
+        continue;
+      }
+
+      const unitPrice = Number(produto.price);
+      const priceValidation = this.validatePrice(unitPrice);
+      if (!priceValidation.valid) {
+        return '❌ Erro no preço do produto. Por favor, tente novamente.';
+      }
+
+      items.push({
+        produto_id: produto.id,
+        produto_name: produto.name,
+        quantity: requestedQty,
+        unit_price: unitPrice,
+      });
+    }
+
+    if (missing.length > 0) {
+      return (
+        `❌ Alguns itens do último pedido não estão mais disponíveis:\n` +
+        missing.map((name) => `• ${name}`).join('\n') +
+        `\n\n💬 Digite *"cardápio"* para ver os produtos disponíveis.`
+      );
+    }
+
+    if (insufficient.length > 0) {
+      let msg = '❌ Estoque insuficiente para repetir o pedido:\n\n';
+      for (const item of insufficient) {
+        msg += `• ${item.name}: solicitado ${item.requested}, disponível ${item.available}\n`;
+      }
+      msg += '\n💬 Ajuste a quantidade e faça um novo pedido.';
+      return msg;
+    }
+
+    if (items.length === 0) {
+      return '❌ Não consegui montar o pedido repetido.\n\n💬 Faça um novo pedido digitando: "Quero X [produto]"';
+    }
+
+    await this.conversationService.clearPendingOrder(conversation.id);
+    await this.conversationService.clearPedido(conversation.id);
+
+    const subtotal = items.reduce((sum, it) => sum + it.unit_price * it.quantity, 0);
+    const pendingOrder: PendingOrder = {
+      items,
+      subtotal,
+      discount_amount: 0,
+      shipping_amount: 0,
+      total_amount: subtotal,
+    };
+
+    return await this.applyPendingOrderAndProceed(pendingOrder, tenantId, conversation);
   }
 
   private async applyCouponToPendingOrder(
@@ -717,6 +820,10 @@ export class WhatsappService {
 
     if (this.isReopenIntent(lowerMessage)) {
       return await this.handleReopenIntent(tenantId, conversation);
+    }
+
+    if (this.isRepeatOrderIntent(lowerMessage)) {
+      return await this.handleRepeatOrderIntent(tenantId, conversation);
     }
 
     if (currentState === 'confirming_stock_adjustment') {
