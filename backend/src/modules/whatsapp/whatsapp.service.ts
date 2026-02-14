@@ -133,6 +133,20 @@ export class WhatsappService {
       `💬 Se não tiver, digite *"sem"*.`;
   }
 
+  private formatCurrency(value: number): string {
+    return Number(value || 0).toFixed(2).replace('.', ',');
+  }
+
+  private parseCurrencyAmount(raw: string): number | null {
+    const text = (raw || '').trim();
+    if (!text) return null;
+    const match = text.match(/(\d+(?:[.,]\d{1,2})?)/);
+    if (!match) return null;
+    const parsed = Number(match[1].replace(',', '.'));
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    return Number(parsed.toFixed(2));
+  }
+
   private extractCouponCode(message: string): string | null {
     const text = (message || '').trim();
     if (!text) return null;
@@ -566,6 +580,10 @@ export class WhatsappService {
 
     if (currentState === 'confirming_stock_adjustment') {
       return await this.processStockAdjustment(message, tenantId, conversation);
+    }
+
+    if (currentState === 'collecting_cash_change') {
+      return await this.processCashChange(message, tenantId, conversation);
     }
     
     // Se está coletando dados do cliente, processar isso primeiro
@@ -1687,6 +1705,10 @@ export class WhatsappService {
     conversation?: TypedConversation,
   ): Promise<string> {
     try {
+      if (!conversation) {
+        return '❌ Não encontrei um pedido pendente para pagamento.\n\n' +
+          '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
+      }
       const lowerMessage = message.toLowerCase().trim();
       
       // Extrair método de pagamento
@@ -1749,6 +1771,15 @@ export class WhatsappService {
                '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
       }
 
+      if (metodo === MetodoPagamento.DINHEIRO) {
+        await this.conversationService.updateState(conversation.id, 'collecting_cash_change');
+        return (
+          `💵 *Pagamento em dinheiro selecionado.*\n\n` +
+          `Total: R$ ${this.formatCurrency(Number(pedidoPendente.total_amount))}\n` +
+          `Precisa de troco? Informe o valor (ex.: *"100"*) ou digite *"sem"*.`
+        );
+      }
+
       // Criar pagamento
       const createPaymentDto: CreatePaymentDto = {
         pedido_id: pedidoPendente.id,
@@ -1790,6 +1821,114 @@ export class WhatsappService {
       return '❌ Ocorreu um erro ao processar o pagamento.\n\n' +
              '💬 Tente novamente ou digite *"ajuda"* para ver os comandos.';
     }
+  }
+
+  private async processCashChange(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+  ): Promise<string> {
+    if (!conversation) {
+      return '❌ Erro ao processar. Tente novamente.';
+    }
+
+    const sanitizedMessage = this.sanitizeInput(message.trim());
+    const lowerMessage = sanitizedMessage.toLowerCase();
+
+    if (this.isOrderIntent(lowerMessage)) {
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.clearCustomerData(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      conversation.context = {
+        ...(conversation.context || {}),
+        state: 'idle',
+      };
+      return await this.processOrder(message, tenantId, conversation);
+    }
+
+    if (lowerMessage.includes('cancelar') || lowerMessage.includes('voltar')) {
+      await this.conversationService.updateState(conversation.id, 'waiting_payment');
+      return '✅ Ok! Escolha a forma de pagamento:\n' +
+        '*1* PIX\n*2* Cartão de Crédito\n*3* Cartão de Débito\n*4* Dinheiro';
+    }
+
+    const pedidoId = conversation.pedido_id || conversation.context?.pedido_id;
+    if (!pedidoId) {
+      await this.conversationService.updateState(conversation.id, 'waiting_payment');
+      return '❌ Não encontrei um pedido pendente para pagamento.\n\n' +
+        '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
+    }
+
+    const pedidoPendente = await this.ordersService.findOne(pedidoId, tenantId);
+    if (!pedidoPendente || pedidoPendente.status !== PedidoStatus.PENDENTE_PAGAMENTO) {
+      await this.conversationService.updateState(conversation.id, 'waiting_payment');
+      return '❌ Pedido não está pendente de pagamento.\n\n' +
+        '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
+    }
+
+    const totalAmount = Number(pedidoPendente.total_amount || 0);
+    const noChange =
+      !lowerMessage ||
+      lowerMessage === 'sem' ||
+      lowerMessage === 'nao' ||
+      lowerMessage === 'não' ||
+      lowerMessage === 'nenhum' ||
+      lowerMessage === 'nenhuma';
+
+    let changeFor: number | null = null;
+    let changeAmount = 0;
+
+    if (!noChange) {
+      const parsed = this.parseCurrencyAmount(sanitizedMessage);
+      if (!parsed) {
+        return (
+          `❌ Não entendi o valor do troco.\n\n` +
+          `Informe um valor (ex.: *"100"* ou *"100,00"*) ou digite *"sem"*.`
+        );
+      }
+
+      if (parsed < totalAmount) {
+        return (
+          `❌ O valor informado é menor que o total do pedido.\n` +
+          `Total: R$ ${this.formatCurrency(totalAmount)}\n\n` +
+          `Informe um valor maior ou igual ao total.`
+        );
+      }
+
+      changeFor = parsed;
+      changeAmount = Number((parsed - totalAmount).toFixed(2));
+    }
+
+    await this.conversationService.saveCustomerData(conversation.id, {
+      cash_change_for: changeFor,
+      cash_change_amount: changeAmount,
+    });
+
+    await this.conversationService.updateState(conversation.id, 'waiting_payment');
+
+    const createPaymentDto: CreatePaymentDto = {
+      pedido_id: pedidoPendente.id,
+      method: MetodoPagamento.DINHEIRO,
+      amount: pedidoPendente.total_amount,
+      metadata: {
+        cash_change_for: changeFor,
+        cash_change_amount: changeAmount,
+      },
+    };
+
+    const paymentResult = await this.paymentsService.createPayment(tenantId, createPaymentDto);
+
+    if (changeFor) {
+      return (
+        (paymentResult.message || 'Pagamento processado com sucesso!') +
+        `\n\n💵 Troco para: R$ ${this.formatCurrency(changeFor)}` +
+        `\n🧾 Troco: R$ ${this.formatCurrency(changeAmount)}`
+      );
+    }
+
+    return (paymentResult.message || 'Pagamento processado com sucesso!') +
+      '\n\n💵 Pagamento em dinheiro sem troco.';
   }
 
   private async processStockAdjustment(

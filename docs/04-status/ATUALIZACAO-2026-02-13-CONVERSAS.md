@@ -26,6 +26,7 @@ Contexto: conversas antigas em waiting_payment podiam interferir em novos pedido
 - Novo pedido durante confirmacao ou pagamento reinicia o fluxo de forma segura.
 - Idempotencia do WhatsApp considera cada novo intento de pedido, evitando reuso de pedido antigo.
 - Cupom aceita comandos "usar cupom", "aplicar" e codigo direto durante confirmacao.
+- Pagamento em dinheiro agora coleta troco e registra no pagamento.
 
 ## Validacao
 - Ajuste de estoque confirmou 18 unidades a partir de pedido de 50.

@@ -19,6 +19,7 @@ export type ConversationState =
   | 'collecting_address'      // Coletando endereço (se entrega)
   | 'collecting_phone'        // Coletando telefone de contato
   | 'collecting_notes'        // Coletando observações do cliente
+  | 'collecting_cash_change'  // Coletando troco (dinheiro)
   | 'confirming_order'        // Confirmando pedido completo antes de criar
   | 'confirming_stock_adjustment' // Confirmando ajuste de quantidade por estoque
   | 'waiting_payment'         // Aguardando seleção e processamento de pagamento
@@ -43,6 +44,8 @@ export interface CustomerData {
   phone?: string;
   notes?: string;
   delivery_type?: 'delivery' | 'pickup'; // Entrega ou retirada
+  cash_change_for?: number | null; // Troco para quanto (dinheiro)
+  cash_change_amount?: number | null; // Valor do troco
 }
 
 export interface StockAdjustmentContext {

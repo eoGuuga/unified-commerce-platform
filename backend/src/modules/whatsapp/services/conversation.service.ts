@@ -35,6 +35,7 @@ export class ConversationService {
       'collecting_address',
       'collecting_phone',
       'collecting_notes',
+      'collecting_cash_change',
       'confirming_order',
       'confirming_stock_adjustment',
     ].includes(state || '');

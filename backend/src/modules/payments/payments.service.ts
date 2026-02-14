@@ -31,6 +31,7 @@ export interface CreatePaymentDto {
   payerEmail?: string;
   cardToken?: string;
   installments?: number;
+  metadata?: Record<string, unknown>;
 }
 
 export interface PaymentResult {
@@ -141,7 +142,7 @@ export class PaymentsService {
       method: createPaymentDto.method,
       amount: valorFinal,
       status: PagamentoStatus.PENDING,
-      metadata: {},
+      metadata: createPaymentDto.metadata || {},
     });
 
     await pagamentoRepo.save(pagamento);
@@ -221,12 +222,22 @@ export class PaymentsService {
     }
 
     if (pagamento.method === MetodoPagamento.DINHEIRO) {
+      const changeFor = pagamento.metadata?.cash_change_for as number | undefined;
+      const changeAmount = pagamento.metadata?.cash_change_amount as number | undefined;
+      const changeInfo =
+        changeFor && Number.isFinite(changeFor)
+          ? `\nTroco para: R$ ${Number(changeFor).toFixed(2).replace('.', ',')}` +
+            (Number.isFinite(changeAmount)
+              ? `\nTroco: R$ ${Number(changeAmount).toFixed(2).replace('.', ',')}`
+              : '')
+          : '';
       return {
         pagamento,
         message:
           `PAGAMENTO EM DINHEIRO\n\n` +
           `Pedido: ${pedido.order_no}\n` +
-          `Valor: R$ ${Number(pagamento.amount).toFixed(2).replace('.', ',')}\n\n` +
+          `Valor: R$ ${Number(pagamento.amount).toFixed(2).replace('.', ',')}\n` +
+          `${changeInfo}\n\n` +
           `Aguarde a confirmacao do pagamento pela loja.`,
       };
     }
@@ -419,6 +430,7 @@ export class PaymentsService {
 
     pagamento.status = PagamentoStatus.PENDING;
     pagamento.metadata = {
+      ...(pagamento.metadata || {}),
       requires_manual_confirmation: true,
     };
 
