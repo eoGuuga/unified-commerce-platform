@@ -577,6 +577,7 @@ export class WhatsappService {
       if (currentState === 'waiting_payment' && conversation) {
         await this.conversationService.clearPendingOrder(conversation.id);
         await this.conversationService.clearPedido(conversation.id);
+        await this.conversationService.clearCustomerData(conversation.id);
         await this.conversationService.updateState(conversation.id, 'idle');
         conversation.context = {
           ...(conversation.context || {}),
@@ -2248,6 +2249,7 @@ export class WhatsappService {
     if (this.isOrderIntent(lowerMessage)) {
       await this.conversationService.clearPendingOrder(conversation.id);
       await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.clearCustomerData(conversation.id);
       await this.conversationService.updateState(conversation.id, 'idle');
       conversation.context = {
         ...(conversation.context || {}),

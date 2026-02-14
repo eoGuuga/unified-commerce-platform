@@ -284,6 +284,31 @@ export class ConversationService {
   }
 
   /**
+   * Limpa dados do cliente para iniciar novo pedido
+   */
+  async clearCustomerData(conversationId: string): Promise<void> {
+    const conversationRepository = this.db.getRepository(WhatsappConversation);
+    const conversation = await conversationRepository.findOne({
+      where: { id: conversationId },
+    });
+
+    if (!conversation) {
+      this.logger.warn(`Conversation ${conversationId} not found`);
+      return;
+    }
+
+    const {
+      customer_data: _customer_data,
+      ...restContext
+    } = conversation.context || {};
+
+    conversation.customer_name = null as unknown as string;
+    conversation.context = restContext;
+
+    await conversationRepository.save(conversation);
+  }
+
+  /**
    * Limpa pedido associado e contexto de pagamento
    */
   async clearPedido(conversationId: string): Promise<void> {
