@@ -44,6 +44,7 @@ Contexto: conversas antigas em waiting_payment podiam interferir em novos pedido
 - DEV/TESTE atualizado via git pull --ff-only (933085e..056fc74).
 - DEV/TESTE atualizado via git pull --ff-only (056fc74..285fb49).
 - DEV/TESTE atualizado via git pull --ff-only (285fb49..01e90e5).
+- DEV/TESTE atualizado via git pull --ff-only (01e90e5..b373984).
 
 ## Arquivos alterados
 - backend/src/modules/whatsapp/whatsapp.service.ts
