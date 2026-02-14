@@ -8,7 +8,7 @@ import { PaymentsService, CreatePaymentDto } from '../payments/payments.service'
 import { NotificationsService } from '../notifications/notifications.service';
 import { CanalVenda, PedidoStatus, Pedido } from '../../database/entities/Pedido.entity';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
-import { TypedConversation, ProductSearchResult, toTypedConversation, ConversationState, CustomerData, PendingOrder, PendingOrderItem } from './types/whatsapp.types';
+import { TypedConversation, ProductSearchResult, toTypedConversation, ConversationState, CustomerData, PendingOrder, PendingOrderItem, StockAdjustmentContext } from './types/whatsapp.types';
 import { ProductWithStock } from '../products/types/product.types';
 import * as crypto from 'crypto';
 import { CouponsService } from '../coupons/coupons.service';
@@ -362,6 +362,7 @@ export class WhatsappService {
       'collecting_phone',
       'collecting_notes',
       'confirming_order',
+      'confirming_stock_adjustment',
       'waiting_payment',
       'order_confirmed',
       'order_completed',
@@ -529,6 +530,10 @@ export class WhatsappService {
 
     // ✅ NOVO: Verificar estado da conversa PRIMEIRO (antes de qualquer outra coisa)
     const currentState = conversation?.context?.state as ConversationState | undefined;
+
+    if (currentState === 'confirming_stock_adjustment') {
+      return await this.processStockAdjustment(message, tenantId, conversation);
+    }
     
     // Se está coletando dados do cliente, processar isso primeiro
     if (currentState === 'collecting_name') {
@@ -740,6 +745,25 @@ export class WhatsappService {
       total_amount: subtotal,
     };
 
+    return await this.applyPendingOrderAndProceed(pendingOrder, tenantId, conversation);
+  }
+
+  private formatPendingOrderSummary(pendingOrder: PendingOrder): string {
+    let msg = '';
+    pendingOrder.items.forEach((item: PendingOrderItem) => {
+      msg += `📦 *${item.produto_name}*\n`;
+      msg += `Quantidade: ${item.quantity} unidades\n`;
+      msg += `Preço unitário: R$ ${Number(item.unit_price).toFixed(2).replace('.', ',')}\n\n`;
+    });
+    msg += `💰 *Total: R$ ${Number(pendingOrder.total_amount).toFixed(2).replace('.', ',')}*\n\n`;
+    return msg;
+  }
+
+  private async applyPendingOrderAndProceed(
+    pendingOrder: PendingOrder,
+    tenantId: string,
+    conversation: TypedConversation,
+  ): Promise<string> {
     await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
 
     const customerData = conversation?.context?.customer_data as CustomerData | undefined;
@@ -785,17 +809,6 @@ export class WhatsappService {
       this.formatPendingOrderSummary(pendingOrder) +
       `\n💬 *Para finalizar, preciso de algumas informações:*\n\n` +
       `👤 *Qual é o seu nome completo?*`;
-  }
-
-  private formatPendingOrderSummary(pendingOrder: PendingOrder): string {
-    let msg = '';
-    pendingOrder.items.forEach((item: PendingOrderItem) => {
-      msg += `📦 *${item.produto_name}*\n`;
-      msg += `Quantidade: ${item.quantity} unidades\n`;
-      msg += `Preço unitário: R$ ${Number(item.unit_price).toFixed(2).replace('.', ',')}\n\n`;
-    });
-    msg += `💰 *Total: R$ ${Number(pendingOrder.total_amount).toFixed(2).replace('.', ',')}*\n\n`;
-    return msg;
   }
 
   private async processOrder(
@@ -940,11 +953,33 @@ export class WhatsappService {
 
     // ✅ NOVO: Validar estoque
     if (produto.available_stock < quantity) {
+      if (produto.available_stock <= 0) {
+        return `❌ Estoque insuficiente!\n\n` +
+               `*${produto.name}*\n` +
+               `Solicitado: ${quantity} unidades\n` +
+               `Disponível: 0 unidades\n\n` +
+               `💬 Digite *"cardápio"* para ver outros produtos.`;
+      }
+
+      const stockAdjustment: StockAdjustmentContext = {
+        produto_id: produto.id,
+        produto_name: produto.name,
+        requested_qty: quantity,
+        available_qty: produto.available_stock,
+        unit_price: unitPrice,
+      };
+
+      await this.conversationService.updateContext(conversation.id, {
+        stock_adjustment: stockAdjustment,
+      });
+      await this.conversationService.updateState(conversation.id, 'confirming_stock_adjustment');
+
       return `❌ Estoque insuficiente!\n\n` +
              `*${produto.name}*\n` +
              `Solicitado: ${quantity} unidades\n` +
              `Disponível: ${produto.available_stock} unidades\n\n` +
-             `💬 Quer fazer pedido com a quantidade disponível?`;
+             `💬 Posso seguir com *${produto.available_stock}* unidade(s)?\n` +
+             `Digite *"sim"* para confirmar ou envie outra quantidade (até ${produto.available_stock}).`;
     }
 
     // ✅ NOVO: Calcular valores do pedido
@@ -953,77 +988,20 @@ export class WhatsappService {
     const shippingAmount = 0;
     const totalAmount = subtotal - discountAmount + shippingAmount;
 
-    // ✅ NOVO: Salvar pedido pendente no contexto (antes de coletar dados)
-    if (conversation) {
-      const pendingOrder = {
-        items: [{
-          produto_id: produto.id,
-          produto_name: produto.name,
-          quantity: quantity,
-          unit_price: unitPrice,
-        }],
-        subtotal,
-        discount_amount: discountAmount,
-        shipping_amount: shippingAmount,
-        total_amount: totalAmount,
-      };
+    const pendingOrder = {
+      items: [{
+        produto_id: produto.id,
+        produto_name: produto.name,
+        quantity: quantity,
+        unit_price: unitPrice,
+      }],
+      subtotal,
+      discount_amount: discountAmount,
+      shipping_amount: shippingAmount,
+      total_amount: totalAmount,
+    };
 
-      await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
-      await this.conversationService.updateState(conversation.id, 'collecting_name');
-    }
-
-    // ✅ NOVO: Verificar se já temos dados do cliente
-    const customerData = conversation?.context?.customer_data as CustomerData | undefined;
-    
-    // Se já temos nome, verificar se precisa de endereço
-    if (customerData?.name) {
-      // Se não tem endereço, perguntar se é entrega ou retirada
-      if (!customerData.address && !customerData.delivery_type) {
-        return `✅ *PEDIDO PREPARADO!*\n\n` +
-               `📦 *${produto.name}*\n` +
-               `Quantidade: ${quantity} unidades\n` +
-               `Preço unitário: R$ ${unitPrice.toFixed(2).replace('.', ',')}\n` +
-               `Total: R$ ${totalAmount.toFixed(2).replace('.', ',')}\n\n` +
-               `💬 *Como você prefere receber?*\n\n` +
-               `1️⃣ *Entrega* (preciso do seu endereço)\n` +
-               `2️⃣ *Retirada* (você busca aqui)\n\n` +
-               `💬 Digite "1" para entrega ou "2" para retirada.`;
-      }
-      
-      // Se é entrega e não tem endereço, coletar endereço
-      if (customerData.delivery_type === 'delivery' && !customerData.address) {
-        if (conversation) {
-          await this.conversationService.updateState(conversation.id, 'collecting_address');
-        }
-        return `📦 *VAMOS COLETAR SEU ENDEREÇO*\n\n` +
-               `💬 Por favor, envie seu endereço completo:\n` +
-               `Rua, número, complemento (se houver), bairro, cidade, estado e CEP.\n\n` +
-               `Exemplo: "Rua das Flores, 123, Apto 45, Centro, São Paulo, SP, 01234-567"`;
-      }
-      
-      // Se já tem todos os dados, confirmar pedido
-      if (conversation) {
-        if (customerData.notes === undefined) {
-          await this.conversationService.updateState(conversation.id, 'collecting_notes');
-          return this.getNotesPrompt();
-        }
-        await this.conversationService.updateState(conversation.id, 'confirming_order');
-      }
-      return await this.showOrderConfirmation(tenantId, conversation);
-    }
-
-    // ✅ NOVO: Se não tem nome, coletar nome primeiro
-    if (conversation) {
-      await this.conversationService.updateState(conversation.id, 'collecting_name');
-    }
-    
-    return `✅ *PEDIDO PREPARADO!*\n\n` +
-           `📦 *${produto.name}*\n` +
-           `Quantidade: ${quantity} unidades\n` +
-           `Preço unitário: R$ ${unitPrice.toFixed(2).replace('.', ',')}\n` +
-           `Total: R$ ${totalAmount.toFixed(2).replace('.', ',')}\n\n` +
-           `💬 *Para finalizar, preciso de algumas informações:*\n\n` +
-           `👤 *Qual é o seu nome completo?*`;
+    return await this.applyPendingOrderAndProceed(pendingOrder, tenantId, conversation);
   }
 
   private extractOrderInfo(message: string): { quantity: number | null; productName: string | null } {
@@ -1689,11 +1667,10 @@ export class WhatsappService {
         pedidoId = conversation.context.pedido_id;
       } else {
         // Fallback: buscar último pedido pendente (para compatibilidade)
-        const pedidosResult = await this.ordersService.findAll(tenantId);
-        const pedidosPendentes = Array.isArray(pedidosResult) ? pedidosResult : pedidosResult.data;
-        const pedidoPendente = pedidosPendentes
-          .filter((p: Pedido) => p.status === PedidoStatus.PENDENTE_PAGAMENTO)
-          .sort((a: Pedido, b: Pedido) => b.created_at.getTime() - a.created_at.getTime())[0];
+        const pedidoPendente = await this.ordersService.findLatestPendingByCustomerPhone(
+          tenantId,
+          conversation?.customer_phone || '',
+        );
 
         if (!pedidoPendente) {
           return '❌ Não encontrei um pedido pendente de pagamento.\n\n' +
@@ -1757,6 +1734,66 @@ export class WhatsappService {
       return '❌ Ocorreu um erro ao processar o pagamento.\n\n' +
              '💬 Tente novamente ou digite *"ajuda"* para ver os comandos.';
     }
+  }
+
+  private async processStockAdjustment(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+  ): Promise<string> {
+    if (!conversation) {
+      return '❌ Erro ao processar. Tente novamente.';
+    }
+
+    const stateValidation = this.validateConversationState(conversation);
+    if (!stateValidation.valid) {
+      return `❌ ${stateValidation.error}`;
+    }
+
+    const adjustment = conversation.context?.stock_adjustment as StockAdjustmentContext | undefined;
+    if (!adjustment) {
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return '❌ Não encontrei um pedido pendente. Por favor, faça um novo pedido.';
+    }
+
+    const sanitizedMessage = this.sanitizeInput(message.trim());
+    const lowerMessage = sanitizedMessage.toLowerCase().trim();
+
+    if (lowerMessage.includes('cancelar') || lowerMessage.includes('nao') || lowerMessage.includes('não')) {
+      await this.conversationService.updateContext(conversation.id, { stock_adjustment: null });
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return '❌ Pedido cancelado.\n\n💬 Como posso ajudar você?';
+    }
+
+    let chosenQty: number | null = null;
+
+    if (lowerMessage.includes('sim') || lowerMessage.includes('confirmar') || lowerMessage === 'ok') {
+      chosenQty = adjustment.available_qty;
+    } else if (/^\d+$/.test(lowerMessage)) {
+      chosenQty = Number(lowerMessage);
+    }
+
+    if (!chosenQty || chosenQty <= 0 || chosenQty > adjustment.available_qty) {
+      return `❌ Quantidade inválida.\n\n` +
+             `Disponível: ${adjustment.available_qty} unidade(s).\n` +
+             `💬 Digite um número até ${adjustment.available_qty} ou *"cancelar"*.`;
+    }
+
+    const pendingOrder: PendingOrder = {
+      items: [{
+        produto_id: adjustment.produto_id,
+        produto_name: adjustment.produto_name,
+        quantity: chosenQty,
+        unit_price: adjustment.unit_price,
+      }],
+      subtotal: adjustment.unit_price * chosenQty,
+      discount_amount: 0,
+      shipping_amount: 0,
+      total_amount: adjustment.unit_price * chosenQty,
+    };
+
+    await this.conversationService.updateContext(conversation.id, { stock_adjustment: null });
+    return await this.applyPendingOrderAndProceed(pendingOrder, tenantId, conversation);
   }
 
   /**
@@ -1889,6 +1926,7 @@ export class WhatsappService {
     if (!addressParts) {
       // Se não conseguiu fazer parse, salvar como texto e pedir confirmação
       await this.conversationService.saveCustomerData(conversation.id, {
+        delivery_type: 'delivery',
         address: {
           street: sanitizedMessage,
           number: '',
@@ -1896,17 +1934,38 @@ export class WhatsappService {
           city: '',
           state: '',
           zipCode: '',
+          zipcode: '',
         },
       });
-      
+
+      const pendingOrder = conversation.context?.pending_order;
+      if (pendingOrder && Number(pendingOrder.shipping_amount || 0) === 0) {
+        pendingOrder.shipping_amount = this.getDefaultShippingAmount();
+        pendingOrder.total_amount =
+          Number(pendingOrder.subtotal || 0) - Number(pendingOrder.discount_amount || 0) + Number(pendingOrder.shipping_amount || 0);
+        await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
+      }
+
       await this.conversationService.updateState(conversation.id, 'confirming_order');
       return await this.showOrderConfirmation(tenantId, conversation);
     }
 
     // Salvar endereço parseado
     await this.conversationService.saveCustomerData(conversation.id, {
-      address: addressParts,
+      delivery_type: 'delivery',
+      address: {
+        ...addressParts,
+        zipcode: addressParts.zipCode || addressParts.zipcode || '',
+      },
     });
+
+    const pendingOrder = conversation.context?.pending_order;
+    if (pendingOrder && Number(pendingOrder.shipping_amount || 0) === 0) {
+      pendingOrder.shipping_amount = this.getDefaultShippingAmount();
+      pendingOrder.total_amount =
+        Number(pendingOrder.subtotal || 0) - Number(pendingOrder.discount_amount || 0) + Number(pendingOrder.shipping_amount || 0);
+      await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
+    }
 
     if (!conversation.context?.customer_data?.phone) {
       await this.conversationService.updateState(conversation.id, 'collecting_phone');
@@ -1929,36 +1988,58 @@ export class WhatsappService {
     state: string;
     zipCode: string;
   } | null {
-    // Parse básico - pode ser melhorado depois
     // Formato esperado: "Rua, número, complemento, bairro, cidade, estado, CEP"
-    const parts = addressText.split(',').map(p => p.trim());
-    
-    if (parts.length < 4) {
+    const parts = addressText.split(',').map(p => p.trim()).filter(Boolean);
+
+    if (parts.length < 3) {
       return null; // Endereço muito simples, não consegue fazer parse
     }
 
-    // Extrair CEP (último elemento que tem formato de CEP)
-    const cepMatch = addressText.match(/(\d{5}-?\d{3})/);
-    const zipCode = cepMatch ? cepMatch[1].replace('-', '') : '';
+    // Extrair CEP a partir do final
+    let zipCode = '';
+    for (let i = parts.length - 1; i >= 0; i -= 1) {
+      const match = parts[i].match(/(\d{5}-?\d{3})/);
+      if (match) {
+        zipCode = match[1].replace('-', '');
+        parts.splice(i, 1);
+        break;
+      }
+    }
 
-    // Extrair estado (penúltimo elemento, geralmente 2 letras)
-    const stateMatch = addressText.match(/,?\s*([A-Z]{2})\s*,?\s*(?:\d{5}-?\d{3})?/i);
-    const state = stateMatch ? stateMatch[1].toUpperCase() : '';
+    // Estado = último item com 2 letras (se existir)
+    let state = '';
+    if (parts.length > 0) {
+      const last = parts[parts.length - 1];
+      if (/^[A-Za-z]{2}$/.test(last)) {
+        state = last.toUpperCase();
+        parts.pop();
+      }
+    }
 
-    // Rua e número (primeiro elemento)
-    const streetAndNumber = parts[0];
-    const numberMatch = streetAndNumber.match(/(\d+)/);
-    const number = numberMatch ? numberMatch[1] : '';
-    const street = streetAndNumber.replace(/\d+.*$/, '').trim();
+    // Cidade e bairro (a partir do final)
+    const city = parts.length > 0 ? parts.pop() || '' : '';
+    const neighborhood = parts.length > 0 ? parts.pop() || '' : '';
 
-    // Complemento (segundo elemento, se existir)
-    const complement = parts.length > 2 ? parts[1] : undefined;
+    // Rua e número
+    let street = parts.length > 0 ? parts.shift() || '' : '';
+    let number = '';
+    let complement: string | undefined;
 
-    // Bairro (terceiro elemento ou segundo se não tem complemento)
-    const neighborhood = parts.length > 2 ? parts[2] : parts[1];
+    if (street) {
+      const numberMatch = street.match(/(\d+)/);
+      if (numberMatch) {
+        number = numberMatch[1];
+        street = street.replace(/\d+.*$/, '').trim();
+      }
+    }
 
-    // Cidade (quarto elemento ou terceiro se não tem complemento)
-    const city = parts.length > 3 ? parts[3] : (parts.length > 2 ? parts[2] : '');
+    if (!number && parts.length > 0 && /^\d+[A-Za-z]?$/.test(parts[0])) {
+      number = parts.shift() || '';
+    }
+
+    if (parts.length > 0) {
+      complement = parts.join(', ').trim();
+    }
 
     return {
       street: street || addressText,
@@ -2098,11 +2179,10 @@ export class WhatsappService {
       message += `📝 *Observações:* ${customerData.notes.trim()}\n`;
     }
     if (customerData?.delivery_type === 'delivery' && customerData?.address) {
-      message += `📍 *Endereço:* ${customerData.address.street}, ${customerData.address.number}`;
-      if (customerData.address.complement) {
-        message += `, ${customerData.address.complement}`;
-      }
-      message += `\n   ${customerData.address.neighborhood}, ${customerData.address.city} - ${customerData.address.state}\n`;
+      const addressNumber = customerData.address.number ? `, ${customerData.address.number}` : '';
+      const addressComplement = customerData.address.complement ? `, ${customerData.address.complement}` : '';
+      message += `📍 *Endereço:* ${customerData.address.street}${addressNumber}${addressComplement}\n`;
+      message += `   ${customerData.address.neighborhood}, ${customerData.address.city} - ${customerData.address.state}\n`;
     } else if (customerData?.delivery_type === 'pickup') {
 
       if (!customerData.phone) {

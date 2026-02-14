@@ -16,6 +16,10 @@ Melhorar estabilidade do fluxo WhatsApp em cenarios com conversas antigas.
 - Implementado em DEV/TESTE com limpeza por TTL e preferencia por conversa ativa recente.
 - Parametros configuraveis via WHATSAPP_CONVERSATION_TTL_HOURS e WHATSAPP_ACTIVE_GRACE_MINUTES.
 
+## Atualizacao adicional
+- Fluxo WhatsApp reforcado com ajuste de estoque interativo e endereco mais confiavel.
+- Selecao de pagamento com fallback seguro por telefone.
+
 ## Validacao
 - E2E WhatsApp com conversa antiga nao interfere em novo pedido.
 - Selecionar pix sempre encontra o pedido pendente atual.

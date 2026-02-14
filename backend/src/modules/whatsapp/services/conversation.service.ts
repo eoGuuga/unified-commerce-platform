@@ -36,6 +36,7 @@ export class ConversationService {
       'collecting_phone',
       'collecting_notes',
       'confirming_order',
+      'confirming_stock_adjustment',
     ].includes(state || '');
   }
 
@@ -271,7 +272,11 @@ export class ConversationService {
       return;
     }
 
-    const { pending_order: _pending_order, ...restContext } = conversation.context || {};
+    const {
+      pending_order: _pending_order,
+      stock_adjustment: _stock_adjustment,
+      ...restContext
+    } = conversation.context || {};
     conversation.context = restContext;
 
     await conversationRepository.save(conversation);

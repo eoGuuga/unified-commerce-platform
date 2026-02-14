@@ -396,6 +396,23 @@ export class OrdersService {
     });
   }
 
+  async findLatestPendingByCustomerPhone(
+    tenantId: string,
+    customerPhone: string,
+  ): Promise<Pedido | null> {
+    const normalized = (customerPhone || '').trim();
+    if (!normalized) return null;
+
+    return await this.db.getRepository(Pedido).findOne({
+      where: {
+        tenant_id: tenantId,
+        customer_phone: normalized,
+        status: PedidoStatus.PENDENTE_PAGAMENTO,
+      },
+      order: { created_at: 'DESC' },
+    });
+  }
+
   async updateStatus(
     id: string,
     status: PedidoStatus,

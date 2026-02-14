@@ -20,6 +20,7 @@ export type ConversationState =
   | 'collecting_phone'        // Coletando telefone de contato
   | 'collecting_notes'        // Coletando observações do cliente
   | 'confirming_order'        // Confirmando pedido completo antes de criar
+  | 'confirming_stock_adjustment' // Confirmando ajuste de quantidade por estoque
   | 'waiting_payment'         // Aguardando seleção e processamento de pagamento
   | 'order_confirmed'         // Pedido confirmado e pago
   | 'order_completed';        // Pedido completo (entregue)
@@ -37,10 +38,19 @@ export interface CustomerData {
     city: string;
     state: string;
     zipCode: string;
+    zipcode?: string;
   };
   phone?: string;
   notes?: string;
   delivery_type?: 'delivery' | 'pickup'; // Entrega ou retirada
+}
+
+export interface StockAdjustmentContext {
+  produto_id: string;
+  produto_name: string;
+  requested_qty: number;
+  available_qty: number;
+  unit_price: number;
 }
 
 /**
@@ -74,6 +84,7 @@ export interface ConversationContext {
   state?: ConversationState;           // Estado atual da conversa
   customer_data?: CustomerData;         // Dados do cliente coletados
   pending_order?: PendingOrder;        // Pedido pendente (antes de confirmar)
+  stock_adjustment?: StockAdjustmentContext; // Ajuste de quantidade por estoque
   [key: string]: unknown; // Para permitir extensibilidade
 }
 

@@ -17,3 +17,15 @@ Contexto: conversas antigas em waiting_payment podiam interferir em novos pedido
 ## Resultado esperado
 - Conversas antigas nao atrapalham o inicio de novos pedidos.
 - Selecao de pagamento sempre encontra o pedido pendente atual.
+
+## Ajustes adicionais (qualidade WhatsApp)
+- Estoque insuficiente agora permite confirmar quantidade disponivel ou informar outra quantidade valida.
+- Endereco informado sem escolha explicita assume entrega, aplica frete default e faz parse mais robusto.
+- Confirmacao de endereco nao exibe campos vazios (numero/complemento).
+- Selecao de pagamento por fallback usa ultimo pedido pendente do mesmo telefone.
+
+## Arquivos alterados
+- backend/src/modules/whatsapp/whatsapp.service.ts
+- backend/src/modules/whatsapp/types/whatsapp.types.ts
+- backend/src/modules/whatsapp/services/conversation.service.ts
+- backend/src/modules/orders/orders.service.ts

@@ -16,11 +16,16 @@ Validar o fluxo completo do WhatsApp no DEV/TESTE: pedido -> coleta de dados -> 
 5) Banco confirmou pagamento paid e pedido confirmado.
 
 ## Evidencias
-- Health: https://dev.gtsofthub.com.br/api/v1/health (2026-02-13T02:35:14.983Z)
-- Pedido: PED-20260213-A379
-- Pagamento: a555b0e7-48c0-4c51-91c9-e347f9808ff0 (pix)
-- Status final DB: pagamento paid + pedido confirmado (2026-02-13 23:36:58.578213)
+- Rodada 1:
+	- Health: https://dev.gtsofthub.com.br/api/v1/health (2026-02-13T02:35:14.983Z)
+	- Pedido: PED-20260213-A379
+	- Pagamento: a555b0e7-48c0-4c51-91c9-e347f9808ff0 (pix)
+	- Status final DB: pagamento paid + pedido confirmado (2026-02-13 23:36:58.578213)
+- Rodada 2 (final):
+	- Pedido: PED-20260213-03DD
+	- Pagamento: 45169b55-d25a-42e3-8498-02b402227062 (pix)
+	- Status final DB: pagamento paid + pedido confirmado (2026-02-14 00:00:13.259Z)
 
 ## Resultado
 - E2E DEV/TESTE concluido com sucesso e sem falhas.
-- Fluxo WhatsApp PIX validado end-to-end.
+- Fluxo WhatsApp PIX validado end-to-end (rodada final com pagamento confirmado).
