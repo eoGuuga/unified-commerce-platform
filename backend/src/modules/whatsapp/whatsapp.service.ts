@@ -1839,6 +1839,19 @@ export class WhatsappService {
       return `❌ ${stateValidation.error}`;
     }
 
+    const lowerMessage = this.sanitizeInput(message.trim()).toLowerCase();
+    if (this.isOrderIntent(lowerMessage)) {
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.clearCustomerData(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      conversation.context = {
+        ...(conversation.context || {}),
+        state: 'idle',
+      };
+      return await this.processOrder(message, tenantId, conversation);
+    }
+
     // ✅ NOVO: Sanitizar e validar nome
     const sanitizedName = this.sanitizeInput(message.trim());
     const nameValidation = this.validateName(sanitizedName);

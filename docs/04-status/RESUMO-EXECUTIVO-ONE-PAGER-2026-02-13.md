@@ -18,11 +18,18 @@ Validar E2E do WhatsApp PIX no DEV/TESTE com evidencias completas.
 	- Pedido: PED-20260213-03DD.
 	- Pagamento: 45169b55-d25a-42e3-8498-02b402227062 (pix).
 	- DB final: paid + confirmado (2026-02-14 00:00:13.259Z).
+
 - Rodada 3 (ajuste estoque + pix):
 	- Ajuste estoque: solicitado 50, confirmado com 18 unidades.
 	- Pedido: PED-20260214-189F.
 	- Pagamento: c48d5dde-7eb0-4728-900b-21e029080485 (pix).
 	- DB final: paid + confirmado (2026-02-14 00:28:23.692Z).
+
+- Rodada 4 (ajuste estoque + frete + pix):
+	- Ajuste estoque: solicitado 50, confirmado com 16 unidades.
+	- Frete aplicado: 10.
+	- Pedido: PED-20260214-60D2.
+	- Pagamento: PIX gerado (aguardando confirmacao).
 
 ## Documentos gerados
 - docs/04-status/ATUALIZACAO-2026-02-13-DEV-PIX.md

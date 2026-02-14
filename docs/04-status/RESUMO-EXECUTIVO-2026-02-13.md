@@ -5,7 +5,7 @@ Executar nova rodada E2E DEV/TESTE do WhatsApp PIX com evidencias frescas.
 
 ## Resultado
 - Fluxo WhatsApp completo validado no DEV/TESTE.
-- Pagamento PIX confirmado via endpoint e status final em DB: paid + pedido confirmado.
+- Pagamento PIX confirmado via endpoint em rodadas anteriores; ultima rodada com PIX gerado e aguardando confirmacao.
 
 ## Evidencias
 - Rodada 1:
@@ -22,6 +22,11 @@ Executar nova rodada E2E DEV/TESTE do WhatsApp PIX com evidencias frescas.
 	- Pedido: PED-20260214-189F.
 	- Pagamento: c48d5dde-7eb0-4728-900b-21e029080485 (pix).
 	- Status final DB: pagamento paid + pedido confirmado (2026-02-14 00:28:23.692Z).
+- Rodada 4 (ajuste estoque + frete + pix):
+	- Ajuste estoque: solicitado 50, confirmado com 16 unidades.
+	- Frete aplicado: 10.
+	- Pedido: PED-20260214-60D2.
+	- Pagamento: PIX gerado (aguardando confirmacao).
 
 ## Documentos gerados
 - docs/04-status/ATUALIZACAO-2026-02-13-DEV-PIX.md

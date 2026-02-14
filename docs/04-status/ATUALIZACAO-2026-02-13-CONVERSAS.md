@@ -29,6 +29,8 @@ Contexto: conversas antigas em waiting_payment podiam interferir em novos pedido
 ## Validacao
 - Ajuste de estoque confirmou 18 unidades a partir de pedido de 50.
 - Pagamento confirmado (paid) para PED-20260214-189F.
+- Ajuste de estoque confirmou 16 unidades e frete aplicado no fluxo de entrega.
+- PIX gerado para PED-20260214-60D2 (aguardando confirmacao).
 
 ## Arquivos alterados
 - backend/src/modules/whatsapp/whatsapp.service.ts

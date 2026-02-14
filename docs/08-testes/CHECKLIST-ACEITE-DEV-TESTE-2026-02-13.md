@@ -31,6 +31,11 @@ Objetivo: validar o fluxo E2E do WhatsApp no stack DEV/TESTE com evidencias clar
 	- Pedido: PED-20260214-189F.
 	- Pagamento: c48d5dde-7eb0-4728-900b-21e029080485 (pix).
 	- Status final DB: pagamento paid + pedido confirmado (2026-02-14 00:28:23.692Z).
+- Rodada 4 (ajuste estoque + frete + pix):
+	- Ajuste estoque: pedido solicitado 50, confirmado com 16 unidades.
+	- Frete aplicado: 10.
+	- Pedido: PED-20260214-60D2.
+	- Pagamento: PIX gerado (aguardando confirmacao).
 
 ## Observacoes
 - O endpoint /api/v1/whatsapp/test exige o campo "message".
