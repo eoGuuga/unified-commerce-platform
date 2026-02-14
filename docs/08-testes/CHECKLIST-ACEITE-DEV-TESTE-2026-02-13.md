@@ -21,6 +21,7 @@ Objetivo: validar o fluxo E2E do WhatsApp no stack DEV/TESTE com evidencias clar
 	- Health: https://dev.gtsofthub.com.br/api/v1/health (2026-02-14T00:44:02.915Z).
 	- Health pre-E2E: https://dev.gtsofthub.com.br/api/v1/health (2026-02-14T01:07:14.267Z).
 - Tentativa confirmacao PIX sem JWT valido: 401 Unauthorized (2026-02-14T01:08:54.435Z).
+- Tentativa confirmacao PIX sem JWT valido: 401 Unauthorized (2026-02-14T01:09:52.091Z).
 - Rodada 1:
 	- Health: https://dev.gtsofthub.com.br/api/v1/health (2026-02-13T02:35:14.983Z).
 	- Pedido: PED-20260213-A379.

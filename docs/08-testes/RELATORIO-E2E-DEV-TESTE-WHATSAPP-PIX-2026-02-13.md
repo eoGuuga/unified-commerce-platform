@@ -18,6 +18,7 @@ Validar o fluxo completo do WhatsApp no DEV/TESTE: pedido -> coleta de dados -> 
 ## Evidencias
 - Health pre-E2E: https://dev.gtsofthub.com.br/api/v1/health (2026-02-14T01:07:14.267Z)
 - Tentativa confirmacao PIX sem JWT valido (esperado 401): /api/v1/payments/PAGAMENTO_ID/confirm (2026-02-14T01:08:54.435Z)
+- Tentativa confirmacao PIX sem JWT valido (esperado 401): /api/v1/payments/PAGAMENTO_ID/confirm (2026-02-14T01:09:52.091Z)
 - Deploy DEV/TESTE (pull + rebuild):
 	- Health: https://dev.gtsofthub.com.br/api/v1/health (2026-02-14T00:44:02.915Z)
 - Rodada 1:
