@@ -20,7 +20,8 @@ Executar nova rodada E2E DEV/TESTE do WhatsApp PIX com evidencias frescas.
 - Rodada 3 (ajuste estoque + pix):
 	- Ajuste estoque: solicitado 50, confirmado com 18 unidades.
 	- Pedido: PED-20260214-189F.
-	- PIX gerado (aguardando confirmacao).
+	- Pagamento: c48d5dde-7eb0-4728-900b-21e029080485 (pix).
+	- Status final DB: pagamento paid + pedido confirmado (2026-02-14 00:28:23.692Z).
 
 ## Documentos gerados
 - docs/04-status/ATUALIZACAO-2026-02-13-DEV-PIX.md
