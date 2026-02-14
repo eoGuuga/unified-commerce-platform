@@ -32,6 +32,7 @@ Contexto: conversas antigas em waiting_payment podiam interferir em novos pedido
 - Ajuste de estoque confirmou 16 unidades e frete aplicado no fluxo de entrega.
 - PIX gerado para PED-20260214-60D2 (aguardando confirmacao).
 - Deploy DEV/TESTE aplicado e health OK (2026-02-14T00:44:02.915Z).
+- DEV/TESTE atualizado via git pull --ff-only (25c15fb..b1be483).
 
 ## Arquivos alterados
 - backend/src/modules/whatsapp/whatsapp.service.ts
