@@ -20,6 +20,7 @@ Melhorar estabilidade do fluxo WhatsApp em cenarios com conversas antigas.
 - Fluxo WhatsApp reforcado com ajuste de estoque interativo e endereco mais confiavel.
 - Selecao de pagamento com fallback seguro por telefone.
 - Novo pedido durante confirmacao/pagamento reinicia o fluxo com contexto limpo.
+- Idempotencia por intento de pedido evita reutilizar pedido antigo.
 
 ## Validacao
 - E2E WhatsApp com conversa antiga nao interfere em novo pedido.

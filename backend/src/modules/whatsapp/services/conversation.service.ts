@@ -275,6 +275,7 @@ export class ConversationService {
     const {
       pending_order: _pending_order,
       stock_adjustment: _stock_adjustment,
+      order_attempt_id: _order_attempt_id,
       ...restContext
     } = conversation.context || {};
     conversation.context = restContext;
@@ -299,6 +300,7 @@ export class ConversationService {
     const {
       pedido_id: _pedido_id,
       waiting_payment: _waiting_payment,
+      order_attempt_id: _order_attempt_id,
       ...restContext
     } = conversation.context || {};
 

@@ -24,6 +24,7 @@ Contexto: conversas antigas em waiting_payment podiam interferir em novos pedido
 - Confirmacao de endereco nao exibe campos vazios (numero/complemento).
 - Selecao de pagamento por fallback usa ultimo pedido pendente do mesmo telefone.
 - Novo pedido durante confirmacao ou pagamento reinicia o fluxo de forma segura.
+- Idempotencia do WhatsApp considera cada novo intento de pedido, evitando reuso de pedido antigo.
 
 ## Arquivos alterados
 - backend/src/modules/whatsapp/whatsapp.service.ts

@@ -85,6 +85,7 @@ export interface ConversationContext {
   customer_data?: CustomerData;         // Dados do cliente coletados
   pending_order?: PendingOrder;        // Pedido pendente (antes de confirmar)
   stock_adjustment?: StockAdjustmentContext; // Ajuste de quantidade por estoque
+  order_attempt_id?: string;            // Identificador do intento de pedido
   [key: string]: unknown; // Para permitir extensibilidade
 }
 

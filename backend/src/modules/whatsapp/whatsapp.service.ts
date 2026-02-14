@@ -65,7 +65,9 @@ export class WhatsappService {
     pendingOrder: PendingOrder,
     customerData?: CustomerData,
   ): string {
+    const attemptId = conversation.context?.order_attempt_id || conversation.id;
     const stablePayload = {
+      order_attempt_id: attemptId,
       conversation_id: conversation.id,
       customer_phone: conversation.customer_phone,
       tenant_id: conversation.tenant_id,
@@ -776,6 +778,16 @@ export class WhatsappService {
     tenantId: string,
     conversation: TypedConversation,
   ): Promise<string> {
+    if (!conversation.context?.order_attempt_id) {
+      const attemptId = crypto.randomUUID();
+      await this.conversationService.updateContext(conversation.id, {
+        order_attempt_id: attemptId,
+      });
+      conversation.context = {
+        ...(conversation.context || {}),
+        order_attempt_id: attemptId,
+      };
+    }
     await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
 
     const customerData = conversation?.context?.customer_data as CustomerData | undefined;
