@@ -572,7 +572,7 @@ export class WhatsappService {
 
     // IMPORTANTE: Verificar pedidos (antes de outras respostas)
     if (this.isOrderIntent(lowerMessage)) {
-      if (currentState === 'waiting_payment') {
+      if (currentState === 'waiting_payment' && conversation) {
         await this.conversationService.clearPendingOrder(conversation.id);
         await this.conversationService.clearPedido(conversation.id);
         await this.conversationService.updateState(conversation.id, 'idle');
@@ -631,6 +631,23 @@ export class WhatsappService {
     const hasConnector = lower.includes(' e ') || lower.includes(',');
     const nums = lower.match(/\d+/g) || [];
     return hasConnector && nums.length >= 2;
+  }
+
+  private isOrderIntent(lowerMessage: string): boolean {
+    const palavrasPedido = [
+      'quero', 'preciso', 'comprar', 'pedir', 'vou querer', 'gostaria de',
+      'desejo', 'vou comprar', 'preciso de', 'queria', 'ia querer',
+      'me manda', 'manda', 'pode ser', 'faz', 'me faz', 'faz pra mim',
+      'pode me enviar', 'tem como', 'dá pra', 'dá pra fazer', 'dá pra me enviar',
+      'seria possível', 'poderia', 'pode me mandar', 'me envia', 'envia',
+      'vou pedir', 'quero comprar', 'preciso comprar', 'quero pedir',
+      'preciso pedir', 'quero encomendar', 'preciso encomendar',
+      'quero fazer pedido', 'preciso fazer pedido', 'quero fazer um pedido',
+      'preciso fazer um pedido', 'quero fazer uma encomenda', 'preciso fazer uma encomenda',
+      'quero fazer encomenda', 'preciso fazer encomenda', 'quero fazer', 'preciso fazer',
+    ];
+
+    return palavrasPedido.some((palavra) => lowerMessage.includes(palavra));
   }
 
   private extractMultipleOrderInfos(
