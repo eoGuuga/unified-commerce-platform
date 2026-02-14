@@ -1955,7 +1955,7 @@ export class WhatsappService {
       delivery_type: 'delivery',
       address: {
         ...addressParts,
-        zipcode: addressParts.zipCode || addressParts.zipcode || '',
+        zipcode: addressParts.zipCode || '',
       },
     });
 
