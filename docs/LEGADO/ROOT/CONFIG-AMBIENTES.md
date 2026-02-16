@@ -1,0 +1,218 @@
+﻿> LEGADO: documento historico. Fonte de verdade: docs/CONSOLIDADO/README.md
+> Servidor/comandos: docs/CONSOLIDADO/10-SERVIDOR-COMANDOS.md
+# ðŸ—ï¸ **CONFIGURAÃ‡ÃƒO DE AMBIENTES SEPARADOS**
+
+## ðŸŽ¯ **VISÃƒO GERAL**
+
+O sistema agora suporta **dois ambientes completamente separados**:
+
+- **ðŸ› ï¸ DEV**: Ambiente de desenvolvimento e testes
+- **ðŸš€ PROD**: Ambiente de produÃ§Ã£o pÃºblico
+
+---
+
+## ðŸ“‹ **DIFERENÃ‡AS ENTRE AMBIENTES**
+
+| Aspecto | Ambiente DEV | Ambiente PROD |
+|---------|--------------|---------------|
+| **Portas** | Backend: 3002, Frontend: 3003 | Nginx: 80/443 |
+| **Banco** | `ucm_dev` (porta 5433) | `ucm_prod` (porta 5432) |
+| **Dados** | Seeds de teste automÃ¡ticos | Dados reais de produÃ§Ã£o |
+| **SeguranÃ§a** | CORS permissivo, JWT simples | SeguranÃ§a mÃ¡xima |
+| **Logs** | Verbose para debug | Otimizado para produÃ§Ã£o |
+| **WhatsApp** | Mock (simulado) | Twilio/Evolution API |
+| **Pagamentos** | Sandbox Mercado Pago | ProduÃ§Ã£o Mercado Pago |
+
+---
+
+## ðŸš€ **INICIANDO AMBIENTE DEV**
+
+```powershell
+# 1. Ambiente de desenvolvimento (hot reload, dados de teste)
+.\INICIAR-DEV.ps1
+
+# Acessos DEV:
+# ðŸŒ Frontend: http://localhost:3003
+# ðŸ”§ Backend:  http://localhost:3002
+# ðŸ—„ï¸  Banco:   localhost:5433 (ucm_dev/ucm_dev/dev_password_2026)
+# ðŸ¤– IA:       localhost:11435 (Ollama)
+```
+
+**CaracterÃ­sticas DEV:**
+- âœ… Hot reload automÃ¡tico
+- âœ… Dados de teste prÃ©-carregados
+- âœ… IA Ollama integrada
+- âœ… Mercado Pago sandbox
+- âœ… Logs verbosos
+- âœ… Sem impacto na produÃ§Ã£o
+
+---
+
+## ðŸš€ **INICIANDO AMBIENTE PROD**
+
+```powershell
+# 1. Configurar variÃ¡veis de ambiente
+# Copie .env.example para .env e configure
+
+# 2. Iniciar produÃ§Ã£o
+.\INICIAR-PRODUCAO.ps1
+
+# Acesso PROD:
+# ðŸŒ Site: https://seudominio.com
+# ðŸ”§ API:  https://seudominio.com/api/v1
+```
+
+**CaracterÃ­sticas PROD:**
+- âœ… Nginx com SSL automÃ¡tico
+- âœ… SeguranÃ§a mÃ¡xima
+- âœ… OtimizaÃ§Ã£o de performance
+- âœ… WhatsApp real integrado
+- âœ… Mercado Pago produÃ§Ã£o
+- âœ… Backups automÃ¡ticos
+
+---
+
+## ðŸ“Š **VERIFICANDO STATUS**
+
+```powershell
+# Ver status de ambos os ambientes
+.\STATUS-AMBIENTES.ps1
+```
+
+**SaÃ­da exemplo:**
+```
+ðŸ³ Docker: âœ… rodando
+ðŸ› ï¸  DEV: ðŸŸ¢ RODANDO (3 containers)
+ðŸš€ PROD: ðŸŸ¢ RODANDO (5 containers)
+ðŸ’» Recursos: CPU OK, RAM OK
+ðŸ’¾ Backups: 3 backups disponÃ­veis
+```
+
+---
+
+## ðŸ›‘ **PARANDO AMBIENTES**
+
+```powershell
+# Parar apenas desenvolvimento
+.\PARAR-DEV.ps1
+
+# Parar produÃ§Ã£o (CUIDADO!)
+.\PARAR-PRODUCAO.ps1
+```
+
+---
+
+## ðŸ”§ **CONFIGURAÃ‡ÃƒO .env PARA PRODUÃ‡ÃƒO**
+
+```bash
+# Arquivo .env (produÃ§Ã£o)
+DB_USERNAME=seu_usuario_prod
+DB_PASSWORD=sua_senha_forte_prod
+JWT_SECRET=jwt_secret_muito_forte_prod_2026
+MERCADOPAGO_ACCESS_TOKEN=APP_USR_..._prod
+MERCADOPAGO_PUBLIC_KEY=APP_USR_..._prod
+WHATSAPP_PROVIDER=twilio  # ou evolution
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...
+TWILIO_WHATSAPP_NUMBER=whatsapp:+5511999999999
+DEFAULT_TENANT_ID=prod-tenant-001
+CORS_ORIGIN=https://seudominio.com
+```
+
+---
+
+## ðŸ”„ **FLUXO DE DESENVOLVIMENTO**
+
+### **1. Desenvolvimento**
+```bash
+# Trabalhe no ambiente DEV
+.\INICIAR-DEV.ps1
+# FaÃ§a mudanÃ§as no cÃ³digo
+# Teste em localhost:3003
+```
+
+### **2. Testes**
+```bash
+# Teste funcionalidades
+.\scripts\test-whatsapp-ai.ps1
+# Teste pagamentos
+.\scripts\test-payments-mercadopago.ps1
+```
+
+### **3. Deploy**
+```bash
+# Quando estiver pronto
+.\PARAR-PRODUCAO.ps1  # Para deploy
+# FaÃ§a deploy das mudanÃ§as
+.\INICIAR-PRODUCAO.ps1
+```
+
+---
+
+## ðŸ’¡ **DICAS IMPORTANTES**
+
+### **ðŸš¨ Nunca teste em produÃ§Ã£o:**
+- Use sempre DEV para desenvolvimento
+- PROD Ã© sÃ³ para cÃ³digo testado e aprovado
+
+### **ðŸ’¾ Backups automÃ¡ticos:**
+- ProduÃ§Ã£o faz backup automÃ¡tico antes de parar
+- Backups ficam em `backups/` com timestamp
+
+### **ðŸ”„ AtualizaÃ§Ãµes seguras:**
+- Sempre teste no DEV primeiro
+- FaÃ§a backup antes de atualizar PROD
+- Use migraÃ§Ãµes para mudanÃ§as no banco
+
+### **ðŸ“Š Monitoramento:**
+- Use `.\STATUS-AMBIENTES.ps1` para ver status
+- Logs DEV: `docker logs ucm-backend-dev`
+- Logs PROD: `docker logs ucm-backend-prod`
+
+---
+
+## ðŸŽ¯ **RESUMO**
+
+**Agora vocÃª tem:**
+- **ðŸ› ï¸ DEV**: Ambiente seguro para desenvolvimento
+- **ðŸš€ PROD**: Site pÃºblico otimizado
+- **ðŸ“Š Status**: Monitoramento completo
+- **ðŸ”„ Deploy**: Processo seguro de atualizaÃ§Ãµes
+
+**Workflow perfeito: Desenvolva no DEV â†’ Teste tudo â†’ Deploy no PROD!** ðŸš€âœ¨
+---
+
+## Flags de seguranca e integracoes
+
+```bash
+# Multi-tenant
+ALLOW_TENANT_FROM_REQUEST=true   # dev/test only
+
+# CSRF
+CSRF_ENABLED=false
+CSRF_COOKIE_NAME=csrf-token
+CSRF_HEADER_NAME=x-csrf-token
+CSRF_SESSION_HEADER_NAME=x-csrf-session-token
+
+# OpenAI/Ollama
+OPENAI_API_KEY=
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_TIMEOUT_MS=8000
+OPENAI_ALLOW_NO_KEY=false
+
+# Email (Resend)
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=
+EMAIL_FROM=noreply@your-domain.com
+
+# WhatsApp (Twilio/Evolution)
+WHATSAPP_PROVIDER=twilio
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_WHATSAPP_NUMBER=whatsapp:+5511999999999
+EVOLUTION_API_URL=
+EVOLUTION_API_KEY=
+EVOLUTION_INSTANCE=default
+```
+

@@ -1,12 +1,12 @@
-/**
- * Script para cadastrar produtos reais da mãe (cliente beta)
+﻿/**
+ * Script para cadastrar produtos reais da mÃ£e (cliente beta)
  * 
  * Este script cadastra:
  * - Categorias de doces artesanais
- * - Produtos típicos (bolos, doces, salgados)
+ * - Produtos tÃ­picos (bolos, doces, salgados)
  * - Estoque inicial
  * 
- * Execute: npx ts-node scripts/seed-produtos-mae.ts
+ * Execute: npm run seed:mae (backend)
  */
 
 import { DataSource, EntityManager } from 'typeorm';
@@ -28,11 +28,11 @@ import { ItemPedido } from '../src/database/entities/ItemPedido.entity';
 const TENANT_ID = '00000000-0000-0000-0000-000000000000';
 
   // Produtos REAIS da Loucas por Brigadeiro
-  // Extraído de: https://loucasporbrigadeiro.my.canva.site/loucas-por-brigadeiro
+  // ExtraÃ­do de: https://loucasporbrigadeiro.my.canva.site/loucas-por-brigadeiro
   // 
   // IMPORTANTE: Separado em duas categorias:
   // 1. PRODUTOS DE ENCOMENDA: estoque = 0 (sempre encomenda)
-  // 2. PRODUTOS NORMAIS: têm estoque (vendidos imediatamente)
+  // 2. PRODUTOS NORMAIS: tÃªm estoque (vendidos imediatamente)
   
   // ============================================
   // PRODUTOS DE ENCOMENDA (estoque = 0)
@@ -42,7 +42,7 @@ const PRODUTOS_ENCOMENDA = [
   {
     name: 'Mini Bolo Casadinho',
     price: 48.00,
-    description: 'Mini bolo casadinho, peso aproximado 500 gramas (serve até 4 pessoas)',
+    description: 'Mini bolo casadinho, peso aproximado 500 gramas (serve atÃ© 4 pessoas)',
     unit: 'unidade',
     categoria: 'Bolos',
     estoque: 0, // Sempre encomenda
@@ -51,7 +51,7 @@ const PRODUTOS_ENCOMENDA = [
   {
     name: 'Mini Bolo Ninho com Nutella',
     price: 52.00,
-    description: 'Mini bolo ninho com nutella, peso aproximado 500 gramas (serve até 4 pessoas)',
+    description: 'Mini bolo ninho com nutella, peso aproximado 500 gramas (serve atÃ© 4 pessoas)',
     unit: 'unidade',
     categoria: 'Bolos',
     estoque: 0,
@@ -60,16 +60,16 @@ const PRODUTOS_ENCOMENDA = [
   {
     name: 'Mini Bolo Brigadeiro',
     price: 48.00,
-    description: 'Mini bolo brigadeiro, peso aproximado 500 gramas (serve até 4 pessoas)',
+    description: 'Mini bolo brigadeiro, peso aproximado 500 gramas (serve atÃ© 4 pessoas)',
     unit: 'unidade',
     categoria: 'Bolos',
     estoque: 0,
     min_stock: 0,
   },
   {
-    name: 'Mini Bolo Prestígio',
+    name: 'Mini Bolo PrestÃ­gio',
     price: 48.00,
-    description: 'Mini bolo prestígio, peso aproximado 500 gramas (serve até 4 pessoas)',
+    description: 'Mini bolo prestÃ­gio, peso aproximado 500 gramas (serve atÃ© 4 pessoas)',
     unit: 'unidade',
     categoria: 'Bolos',
     estoque: 0,
@@ -78,9 +78,9 @@ const PRODUTOS_ENCOMENDA = [
   
   // BOLOS GELADOS
   {
-    name: 'Bolo Gelado Delícia de Abacaxi',
+    name: 'Bolo Gelado DelÃ­cia de Abacaxi',
     price: 110.00,
-    description: 'Bolo gelado delícia de abacaxi - serve até 15 pessoas',
+    description: 'Bolo gelado delÃ­cia de abacaxi - serve atÃ© 15 pessoas',
     unit: 'unidade',
     categoria: 'Bolos',
     estoque: 0,
@@ -89,7 +89,7 @@ const PRODUTOS_ENCOMENDA = [
   {
     name: 'Bolo Gelado Doce de Leite com Coco',
     price: 110.00,
-    description: 'Bolo gelado doce de leite com coco - serve até 15 pessoas',
+    description: 'Bolo gelado doce de leite com coco - serve atÃ© 15 pessoas',
     unit: 'unidade',
     categoria: 'Bolos',
     estoque: 0,
@@ -98,16 +98,16 @@ const PRODUTOS_ENCOMENDA = [
   {
     name: 'Bolo Gelado Frutas Vermelhas',
     price: 110.00,
-    description: 'Bolo gelado frutas vermelhas - serve até 15 pessoas',
+    description: 'Bolo gelado frutas vermelhas - serve atÃ© 15 pessoas',
     unit: 'unidade',
     categoria: 'Bolos',
     estoque: 0,
     min_stock: 0,
   },
   {
-    name: 'Bolo Gelado Prestígio',
+    name: 'Bolo Gelado PrestÃ­gio',
     price: 110.00,
-    description: 'Bolo gelado prestígio - serve até 15 pessoas',
+    description: 'Bolo gelado prestÃ­gio - serve atÃ© 15 pessoas',
     unit: 'unidade',
     categoria: 'Bolos',
     estoque: 0,
@@ -116,7 +116,7 @@ const PRODUTOS_ENCOMENDA = [
   {
     name: 'Bolo Gelado Coco',
     price: 120.00,
-    description: 'Bolo gelado coco - serve até 15 pessoas',
+    description: 'Bolo gelado coco - serve atÃ© 15 pessoas',
     unit: 'unidade',
     categoria: 'Bolos',
     estoque: 0,
@@ -125,7 +125,7 @@ const PRODUTOS_ENCOMENDA = [
   {
     name: 'Bolo Gelado Doce de Leite com Ameixa',
     price: 120.00,
-    description: 'Bolo gelado doce de leite com ameixa - serve até 15 pessoas',
+    description: 'Bolo gelado doce de leite com ameixa - serve atÃ© 15 pessoas',
     unit: 'unidade',
     categoria: 'Bolos',
     estoque: 0,
@@ -134,16 +134,16 @@ const PRODUTOS_ENCOMENDA = [
   {
     name: 'Bolo Gelado Dueto Coco Cremoso',
     price: 120.00,
-    description: 'Bolo gelado dueto coco cremoso - serve até 15 pessoas',
+    description: 'Bolo gelado dueto coco cremoso - serve atÃ© 15 pessoas',
     unit: 'unidade',
     categoria: 'Bolos',
     estoque: 0,
     min_stock: 0,
   },
   {
-    name: 'Decoração Opcional Bolo Gelado',
+    name: 'DecoraÃ§Ã£o Opcional Bolo Gelado',
     price: 30.00,
-    description: 'Decoração opcional: 6 morangos + 6 brigadeiros ao leite e 100 grs raspas de chocolate',
+    description: 'DecoraÃ§Ã£o opcional: 6 morangos + 6 brigadeiros ao leite e 100 grs raspas de chocolate',
     unit: 'unidade',
     categoria: 'Bolos',
     estoque: 999,
@@ -154,7 +154,7 @@ const PRODUTOS_ENCOMENDA = [
   {
     name: 'Doces Tradicionais - 1/2 Cento',
     price: 95.00,
-    description: '1/2 cento de doces tradicionais (Beijinho, Brigadeiro tradicional, Leite ninho, Bicho de pé, Prestígio, Paçoca, Sensação)',
+    description: '1/2 cento de doces tradicionais (Beijinho, Brigadeiro tradicional, Leite ninho, Bicho de pÃ©, PrestÃ­gio, PaÃ§oca, SensaÃ§Ã£o)',
     unit: '1/2 cento',
     categoria: 'Doces',
     estoque: 0,
@@ -163,25 +163,25 @@ const PRODUTOS_ENCOMENDA = [
   {
     name: 'Doces Tradicionais - Cento',
     price: 180.00,
-    description: 'Cento de doces tradicionais (Beijinho, Brigadeiro tradicional, Leite ninho, Bicho de pé, Prestígio, Paçoca, Sensação)',
+    description: 'Cento de doces tradicionais (Beijinho, Brigadeiro tradicional, Leite ninho, Bicho de pÃ©, PrestÃ­gio, PaÃ§oca, SensaÃ§Ã£o)',
     unit: 'cento',
     categoria: 'Doces',
     estoque: 0,
     min_stock: 0,
   },
   {
-    name: 'Doces Clássicos - 1/2 Cento',
+    name: 'Doces ClÃ¡ssicos - 1/2 Cento',
     price: 105.00,
-    description: '1/2 cento de doces clássicos (Bicho de pé com nutella, Ninho com nutella, Uva com ninho, Churros, Uva com brigadeiro, Tradicional com nutella, Ferrero rocher)',
+    description: '1/2 cento de doces clÃ¡ssicos (Bicho de pÃ© com nutella, Ninho com nutella, Uva com ninho, Churros, Uva com brigadeiro, Tradicional com nutella, Ferrero rocher)',
     unit: '1/2 cento',
     categoria: 'Doces',
     estoque: 0,
     min_stock: 0,
   },
   {
-    name: 'Doces Clássicos - Cento',
+    name: 'Doces ClÃ¡ssicos - Cento',
     price: 200.00,
-    description: 'Cento de doces clássicos (Bicho de pé com nutella, Ninho com nutella, Uva com ninho, Churros, Uva com brigadeiro, Tradicional com nutella, Ferrero rocher)',
+    description: 'Cento de doces clÃ¡ssicos (Bicho de pÃ© com nutella, Ninho com nutella, Uva com ninho, Churros, Uva com brigadeiro, Tradicional com nutella, Ferrero rocher)',
     unit: 'cento',
     categoria: 'Doces',
     estoque: 0,
@@ -190,9 +190,9 @@ const PRODUTOS_ENCOMENDA = [
   
   // LEMBRANCINHAS
   {
-    name: 'Pão de Mel',
+    name: 'PÃ£o de Mel',
     price: 14.00,
-    description: 'Pão de mel artesanal',
+    description: 'PÃ£o de mel artesanal',
     unit: 'unidade',
     categoria: 'Lembrancinhas',
     estoque: 20,
@@ -264,7 +264,7 @@ const PRODUTOS_ENCOMENDA = [
     min_stock: 0,
   },
   {
-    name: 'Torta de Maracujá',
+    name: 'Torta de MaracujÃ¡',
     price: 110.00,
     description: 'Mousse levinho, base de biscoito, ganache de chocolate ao leite',
     unit: 'unidade',
@@ -273,18 +273,18 @@ const PRODUTOS_ENCOMENDA = [
     min_stock: 0,
   },
   {
-    name: 'Torta de Limão',
+    name: 'Torta de LimÃ£o',
     price: 110.00,
-    description: 'Mousse levinho, base de biscoito, chantilly raspas de limão',
+    description: 'Mousse levinho, base de biscoito, chantilly raspas de limÃ£o',
     unit: 'unidade',
     categoria: 'Sobremesas',
     estoque: 0,
     min_stock: 0,
   },
   {
-    name: 'Torta de Limão Grande',
+    name: 'Torta de LimÃ£o Grande',
     price: 130.00,
-    description: 'Torta de limão inteira - Mousse levinho, base de biscoito, chantilly raspas de limão',
+    description: 'Torta de limÃ£o inteira - Mousse levinho, base de biscoito, chantilly raspas de limÃ£o',
     unit: 'unidade',
     categoria: 'Sobremesas',
     estoque: 0,
@@ -318,7 +318,7 @@ const PRODUTOS_ENCOMENDA = [
     min_stock: 0,
   },
   {
-    name: 'Delícia de Abacaxi',
+    name: 'DelÃ­cia de Abacaxi',
     price: 72.00,
     description: 'Cremoso branquinho, abacaxi, bolo branco e chantilly',
     unit: 'unidade',
@@ -327,9 +327,9 @@ const PRODUTOS_ENCOMENDA = [
     min_stock: 0,
   },
   {
-    name: 'Mousse de Limão',
+    name: 'Mousse de LimÃ£o',
     price: 72.00,
-    description: 'Mousse levinho, farofa biscoito, chantilly raspas de limão',
+    description: 'Mousse levinho, farofa biscoito, chantilly raspas de limÃ£o',
     unit: 'unidade',
     categoria: 'Sobremesas',
     estoque: 0,
@@ -378,8 +378,8 @@ const PRODUTOS_ENCOMENDA = [
   // ============================================
   // PRODUTOS NORMAIS (com estoque - vendidos imediatamente)
   // ============================================
-  // Estes produtos estão disponíveis na loja e podem ser vendidos imediatamente
-  // Extraído do menu direto da loja
+  // Estes produtos estÃ£o disponÃ­veis na loja e podem ser vendidos imediatamente
+  // ExtraÃ­do do menu direto da loja
 const PRODUTOS_NORMAIS = [
   // DOCINHOS
   {
@@ -457,9 +457,9 @@ const PRODUTOS_NORMAIS = [
     min_stock: 10,
   },
   {
-    name: 'Bolo no pote delícia de abacaxi',
+    name: 'Bolo no pote delÃ­cia de abacaxi',
     price: 16.00,
-    description: 'Massa branca, com recheio cremoso de brigadeiro branquinho, com pedaços de abacaxi fresco.',
+    description: 'Massa branca, com recheio cremoso de brigadeiro branquinho, com pedaÃ§os de abacaxi fresco.',
     unit: 'unidade',
     categoria: 'Bolos',
     estoque: 30,
@@ -475,18 +475,18 @@ const PRODUTOS_NORMAIS = [
     min_stock: 10,
   },
   {
-    name: 'Bolo no pote trufado de maracujá',
+    name: 'Bolo no pote trufado de maracujÃ¡',
     price: 16.00,
-    description: 'Massa de chocolate, recheado com mousse de maracujá e brigadeiro ao leite.',
+    description: 'Massa de chocolate, recheado com mousse de maracujÃ¡ e brigadeiro ao leite.',
     unit: 'unidade',
     categoria: 'Bolos',
     estoque: 30,
     min_stock: 10,
   },
   
-  // BOLO VULCÃO
+  // BOLO VULCÃƒO
   {
-    name: 'Mini vulcão de cenoura',
+    name: 'Mini vulcÃ£o de cenoura',
     price: 12.00,
     description: 'Mini bolo de cenoura (massa caseira) coberto com brigadeiro cremoso ao leite. Serve 1 pessoa.',
     unit: 'unidade',
@@ -495,16 +495,16 @@ const PRODUTOS_NORMAIS = [
     min_stock: 8,
   },
   {
-    name: 'Bolo vulcão de cenoura cobertura de brigadeiro',
+    name: 'Bolo vulcÃ£o de cenoura cobertura de brigadeiro',
     price: 52.00,
-    description: 'Bolo caseiro de cenoura, com cobertura de brigadeiro. Obs: MASSA ARTESANAL, FOFINHA, PODENDO RACHAR NO TRANSPORTE DE MOTO. Serve em média 6 pessoas.',
+    description: 'Bolo caseiro de cenoura, com cobertura de brigadeiro. Obs: MASSA ARTESANAL, FOFINHA, PODENDO RACHAR NO TRANSPORTE DE MOTO. Serve em mÃ©dia 6 pessoas.',
     unit: 'unidade',
     categoria: 'Bolos',
     estoque: 5,
     min_stock: 2,
   },
   
-  // DELÍCIAS
+  // DELÃCIAS
   {
     name: 'Bala de brigadeiro',
     price: 12.00,
@@ -515,27 +515,27 @@ const PRODUTOS_NORMAIS = [
     min_stock: 15,
   },
   {
-    name: 'Dose de doçura Brigadeiro e Ninho',
+    name: 'Dose de doÃ§ura Brigadeiro e Ninho',
     price: 22.00,
-    description: 'Brigadeiro de colher: Brigadeiro ao leite cremoso, e brigadeiro ninho, 220 ml. Não é refrigerado, temperatura ambiente!',
+    description: 'Brigadeiro de colher: Brigadeiro ao leite cremoso, e brigadeiro ninho, 220 ml. NÃ£o Ã© refrigerado, temperatura ambiente!',
     unit: 'unidade',
     categoria: 'Doces',
     estoque: 25,
     min_stock: 10,
   },
   {
-    name: 'Dose de doçura Brigadeiro ao leite',
+    name: 'Dose de doÃ§ura Brigadeiro ao leite',
     price: 22.00,
-    description: 'Brigadeiro ao leite cremoso de colher, 220 ml. Não é refrigerado, temperatura ambiente!',
+    description: 'Brigadeiro ao leite cremoso de colher, 220 ml. NÃ£o Ã© refrigerado, temperatura ambiente!',
     unit: 'unidade',
     categoria: 'Doces',
     estoque: 25,
     min_stock: 10,
   },
   {
-    name: 'Dose doçura Ninho com nutella',
+    name: 'Dose doÃ§ura Ninho com nutella',
     price: 22.00,
-    description: 'Brigadeiro de colher: sabor ninho intercalado com nutella, 220 ml. Não é refrigerado, temperatura ambiente!',
+    description: 'Brigadeiro de colher: sabor ninho intercalado com nutella, 220 ml. NÃ£o Ã© refrigerado, temperatura ambiente!',
     unit: 'unidade',
     categoria: 'Doces',
     estoque: 25,
@@ -580,7 +580,7 @@ const PRODUTOS_NORMAIS = [
   {
     name: 'Brownie c/ ninho nutella e kinder',
     price: 13.00,
-    description: 'Pedaço de brownie tradicional, coberto com ninho, nutella e pedaço de kinder.',
+    description: 'PedaÃ§o de brownie tradicional, coberto com ninho, nutella e pedaÃ§o de kinder.',
     unit: 'unidade',
     categoria: 'Doces',
     estoque: 25,
@@ -589,7 +589,7 @@ const PRODUTOS_NORMAIS = [
   {
     name: 'Cestinha de brownie ninho e brigadeiro',
     price: 22.00,
-    description: 'Cestinha banhada na cobertura bland, contendo pedaços de brownie 50% cacau, finalizado com ninho e brigadeiro.',
+    description: 'Cestinha banhada na cobertura bland, contendo pedaÃ§os de brownie 50% cacau, finalizado com ninho e brigadeiro.',
     unit: 'unidade',
     categoria: 'Doces',
     estoque: 20,
@@ -598,7 +598,7 @@ const PRODUTOS_NORMAIS = [
   {
     name: 'Cestinha de brownie brigadeiro ao leite',
     price: 22.00,
-    description: 'Casquinha banhada na cobertura bland, contendo pedaços de brownie 50% cacau, finalizado com brigadeiro ao leite cremoso.',
+    description: 'Casquinha banhada na cobertura bland, contendo pedaÃ§os de brownie 50% cacau, finalizado com brigadeiro ao leite cremoso.',
     unit: 'unidade',
     categoria: 'Doces',
     estoque: 20,
@@ -636,7 +636,7 @@ const PRODUTOS_NORMAIS = [
   
   // BEBIDAS
   {
-    name: 'Água crystal sem gás',
+    name: 'Ãgua crystal sem gÃ¡s',
     price: 4.00,
     description: '500 ml',
     unit: 'unidade',
@@ -645,9 +645,9 @@ const PRODUTOS_NORMAIS = [
     min_stock: 30,
   },
   {
-    name: 'Água crystal com gás',
+    name: 'Ãgua crystal com gÃ¡s',
     price: 5.00,
-    description: 'Conteúdo 500ml',
+    description: 'ConteÃºdo 500ml',
     unit: 'unidade',
     categoria: 'Bebidas',
     estoque: 80,
@@ -665,7 +665,7 @@ const PRODUTOS_NORMAIS = [
   {
     name: 'Mini coca-cola zero',
     price: 3.50,
-    description: '200ml, zero açúcar.',
+    description: '200ml, zero aÃ§Ãºcar.',
     unit: 'unidade',
     categoria: 'Bebidas',
     estoque: 80,
@@ -683,7 +683,7 @@ const PRODUTOS_NORMAIS = [
   {
     name: 'Coca-cola lata zero',
     price: 6.00,
-    description: 'Coca-cola lata, zero açúcar, 350ML.',
+    description: 'Coca-cola lata, zero aÃ§Ãºcar, 350ML.',
     unit: 'unidade',
     categoria: 'Bebidas',
     estoque: 80,
@@ -695,7 +695,7 @@ const PRODUTOS_NORMAIS = [
 const PRODUTOS = [...PRODUTOS_ENCOMENDA, ...PRODUTOS_NORMAIS];
 
 async function seedProdutosMae() {
-  console.log('🌱 Iniciando cadastro de produtos da mãe...\n');
+  console.log('ðŸŒ± Iniciando cadastro de produtos da mÃ£e...\n');
 
   // Criar DataSource
   const dataSource = new DataSource({
@@ -708,7 +708,7 @@ async function seedProdutosMae() {
 
   try {
     await dataSource.initialize();
-    console.log('✅ Conectado ao banco de dados\n');
+    console.log('âœ… Conectado ao banco de dados\n');
 
     // Verificar tenant
     const tenantRepo = dataSource.getRepository(Tenant);
@@ -722,9 +722,9 @@ async function seedProdutosMae() {
         is_active: true,
       });
       tenant = await tenantRepo.save(tenant);
-      console.log('✅ Tenant criado\n');
+      console.log('âœ… Tenant criado\n');
     } else {
-      console.log('✅ Tenant já existe\n');
+      console.log('âœ… Tenant jÃ¡ existe\n');
     }
 
     // Criar/obter categorias
@@ -744,9 +744,9 @@ async function seedProdutosMae() {
           description: `Categoria: ${nomeCategoria}`,
         });
         categoria = await categoriaRepo.save(categoria);
-        console.log(`✅ Categoria criada: ${nomeCategoria}`);
+        console.log(`âœ… Categoria criada: ${nomeCategoria}`);
       } else {
-        console.log(`✅ Categoria já existe: ${nomeCategoria}`);
+        console.log(`âœ… Categoria jÃ¡ existe: ${nomeCategoria}`);
       }
 
       categoriasMap.set(nomeCategoria, categoria);
@@ -779,14 +779,14 @@ async function seedProdutosMae() {
         });
         produto = await produtoRepo.save(produto);
         produtosCriados++;
-        console.log(`✅ Produto criado: ${produtoData.name}`);
+        console.log(`âœ… Produto criado: ${produtoData.name}`);
       } else {
         // Atualizar dados
         produto.price = produtoData.price;
         produto.description = produtoData.description;
         produto = await produtoRepo.save(produto);
         produtosAtualizados++;
-        console.log(`🔄 Produto atualizado: ${produtoData.name}`);
+        console.log(`ðŸ”„ Produto atualizado: ${produtoData.name}`);
       }
 
       // Criar/atualizar estoque
@@ -802,27 +802,27 @@ async function seedProdutosMae() {
           min_stock: produtoData.min_stock,
         });
         await estoqueRepo.save(estoque);
-        console.log(`   📦 Estoque: ${produtoData.estoque} unidades (mínimo: ${produtoData.min_stock})`);
+        console.log(`   ðŸ“¦ Estoque: ${produtoData.estoque} unidades (mÃ­nimo: ${produtoData.min_stock})`);
       } else {
         // Atualizar estoque
         estoque.current_stock = produtoData.estoque;
         estoque.min_stock = produtoData.min_stock;
         await estoqueRepo.save(estoque);
-        console.log(`   📦 Estoque atualizado: ${produtoData.estoque} unidades (mínimo: ${produtoData.min_stock})`);
+        console.log(`   ðŸ“¦ Estoque atualizado: ${produtoData.estoque} unidades (mÃ­nimo: ${produtoData.min_stock})`);
       }
     }
 
-    console.log('\n📊 Resumo:');
+    console.log('\nðŸ“Š Resumo:');
     console.log(`   - Produtos criados: ${produtosCriados}`);
     console.log(`   - Produtos atualizados: ${produtosAtualizados}`);
     console.log(`   - Total de produtos: ${PRODUTOS.length}`);
     console.log(`   - Categorias: ${categoriasUnicas.length}\n`);
 
-    console.log('🎉 Cadastro de produtos concluído com sucesso!');
-    console.log('✅ Produtos prontos para uso no PDV\n');
+    console.log('ðŸŽ‰ Cadastro de produtos concluÃ­do com sucesso!');
+    console.log('âœ… Produtos prontos para uso no PDV\n');
 
   } catch (error: any) {
-    console.error('❌ Erro ao cadastrar produtos:', error.message);
+    console.error('âŒ Erro ao cadastrar produtos:', error.message);
     throw error;
   } finally {
     await dataSource.destroy();
@@ -832,10 +832,10 @@ async function seedProdutosMae() {
 // Executar
 seedProdutosMae()
   .then(() => {
-    console.log('✅ Script concluído!');
+    console.log('âœ… Script concluÃ­do!');
     process.exit(0);
   })
   .catch((error) => {
-    console.error('❌ Erro ao executar script:', error);
+    console.error('âŒ Erro ao executar script:', error);
     process.exit(1);
   });

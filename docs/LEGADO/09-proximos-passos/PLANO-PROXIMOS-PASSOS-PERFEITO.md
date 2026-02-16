@@ -1,0 +1,372 @@
+﻿> LEGADO: documento historico. Fonte de verdade: docs/CONSOLIDADO/README.md
+> Servidor/comandos: docs/CONSOLIDADO/10-SERVIDOR-COMANDOS.md
+# ðŸŽ¯ Plano de Proximos Passos - Buscando a PERFEICAO
+
+> **Data:** 2026-02-10  
+> **Status:** Fase 3.3 em correcao | Proximo: concluir fluxo completo WhatsApp  
+> **Foco:** Sistema consistente e pronto para producao  
+> **ðŸ“Š Ver [BACKEND-OPERACIONAL.md](../04-status/BACKEND-OPERACIONAL.md) para status consolidado**
+
+---
+
+## âœ… O QUE JA ESTA IMPLEMENTADO (STATUS CONSOLIDADO)
+
+### PDV (Ponto de Venda)
+- âœ… Fluxo principal completo
+- âœ… Reserva e liberacao de estoque
+- âœ… Validacoes criticas no backend
+- âœ… Recomendado validar UX e estoque em tempo real
+
+### Backend
+- âœ… Transacoes ACID
+- âœ… Endpoints de reserva/liberacao de estoque
+- âœ… Validacoes robustas
+- âœ… Estrutura WhatsApp preparada
+- âœ… Swagger/OpenAPI, rate limiting e health checks
+- âœ… Testes unitarios e de integracao (validar execucao)
+
+### Gestao de Estoque
+- âœ… Pagina `/admin/estoque` completa
+- âœ… Ajustes de estoque (adicionar/reduzir)
+- âœ… Alertas visuais (estoque baixo)
+- âœ… Endpoints completos
+
+### Dashboard Admin
+- ðŸŸ¡ Dashboard basico completo
+- â³ Analytics avancado pendente
+- â³ Gestao de clientes pendente
+
+---
+
+## âœ… FASE 0: INFRAESTRUTURA (COMPLETA)
+
+**Status:** âœ… **100% COMPLETA**
+
+### 0.1 Swagger/OpenAPI âœ…
+- âœ… Swagger configurado em `/api/docs`
+- âœ… Todos os endpoints documentados
+- âœ… DTOs com `@ApiProperty`
+
+### 0.2 Exception Filters Globais âœ…
+- âœ… `HttpExceptionFilter` global implementado
+- âœ… Erros formatados consistentemente
+- âœ… Logging estruturado
+
+### 0.3 Rate Limiting âœ…
+- âœ… `@nestjs/throttler` configurado
+- âœ… Rate limiting global e restrito
+- âœ… Headers de rate limit
+
+### 0.4 Error Boundaries âœ…
+- âœ… `ErrorBoundary` component criado
+- âœ… Rotas crÃ­ticas envolvidas
+- âœ… Mensagem amigÃ¡vel + retry
+
+### 0.5 Health Checks Completos âœ…
+- âœ… Endpoint `/health` melhorado
+- âœ… VerificaÃ§Ã£o de DB e Redis
+- âœ… Endpoints `/health/ready` e `/health/live`
+
+### 0.6 Testes UnitÃ¡rios âœ…
+- âœ… Testes para `OrdersService` (cobertura > 80%)
+- âœ… Testa transaÃ§Ã£o ACID, validaÃ§Ã£o, race conditions
+
+### 0.7 Testes de IntegraÃ§Ã£o âœ…
+- âœ… Testes para endpoints crÃ­ticos
+- âœ… Testa criaÃ§Ã£o de pedido, validaÃ§Ã£o, autenticaÃ§Ã£o
+
+**Ver [SUCESSO-PDV-FUNCIONANDO.md](../06-implementacoes/SUCESSO-PDV-FUNCIONANDO.md) para detalhes**
+
+---
+
+## âœ… FASE 1: GESTAO DE ESTOQUE (COMPLETA)
+
+**Status:** âœ… **100% COMPLETA**
+
+### 1.1 PÃ¡gina `/admin/estoque` âœ…
+- âœ… Lista de produtos com estoque em tempo real
+- âœ… Busca e filtros
+- âœ… Cards coloridos (verde/amarelo/vermelho)
+- âœ… InformaÃ§Ãµes completas (atual, reservado, disponÃ­vel, mÃ­nimo)
+
+### 1.2 Ajustes de Estoque âœ…
+- âœ… BotÃ£o "+" e "-" para ajustes rÃ¡pidos
+- âœ… Input manual para ajuste preciso
+- âœ… Campo "Motivo do ajuste"
+- âœ… ValidaÃ§Ãµes robustas
+
+### 1.3 Alertas e NotificaÃ§Ãµes âœ…
+- âœ… Lista destacada de produtos com estoque baixo
+- âœ… Contador de produtos crÃ­ticos
+- âœ… NotificaÃ§Ã£o visual quando estoque < mÃ­nimo
+
+### 1.4 Backend Endpoints âœ…
+- âœ… `GET /products/stock-summary`
+- âœ… `POST /products/:id/adjust-stock`
+- âœ… `PATCH /products/:id/min-stock`
+
+---
+
+## ðŸŸ¡ FASE 2: DASHBOARD ADMIN (PARCIAL)
+
+**Status:** ðŸŸ¡ **PARCIAL**
+
+### 2.1 Dashboard Principal âœ…
+- âœ… Cards de mÃ©tricas grandes e visuais
+- âœ… GrÃ¡fico de vendas Ãºltimos 7 dias (Chart.js)
+- âœ… Top 10 produtos mais vendidos
+- âœ… Lista de vendas recentes
+- âœ… AtualizaÃ§Ã£o em tempo real (SWR)
+
+### 2.2 Relatorios Avancados âœ…
+- âœ… `GET /orders/reports/sales` (relatÃ³rio completo)
+- âœ… `GET /orders/reports/sales-by-period`
+- âœ… `GET /orders/reports/top-selling-products`
+- âœ… `GET /orders/reports/sales-by-channel`
+- âœ… `GET /orders/reports/orders-by-status`
+
+### 2.3 Visual e UX âœ…
+- âœ… Gradientes modernos
+- âœ… AnimaÃ§Ãµes suaves
+- âœ… Responsivo (mobile + desktop)
+
+---
+
+## ðŸŽ¯ PROXIMOS PASSOS (ORDEM DE PRIORIDADE)
+
+### FASE 3: Bot WhatsApp (PRIORIDADE MAXIMA) â­â­â­
+
+**Objetivo:** Bot que automatiza 80% das mensagens e coleta encomendas.
+
+**Status:** â³ **PRÃ“XIMO PASSO**
+
+---
+
+### FASE 3: Bot WhatsApp (MVP) â­â­â­
+
+**Objetivo:** Bot que automatiza 80% das mensagens e coleta encomendas.
+
+#### 3.1 Respostas Automaticas para Perguntas Comuns (CONCLUIDO)
+
+**Comandos:**
+- [ ] "CardÃ¡pio" â†’ Lista produtos disponÃ­veis
+- [ ] "PreÃ§o de [produto]" â†’ Mostra preÃ§o e estoque
+- [ ] "Estoque de [produto]" â†’ Mostra estoque disponÃ­vel
+- [ ] "HorÃ¡rio" â†’ Mostra horÃ¡rio de funcionamento
+- [ ] "Ajuda" â†’ Lista comandos disponÃ­veis
+
+**ImplementaÃ§Ã£o:**
+- [ ] Melhorar `WhatsappService.generateSimpleResponse()`
+- [ ] Integrar com `ProductsService` para buscar produtos
+- [ ] FormataÃ§Ã£o de mensagens bonita (emoji, formataÃ§Ã£o)
+
+**Arquivo:** `backend/src/modules/whatsapp/whatsapp.service.ts`
+
+**Tempo estimado:** 1 dia
+
+---
+
+#### 3.2 Processamento de Pedidos Simples (CONCLUIDO)
+
+**Fluxo:**
+```
+Cliente: "Quero 10 brigadeiros"
+Bot: "Perfeito! 10 Brigadeiros = R$ 25,00. Confirmar? (sim/nÃ£o)"
+Cliente: "sim"
+Bot: "Pedido criado! CÃ³digo: #1234. Aguarde confirmaÃ§Ã£o."
+```
+
+**Features:**
+- [ ] Extrair produto e quantidade da mensagem
+- [ ] Validar estoque disponÃ­vel
+- [ ] Criar pedido pendente
+- [ ] Confirmar com cliente
+- [ ] Notificar admin (pÃ¡gina de pedidos pendentes)
+
+**ImplementaÃ§Ã£o:**
+- [ ] Melhorar `OpenAIService.fallbackProcessing()` para extrair intenÃ§Ã£o
+- [ ] Criar endpoint `POST /whatsapp/process-order`
+- [ ] Integrar com `OrdersService` para criar pedido
+
+**Arquivo:** `backend/src/modules/whatsapp/whatsapp.service.ts`
+
+**Tempo estimado:** 2 dias
+
+---
+
+#### 3.3 Fluxo de Confirmacao e Dados do Cliente (PENDENTE)
+
+**Fluxo:**
+```
+Cliente: "Quero encomendar um bolo"
+Bot: "Ã“timo! Que tipo de bolo? (aniversÃ¡rio, casamento, festa)"
+Cliente: "AniversÃ¡rio"
+Bot: "Que tamanho? (pequeno/mÃ©dio/grande)"
+Cliente: "MÃ©dio"
+Bot: "Para quantas pessoas?"
+Cliente: "30 pessoas"
+Bot: "Para quando vocÃª precisa? (dia/mÃªs)"
+Cliente: "15/02"
+Bot: "Algum sabor especÃ­fico?"
+Cliente: "Chocolate com morangos"
+Bot: "Encomenda coletada! Valor: R$ 80,00. Aguarde aprovaÃ§Ã£o."
+```
+
+**Features:**
+- [ ] Estado de conversa (contexto)
+- [ ] Coleta sequencial de informaÃ§Ãµes
+- [ ] ValidaÃ§Ã£o de dados coletados
+- [ ] CriaÃ§Ã£o de encomenda pendente
+- [ ] PÃ¡gina `/admin/encomendas` para aprovar/rejeitar
+
+**ImplementaÃ§Ã£o:**
+- [ ] Criar entidade `Encomenda` (tipo, tamanho, pessoas, data, sabor, status)
+- [ ] Gerenciar estado de conversa (Redis ou DB)
+- [ ] Fluxo de perguntas sequenciais
+- [ ] PÃ¡gina admin para gerenciar encomendas
+
+**Arquivos:**
+- `backend/src/database/entities/Encomenda.entity.ts`
+- `backend/src/modules/whatsapp/services/conversation.service.ts`
+- `frontend/app/admin/encomendas/page.tsx`
+
+**Tempo estimado:** 3-4 dias
+
+---
+
+### FASE 4: Integracao Ollama (IA Local) â­â­
+
+**Objetivo:** Bot mais inteligente usando IA local (gratuita).
+
+#### 4.1 Configurar Ollama
+
+- [ ] Instalar Ollama localmente
+- [ ] Baixar modelo (llama3.2 ou mistral)
+- [ ] Criar serviÃ§o `OllamaService` (similar ao `OpenAIService`)
+- [ ] Substituir `OpenAIService` por `OllamaService`
+
+**Arquivo:** `backend/src/modules/whatsapp/services/ollama.service.ts`
+
+**Documento:** `docs/LEGADO/01-tecnico/14-ADAPTACAO-OLLAMA.md`
+
+**Tempo estimado:** 1 dia
+
+---
+
+#### 4.2 Melhorar Processamento de Mensagens
+
+- [ ] Usar Ollama para entender intenÃ§Ã£o
+- [ ] Extrair entidades (produto, quantidade) com IA
+- [ ] Respostas mais naturais e contextuais
+- [ ] Manter fallback para quando IA falhar
+
+**Tempo estimado:** 2 dias
+
+---
+
+## ðŸ“… TIMELINE RECOMENDADA (ATUALIZADA)
+
+### âœ… CONCLUIDO:
+- âœ… **FASE 0:** Infraestrutura (Swagger, Exception Filters, Rate Limiting, Error Boundaries, Health Checks, Testes)
+- âœ… **FASE 1:** Gestao de Estoque (pagina `/admin/estoque`, ajustes, alertas)
+- ðŸŸ¡ **FASE 2:** Dashboard Admin (basico concluido, avancado pendente)
+
+---
+
+### Esta Semana (Dias 1-3): BOT WHATSAPP (FASE 3.3)
+1. **Respostas AutomÃ¡ticas**
+   - Comandos: "CardÃ¡pio", "PreÃ§o", "Estoque", "HorÃ¡rio"
+   - Integrar com ProductsService
+   - FormataÃ§Ã£o bonita de mensagens
+
+### Proxima Semana (Dias 4-6): PROCESSAMENTO E CONFIRMACAO
+2. **Processamento de Pedidos Simples**
+   - Extrair produto e quantidade da mensagem
+   - Validar estoque
+   - Criar pedido pendente
+   - Confirmar com cliente
+
+### Semana 3 (Dias 7-10): FLUXO COMPLETO E TESTES
+3. **Fluxo de Encomendas**
+   - Estado de conversa (contexto)
+   - Coleta sequencial de informaÃ§Ãµes
+   - CriaÃ§Ã£o de encomenda pendente
+   - PÃ¡gina `/admin/encomendas` para aprovar
+
+### Semana 4 (Dias 11-14): INTEGRACAO OLLAMA
+4. **IntegraÃ§Ã£o Ollama**
+   - Instalar e configurar Ollama
+   - Criar `OllamaService`
+   - Melhorar processamento de mensagens
+   - Respostas mais inteligentes
+
+---
+
+## ðŸŽ¯ CRITERIOS DE PERFEICAO
+
+### GestÃ£o de Estoque:
+- âœ… Visual profissional e intuitivo
+- âœ… AtualizaÃ§Ã£o em tempo real
+- âœ… Alertas automÃ¡ticos
+- âœ… HistÃ³rico completo
+
+### Dashboard:
+- âœ… MÃ©tricas relevantes
+- âœ… Visual impressionante
+- âœ… Dados atualizados
+- âœ… Performance rÃ¡pida
+
+### Bot WhatsApp:
+- âœ… 80% mensagens automatizadas
+- âœ… Respostas naturais
+- âœ… Encomendas coletadas automaticamente
+- âœ… IntegraÃ§Ã£o perfeita com sistema
+
+---
+
+## ðŸš€ PROXIMO PASSO IMEDIATO (ATUALIZADO)
+
+**Comecar pela FASE 3.3: Fluxo completo WhatsApp**
+
+1. **Respostas AutomÃ¡ticas** (comandos bÃ¡sicos)
+2. **Processamento de Pedidos** (extrair intenÃ§Ã£o, validar estoque)
+3. **Fluxo de Encomendas** (coleta de informaÃ§Ãµes, aprovaÃ§Ã£o)
+
+**Depois:** FASE 4 - Integracao Ollama (IA local)
+
+---
+
+## âœ… CRITERIOS DE PERFEICAO (ATUALIZADOS)
+
+### Infraestrutura:
+- âœ… API 100% documentada (Swagger)
+- âœ… Erros tratados consistentemente
+- âœ… ProteÃ§Ã£o contra abuso (rate limiting)
+- âœ… UX perfeita mesmo quando quebra (error boundaries)
+- âœ… Monitoramento completo (health checks)
+
+### GestÃ£o de Estoque:
+- âœ… Visual profissional e intuitivo
+- âœ… AtualizaÃ§Ã£o em tempo real
+- âœ… Alertas automÃ¡ticos
+- âœ… HistÃ³rico completo
+
+### Dashboard:
+- âœ… MÃ©tricas relevantes
+- âœ… Visual impressionante
+- âœ… Dados atualizados
+- âœ… Performance rÃ¡pida
+
+### Bot WhatsApp:
+- âœ… 80% mensagens automatizadas
+- âœ… Respostas naturais
+- âœ… Encomendas coletadas automaticamente
+- âœ… IntegraÃ§Ã£o perfeita com sistema
+
+---
+
+**Ultima atualizacao:** 2026-02-10  
+**Status:** Fase 3.3 em correcao | Proximo: fluxo completo WhatsApp  
+**ðŸ“Š Ver [BACKEND-OPERACIONAL.md](../04-status/BACKEND-OPERACIONAL.md) para status consolidado**
+
+

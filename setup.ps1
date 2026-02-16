@@ -1,3 +1,2 @@
-# Wrapper script para executar setup.ps1
-# Este script mantém compatibilidade com a execução direta da raiz
-& "$PSScriptRoot\scripts\setup\setup.ps1"
+# Wrapper script to keep compatibility with running from repo root.
+& "$PSScriptRoot\scripts\setup\setup.ps1" @args

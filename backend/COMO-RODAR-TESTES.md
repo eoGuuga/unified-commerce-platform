@@ -146,7 +146,7 @@ process.env.ENCRYPTION_KEY = '...'; // Padrão para testes
 
 ## 📚 Documentação Relacionada
 
-- **Setup completo:** `docs/07-setup/COMO-INICIAR-AMBIENTE.md`
+- **Setup completo:** `docs/LEGADO/07-setup/COMO-INICIAR-AMBIENTE.md`
 - **Scripts de teste:** `scripts/test/`
 
 ---

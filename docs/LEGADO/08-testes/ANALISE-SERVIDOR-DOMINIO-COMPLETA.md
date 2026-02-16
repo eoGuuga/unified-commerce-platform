@@ -1,0 +1,236 @@
+﻿> LEGADO: documento historico. Fonte de verdade: docs/CONSOLIDADO/README.md
+> Servidor/comandos: docs/CONSOLIDADO/10-SERVIDOR-COMANDOS.md
+# ðŸ” AnÃ¡lise Completa - Servidor e DomÃ­nio (gtsofthub.com.br)
+
+> **Data:** 09/01/2026  
+> **Status:** âœ… **ANÃLISE COMPLETA REALIZADA**  
+> **DomÃ­nio:** `gtsofthub.com.br`  
+> **Servidor:** VPS Ubuntu (OVHcloud)
+
+> **Atualizacao (2026-01-14):** pontos de HTTPS/Nginx abaixo foram resolvidos.  
+> Ver status atual em `docs/LEGADO/04-status/ATUALIZACAO-2026-01-15.md`.
+
+---
+
+## ðŸ“Š RESUMO EXECUTIVO
+
+### âœ… O Que EstÃ¡ Configurado
+
+1. **DomÃ­nio:** `gtsofthub.com.br` (sem www, com redirect de www)
+2. **Servidor:** VPS Ubuntu rodando Docker Compose
+3. **Stack Completa:** Nginx + Frontend + Backend + PostgreSQL + Redis
+4. **SSL/HTTPS:** Let's Encrypt configurado (certificados em `/etc/letsencrypt/`)
+5. **Backups:** Local diÃ¡rio + Offsite (Backblaze B2 criptografado)
+6. **Monitoramento:** UptimeRobot configurado
+7. **Hardening:** UFW, fail2ban, unattended upgrades
+8. **DocumentaÃ§Ã£o:** Runbook completo de operaÃ§Ã£o
+
+### âš ï¸ Pontos de AtenÃ§Ã£o (verificar)
+
+1. **RenovaÃ§Ã£o automÃ¡tica de certificados** - garantir cron/hook ativo no VPS.
+2. **`FRONTEND_URL` e DNS** - confirmar alinhamento em produÃ§Ã£o e dev.
+
+---
+
+## ðŸ—ï¸ ARQUITETURA EM PRODUÃ‡ÃƒO
+
+### Infraestrutura
+
+```
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚         VPS Ubuntu (OVHcloud)          â”‚
+â”‚         IP: 37.59.118.210              â”‚
+â”‚         Hostname: vps-0e3446f6...      â”‚
+â”‚                                         â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
+â”‚  â”‚  Docker Compose (ProduÃ§Ã£o)       â”‚  â”‚
+â”‚  â”‚                                   â”‚  â”‚
+â”‚  â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”     â”‚  â”‚
+â”‚  â”‚  â”‚  Nginx   â”‚  â”‚ Frontend â”‚     â”‚  â”‚
+â”‚  â”‚  â”‚  :80     â”‚  â”‚  :3000   â”‚     â”‚  â”‚
+â”‚  â”‚  â””â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”˜     â”‚  â”‚
+â”‚  â”‚       â”‚            â”‚            â”‚  â”‚
+â”‚  â”‚  â”Œâ”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”     â”‚  â”‚
+â”‚  â”‚  â”‚      Backend          â”‚     â”‚  â”‚
+â”‚  â”‚  â”‚      :3001            â”‚     â”‚  â”‚
+â”‚  â”‚  â””â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”˜     â”‚  â”‚
+â”‚  â”‚       â”‚              â”‚          â”‚  â”‚
+â”‚  â”‚  â”Œâ”€â”€â”€â”€â–¼â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”   â”‚  â”‚
+â”‚  â”‚  â”‚Postgres â”‚  â”‚   Redis    â”‚   â”‚  â”‚
+â”‚  â”‚  â”‚ :5432   â”‚  â”‚   :6379    â”‚   â”‚  â”‚
+â”‚  â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â”‚  â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+         â”‚
+         â”‚ HTTPS (443) - âœ… CONFIGURADO
+         â”‚ HTTP (80) - âœ… CONFIGURADO
+         â”‚
+         â–¼
+    gtsofthub.com.br
+```
+
+### Containers Docker
+
+| Container | Porta Interna | Porta Externa | Status |
+|-----------|---------------|---------------|--------|
+| `ucm-nginx` | 80 | 80 | âœ… Configurado |
+| `ucm-nginx` | 443 | 443 | âœ… Configurado |
+| `ucm-frontend` | 3000 | - | âœ… Configurado |
+| `ucm-backend` | 3001 | - | âœ… Configurado |
+| `ucm-postgres` | 5432 | - | âœ… Configurado |
+| `ucm-redis` | 6379 | - | âœ… Configurado |
+
+---
+
+## ðŸ”’ SSL/HTTPS - ANÃLISE CRÃTICA
+
+### âœ… O Que Existe
+
+1. **Certificados Let's Encrypt:**
+   - ProduÃ§Ã£o: `/etc/letsencrypt/live/gtsofthub.com.br/`
+   - Dev: `/etc/letsencrypt/live/dev.gtsofthub.com.br/`
+   - Arquivos:
+     - `fullchain.pem` âœ…
+     - `privkey.pem` âœ…
+
+2. **Mencionado no Runbook:**
+   - RenovaÃ§Ã£o: `certbot renew --dry-run` âœ…
+   - DocumentaÃ§Ã£o presente âœ…
+
+### âš ï¸ O Que Ainda Precisa Validar
+
+1. **RenovaÃ§Ã£o automÃ¡tica de certificados:**
+   - Verificar cron/job para `certbot renew`
+   - Garantir reload do Nginx apÃ³s renovaÃ§Ã£o
+
+---
+
+## ðŸ“‹ CONFIGURAÃ‡Ã•ES ATUAIS
+
+### Nginx (`deploy/nginx/ucm.conf`)
+
+**Status:** âœ… **HTTP + HTTPS (80/443)**
+
+```nginx
+server {
+  listen 80;
+  server_name gtsofthub.com.br;
+  return 301 https://gtsofthub.com.br$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  server_name gtsofthub.com.br;
+  ssl_certificate /etc/letsencrypt/live/gtsofthub.com.br/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/gtsofthub.com.br/privkey.pem;
+  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+}
+```
+
+**Status atual:**
+- âœ… Escuta 80 e 443
+- âœ… Certificados SSL montados via `/etc/letsencrypt`
+- âœ… Redirect HTTP â†’ HTTPS
+- âœ… HSTS habilitado
+
+### Docker Compose (`deploy/docker-compose.prod.yml`)
+
+**Status:** âœ… **PORTA 443 MAPEADA**
+
+```yaml
+nginx:
+  ports:
+    - "80:80"
+    - "443:443"
+  volumes:
+    - ./nginx/ucm.conf:/etc/nginx/conf.d/default.conf:ro
+    - /etc/letsencrypt:/etc/letsencrypt:ro
+    - /var/www/certbot:/var/www/certbot:ro
+```
+
+**Status atual:**
+- âœ… Porta 443 mapeada
+- âœ… Certificados SSL montados como volume
+- âœ… Nginx com acesso aos certificados
+
+---
+
+## ðŸ”§ CORREÃ‡Ã•ES APLICADAS (2026-01-14)
+
+- âœ… Nginx com HTTPS ativo (80/443), redirects HTTP â†’ HTTPS e www â†’ sem www.
+- âœ… Docker Compose mapeando 443 e montando `/etc/letsencrypt`.
+- âœ… Certificados para produÃ§Ã£o e dev em `/etc/letsencrypt/live/...`.
+- âœ… Script de renovaÃ§Ã£o disponÃ­vel em `deploy/scripts/renew-ssl.sh`.
+- âš ï¸ Validar cron/hook de renovaÃ§Ã£o no VPS (se ainda nÃ£o configurado).
+
+---
+
+## âœ… CHECKLIST DE PERFEIÃ‡ÃƒO
+
+### SeguranÃ§a
+- [x] âœ… UFW configurado (22/80/443)
+- [x] âœ… Fail2ban ativo
+- [x] âœ… Unattended upgrades
+- [x] âœ… **HTTPS configurado**
+- [x] âœ… **HSTS ativo**
+- [ ] âš ï¸ **RenovaÃ§Ã£o automÃ¡tica SSL** (verificar cron/hook)
+
+### Infraestrutura
+- [x] âœ… Docker Compose funcionando
+- [x] âœ… Containers com health checks
+- [x] âœ… Logs rotacionados
+- [x] âœ… **Porta 443 exposta**
+- [x] âœ… **Certificados montados**
+
+### Backups
+- [x] âœ… Backup local diÃ¡rio
+- [x] âœ… Backup offsite (B2)
+- [x] âœ… Restore drill mensal
+- [x] âœ… Alertas Telegram
+
+### Monitoramento
+- [x] âœ… UptimeRobot configurado
+- [x] âœ… Health checks funcionando
+- [x] âœ… Logs acessÃ­veis
+
+---
+
+## ðŸš¨ PRIORIDADES
+
+### ðŸ”´ CRÃTICO (Fazer Agora)
+
+Nenhuma pendÃªncia crÃ­tica no momento.
+
+### ðŸŸ¡ IMPORTANTE (Fazer Em Breve)
+
+1. **Validar renovaÃ§Ã£o automÃ¡tica SSL**
+   - Cron + `certbot renew --dry-run`
+
+2. **Revalidar URLs**
+   - Prod e dev (`/api/v1/health`)
+
+---
+
+## ðŸ“ PRÃ“XIMOS PASSOS
+
+1. âœ… **ConfiguraÃ§Ã£o HTTPS aplicada no servidor**
+2. âœ… **Docker Compose com 443 e certificados**
+3. âœ… **DocumentaÃ§Ã£o atualizada**
+4. â³ **Confirmar cron de renovaÃ§Ã£o SSL no VPS**
+5. â³ **Monitorar health prod/dev apÃ³s deploys**
+
+---
+
+## ðŸ“š DOCUMENTAÃ‡ÃƒO RELACIONADA
+
+- **Runbook:** `deploy/RUNBOOK-OPERACAO.md`
+- **Checklist Release:** `deploy/CHECKLIST-DE-RELEASE.md`
+- **Deploy:** `deploy/README-PRODUCAO.md`
+- **RelatÃ³rio Completo:** `docs/LEGADO/00-projeto/RELATORIO-COMPLETO-DO-PROJETO-2026.md`
+
+---
+
+**Ãšltima atualizaÃ§Ã£o:** 14/01/2026  
+**Status:** âœ… **ANÃLISE COMPLETA** | âœ… **CORREÃ‡Ã•ES APLICADAS**
+
+

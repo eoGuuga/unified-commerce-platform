@@ -14,7 +14,7 @@ process.env.NODE_PATH = nodeModulesPath;
 require('module').Module._initPaths();
 
 // Executar script
-const scriptPath = path.join(scriptsDir, 'test-acid-transactions.ts');
+const scriptPath = path.join(scriptsDir, 'test', 'test-acid-transactions.ts');
 const envPath = path.join(backendDir, '.env');
 
 try {

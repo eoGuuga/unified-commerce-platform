@@ -1,0 +1,118 @@
+﻿> LEGADO: documento historico. Fonte de verdade: docs/CONSOLIDADO/README.md
+> Servidor/comandos: docs/CONSOLIDADO/10-SERVIDOR-COMANDOS.md
+# ðŸ“š Documentacao Completa - Unified Commerce Platform
+
+> Referencia unica para toda a documentacao ativa do projeto.
+
+---
+
+## âœ… Leia Primeiro
+
+- [`00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`](./00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md)
+- [`INDICE-DOCUMENTACAO.md`](./INDICE-DOCUMENTACAO.md)
+
+---
+
+## ðŸ“ Estrutura Atual
+
+### 00-projeto
+- [`00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`](./00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md)
+- [`01-VISION.md`](./00-projeto/01-VISION.md)
+- [`02-PERSONAS.md`](./00-projeto/02-PERSONAS.md)
+- [`08-ROADMAP.md`](./00-projeto/08-ROADMAP.md)
+- [`09-BUSINESS-MODEL.md`](./00-projeto/09-BUSINESS-MODEL.md)
+- [`11-GO-TO-MARKET.md`](./00-projeto/11-GO-TO-MARKET.md)
+- [`12-VIABILIDADE-ANALISE.md`](./00-projeto/12-VIABILIDADE-ANALISE.md)
+- [`13-CLIENTE-BETA-MAE.md`](./00-projeto/13-CLIENTE-BETA-MAE.md)
+- [`14-ESTRATEGIA-PRODUTOS-REAIS.md`](./00-projeto/14-ESTRATEGIA-PRODUTOS-REAIS.md)
+- [`ANALISE-PERFEICAO-PLANO-MESTRE.md`](./00-projeto/ANALISE-PERFEICAO-PLANO-MESTRE.md)
+- [`ANALISE-ROADMAP-END-TO-END.md`](./00-projeto/ANALISE-ROADMAP-END-TO-END.md)
+- [`RELATORIO-COMPLETO-DO-PROJETO-2026.md`](./00-projeto/RELATORIO-COMPLETO-DO-PROJETO-2026.md)
+
+### 01-tecnico
+- [`03-ARCHITECTURE.md`](./01-tecnico/03-ARCHITECTURE.md)
+- [`03-FEATURES.md`](./01-tecnico/03-FEATURES.md)
+- [`04-DATABASE.md`](./01-tecnico/04-DATABASE.md)
+- [`06-WORKFLOWS.md`](./01-tecnico/06-WORKFLOWS.md)
+- [`07-SECURITY.md`](./01-tecnico/07-SECURITY.md)
+- [`10-SETUP.md`](./01-tecnico/10-SETUP.md)
+- [`12-GLOSSARY.md`](./01-tecnico/12-GLOSSARY.md)
+- [`14-ADAPTACAO-OLLAMA.md`](./01-tecnico/14-ADAPTACAO-OLLAMA.md)
+- [`TENANT-DB-CONTEXT-INTERCEPTOR.md`](./01-tecnico/TENANT-DB-CONTEXT-INTERCEPTOR.md)
+- [`DBCONTEXT-SERVICE.md`](./01-tecnico/DBCONTEXT-SERVICE.md)
+
+### 02-implementacao
+- [`PLANO_IMPLEMENTACAO.md`](./02-implementacao/PLANO_IMPLEMENTACAO.md)
+- [`MVP-FOCADO.md`](./02-implementacao/MVP-FOCADO.md)
+- [`MVP-MAE.md`](./02-implementacao/MVP-MAE.md)
+- [`ROADMAP-EXECUCAO-PERFEITA.md`](./02-implementacao/ROADMAP-EXECUCAO-PERFEITA.md)
+
+### 03-comercial
+- [`DOCUMENTACAO_COMPLETA_PARA_VENDAS.md`](./03-comercial/DOCUMENTACAO_COMPLETA_PARA_VENDAS.md)
+- [`PLANO_ACAO_DOCUMENTACAO.md`](./03-comercial/PLANO_ACAO_DOCUMENTACAO.md)
+
+### 04-status
+- [`BACKEND-OPERACIONAL.md`](./04-status/BACKEND-OPERACIONAL.md)
+- [`ATUALIZACAO-2026-01-15.md`](./04-status/ATUALIZACAO-2026-01-15.md)
+- [`ATUALIZACAO-2026-01-16.md`](./04-status/ATUALIZACAO-2026-01-16.md)
+- [`CHECKLIST-FINAL-PERFEITO.md`](./04-status/CHECKLIST-FINAL-PERFEITO.md)
+
+### 05-correcoes
+- [`RESUMO-CORRECOES-CRITICAS.md`](./05-correcoes/RESUMO-CORRECOES-CRITICAS.md)
+- [`REVISAO-COMPLETA-SEGURANCA-E-PERFORMANCE.md`](./05-correcoes/REVISAO-COMPLETA-SEGURANCA-E-PERFORMANCE.md)
+
+### 06-implementacoes
+- [`PLANO-FASE-3-3-PERFEITO.md`](./06-implementacoes/PLANO-FASE-3-3-PERFEITO.md)
+- [`STATUS-ATUAL-FASE-3-3.md`](./06-implementacoes/STATUS-ATUAL-FASE-3-3.md)
+- [`SUCESSO-PDV-FUNCIONANDO.md`](./06-implementacoes/SUCESSO-PDV-FUNCIONANDO.md)
+- [`SISTEMA-CUPONS-IMPLEMENTADO.md`](./06-implementacoes/SISTEMA-CUPONS-IMPLEMENTADO.md)
+
+### 07-setup
+- [`CHECKLIST-SETUP.md`](./07-setup/CHECKLIST-SETUP.md)
+- [`COMO-INICIAR-AMBIENTE.md`](./07-setup/COMO-INICIAR-AMBIENTE.md)
+- [`PEGAR-CREDENCIAIS-OFICIAIS.md`](./07-setup/PEGAR-CREDENCIAIS-OFICIAIS.md)
+- [`SEPARAR-CHAVES-DEV-PROD.md`](./07-setup/SEPARAR-CHAVES-DEV-PROD.md)
+- [`SETUP-DEV-PROD-MERCADOPAGO.md`](./07-setup/SETUP-DEV-PROD-MERCADOPAGO.md)
+- [`SETUP-INICIAL.md`](./07-setup/SETUP-INICIAL.md)
+- [`SOLUCAO-POWERSHELL.md`](./07-setup/SOLUCAO-POWERSHELL.md)
+- [`VALIDACAO-SETUP.md`](./07-setup/VALIDACAO-SETUP.md)
+
+### 08-testes
+- [`ANALISE-ALINHAMENTO-COMPLETA.md`](./08-testes/ANALISE-ALINHAMENTO-COMPLETA.md)
+- [`ANALISE-SERVIDOR-DOMINIO-COMPLETA.md`](./08-testes/ANALISE-SERVIDOR-DOMINIO-COMPLETA.md)
+- [`RESUMO-TESTES-EXECUTADOS.md`](./08-testes/RESUMO-TESTES-EXECUTADOS.md)
+- [`RESUMO-SINCRONIZACAO-FINAL.md`](./08-testes/RESUMO-SINCRONIZACAO-FINAL.md)
+
+### 09-proximos-passos
+- [`PROXIMOS-PASSOS.md`](./09-proximos-passos/PROXIMOS-PASSOS.md)
+- [`PLANO-PROXIMOS-PASSOS-PERFEITO.md`](./09-proximos-passos/PLANO-PROXIMOS-PASSOS-PERFEITO.md)
+
+### 15-servidor
+- [`AUDITORIA-2026-01-12.md`](./15-servidor/AUDITORIA-2026-01-12.md)
+- [`DEPLOY-ROLLBACK-CHECKLIST.md`](./15-servidor/DEPLOY-ROLLBACK-CHECKLIST.md)
+- [`SSL-TLS.md`](./15-servidor/SSL-TLS.md)
+- [`SERVIDOR-HARDENED-ROOT.md`](./15-servidor/SERVIDOR-HARDENED-ROOT.md)
+- [`SERVIDOR-OTIMIZADO.md`](./15-servidor/SERVIDOR-OTIMIZADO.md)
+
+---
+
+## ðŸ§­ Caminhos Rapidos
+
+### Entender o projeto
+1. [`00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`](./00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md)
+2. [`00-projeto/01-VISION.md`](./00-projeto/01-VISION.md)
+3. [`01-tecnico/03-ARCHITECTURE.md`](./01-tecnico/03-ARCHITECTURE.md)
+
+### Setup e operacao
+1. [`07-setup/SETUP-INICIAL.md`](./07-setup/SETUP-INICIAL.md)
+2. [`07-setup/COMO-INICIAR-AMBIENTE.md`](./07-setup/COMO-INICIAR-AMBIENTE.md)
+3. [`15-servidor/SSL-TLS.md`](./15-servidor/SSL-TLS.md)
+
+### Proximos passos
+1. [`09-proximos-passos/PROXIMOS-PASSOS.md`](./09-proximos-passos/PROXIMOS-PASSOS.md)
+2. [`09-proximos-passos/PLANO-PROXIMOS-PASSOS-PERFEITO.md`](./09-proximos-passos/PLANO-PROXIMOS-PASSOS-PERFEITO.md)
+
+---
+
+Ultima atualizacao: 2026-01-16
+

@@ -9,7 +9,7 @@ const nodeModulesPath = path.join(backendDir, 'node_modules');
 process.env.NODE_PATH = nodeModulesPath;
 require('module').Module._initPaths();
 
-const scriptPath = path.join(scriptsDir, 'seed-usuario-padrao.ts');
+const scriptPath = path.join(scriptsDir, 'seeds', 'seed-usuario-padrao.ts');
 const envPath = path.join(backendDir, '.env');
 
 try {

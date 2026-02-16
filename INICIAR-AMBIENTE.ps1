@@ -1,3 +1,2 @@
-# Wrapper script para executar INICIAR-AMBIENTE.ps1
-# Este script mantém compatibilidade com a execução direta da raiz
-& "$PSScriptRoot\scripts\INICIAR-AMBIENTE.ps1" @args
+# Wrapper script to keep compatibility with running from repo root.
+& "$PSScriptRoot\scripts\dev\INICIAR-AMBIENTE.ps1" @args

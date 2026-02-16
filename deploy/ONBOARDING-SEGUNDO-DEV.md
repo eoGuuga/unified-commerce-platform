@@ -1,36 +1,36 @@
-# Onboarding do 2º Desenvolvedor — gtsofthub.com.br (SaaS)
-> **Objetivo:** colocar uma segunda pessoa produtiva e segura no projeto, sem comprometer produção.
+﻿# Onboarding do 2Âº Desenvolvedor â€” gtsofthub.com.br (SaaS)
+> **Objetivo:** colocar uma segunda pessoa produtiva e segura no projeto, sem comprometer produÃ§Ã£o.
 >
-> **Regra de ouro:** o dev 2 deve conseguir operar com autonomia, mas com **limites** (princípio do menor privilégio).
+> **Regra de ouro:** o dev 2 deve conseguir operar com autonomia, mas com **limites** (princÃ­pio do menor privilÃ©gio).
 
 ---
 
-## 1) Acessos (contas e permissões)
-### 1.1 Repositório e documentação
-- Acesso ao repositório (leitura/escrita conforme papel).
-- Leitura obrigatória:
-  - `docs/00-projeto/00-DOCUMENTO-MESTRE-LEIA-PRIMEIRO.md`
-  - `docs/00-projeto/RELATORIO-COMPLETO-DO-PROJETO-2026.md`
+## 1) Acessos (contas e permissÃµes)
+### 1.1 RepositÃ³rio e documentaÃ§Ã£o
+- Acesso ao repositÃ³rio (leitura/escrita conforme papel).
+- Leitura obrigatÃ³ria:
+  - `docs/CONSOLIDADO/README.md`
+  - `docs/CONSOLIDADO/01-ESTADO-ATUAL.md`
   - `deploy/RUNBOOK-OPERACAO.md`
   - `deploy/README-PRODUCAO.md`
   - `deploy/CHECKLIST-DE-RELEASE.md`
 
-### 1.2 VPS (produção)
-- Acesso SSH **como `ubuntu`** (não root direto).
-- Elevação via `sudo -i` (apenas quando necessário).
+### 1.2 VPS (produÃ§Ã£o)
+- Acesso SSH **como `ubuntu`** (nÃ£o root direto).
+- ElevaÃ§Ã£o via `sudo -i` (apenas quando necessÃ¡rio).
 
-**Recomendação forte (produção):** chaves SSH por usuário (ed25519).  
+**RecomendaÃ§Ã£o forte (produÃ§Ã£o):** chaves SSH por usuÃ¡rio (ed25519).  
 Se optar por senha, manter fail2ban ativo e limites no `sshd_config`.
 
 ---
 
-## Perfil atual do 2º dev (iniciante / frontend-only)
-> Este projeto tem um 2º dev iniciante que vai atuar **apenas no frontend** por enquanto.
+## Perfil atual do 2Âº dev (iniciante / frontend-only)
+> Este projeto tem um 2Âº dev iniciante que vai atuar **apenas no frontend** por enquanto.
 
-### Regras de escopo (obrigatórias)
+### Regras de escopo (obrigatÃ³rias)
 - **Pode mexer:** somente `frontend/**` (UI/UX).
-- **Não pode mexer:** `backend/**`, `deploy/**`, `scripts/**`, `scripts/migrations/**`.
-- **Sem acesso à produção:** sem SSH/VPS, sem `.env`, sem tokens (B2/Telegram/UptimeRobot).
+- **NÃ£o pode mexer:** `backend/**`, `deploy/**`, `scripts/**`, `scripts/migrations/**`.
+- **Sem acesso Ã  produÃ§Ã£o:** sem SSH/VPS, sem `.env`, sem tokens (B2/Telegram/UptimeRobot).
 
 Documento oficial de regras:
 - `frontend/CONTRIBUICAO-FRONTEND-INICIANTE.md`
@@ -39,53 +39,53 @@ Documento oficial de regras:
 
 ## 2) Setup local (Windows/macOS/Linux)
 ### 2.1 Ferramentas
-- Node.js LTS (compatível com o projeto)
+- Node.js LTS (compatÃ­vel com o projeto)
 - Docker Desktop (para Postgres/Redis local)
 - Git
 
 ### 2.2 Subir ambiente dev
-- Documento: `COMO-INICIAR-AMBIENTE.md`
+- Documento: `docs/LEGADO/07-setup/COMO-INICIAR-AMBIENTE.md`
 - Script recomendado: `DEV-RODAR-TUDO.ps1` (Windows)
 
-### 2.3 Padrões de execução
+### 2.3 PadrÃµes de execuÃ§Ã£o
 - Backend: `cd backend && npm run start:dev`
 - Frontend: `cd frontend && npm run dev`
 
 ---
 
-## 3) Padrões de trabalho (processo)
-### 3.1 Branching e revisão
+## 3) PadrÃµes de trabalho (processo)
+### 3.1 Branching e revisÃ£o
 - Sempre trabalhar em branch (ex.: `feat/...`, `fix/...`).
-- PR obrigatório para mudanças significativas (backend/db/prod).
+- PR obrigatÃ³rio para mudanÃ§as significativas (backend/db/prod).
 - Revisar:
-  - alterações em migrations
-  - alterações em autenticação, segurança, RLS
-  - alterações em `deploy/` e scripts
+  - alteraÃ§Ãµes em migrations
+  - alteraÃ§Ãµes em autenticaÃ§Ã£o, seguranÃ§a, RLS
+  - alteraÃ§Ãµes em `deploy/` e scripts
 
-### 3.2 “Gates” antes de merge
+### 3.2 â€œGatesâ€ antes de merge
 Rodar:
 - `npm run lint`
 - `npm run build`
 - `npm run test` (quando houver)
-- E2E relevante (WhatsApp/Orders) quando a mudança tocar fluxo crítico
+- E2E relevante (WhatsApp/Orders) quando a mudanÃ§a tocar fluxo crÃ­tico
 
 ---
 
-## 4) Produção (como operar sem quebrar)
-### 4.1 O que NÃO fazer
-- Não editar `deploy/.env` sem registrar a mudança.
-- Não desativar RLS nem trocar `DB_APP_USER` para superuser.
-- Não abrir portas no firewall sem necessidade.
-- Não expor Swagger externamente.
+## 4) ProduÃ§Ã£o (como operar sem quebrar)
+### 4.1 O que NÃƒO fazer
+- NÃ£o editar `deploy/.env` sem registrar a mudanÃ§a.
+- NÃ£o desativar RLS nem trocar `DB_APP_USER` para superuser.
+- NÃ£o abrir portas no firewall sem necessidade.
+- NÃ£o expor Swagger externamente.
 
-### 4.2 O que fazer (padrão)
+### 4.2 O que fazer (padrÃ£o)
 - Seguir sempre:
   - `deploy/CHECKLIST-DE-RELEASE.md`
   - `deploy/RUNBOOK-OPERACAO.md`
 
 ### 4.3 Onde ficam as coisas (no VPS)
-- Código: `/opt/ucm`
-- Env de produção: `/opt/ucm/deploy/.env`
+- CÃ³digo: `/opt/ucm`
+- Env de produÃ§Ã£o: `/opt/ucm/deploy/.env`
 - Backups locais: `/opt/ucm/backups`
 - Logs:
   - backup local: `/opt/ucm/backups/backup.log`
@@ -106,8 +106,8 @@ Recomendado:
 
 ---
 
-## 6) Secrets e “como guardar”
-**Obrigatório:** usar gerenciador de senhas (Bitwarden/1Password).
+## 6) Secrets e â€œcomo guardarâ€
+**ObrigatÃ³rio:** usar gerenciador de senhas (Bitwarden/1Password).
 
 Itens que devem existir no cofre (sem colar em chat):
 - Acesso ao VPS (credenciais/chaves)
@@ -124,10 +124,10 @@ Fluxo curto:
 2) Acessar VPS por SSH
 3) `docker ps`
 4) `docker logs --tail 200 ucm-backend` e `ucm-nginx`
-5) Reiniciar serviço afetado
+5) Reiniciar serviÃ§o afetado
 6) Confirmar `/api/v1/health/ready`
 
-Referência: `deploy/RUNBOOK-OPERACAO.md`
+ReferÃªncia: `deploy/RUNBOOK-OPERACAO.md`
 
 ---
 
@@ -136,6 +136,6 @@ Referência: `deploy/RUNBOOK-OPERACAO.md`
 - [ ] Conseguiu autenticar e bater health endpoints
 - [ ] Leu o runbook e o checklist de release
 - [ ] Recebeu acesso ao UptimeRobot
-- [ ] Entendeu política de RLS/tenant
+- [ ] Entendeu polÃ­tica de RLS/tenant
 - [ ] Consegue rodar backup/restore drill em ambiente controlado
 
