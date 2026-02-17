@@ -199,6 +199,21 @@ describe('OrdersService', () => {
       },
     ] as MovimentacaoEstoque[];
 
+    const mockProdutos: Partial<Produto>[] = [
+      {
+        id: produtoId1,
+        tenant_id: tenantId,
+        is_active: true,
+        price: 10.5,
+      },
+      {
+        id: produtoId2,
+        tenant_id: tenantId,
+        is_active: true,
+        price: 20.0,
+      },
+    ] as Produto[];
+
     const mockPedido: Partial<Pedido> = {
       id: 'pedido-id',
       tenant_id: tenantId,
@@ -216,17 +231,32 @@ describe('OrdersService', () => {
 
     it('deve criar pedido com sucesso quando há estoque suficiente', async () => {
       // Arrange
-      const queryBuilder = {
+      const estoqueQueryBuilder = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         setLock: jest.fn().mockReturnThis(),
         getMany: jest.fn().mockResolvedValue(mockEstoques),
+      };
+
+      const produtosQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockProdutos),
+      };
+
+      const updateQueryBuilder = {
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
       };
 
-      mockManager.createQueryBuilder = jest.fn(() => queryBuilder as any);
+      mockManager.createQueryBuilder = jest.fn((entity) => {
+        if (entity === MovimentacaoEstoque) return estoqueQueryBuilder as any;
+        if (entity === Produto) return produtosQueryBuilder as any;
+        return updateQueryBuilder as any;
+      });
       mockManager.create = jest.fn().mockReturnValue(mockPedido);
       mockManager.save = jest.fn().mockResolvedValue(mockPedido);
 
@@ -245,8 +275,8 @@ describe('OrdersService', () => {
       expect(result.total_amount).toBe(112.5); // (5 * 10.5) + (3 * 20.0) = 52.5 + 60 = 112.5
       expect(result.status).toBe(PedidoStatus.PENDENTE_PAGAMENTO);
       expect(mockDbContextService.runInTransaction).toHaveBeenCalled();
-      expect(queryBuilder.setLock).toHaveBeenCalledWith('pessimistic_write');
-      expect(queryBuilder.getMany).toHaveBeenCalled();
+      expect(estoqueQueryBuilder.setLock).toHaveBeenCalledWith('pessimistic_write');
+      expect(estoqueQueryBuilder.getMany).toHaveBeenCalled();
       expect(mockManager.save).toHaveBeenCalled();
     });
 
@@ -262,22 +292,27 @@ describe('OrdersService', () => {
       const produtosQueryBuilder = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([
-          { id: produtoId1, tenant_id: tenantId, is_active: true },
-          { id: produtoId2, tenant_id: tenantId, is_active: true },
-        ]),
+        getMany: jest.fn().mockResolvedValue(mockProdutos),
+      };
+
+      const updateQueryBuilder = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
       };
 
       mockManager.createQueryBuilder = jest.fn((entity) => {
         // 1) MovimentacaoEstoque -> getMany retorna estoques
-        if (entity && (entity as any).name === 'MovimentacaoEstoque') {
+        if (entity === MovimentacaoEstoque) {
           return estoqueQueryBuilder as any;
         }
         // 2) Produto -> getMany retorna produtos ativos
-        if (entity && (entity as any).name === 'Produto') {
+        if (entity === Produto) {
           return produtosQueryBuilder as any;
         }
-        return estoqueQueryBuilder as any;
+        return updateQueryBuilder as any;
       });
 
       // ✅ OrdersService agora usa db.runInTransaction
@@ -307,14 +342,32 @@ describe('OrdersService', () => {
         mockEstoques[1],
       ] as MovimentacaoEstoque[];
 
-      const queryBuilder = {
+      const estoqueQueryBuilder = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         setLock: jest.fn().mockReturnThis(),
         getMany: jest.fn().mockResolvedValue(estoquesInsuficientes),
       };
 
-      mockManager.createQueryBuilder = jest.fn(() => queryBuilder as any);
+      const produtosQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockProdutos),
+      };
+
+      const updateQueryBuilder = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      };
+
+      mockManager.createQueryBuilder = jest.fn((entity) => {
+        if (entity === MovimentacaoEstoque) return estoqueQueryBuilder as any;
+        if (entity === Produto) return produtosQueryBuilder as any;
+        return updateQueryBuilder as any;
+      });
 
       mockDbContextService.runInTransaction = jest.fn(async (callback) => {
         return callback(mockManager);
@@ -336,14 +389,32 @@ describe('OrdersService', () => {
         mockEstoques[1],
       ] as MovimentacaoEstoque[];
 
-      const queryBuilder = {
+      const estoqueQueryBuilder = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         setLock: jest.fn().mockReturnThis(),
         getMany: jest.fn().mockResolvedValue(estoquesComReserva),
       };
 
-      mockManager.createQueryBuilder = jest.fn(() => queryBuilder as any);
+      const produtosQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockProdutos),
+      };
+
+      const updateQueryBuilder = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      };
+
+      mockManager.createQueryBuilder = jest.fn((entity) => {
+        if (entity === MovimentacaoEstoque) return estoqueQueryBuilder as any;
+        if (entity === Produto) return produtosQueryBuilder as any;
+        return updateQueryBuilder as any;
+      });
 
       // ✅ OrdersService agora usa db.runInTransaction
       mockDbContextService.runInTransaction = jest.fn(async (callback) => {
@@ -359,21 +430,50 @@ describe('OrdersService', () => {
       // Arrange
       const orderComDesconto: CreateOrderDto = {
         ...createOrderDto,
+        coupon_code: 'CUPOM10',
         discount_amount: 10.0,
         shipping_amount: 5.0,
       };
 
-      const queryBuilder = {
+      const estoqueQueryBuilder = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         setLock: jest.fn().mockReturnThis(),
         getMany: jest.fn().mockResolvedValue(mockEstoques),
+      };
+
+      const produtosQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockProdutos),
+      };
+
+      const updateQueryBuilder = {
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
       };
 
-      mockManager.createQueryBuilder = jest.fn(() => queryBuilder as any);
+      mockManager.createQueryBuilder = jest.fn((entity) => {
+        if (entity === MovimentacaoEstoque) return estoqueQueryBuilder as any;
+        if (entity === Produto) return produtosQueryBuilder as any;
+        return updateQueryBuilder as any;
+      });
+
+      mockCouponsService.findActiveByCode.mockResolvedValueOnce({
+        id: 'coupon-id',
+        tenant_id: tenantId,
+        code: 'CUPOM10',
+        is_active: true,
+      });
+      mockCouponsService.validateCoupon.mockReturnValueOnce({
+        valid: true,
+        discountAmount: 10.0,
+        code: 'CUPOM10',
+      });
+
       const pedidoComDesconto = {
         ...mockPedido,
         subtotal: 112.5,
@@ -403,17 +503,32 @@ describe('OrdersService', () => {
 
     it('deve definir status correto baseado no canal (sempre PENDENTE_PAGAMENTO)', async () => {
       // Arrange
-      const queryBuilder = {
+      const estoqueQueryBuilder = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         setLock: jest.fn().mockReturnThis(),
         getMany: jest.fn().mockResolvedValue(mockEstoques),
+      };
+
+      const produtosQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockProdutos),
+      };
+
+      const updateQueryBuilder = {
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
       };
 
-      mockManager.createQueryBuilder = jest.fn(() => queryBuilder as any);
+      mockManager.createQueryBuilder = jest.fn((entity) => {
+        if (entity === MovimentacaoEstoque) return estoqueQueryBuilder as any;
+        if (entity === Produto) return produtosQueryBuilder as any;
+        return updateQueryBuilder as any;
+      });
       mockManager.create = jest.fn().mockReturnValue(mockPedido);
       mockManager.save = jest.fn().mockResolvedValue(mockPedido);
 
