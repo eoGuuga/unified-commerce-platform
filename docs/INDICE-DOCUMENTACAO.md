@@ -15,7 +15,10 @@ Este indice aponta apenas para a documentacao consolidada.
 - `docs/CONSOLIDADO/09-CRONOLOGIA-DOCS.md`
 - `docs/CONSOLIDADO/10-SERVIDOR-COMANDOS.md`
 
+## Registros
+- Testes_com_sucesso.txt
+
 ## Legado (arquivado)
 - `docs/LEGADO/README.md`
 
-Ultima atualizacao: 2026-02-16
+Ultima atualizacao: 2026-02-22

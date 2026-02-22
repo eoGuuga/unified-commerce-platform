@@ -1,6 +1,7 @@
 # Testes e Validacao (Consolidado)
 
 Ultima atualizacao: 2026-02-22
+Registro consolidado: Testes_com_sucesso.txt
 
 ## Evidencias recentes (DEV/TESTE)
 - E2E WhatsApp PIX validado em 2026-02-13 e 2026-02-14.

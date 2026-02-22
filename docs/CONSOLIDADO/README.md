@@ -3,8 +3,8 @@
 Objetivo: consolidar toda a documentacao antiga em poucos arquivos oficiais (maximo ~10).
 Este diretorio e a fonte de verdade.
 
-Status: FINALIZADO (estrutura completa, conteudo revisado)
-Ultima atualizacao: 2026-02-16
+Status: ATUALIZADO (revisao continua, fonte de verdade)
+Ultima atualizacao: 2026-02-22
 
 ## Estrutura (fonte de verdade)
 1. 01-ESTADO-ATUAL.md
@@ -19,6 +19,7 @@ Ultima atualizacao: 2026-02-16
 10. 10-SERVIDOR-COMANDOS.md
 
 Observacoes:
+- Registro de execucoes de testes: Testes_com_sucesso.txt
 - Os arquivos acima substituem a documentacao espalhada.
 - Documentacao antiga foi movida para docs/LEGADO (nenhum arquivo foi deletado).
 - LEGADO nao e mantido e pode conter comandos desatualizados.

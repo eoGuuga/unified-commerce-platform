@@ -1,7 +1,7 @@
 # Estado Atual (Consolidado)
 
 Status: ATUALIZADO
-Ultima atualizacao: 2026-02-16
+Ultima atualizacao: 2026-02-22
 
 ## Snapshot (codigo + docs mais recentes)
 - Backend operacional com RLS, idempotencia, audit log, cache e health checks.
@@ -18,6 +18,8 @@ Ultima atualizacao: 2026-02-16
 ## Evidencias recentes (DEV/TESTE)
 - 2026-02-13 e 2026-02-14: E2E WhatsApp PIX validado com pedidos e pagamentos confirmados.
 - Exemplos: PED-20260213-A379, PED-20260213-03DD, PED-20260214-189F.
+- 2026-02-22: testes backend (unit/integration/acid) PASS.
+- 2026-02-22: /api/v1/whatsapp/test validado (pedido preparado).
 
 ## Achados criticos da analise de codigo (sem alteracoes)
 1. Webhook WhatsApp em producao pode falhar com RLS.
@@ -37,3 +39,7 @@ Ultima atualizacao: 2026-02-16
 - E-commerce completo (checkout + fluxo de pagamento).
 - Dashboard avancado (relatorios, clientes, exportacao).
 - Refinos de UX no PDV e loja.
+
+## Melhorias recentes (2026-02-22)
+- WhatsApp: selecao de produto prioriza SKU, estoque disponivel e mais recente em caso de duplicados.
+- Scripts: limpeza de duplicados e produtos de teste antigos no DEV/TESTE.

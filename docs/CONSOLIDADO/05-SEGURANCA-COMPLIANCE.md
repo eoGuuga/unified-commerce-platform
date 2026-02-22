@@ -1,6 +1,6 @@
 # Seguranca e Compliance (Consolidado)
 
-Ultima atualizacao: 2026-02-16
+Ultima atualizacao: 2026-02-22
 
 ## Modelo de seguranca (aplicacao)
 - Auth via JWT.
@@ -38,6 +38,7 @@ Ultima atualizacao: 2026-02-16
 - Nao ha SLA formal publicado.
 
 ## Acoes recomendadas (curto prazo)
+- Garantir SEED_DEV_USER=false em producao (seed apenas em dev/test).
 - Definir fluxo oficial de tenant em login e webhooks em producao.
 - Validar audit log e idempotencia com testes e evidencias repetiveis.
 - Consolidar politicas legais (LGPD, privacidade, termos).

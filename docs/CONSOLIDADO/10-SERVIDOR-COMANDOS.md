@@ -1,6 +1,6 @@
 # Servidor - Comandos e Configuracao (Fonte de Verdade)
 
-Ultima atualizacao: 2026-02-16
+Ultima atualizacao: 2026-02-22
 
 ## Escopo e regras
 - Este documento define o passo a passo e os comandos de operacao do servidor.
@@ -137,36 +137,71 @@ cd /opt/ucm-test-repo
 docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.test.yml --project-name ucmtest up -d --build
 ```
 
-### Migrations no dev (manual, sem risco)
+### Migrations no DEV/TESTE (preferencial)
+```bash
+cd /opt/ucm-test-repo
+bash deploy/scripts/run-migrations-test.sh
+```
+
+### Migrations no DEV/TESTE (manual, fallback)
 ```bash
 cd /opt/ucm-test-repo
 for migration in scripts/migrations/*.sql; do
   if [ -f "$migration" ]; then
     echo "Aplicando: $(basename "$migration")"
-    docker exec -i ucm-postgres-dev psql -U postgres -d ucm_dev -v ON_ERROR_STOP=1 < "$migration" || echo "Aviso: migration pode ter falhado (ou ja aplicada)"
+    docker exec -i ucm-postgres-test psql -U postgres -d ucm -v ON_ERROR_STOP=1 < "$migration" || echo "Aviso: migration pode ter falhado (ou ja aplicada)"
   fi
 done
 ```
 
-### Criar usuario do app no dev
+### Criar usuario do app no DEV/TESTE
 ```bash
-docker exec -i ucm-postgres-dev psql -U postgres -d ucm_dev -v ON_ERROR_STOP=1 <<'SQL'
+cd /opt/ucm-test-repo
+set -a; source deploy/.env; set +a
+
+cat <<SQL | docker exec -i ucm-postgres-test psql -U postgres -d ucm -v ON_ERROR_STOP=1
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ucm_app') THEN
-    CREATE ROLE ucm_app LOGIN PASSWORD 'ucm_app_dev_password';
-    GRANT CONNECT ON DATABASE ucm_dev TO ucm_app;
-    GRANT USAGE ON SCHEMA public TO ucm_app;
-    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ucm_app;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ucm_app;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${DB_APP_USER}') THEN
+    EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L', '${DB_APP_USER}', '${DB_APP_PASSWORD}');
   END IF;
 END $$;
+ALTER ROLE ${DB_APP_USER} NOSUPERUSER NOCREATEDB NOCREATEROLE;
+GRANT CONNECT ON DATABASE ucm TO ${DB_APP_USER};
+GRANT USAGE ON SCHEMA public TO ${DB_APP_USER};
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${DB_APP_USER};
+GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO ${DB_APP_USER};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${DB_APP_USER};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO ${DB_APP_USER};
 SQL
 ```
 
 ### Health checks (dev)
 ```bash
 curl -I https://dev.gtsofthub.com.br/api/v1/health
+```
+
+### Limpeza de produtos de teste (DEV/TESTE)
+Duplicados por nome (mantem 1 ativo com estoque):
+```bash
+TENANT_ID=00000000-0000-0000-0000-000000000000 \
+NAME_PATTERN="Produto Teste%" \
+bash deploy/scripts/cleanup-duplicate-products-test.sh
+```
+Produtos antigos por nome (requer OLDER_THAN_DAYS):
+```bash
+TENANT_ID=00000000-0000-0000-0000-000000000000 \
+NAME_PATTERN="%Teste%" \
+OLDER_THAN_DAYS=30 \
+bash deploy/scripts/cleanup-old-test-products-test.sh
+```
+Observacao: se o cache estiver ativo, limpe o Redis apos o cleanup.
+
+### Cache Redis (DEV/TESTE)
+```bash
+set -a; source /opt/ucm-test-repo/deploy/.env; set +a
+
+docker exec -e REDISCLI_AUTH="$REDIS_PASSWORD" ucm-redis-test redis-cli FLUSHDB
 ```
 
 ## Nginx (config e reload)

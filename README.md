@@ -7,10 +7,12 @@ Plataforma SaaS para vendas omnichannel (WhatsApp + PDV + loja online) com estoq
 - `docs/INDICE-DOCUMENTACAO.md`
 - Legado: `docs/LEGADO/README.md`
 
-## Status rapido (2026-02-16)
+## Status rapido (2026-02-22)
 - Producao: https://gtsofthub.com.br (stack em /opt/ucm)
 - DEV/TESTE: https://dev.gtsofthub.com.br (stack em /opt/ucm-test-repo)
+- Testes backend (unit/integration/acid) PASS em 2026-02-22 (ver Testes_com_sucesso.txt)
 - WhatsApp PIX E2E validado em DEV/TESTE (2026-02-13 e 2026-02-14)
+- WhatsApp /whatsapp/test validado em DEV/TESTE (2026-02-22)
 - Pendencias: e-commerce completo e dashboard avancado
 
 ## Stack
@@ -59,4 +61,4 @@ npm run dev
 - A documentacao antiga foi movida para `docs/LEGADO`.
 - Para detalhes operacionais e tecnicos, use o consolidado.
 
-Ultima atualizacao: 2026-02-16
+Ultima atualizacao: 2026-02-22
