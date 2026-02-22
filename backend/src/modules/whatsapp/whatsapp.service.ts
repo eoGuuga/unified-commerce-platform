@@ -1508,7 +1508,10 @@ export class WhatsappService {
         .toLowerCase();
     };
 
-    const pickBestProduct = (candidates: ProductWithStock[]): ProductWithStock | null => {
+    const pickBestProduct = (
+      candidates: ProductWithStock[],
+      queryNormalized?: string,
+    ): ProductWithStock | null => {
       if (!candidates.length) return null;
 
       return candidates.reduce((best, current) => {
@@ -1516,9 +1519,23 @@ export class WhatsappService {
         const currentStock = Number(current.available_stock || 0);
         const bestInStock = bestStock > 0;
         const currentInStock = currentStock > 0;
+        const bestCategoryMatch = !!(
+          queryNormalized &&
+          best.categoria?.name &&
+          queryNormalized.includes(normalize(best.categoria.name))
+        );
+        const currentCategoryMatch = !!(
+          queryNormalized &&
+          current.categoria?.name &&
+          queryNormalized.includes(normalize(current.categoria.name))
+        );
 
         if (bestInStock !== currentInStock) {
           return currentInStock ? current : best;
+        }
+
+        if (bestCategoryMatch !== currentCategoryMatch) {
+          return currentCategoryMatch ? current : best;
         }
 
         if (bestStock !== currentStock) {
@@ -1533,8 +1550,16 @@ export class WhatsappService {
 
     // 1) Tentar match exato do nome completo (inclui casos como "3 beijinhos de coco")
     const queryNormalized = normalize(productName).trim();
+    const skuMatches = produtos.filter(
+      (p) => p.sku && normalize(p.sku).trim() === queryNormalized,
+    );
+    const skuMatch = pickBestProduct(skuMatches, queryNormalized);
+    if (skuMatch) {
+      return { produto: skuMatch };
+    }
+
     const exactMatches = produtos.filter((p) => normalize(p.name).trim() === queryNormalized);
-    const exact = pickBestProduct(exactMatches);
+    const exact = pickBestProduct(exactMatches, queryNormalized);
     if (exact) {
       return { produto: exact };
     }
@@ -1556,6 +1581,7 @@ export class WhatsappService {
           return nomeNormalizado.includes(palavraNormalizada);
         });
       }),
+      queryNormalized,
     );
 
     // Estrategia 2: Buscar por nome completo (query completa)
@@ -1566,6 +1592,7 @@ export class WhatsappService {
           const nomeNormalizado = normalize(p.name);
           return nomeNormalizado.includes(normalize(queryCompleta));
         }),
+        queryNormalized,
       );
     }
 
@@ -1579,6 +1606,7 @@ export class WhatsappService {
             return nomeNormalizado.includes(palavraNormalizada);
           });
         }),
+        queryNormalized,
       );
     }
 
@@ -1607,6 +1635,7 @@ export class WhatsappService {
             nomeNormalizado.startsWith(plural)
           );
         }),
+        queryNormalized,
       );
     }
 
@@ -1634,6 +1663,7 @@ export class WhatsappService {
               const nomeNormalizado = normalize(p.name);
               return variacoes.some((v) => nomeNormalizado.includes(normalize(v)));
             }),
+            queryNormalized,
           );
           if (produto) break;
         }

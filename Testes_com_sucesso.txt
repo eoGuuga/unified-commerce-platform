@@ -1,0 +1,10 @@
+2026-02-22
+- Ambiente: DEV/TESTE (VPS) /opt/ucm-test-repo
+- Commit: 71d23d5
+- Comando: bash deploy/scripts/run-backend-all-tests.sh
+- Unit: 34/34 PASS
+- Integration: 17/17 PASS
+- ACID: PASS (overselling bloqueado e race condition tratada)
+- WhatsApp: /api/v1/whatsapp/test => PEDIDO PREPARADO para "Produto Teste" (2 unidades)
+- Observacao: npm audit reportou 37 vulnerabilidades (2 low, 5 moderate, 30 high)
+

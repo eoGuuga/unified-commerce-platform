@@ -8,6 +8,15 @@ Ultima atualizacao: 2026-02-22
 - Exemplos: PED-20260213-A379, PED-20260213-03DD, PED-20260214-189F.
 
 ## Execucao automatizada registrada (DEV/TESTE)
+Data: 2026-02-22
+- Stack: `/opt/ucm-test-repo` (compose `deploy/docker-compose.test.yml`, project `ucmtest`).
+- Comando: `bash deploy/scripts/run-backend-all-tests.sh`.
+- Unit: 34/34 PASS.
+- Integration: 17/17 PASS.
+- ACID: PASS (overselling bloqueado e race condition tratada).
+- WhatsApp: `/api/v1/whatsapp/test` retornou *PEDIDO PREPARADO* para "Produto Teste".
+- Observacao: `npm audit` reportou 37 vulnerabilidades (2 low, 5 moderate, 30 high) no container de testes.
+
 Data: 2026-02-17
 - Stack: `/opt/ucm-test-repo` (compose `deploy/docker-compose.test.yml`, project `ucmtest`).
 - Migrations aplicadas: inclui `013-add-customer-notes-to-pedidos.sql`.
