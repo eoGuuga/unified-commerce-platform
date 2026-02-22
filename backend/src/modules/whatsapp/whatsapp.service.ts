@@ -1500,7 +1500,7 @@ export class WhatsappService {
   private findProductByName(produtos: ProductWithStock[], productName: string): ProductSearchResult {
     if (!productName) return { produto: null };
 
-    // Normalizar: remover acentos para busca mais flexível
+    // Normalizar: remover acentos para busca mais flexivel
     const normalize = (str: string) => {
       return str
         .normalize('NFD')
@@ -1508,74 +1508,111 @@ export class WhatsappService {
         .toLowerCase();
     };
 
+    const pickBestProduct = (candidates: ProductWithStock[]): ProductWithStock | null => {
+      if (!candidates.length) return null;
+
+      return candidates.reduce((best, current) => {
+        const bestStock = Number(best.available_stock || 0);
+        const currentStock = Number(current.available_stock || 0);
+        const bestInStock = bestStock > 0;
+        const currentInStock = currentStock > 0;
+
+        if (bestInStock !== currentInStock) {
+          return currentInStock ? current : best;
+        }
+
+        if (bestStock !== currentStock) {
+          return currentStock > bestStock ? current : best;
+        }
+
+        const bestDate = new Date(best.created_at || 0).getTime();
+        const currentDate = new Date(current.created_at || 0).getTime();
+        return currentDate > bestDate ? current : best;
+      });
+    };
+
     // 1) Tentar match exato do nome completo (inclui casos como "3 beijinhos de coco")
     const queryNormalized = normalize(productName).trim();
-    const exact = produtos.find((p) => normalize(p.name).trim() === queryNormalized);
+    const exactMatches = produtos.filter((p) => normalize(p.name).trim() === queryNormalized);
+    const exact = pickBestProduct(exactMatches);
     if (exact) {
       return { produto: exact };
     }
 
-    // 2) Fallback: tokenização (mantém tokens numéricos mesmo com 1 char)
+    // 2) Fallback: tokenizacao (mantem tokens numericos mesmo com 1 char)
     const palavras = productName
       .toLowerCase()
       .split(/\s+/)
       .filter((p) => p.length >= 2 || /^\d+$/.test(p));
-    
+
     if (palavras.length === 0) return { produto: null };
 
-    // Estratégia 1: Buscar por nome exato (todas as palavras, sem acentos)
-    let produto = produtos.find(p => {
-      const nomeNormalizado = normalize(p.name);
-      return palavras.every(palavra => {
-        const palavraNormalizada = normalize(palavra);
-        return nomeNormalizado.includes(palavraNormalizada);
-      });
-    });
-
-    // Estratégia 2: Buscar por nome completo (query completa)
-    if (!produto) {
-      const queryCompleta = palavras.join(' ');
-      produto = produtos.find(p => {
+    // Estrategia 1: Buscar por nome exato (todas as palavras, sem acentos)
+    let produto = pickBestProduct(
+      produtos.filter((p) => {
         const nomeNormalizado = normalize(p.name);
-        return nomeNormalizado.includes(normalize(queryCompleta));
-      });
-    }
-
-    // Estratégia 3: Buscar por qualquer palavra (se não encontrou)
-    if (!produto) {
-      produto = produtos.find(p => {
-        const nomeNormalizado = normalize(p.name);
-        return palavras.some(palavra => {
+        return palavras.every((palavra) => {
           const palavraNormalizada = normalize(palavra);
           return nomeNormalizado.includes(palavraNormalizada);
         });
-      });
+      }),
+    );
+
+    // Estrategia 2: Buscar por nome completo (query completa)
+    if (!produto) {
+      const queryCompleta = palavras.join(' ');
+      produto = pickBestProduct(
+        produtos.filter((p) => {
+          const nomeNormalizado = normalize(p.name);
+          return nomeNormalizado.includes(normalize(queryCompleta));
+        }),
+      );
     }
 
-    // Estratégia 4: Buscar por singular/plural (brigadeiro/brigadeiros, bolo/bolos)
+    // Estrategia 3: Buscar por qualquer palavra (se nao encontrou)
+    if (!produto) {
+      produto = pickBestProduct(
+        produtos.filter((p) => {
+          const nomeNormalizado = normalize(p.name);
+          return palavras.some((palavra) => {
+            const palavraNormalizada = normalize(palavra);
+            return nomeNormalizado.includes(palavraNormalizada);
+          });
+        }),
+      );
+    }
+
+    // Estrategia 4: Buscar por singular/plural (brigadeiro/brigadeiros, bolo/bolos)
     if (!produto && palavras.length === 1) {
       const palavra = palavras[0];
       const palavraNormalizada = normalize(palavra);
-      
+
       // Tentar com 's' no final (plural)
       const plural = palavraNormalizada + 's';
       // Tentar sem 's' (singular)
-      const singular = palavraNormalizada.endsWith('s') && palavraNormalizada.length > 4 
-        ? palavraNormalizada.slice(0, -1) 
+      const singular = palavraNormalizada.endsWith('s') && palavraNormalizada.length > 4
+        ? palavraNormalizada.slice(0, -1)
         : palavraNormalizada;
-      
-      produto = produtos.find(p => {
-        const nomeNormalizado = normalize(p.name);
-        // Buscar por palavra singular ou plural (incluindo no início do nome)
-        return nomeNormalizado.includes(singular) || nomeNormalizado.includes(plural) || 
-               nomeNormalizado.startsWith(singular + ' ') || nomeNormalizado.startsWith(plural + ' ') ||
-               nomeNormalizado.startsWith(singular) || nomeNormalizado.startsWith(plural);
-      });
+
+      produto = pickBestProduct(
+        produtos.filter((p) => {
+          const nomeNormalizado = normalize(p.name);
+          // Buscar por palavra singular ou plural (incluindo no inicio do nome)
+          return (
+            nomeNormalizado.includes(singular) ||
+            nomeNormalizado.includes(plural) ||
+            nomeNormalizado.startsWith(singular + ' ') ||
+            nomeNormalizado.startsWith(plural + ' ') ||
+            nomeNormalizado.startsWith(singular) ||
+            nomeNormalizado.startsWith(plural)
+          );
+        }),
+      );
     }
 
-    // Estratégia 5: Busca por similaridade (erros de digitação comuns)
+    // Estrategia 5: Busca por similaridade (erros de digitacao comuns)
     if (!produto) {
-      // Mapeamento de erros comuns de digitação
+      // Mapeamento de erros comuns de digitacao
       const correcoes: Record<string, string[]> = {
         'brigadeiro': ['brigadeiro', 'brigadeiros', 'brigadinho', 'brigadinha'],
         'bolo': ['bolo', 'bolos', 'bolinho', 'bolinha'],
@@ -1583,19 +1620,21 @@ export class WhatsappService {
         'chocolate': ['chocolate', 'chocolat', 'chocolat'],
         'leite': ['leite', 'leite'],
         'ninho': ['ninho', 'nino'],
-        'maracuja': ['maracuja', 'maracujá', 'maracuja'],
+        'maracuja': ['maracuja', 'maracuja', 'maracuja'],
         'beijinho': ['beijinho', 'beijinho', 'beijinho'],
         'cajuzinho': ['cajuzinho', 'cajuzinho'],
         'coxinha': ['coxinha', 'coxinha'],
       };
 
-      // Tentar correções
+      // Tentar correcoes
       for (const [_original, variacoes] of Object.entries(correcoes)) {
-        if (palavras.some(p => variacoes.some(v => normalize(p).includes(normalize(v))))) {
-          produto = produtos.find(p => {
-            const nomeNormalizado = normalize(p.name);
-            return variacoes.some(v => nomeNormalizado.includes(normalize(v)));
-          });
+        if (palavras.some((p) => variacoes.some((v) => normalize(p).includes(normalize(v))))) {
+          produto = pickBestProduct(
+            produtos.filter((p) => {
+              const nomeNormalizado = normalize(p.name);
+              return variacoes.some((v) => nomeNormalizado.includes(normalize(v)));
+            }),
+          );
           if (produto) break;
         }
       }
@@ -1606,9 +1645,9 @@ export class WhatsappService {
       return { produto };
     }
 
-    // Se não encontrou, buscar produtos similares (para sugestões)
+    // Se nao encontrou, buscar produtos similares (para sugestoes)
     const sugestoes = this.findSimilarProducts(produtos, productName);
-    
+
     return { produto: null, sugestoes: sugestoes.length > 0 ? sugestoes : undefined };
   }
 

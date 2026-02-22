@@ -16,8 +16,10 @@ import { TenantDbContextInterceptor } from '../../common/interceptors/tenant-db-
 
 describe('Products Integration Tests (e2e)', () => {
   let app: INestApplication | null = null;
+  let dataSource: DataSource;
   let jwtToken: string;
   const tenantId = '00000000-0000-0000-0000-000000000000';
+  const productName = 'Produto Teste E2E Produtos';
 
   beforeAll(async () => {
     try {
@@ -38,6 +40,8 @@ describe('Products Integration Tests (e2e)', () => {
         ],
       }).compile();
 
+      dataSource = moduleFixture.get<DataSource>(DataSource);
+
       app = moduleFixture.createNestApplication();
       app.useGlobalPipes(
         new ValidationPipe({
@@ -50,7 +54,6 @@ describe('Products Integration Tests (e2e)', () => {
       await app.init();
 
       // Criar usuário de teste no banco para autenticação funcionar
-      const dataSource = moduleFixture.get<DataSource>(DataSource);
       const queryRunner = dataSource.createQueryRunner();
       await queryRunner.connect();
       await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
@@ -123,11 +126,20 @@ describe('Products Integration Tests (e2e)', () => {
         console.log('⏭️ Pulando teste - app não inicializado');
         return;
       }
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      await queryRunner.query(
+        'UPDATE produtos SET is_active = false WHERE tenant_id = $1 AND name = $2',
+        [tenantId, productName],
+      );
+      await queryRunner.release();
+
       const response = await request(app.getHttpServer())
         .post(`/api/v1/products`)
         .set('Authorization', `Bearer ${jwtToken}`)
         .send({
-          name: 'Produto Teste',
+          name: productName,
           price: 15.99,
           description: 'Descrição do produto',
           unit: 'unidade',
@@ -135,7 +147,7 @@ describe('Products Integration Tests (e2e)', () => {
         .expect(201);
 
       expect(response.body).toHaveProperty('id');
-      expect(response.body.name).toBe('Produto Teste');
+      expect(response.body.name).toBe(productName);
       expect(response.body.price).toBe(15.99);
 
       const stockResponse = await request(app.getHttpServer())
@@ -156,7 +168,7 @@ describe('Products Integration Tests (e2e)', () => {
       await request(app.getHttpServer())
         .post(`/api/v1/products`)
         .send({
-          name: 'Produto Teste',
+          name: productName,
           price: 15.99,
         })
         .expect(401);
