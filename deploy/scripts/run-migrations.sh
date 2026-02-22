@@ -24,7 +24,8 @@ for f in \
   "009-rls-force-and-extra-policies.sql" \
   "010-idempotency-unique-tenant-operation.sql" \
   "011-create-pagamentos-table.sql" \
-  "012-tenants-rls-policy.sql"
+  "012-tenants-rls-policy.sql" \
+  "013-add-customer-notes-to-pedidos.sql"
 do
   path="${MIG_DIR}/${f}"
   if [[ -f "${path}" ]]; then

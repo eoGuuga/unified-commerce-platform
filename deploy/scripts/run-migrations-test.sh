@@ -58,6 +58,7 @@ MIGRATIONS=(
   "010-idempotency-unique-tenant-operation.sql"
   "011-create-pagamentos-table.sql"
   "012-tenants-rls-policy.sql"
+  "013-add-customer-notes-to-pedidos.sql"
 )
 
 if [[ "$TABLE_EXISTS" == "t" ]]; then
