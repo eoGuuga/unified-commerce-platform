@@ -14,6 +14,7 @@ Observacao: datas baseadas em metadata do arquivo (LastWriteTime), podem nao ref
 - docs/CONSOLIDADO/06-TESTES-VALIDACAO.md
 - docs/CONSOLIDADO/09-CRONOLOGIA-DOCS.md
 - docs/CONSOLIDADO/10-SERVIDOR-COMANDOS.md
+- docs/CONSOLIDADO/11-CHECKLIST-FINAL-ENTREGA.md
 - Testes_com_sucesso.txt
 
 ## 2026-02-16
@@ -28,6 +29,7 @@ Observacao: datas baseadas em metadata do arquivo (LastWriteTime), podem nao ref
 - docs/CONSOLIDADO/08-COMERCIAL-GO-TO-MARKET.md
 - docs/CONSOLIDADO/09-CRONOLOGIA-DOCS.md
 - docs/CONSOLIDADO/10-SERVIDOR-COMANDOS.md
+- docs/CONSOLIDADO/11-CHECKLIST-FINAL-ENTREGA.md
 ## 2025-01-07
 - docs/LEGADO/07-setup/VALIDACAO-SETUP.md
 

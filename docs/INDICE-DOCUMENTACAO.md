@@ -14,6 +14,7 @@ Este indice aponta apenas para a documentacao consolidada.
 - `docs/CONSOLIDADO/08-COMERCIAL-GO-TO-MARKET.md`
 - `docs/CONSOLIDADO/09-CRONOLOGIA-DOCS.md`
 - `docs/CONSOLIDADO/10-SERVIDOR-COMANDOS.md`
+- `docs/CONSOLIDADO/11-CHECKLIST-FINAL-ENTREGA.md`
 
 ## Registros
 - Testes_com_sucesso.txt

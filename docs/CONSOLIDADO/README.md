@@ -1,6 +1,6 @@
 # Consolidado - Documentacao Oficial
 
-Objetivo: consolidar toda a documentacao antiga em poucos arquivos oficiais (maximo ~10).
+Objetivo: consolidar toda a documentacao antiga em poucos arquivos oficiais (cerca de 10).
 Este diretorio e a fonte de verdade.
 
 Status: ATUALIZADO (revisao continua, fonte de verdade)
@@ -17,6 +17,7 @@ Ultima atualizacao: 2026-02-22
 8. 08-COMERCIAL-GO-TO-MARKET.md
 9. 09-CRONOLOGIA-DOCS.md
 10. 10-SERVIDOR-COMANDOS.md
+11. 11-CHECKLIST-FINAL-ENTREGA.md
 
 Observacoes:
 - Registro de execucoes de testes: Testes_com_sucesso.txt
