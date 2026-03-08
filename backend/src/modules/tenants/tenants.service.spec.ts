@@ -28,6 +28,13 @@ describe('TenantsService', () => {
 
   const mockDbContextService = {
     getRepository: jest.fn(() => mockRepository),
+    runInTransaction: jest.fn(async (callback) => {
+      const mockManager = {
+        query: jest.fn().mockResolvedValue(undefined),
+        getRepository: jest.fn(() => mockRepository),
+      };
+      return callback(mockManager as any);
+    }),
   };
 
   beforeEach(async () => {

@@ -1,7 +1,7 @@
 # Estado Atual (Consolidado)
 
 Status: ATUALIZADO
-Ultima atualizacao: 2026-02-22
+Ultima atualizacao: 2026-03-08
 
 ## Snapshot (codigo + docs mais recentes)
 - Backend operacional com RLS, idempotencia, audit log, cache e health checks.
@@ -21,13 +21,15 @@ Ultima atualizacao: 2026-02-22
 - 2026-02-22: testes backend (unit/integration/acid) PASS.
 - 2026-02-22: /api/v1/whatsapp/test validado (pedido preparado).
 
-## Achados criticos da analise de codigo (sem alteracoes)
-1. Webhook WhatsApp em producao pode falhar com RLS.
-   Motivo: interceptor nao aceita tenant por header/body em prod e webhook nao usa JWT.
-   Impacto: TenantsService.findOneById pode retornar vazio quando RLS estiver ativo.
-2. Login em producao pode falhar com RLS.
-   Motivo: /auth/login em prod nao seta tenant e interceptor ignora header/body.
-   Impacto: query de usuarios pode retornar vazio quando RLS estiver ativo.
+## Achados criticos da analise de codigo (status)
+1. Webhook WhatsApp com RLS em producao.
+   Status: mitigado no codigo em 2026-03-08.
+   Ajuste: TenantsService.findOneById agora seta `app.current_tenant_id` em transacao.
+   Proximo passo: validar em producao com evidencias.
+2. Login com RLS em producao.
+   Status: mitigado no codigo em 2026-03-08.
+   Ajuste: login requer `x-tenant-id` e AuthService seta `app.current_tenant_id` no fluxo de login.
+   Proximo passo: validar em producao com evidencias.
 
 ## Inconsistencias documentais
 - Muitos docs antigos citam Stripe e Supabase, mas o codigo atual usa Mercado Pago e Postgres local.

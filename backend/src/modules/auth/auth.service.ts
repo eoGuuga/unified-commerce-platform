@@ -38,12 +38,24 @@ export class AuthService {
     private readonly db: DbContextService,
   ) {}
 
+  private async runWithTenantContext<T>(
+    tenantId: string,
+    fn: (repo: Repository<Usuario>) => Promise<T>,
+  ): Promise<T> {
+    return this.db.runInTransaction(async (manager) => {
+      await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [tenantId]);
+      return fn(manager.getRepository(Usuario));
+    });
+  }
+
   async login(loginDto: LoginDto, tenantId?: string): Promise<LoginResponse> {
     let usuario: Usuario | null = null;
 
     if (tenantId) {
-      usuario = await this.db.getRepository(Usuario).findOne({
-        where: { email: loginDto.email, tenant_id: tenantId },
+      usuario = await this.runWithTenantContext(tenantId, async (repo) => {
+        return repo.findOne({
+          where: { email: loginDto.email, tenant_id: tenantId },
+        });
       });
     } else {
       const matches = await this.db.getRepository(Usuario).find({
@@ -78,7 +90,11 @@ export class AuthService {
 
     // Atualizar last_login
     usuario.last_login = new Date();
-    await this.db.getRepository(Usuario).save(usuario);
+    if (tenantId) {
+      await this.runWithTenantContext(tenantId, async (repo) => repo.save(usuario));
+    } else {
+      await this.db.getRepository(Usuario).save(usuario);
+    }
 
     const payload: JwtPayload = {
       sub: usuario.id,

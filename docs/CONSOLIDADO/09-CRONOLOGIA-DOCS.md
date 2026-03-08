@@ -6,8 +6,13 @@ Observacao: datas baseadas em metadata do arquivo (LastWriteTime), podem nao ref
 
 ## 2026-03-08
 - deploy/scripts/run-final-delivery-gate.sh
+- backend/src/modules/auth/auth.controller.ts
+- backend/src/modules/auth/auth.service.ts
+- backend/src/modules/tenants/tenants.service.ts
 - docs/CONSOLIDADO/10-SERVIDOR-COMANDOS.md
 - docs/CONSOLIDADO/11-CHECKLIST-FINAL-ENTREGA.md
+- docs/CONSOLIDADO/01-ESTADO-ATUAL.md
+- docs/CONSOLIDADO/05-SEGURANCA-COMPLIANCE.md
 - docs/CONSOLIDADO/09-CRONOLOGIA-DOCS.md
 
 ## 2026-02-22

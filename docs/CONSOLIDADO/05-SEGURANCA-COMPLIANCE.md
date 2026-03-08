@@ -1,6 +1,6 @@
 # Seguranca e Compliance (Consolidado)
 
-Ultima atualizacao: 2026-02-22
+Ultima atualizacao: 2026-03-08
 
 ## Modelo de seguranca (aplicacao)
 - Auth via JWT.
@@ -28,9 +28,9 @@ Ultima atualizacao: 2026-02-22
 - Chaves criticas: JWT_SECRET, ENCRYPTION_KEY, MERCADOPAGO_*, WHATSAPP_*, OPENAI_*, RESEND_*.
 
 ## Riscos e pontos criticos (codigo)
-- Login em producao pode falhar com RLS se tenant nao vier do JWT.
-- Webhook WhatsApp em producao pode falhar com RLS se tenant nao for resolvido.
-- Necessario definir abordagem oficial para tenant em webhooks e login prod.
+- Login em producao com RLS: mitigado em codigo (2026-03-08) exigindo `x-tenant-id` no login e contexto RLS explicito no AuthService.
+- Webhook WhatsApp em producao com RLS: mitigado em codigo (2026-03-08) com contexto RLS explicito no TenantsService.
+- Pendente: validacao em producao com evidencias operacionais (gate final + logs).
 
 ## Compliance (estado atual)
 - LGPD e termos ainda precisam de documentos oficiais.

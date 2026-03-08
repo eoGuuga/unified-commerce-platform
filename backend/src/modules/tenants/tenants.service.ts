@@ -12,8 +12,11 @@ export class TenantsService {
    * Busca um tenant por ID e valida se está ativo
    */
   async findOneById(tenantId: string): Promise<Tenant> {
-    const tenant = await this.dbContext.getRepository(Tenant).findOne({
-      where: { id: tenantId },
+    const tenant = await this.dbContext.runInTransaction(async (manager) => {
+      await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [tenantId]);
+      return manager.getRepository(Tenant).findOne({
+        where: { id: tenantId },
+      });
     });
 
     if (!tenant) {

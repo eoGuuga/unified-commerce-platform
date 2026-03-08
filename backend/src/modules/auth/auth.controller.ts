@@ -22,14 +22,13 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Login realizado com sucesso' })
   @ApiResponse({ status: 401, description: 'Credenciais invalidas' })
   async login(@Body() loginDto: LoginDto, @Request() req: TypedRequest): Promise<LoginResponse> {
-    const isProd = process.env.NODE_ENV === 'production';
     const headerValue = req.headers['x-tenant-id'];
-    const tenantId = !isProd
-      ? (Array.isArray(headerValue) ? headerValue[0] : headerValue)
-      : undefined;
+    const tenantId = Array.isArray(headerValue) ? headerValue[0] : headerValue;
 
-    if (!tenantId && !isProd) {
-      throw new BadRequestException('tenantId e obrigatorio no login em dev/test. Use header x-tenant-id.');
+    if (!tenantId) {
+      throw new BadRequestException(
+        'tenantId e obrigatorio no login. Use header x-tenant-id.',
+      );
     }
 
     return this.authService.login(loginDto, tenantId);
