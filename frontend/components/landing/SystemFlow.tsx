@@ -19,6 +19,12 @@ const CHANNELS = {
   whatsapp: { name: "WhatsApp", color: "bg-emerald-500" },
 }
 
+const SCENARIOS: Omit<SystemEvent, "state">[] = [
+  { id: 1042, channel: "pdv", product: "SKU-7821", quantity: 2 },
+  { id: 1043, channel: "ecommerce", product: "SKU-3349", quantity: 1 },
+  { id: 1044, channel: "whatsapp", product: "SKU-9912", quantity: 3 },
+]
+
 // Evolving SyncPulse - SystemFlow variant (monitoring/observing)
 function SyncPulse({ active, variant = "default" }: { active: boolean; variant?: "default" | "locked" | "resolved" }) {
   const pulseStyles = {
@@ -254,13 +260,6 @@ export function SystemFlow() {
   const sectionRef = useRef<HTMLElement>(null)
   const [isInView, setIsInView] = useState(false)
 
-  // Event scenarios
-  const scenarios: Omit<SystemEvent, "state">[] = [
-    { id: 1042, channel: "pdv", product: "SKU-7821", quantity: 2 },
-    { id: 1043, channel: "ecommerce", product: "SKU-3349", quantity: 1 },
-    { id: 1044, channel: "whatsapp", product: "SKU-9912", quantity: 3 },
-  ]
-
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -275,7 +274,7 @@ export function SystemFlow() {
   useEffect(() => {
     if (!isInView) return
 
-    const scenario = scenarios[cycleCount % scenarios.length]
+    const scenario = SCENARIOS[cycleCount % SCENARIOS.length]
     // Deliberate, mechanical timing
     const states: EventState[] = ["incoming", "processing", "locked", "resolved", "synced", "idle"]
     const timings = [0, 1400, 2800, 4400, 5800, 8500]

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { Toaster, toast } from 'react-hot-toast';
 import useSWR from 'swr';
 import api from '@/lib/api-client';
@@ -1354,7 +1355,14 @@ export default function PDVPage() {
                 )}
                 {paymentMethod === 'pix' && paymentData.qr_code && (
                   <div className="flex flex-col items-center gap-3">
-                    <img src={paymentData.qr_code} alt="QR Code Pix" className="w-48 h-48" />
+                    <Image
+                      src={paymentData.qr_code}
+                      alt="QR Code Pix"
+                      width={192}
+                      height={192}
+                      unoptimized
+                      className="w-48 h-48"
+                    />
                     {paymentData.copy_paste && (
                       <div className="w-full">
                         <label className="text-xs text-gray-500">Copia e cola</label>

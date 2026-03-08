@@ -200,22 +200,25 @@ export function HowItWorks() {
   // Progress animation
   useEffect(() => {
     if (!isInView) return
-    
-    setProgress(0)
+
     const startTime = Date.now()
-    
+    let frameId = 0
+
     const animationFrame = () => {
       const elapsed = Date.now() - startTime
       const newProgress = Math.min((elapsed / STEP_DURATION) * 100, 100)
       setProgress(newProgress)
-      
+
       if (newProgress < 100) {
-        requestAnimationFrame(animationFrame)
+        frameId = requestAnimationFrame(animationFrame)
       }
     }
-    
-    const frameId = requestAnimationFrame(animationFrame)
-    
+
+    frameId = requestAnimationFrame(() => {
+      setProgress(0)
+      animationFrame()
+    })
+
     return () => cancelAnimationFrame(frameId)
   }, [isInView, activeStep])
 
