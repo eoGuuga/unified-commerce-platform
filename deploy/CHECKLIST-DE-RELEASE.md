@@ -119,7 +119,7 @@ curl -I https://www.gtsofthub.com.br/   # deve 301 -> sem www
 ### 4.2 Gate final automatizado (recomendado)
 ```bash
 cd /opt/ucm
-TARGET_ENV=prod PROJECT_NAME=ucm RUN_TESTS=0 \
+TARGET_ENV=prod RUN_TESTS=0 \
 bash deploy/scripts/run-final-delivery-gate.sh
 ```
 

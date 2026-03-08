@@ -18,7 +18,7 @@ TARGET_ENV=devtest RUN_TESTS=1 RUN_WHATSAPP_TEST=1 TENANT_ID=00000000-0000-0000-
 bash deploy/scripts/run-final-delivery-gate.sh
 
 # Producao (sem disparar WhatsApp)
-TARGET_ENV=prod PROJECT_NAME=ucm RUN_TESTS=0 \
+TARGET_ENV=prod RUN_TESTS=0 \
 bash deploy/scripts/run-final-delivery-gate.sh
 ```
 

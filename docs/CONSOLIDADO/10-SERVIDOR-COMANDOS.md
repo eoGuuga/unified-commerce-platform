@@ -296,7 +296,7 @@ bash deploy/scripts/run-final-delivery-gate.sh
 ### Producao
 ```bash
 cd /opt/ucm
-TARGET_ENV=prod PROJECT_NAME=ucm RUN_TESTS=0 \
+TARGET_ENV=prod RUN_TESTS=0 \
 bash deploy/scripts/run-final-delivery-gate.sh
 ```
 

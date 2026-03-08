@@ -6,7 +6,7 @@ set -euo pipefail
 #   TARGET_ENV=devtest bash deploy/scripts/run-final-delivery-gate.sh
 #
 # Uso (producao):
-#   TARGET_ENV=prod PROJECT_NAME=ucm bash deploy/scripts/run-final-delivery-gate.sh
+#   TARGET_ENV=prod bash deploy/scripts/run-final-delivery-gate.sh
 #
 # Flags uteis:
 #   RUN_TESTS=1                # roda deploy/scripts/run-backend-all-tests.sh
@@ -85,6 +85,44 @@ check_cmd() {
   fi
 }
 
+trim_ws() {
+  local value="${1:-}"
+  # remove espacos, tabs e \r/\n para comparacoes robustas
+  echo "$value" | tr -d '[:space:]'
+}
+
+get_running_container() {
+  local service="$1"
+  local by_label by_name
+
+  by_label="$(docker ps \
+    --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
+    --filter "label=com.docker.compose.service=${service}" \
+    --format '{{.Names}}' | head -n 1)"
+  if [[ -n "$by_label" ]]; then
+    echo "$by_label"
+    return 0
+  fi
+
+  if [[ "$TARGET_ENV" == "devtest" ]]; then
+    case "$service" in
+      postgres) by_name="ucm-postgres-test" ;;
+      redis) by_name="ucm-redis-test" ;;
+      *) by_name="" ;;
+    esac
+  else
+    case "$service" in
+      postgres) by_name="ucm-postgres" ;;
+      redis) by_name="ucm-redis" ;;
+      *) by_name="" ;;
+    esac
+  fi
+
+  if [[ -n "$by_name" ]] && docker ps --format '{{.Names}}' | grep -qx "$by_name"; then
+    echo "$by_name"
+  fi
+}
+
 http_code() {
   local url="$1"
   curl -k -sS -o /dev/null -w "%{http_code}" --max-time 20 "$url" || true
@@ -123,13 +161,19 @@ echo "========================================"
 check_cmd "docker disponivel" docker ps
 check_cmd "docker compose disponivel" docker compose version
 
-check_cmd "subir postgres/redis no compose alvo" \
-  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" --project-name "$PROJECT_NAME" up -d postgres redis
+PRE_PG_CONTAINER="$(get_running_container postgres || true)"
+PRE_REDIS_CONTAINER="$(get_running_container redis || true)"
+if [[ -n "$PRE_PG_CONTAINER" && -n "$PRE_REDIS_CONTAINER" ]]; then
+  pass "postgres/redis ja em execucao (skip compose up)"
+else
+  check_cmd "subir postgres/redis no compose alvo" \
+    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" --project-name "$PROJECT_NAME" up -d postgres redis
+fi
 
 STACK_CONTAINERS="$(docker ps \
   --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
   --format '{{.Names}}' | wc -l | tr -d ' ')"
-if [[ "${STACK_CONTAINERS:-0}" -gt 0 ]]; then
+if [[ "${STACK_CONTAINERS:-0}" -gt 0 || -n "${PRE_PG_CONTAINER:-}" || -n "${PRE_REDIS_CONTAINER:-}" ]]; then
   pass "containers do projeto ${PROJECT_NAME} em execucao"
 else
   fail "containers do projeto ${PROJECT_NAME} em execucao"
@@ -184,15 +228,8 @@ if [[ "$TARGET_ENV" == "prod" ]]; then
   fi
 fi
 
-POSTGRES_CONTAINER="$(docker ps \
-  --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
-  --filter "label=com.docker.compose.service=postgres" \
-  --format '{{.Names}}' | head -n 1)"
-
-REDIS_CONTAINER="$(docker ps \
-  --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
-  --filter "label=com.docker.compose.service=redis" \
-  --format '{{.Names}}' | head -n 1)"
+POSTGRES_CONTAINER="$(get_running_container postgres || true)"
+REDIS_CONTAINER="$(get_running_container redis || true)"
 
 if [[ -z "$POSTGRES_CONTAINER" ]]; then
   fail "container postgres encontrado"
@@ -210,14 +247,20 @@ if [[ -n "$POSTGRES_CONTAINER" && -n "${DB_APP_USER:-}" ]]; then
   PG_USER="${POSTGRES_USER:-postgres}"
   PG_DB="${POSTGRES_DB:-ucm}"
   ROLE_ROW="$(docker exec -i "$POSTGRES_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -At \
-    -c "select rolname || '|' || rolsuper || '|' || rolcreatedb || '|' || rolcreaterole from pg_roles where rolname='${DB_APP_USER}'" || true)"
+    -c "select rolname || '|' || rolsuper || '|' || rolcreatedb || '|' || rolcreaterole || '|' || rolreplication || '|' || rolbypassrls from pg_roles where rolname='${DB_APP_USER}'" || true)"
 
   if [[ -z "$ROLE_ROW" ]]; then
     fail "role do app existe no postgres (${DB_APP_USER})"
   else
-    IFS='|' read -r role_name role_super role_createdb role_createrole <<< "$ROLE_ROW"
+    IFS='|' read -r role_name role_super role_createdb role_createrole role_replication role_bypassrls <<< "$ROLE_ROW"
+    role_name="$(trim_ws "$role_name")"
+    role_super="$(trim_ws "$role_super")"
+    role_createdb="$(trim_ws "$role_createdb")"
+    role_createrole="$(trim_ws "$role_createrole")"
+    role_replication="$(trim_ws "$role_replication")"
+    role_bypassrls="$(trim_ws "$role_bypassrls")"
     pass "role do app existe no postgres (${role_name})"
-    if [[ "$role_super" == "f" && "$role_createdb" == "f" && "$role_createrole" == "f" ]]; then
+    if [[ "$role_super" == "f" && "$role_createdb" == "f" && "$role_createrole" == "f" && "$role_replication" == "f" && "$role_bypassrls" == "f" ]]; then
       pass "role do app sem privilegios elevados"
     else
       fail "role do app sem privilegios elevados"
