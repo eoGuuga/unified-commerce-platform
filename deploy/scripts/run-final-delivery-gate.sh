@@ -246,25 +246,31 @@ fi
 if [[ -n "$POSTGRES_CONTAINER" && -n "${DB_APP_USER:-}" ]]; then
   PG_USER="${POSTGRES_USER:-postgres}"
   PG_DB="${POSTGRES_DB:-ucm}"
-  ROLE_ROW="$(docker exec -i "$POSTGRES_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -At \
-    -c "select rolname || '|' || rolsuper || '|' || rolcreatedb || '|' || rolcreaterole || '|' || rolreplication || '|' || rolbypassrls from pg_roles where rolname='${DB_APP_USER}'" || true)"
 
-  if [[ -z "$ROLE_ROW" ]]; then
-    fail "role do app existe no postgres (${DB_APP_USER})"
+  ROLE_EXISTS_COUNT="$(
+    docker exec -i "$POSTGRES_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -At \
+      -c "select count(*) from pg_roles where rolname='${DB_APP_USER}'" 2>/dev/null || echo "0"
+  )"
+  ROLE_EXISTS_COUNT="$(trim_ws "$ROLE_EXISTS_COUNT")"
+
+  if [[ "$ROLE_EXISTS_COUNT" == "1" ]]; then
+    pass "role do app existe no postgres (${DB_APP_USER})"
   else
-    IFS='|' read -r role_name role_super role_createdb role_createrole role_replication role_bypassrls <<< "$ROLE_ROW"
-    role_name="$(trim_ws "$role_name")"
-    role_super="$(trim_ws "$role_super")"
-    role_createdb="$(trim_ws "$role_createdb")"
-    role_createrole="$(trim_ws "$role_createrole")"
-    role_replication="$(trim_ws "$role_replication")"
-    role_bypassrls="$(trim_ws "$role_bypassrls")"
-    pass "role do app existe no postgres (${role_name})"
-    if [[ "$role_super" == "f" && "$role_createdb" == "f" && "$role_createrole" == "f" && "$role_replication" == "f" && "$role_bypassrls" == "f" ]]; then
-      pass "role do app sem privilegios elevados"
-    else
-      fail "role do app sem privilegios elevados"
-    fi
+    fail "role do app existe no postgres (${DB_APP_USER})"
+  fi
+
+  ROLE_HARDENED_COUNT="$(
+    docker exec -i "$POSTGRES_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -At \
+      -c "select count(*) from pg_roles where rolname='${DB_APP_USER}' and not rolsuper and not rolcreatedb and not rolcreaterole and not rolreplication and not rolbypassrls" 2>/dev/null || echo "0"
+  )"
+  ROLE_HARDENED_COUNT="$(trim_ws "$ROLE_HARDENED_COUNT")"
+
+  if [[ "$ROLE_HARDENED_COUNT" == "1" ]]; then
+    pass "role do app sem privilegios elevados"
+  else
+    fail "role do app sem privilegios elevados"
+    docker exec -i "$POSTGRES_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -c \
+      "select rolname, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls from pg_roles where rolname='${DB_APP_USER}'" || true
   fi
 
   RLS_POLICIES="$(docker exec -i "$POSTGRES_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -At \
