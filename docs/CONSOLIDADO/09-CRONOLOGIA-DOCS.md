@@ -1,9 +1,14 @@
 # Cronologia de Documentos (Consolidado)
 
-Ultima atualizacao: 2026-02-22
+Ultima atualizacao: 2026-03-08
 Fonte: _docs_ordered.txt (ordem cronologica por data do arquivo)
 Observacao: datas baseadas em metadata do arquivo (LastWriteTime), podem nao refletir criacao original.
 
+## 2026-03-08
+- deploy/scripts/run-final-delivery-gate.sh
+- docs/CONSOLIDADO/10-SERVIDOR-COMANDOS.md
+- docs/CONSOLIDADO/11-CHECKLIST-FINAL-ENTREGA.md
+- docs/CONSOLIDADO/09-CRONOLOGIA-DOCS.md
 
 ## 2026-02-22
 - README.md

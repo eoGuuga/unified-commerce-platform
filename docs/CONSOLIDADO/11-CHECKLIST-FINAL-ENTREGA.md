@@ -1,8 +1,28 @@
 # Checklist Final de Entrega (Primor)
 
-Ultima atualizacao: 2026-02-22
+Ultima atualizacao: 2026-03-08
 
 Objetivo: fechar o projeto com evidencias objetivas e risco minimo.
+
+## Comando oficial (gate final)
+Execute no servidor do ambiente alvo:
+```bash
+cd /opt/ucm-test-repo   # ou /opt/ucm para producao
+bash deploy/scripts/run-final-delivery-gate.sh
+```
+
+Opcoes uteis:
+```bash
+# DEV/TESTE com testes e WhatsApp
+TARGET_ENV=devtest RUN_TESTS=1 RUN_WHATSAPP_TEST=1 TENANT_ID=00000000-0000-0000-0000-000000000000 \
+bash deploy/scripts/run-final-delivery-gate.sh
+
+# Producao (sem disparar WhatsApp)
+TARGET_ENV=prod PROJECT_NAME=ucm RUN_TESTS=0 \
+bash deploy/scripts/run-final-delivery-gate.sh
+```
+
+Relatorio gerado em: `deploy/reports/final-gate-<ambiente>-<timestamp>.log`.
 
 ## Evidencias obrigatorias
 - Registro de testes: Testes_com_sucesso.txt

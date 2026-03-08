@@ -1,6 +1,6 @@
 # Servidor - Comandos e Configuracao (Fonte de Verdade)
 
-Ultima atualizacao: 2026-02-22
+Ultima atualizacao: 2026-03-08
 
 ## Escopo e regras
 - Este documento define o passo a passo e os comandos de operacao do servidor.
@@ -284,6 +284,25 @@ tail -n 80 /var/log/ucm-restore-drill.log
 3. `docker logs --tail 200 ucm-nginx` e `ucm-backend`
 4. `docker restart <container>`
 5. `curl -I .../health/ready`
+
+## Gate final de entrega (novo padrao)
+### DEV/TESTE
+```bash
+cd /opt/ucm-test-repo
+TARGET_ENV=devtest RUN_TESTS=1 RUN_WHATSAPP_TEST=1 TENANT_ID=00000000-0000-0000-0000-000000000000 \
+bash deploy/scripts/run-final-delivery-gate.sh
+```
+
+### Producao
+```bash
+cd /opt/ucm
+TARGET_ENV=prod PROJECT_NAME=ucm RUN_TESTS=0 \
+bash deploy/scripts/run-final-delivery-gate.sh
+```
+
+### Resultado
+- O script consolida verificacoes de health, env critico, containers, DB role, Redis auth e Nginx.
+- O relatorio final fica em `deploy/reports/final-gate-<ambiente>-<timestamp>.log`.
 
 ## Referencias diretas
 - `deploy/RUNBOOK-OPERACAO.md`

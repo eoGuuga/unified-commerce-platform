@@ -116,6 +116,15 @@ curl -I https://gtsofthub.com.br/api/v1/health/ready
 curl -I https://www.gtsofthub.com.br/   # deve 301 -> sem www
 ```
 
+### 4.2 Gate final automatizado (recomendado)
+```bash
+cd /opt/ucm
+TARGET_ENV=prod PROJECT_NAME=ucm RUN_TESTS=0 \
+bash deploy/scripts/run-final-delivery-gate.sh
+```
+
+O script gera relatorio em `deploy/reports/final-gate-prod-<timestamp>.log`.
+
 ### 4.1 Verificar logs rÃ¡pidos
 ```bash
 docker logs --tail 200 ucm-backend
