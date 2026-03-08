@@ -8,3 +8,15 @@
 - WhatsApp: /api/v1/whatsapp/test => PEDIDO PREPARADO para "Produto Teste" (2 unidades)
 - Observacao: npm audit reportou 37 vulnerabilidades (2 low, 5 moderate, 30 high)
 
+2026-03-08
+- Ambiente: DEV/TESTE (VPS) /opt/ucm-test-repo
+- Commit: 3c5af4b
+- Comando: TARGET_ENV=devtest RUN_TESTS=1 RUN_WHATSAPP_TEST=1 TENANT_ID=00000000-0000-0000-0000-000000000000 bash deploy/scripts/run-final-delivery-gate.sh
+- Gate final: PASS=23 / FAIL=0
+- Relatorio: /opt/ucm-test-repo/deploy/reports/final-gate-devtest-20260308T024601Z.log
+- Unit: 34/34 PASS
+- Integration: 17/17 PASS
+- ACID: PASS (overselling bloqueado e race condition tratada)
+- WhatsApp: /api/v1/whatsapp/test => PEDIDO PREPARADO
+- Observacao: npm audit reportou 19 vulnerabilidades (2 low, 6 moderate, 11 high)
+

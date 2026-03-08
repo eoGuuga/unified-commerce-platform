@@ -20,6 +20,8 @@ Ultima atualizacao: 2026-03-08
 - Exemplos: PED-20260213-A379, PED-20260213-03DD, PED-20260214-189F.
 - 2026-02-22: testes backend (unit/integration/acid) PASS.
 - 2026-02-22: /api/v1/whatsapp/test validado (pedido preparado).
+- 2026-03-08: gate final DEV/TESTE PASS (23/23 checks; FAIL=0).
+- 2026-03-08: testes backend novamente PASS (unit 34/34, integration 17/17, acid PASS).
 
 ## Achados criticos da analise de codigo (status)
 1. Webhook WhatsApp com RLS em producao.

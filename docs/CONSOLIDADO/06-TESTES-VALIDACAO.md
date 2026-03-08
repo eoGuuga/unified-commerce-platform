@@ -1,6 +1,6 @@
 # Testes e Validacao (Consolidado)
 
-Ultima atualizacao: 2026-02-22
+Ultima atualizacao: 2026-03-08
 Registro consolidado: Testes_com_sucesso.txt
 
 ## Evidencias recentes (DEV/TESTE)
@@ -9,6 +9,17 @@ Registro consolidado: Testes_com_sucesso.txt
 - Exemplos: PED-20260213-A379, PED-20260213-03DD, PED-20260214-189F.
 
 ## Execucao automatizada registrada (DEV/TESTE)
+Data: 2026-03-08
+- Stack: `/opt/ucm-test-repo` (compose `deploy/docker-compose.test.yml`, project `ucmtest`).
+- Comando: `TARGET_ENV=devtest RUN_TESTS=1 RUN_WHATSAPP_TEST=1 TENANT_ID=00000000-0000-0000-0000-000000000000 bash deploy/scripts/run-final-delivery-gate.sh`.
+- Gate final: PASS=23 / FAIL=0.
+- Relatorio: `/opt/ucm-test-repo/deploy/reports/final-gate-devtest-20260308T024601Z.log`.
+- Unit: 34/34 PASS.
+- Integration: 17/17 PASS.
+- ACID: PASS (overselling bloqueado e race condition tratada).
+- WhatsApp: `/api/v1/whatsapp/test` retornou *PEDIDO PREPARADO*.
+- Observacao: `npm audit` reportou 19 vulnerabilidades (2 low, 6 moderate, 11 high) no container de testes.
+
 Data: 2026-02-22
 - Stack: `/opt/ucm-test-repo` (compose `deploy/docker-compose.test.yml`, project `ucmtest`).
 - Comando: `bash deploy/scripts/run-backend-all-tests.sh`.

@@ -9,6 +9,8 @@ Observacao: datas baseadas em metadata do arquivo (LastWriteTime), podem nao ref
 - backend/src/modules/auth/auth.controller.ts
 - backend/src/modules/auth/auth.service.ts
 - backend/src/modules/tenants/tenants.service.ts
+- Testes_com_sucesso.txt
+- docs/CONSOLIDADO/06-TESTES-VALIDACAO.md
 - docs/CONSOLIDADO/10-SERVIDOR-COMANDOS.md
 - docs/CONSOLIDADO/11-CHECKLIST-FINAL-ENTREGA.md
 - docs/CONSOLIDADO/01-ESTADO-ATUAL.md
