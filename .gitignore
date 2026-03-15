@@ -34,6 +34,9 @@ yarn-error.log*
 # Testing
 coverage/
 .nyc_output/
+artifacts/
+test-results/
+test-whatsapp-hardening-results-*.json
 
 # Temporary
 tmp/
