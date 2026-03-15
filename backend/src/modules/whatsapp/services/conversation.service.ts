@@ -348,12 +348,16 @@ export class ConversationService {
     metadata: Record<string, unknown> = {},
   ): Promise<WhatsappMessage> {
     const messageRepository = this.db.getRepository(WhatsappMessage);
+    const persistedMessageType = messageType === 'audio' ? 'text' : messageType;
     const message = messageRepository.create({
       conversation_id: conversationId,
       direction,
       body,
-      message_type: messageType,
-      metadata,
+      message_type: persistedMessageType,
+      metadata: {
+        ...metadata,
+        originalMessageType: messageType,
+      },
     });
 
     return await messageRepository.save(message);
