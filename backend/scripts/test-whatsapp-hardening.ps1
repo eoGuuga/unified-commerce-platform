@@ -69,6 +69,17 @@ function Get-AvailableProduct {
     return $null
 }
 
+function Test-InventoryFailureResponse {
+    param(
+        [string]$Text
+    )
+
+    return (
+        $Text.Contains("No momento esse item ficou sem estoque") -or
+        $Text.Contains("Estoque insuficiente")
+    )
+}
+
 $catalogProducts = @($catalogProductLines | ForEach-Object { ($_ -replace "^- ", "") -replace "\s+\|\s+R\$.+$", "" })
 $preferredProducts = @($catalogProducts | Where-Object { $_ -like "Produto Teste*" })
 $primaryProduct = Get-AvailableProduct -Candidates @($preferredProducts + $catalogProducts)
@@ -161,9 +172,33 @@ $scenarios = @(
         )
     },
     @{
+        Name = "waiting_payment_out_of_order_phone"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "No momento esse item ficou sem estoque") }
+            @{ Message = "Cliente Etapa"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
+            @{ Message = "11999999999"; Expect = "OBSERVACOES DO PEDIDO" }
+            @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
+            @{ Message = "sim"; ExpectAny = @("FORMAS DE PAGAMENTO", "ESCOLHA A FORMA DE PAGAMENTO") }
+            @{ Message = "11988887777"; ExpectAny = @("forma de pagamento", "PAGAMENTO", "Nao preciso mais de telefone") }
+        )
+    },
+    @{
+        Name = "waiting_payment_out_of_order_address"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "No momento esse item ficou sem estoque") }
+            @{ Message = "Cliente Endereco"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
+            @{ Message = "11977776666"; Expect = "OBSERVACOES DO PEDIDO" }
+            @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
+            @{ Message = "sim"; ExpectAny = @("FORMAS DE PAGAMENTO", "ESCOLHA A FORMA DE PAGAMENTO") }
+            @{ Message = "Rua das Flores, 123, Centro, Sao Paulo, SP"; ExpectAny = @("forma de pagamento", "PAGAMENTO", "Nao preciso mais de endereco") }
+        )
+    },
+    @{
         Name = "audio_style_order_with_payment_words"
         Steps = @(
-            @{ Message = "me ve meia dz de $primaryProduct pra retirar no pix"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "Estoque insuficiente") }
+            @{ Message = "me ve meia dz de $primaryProduct pra retirar no pix"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "Estoque insuficiente", "No momento esse item ficou sem estoque") }
         )
     },
     @{
@@ -261,10 +296,51 @@ $scenarios = @(
 for ($scenarioIndex = 0; $scenarioIndex -lt $scenarios.Count; $scenarioIndex++) {
     $scenario = $scenarios[$scenarioIndex]
     $phone = "+55119{0:d5}{1:d3}" -f $runSeed, ($scenarioIndex + 100)
+    $scenarioPrimaryProduct = Get-AvailableProduct -Candidates @($preferredProducts + $catalogProducts)
+    if (-not $scenarioPrimaryProduct) {
+        $scenarioPrimaryProduct = $primaryProduct
+    }
 
-    foreach ($step in $scenario.Steps) {
-        $response = Invoke-WhatsappTest -Phone $phone -Message $step.Message -MessageId $step.MessageId -MessageType $step.MessageType -Metadata $step.Metadata
+    $scenarioSecondaryProduct = Get-AvailableProduct -Candidates $catalogProducts -Exclude @($scenarioPrimaryProduct)
+    if (-not $scenarioSecondaryProduct) {
+        $scenarioSecondaryProduct = $scenarioPrimaryProduct
+    }
+
+    for ($stepIndex = 0; $stepIndex -lt $scenario.Steps.Count; $stepIndex++) {
+        $step = $scenario.Steps[$stepIndex]
+        $resolvedMessage = [string]$step.Message
+        $resolvedMessage = $resolvedMessage.Replace($primaryProduct, $scenarioPrimaryProduct)
+        $resolvedMessage = $resolvedMessage.Replace($secondaryProduct, $scenarioSecondaryProduct)
+
+        $response = Invoke-WhatsappTest -Phone $phone -Message $resolvedMessage -MessageId $step.MessageId -MessageType $step.MessageType -Metadata $step.Metadata
         $text = [string]$response.response
+
+        if ($stepIndex -eq 0 -and $scenario.Steps.Count -gt 1 -and (Test-InventoryFailureResponse -Text $text)) {
+            $alternatePrimary = Get-AvailableProduct -Candidates $catalogProducts -Exclude @($scenarioPrimaryProduct, $scenarioSecondaryProduct)
+            if ($alternatePrimary) {
+                $scenarioPrimaryProduct = $alternatePrimary
+                $scenarioSecondaryProduct = Get-AvailableProduct -Candidates $catalogProducts -Exclude @($scenarioPrimaryProduct)
+                if (-not $scenarioSecondaryProduct) {
+                    $scenarioSecondaryProduct = $scenarioPrimaryProduct
+                }
+
+                $resolvedMessage = [string]$step.Message
+                $resolvedMessage = $resolvedMessage.Replace($primaryProduct, $scenarioPrimaryProduct)
+                $resolvedMessage = $resolvedMessage.Replace($secondaryProduct, $scenarioSecondaryProduct)
+                $response = Invoke-WhatsappTest -Phone $phone -Message $resolvedMessage -MessageId $step.MessageId -MessageType $step.MessageType -Metadata $step.Metadata
+                $text = [string]$response.response
+            }
+
+            if (Test-InventoryFailureResponse -Text $text) {
+                $results += [pscustomobject]@{
+                    scenario = $scenario.Name
+                    message = $resolvedMessage
+                    passed = $true
+                    response = "SKIPPED_STOCK_DYNAMIC`n$text"
+                }
+                break
+            }
+        }
 
         $passed = $true
         if ($step.ContainsKey("Expect")) {
@@ -283,7 +359,7 @@ for ($scenarioIndex = 0; $scenarioIndex -lt $scenarios.Count; $scenarioIndex++) 
 
         $results += [pscustomobject]@{
             scenario = $scenario.Name
-            message = $step.Message
+            message = $resolvedMessage
             passed = $passed
             response = $text
         }

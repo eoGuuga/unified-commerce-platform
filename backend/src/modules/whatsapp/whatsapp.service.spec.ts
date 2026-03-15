@@ -118,6 +118,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       config,
       conversationService,
       ordersService,
+      paymentsService,
       productsService,
     };
   };
@@ -532,6 +533,84 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('/pedido?order=PED-20260315-CACE');
   });
 
+  it('guides stale customer data back to payment when the order is already waiting payment', async () => {
+    const { service, paymentsService } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue(pendingOrder),
+      },
+    });
+
+    const response = await service.generateResponse(
+      '11999998888',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'waiting_payment',
+          waiting_payment: true,
+          pedido_id: 'ord-1',
+        },
+      }),
+    );
+
+    expect(paymentsService.createPayment).not.toHaveBeenCalled();
+    expect(response).toContain('forma de pagamento');
+    expect(response).toContain('PED-20260315-CACE');
+  });
+
+  it('does not create a second payment when the order is already confirmed', async () => {
+    const { service, paymentsService } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue(confirmedOrder),
+      },
+    });
+
+    const response = await service.generateResponse(
+      'pix',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'order_confirmed',
+          waiting_payment: false,
+          pedido_id: 'ord-1',
+        },
+      }),
+    );
+
+    expect(paymentsService.createPayment).not.toHaveBeenCalled();
+    expect(response).toContain('nao precisa ser escolhido novamente');
+    expect(response).toContain('PED-20260315-CACE');
+  });
+
+  it('redirects stale address replies to tracking after order completion', async () => {
+    const deliveredOrder = {
+      ...pendingOrder,
+      status: PedidoStatus.ENTREGUE,
+    };
+    const { service } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue(deliveredOrder),
+      },
+    });
+
+    const response = await service.generateResponse(
+      'Rua das Flores, 123, Centro, Sao Paulo, SP',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'order_completed',
+          waiting_payment: false,
+          pedido_id: 'ord-1',
+        },
+      }),
+    );
+
+    expect(response).toContain('concluiu a jornada');
+    expect(response).toContain('/pedido?order=PED-20260315-CACE');
+  });
+
   it('escalates cancellation to human support after confirmation', async () => {
     const { service, ordersService } = createFixture([], {
       orders: {
@@ -553,6 +632,24 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     expect(ordersService.updateStatus).not.toHaveBeenCalled();
     expect(response).toContain('atendimento humano');
+    expect(response).toContain('PED-20260315-CACE');
+  });
+
+  it('refuses to cancel only by order code without verified conversation context', async () => {
+    const { service } = createFixture([], {
+      orders: {
+        findByOrderNo: jest.fn().mockResolvedValue(confirmedOrder),
+      },
+    });
+
+    const response = await service.handlePremiumCancelIntent(
+      'tenant-id',
+      undefined,
+      undefined,
+      'PED-20260315-CACE',
+    );
+
+    expect(response).toContain('Por seguranca');
     expect(response).toContain('PED-20260315-CACE');
   });
 });

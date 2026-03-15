@@ -30,6 +30,14 @@ export interface ProductInfo {
   stock: number;
 }
 
+type StageRecoveryKind =
+  | 'phone'
+  | 'address'
+  | 'delivery'
+  | 'confirmation'
+  | 'notes'
+  | 'name';
+
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
@@ -299,6 +307,240 @@ export class WhatsappService {
       '',
       `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
     ].join('\n');
+  }
+
+  private async safelyFindOrderById(
+    pedidoId: string,
+    tenantId: string,
+  ): Promise<Pedido | null> {
+    try {
+      return await this.ordersService.findOne(pedidoId, tenantId);
+    } catch (error) {
+      this.logger.warn('Could not resolve WhatsApp order by id', {
+        pedidoId,
+        tenantId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  private async resolveRelevantOrder(
+    tenantId: string,
+    conversation?: TypedConversation,
+    orderNo?: string | null,
+  ): Promise<Pedido | null> {
+    if (orderNo) {
+      const byOrderNo = await this.ordersService.findByOrderNo(orderNo, tenantId);
+      if (byOrderNo) {
+        return byOrderNo;
+      }
+    }
+
+    const pedidoId = conversation?.pedido_id || conversation?.context?.pedido_id;
+    if (pedidoId) {
+      const byId = await this.safelyFindOrderById(pedidoId, tenantId);
+      if (byId) {
+        return byId;
+      }
+    }
+
+    if (!conversation?.customer_phone) {
+      return null;
+    }
+
+    const latestPending = await this.ordersService.findLatestPendingByCustomerPhone(
+      tenantId,
+      conversation.customer_phone,
+    );
+    if (latestPending) {
+      return latestPending;
+    }
+
+    return await this.ordersService.findLatestByCustomerPhone(
+      tenantId,
+      conversation.customer_phone,
+    );
+  }
+
+  private getStageRecoveryLabel(kind: StageRecoveryKind): string {
+    const labels: Record<StageRecoveryKind, string> = {
+      phone: 'telefone',
+      address: 'endereco',
+      delivery: 'forma de recebimento',
+      confirmation: 'confirmacao final',
+      notes: 'observacao',
+      name: 'nome',
+    };
+
+    return labels[kind];
+  }
+
+  private classifyOutOfOrderReply(message: string): StageRecoveryKind | null {
+    const sanitized = this.sanitizeInput((message || '').trim());
+    const normalized = this.normalizeIntentText(sanitized);
+    if (!normalized) {
+      return null;
+    }
+
+    if (
+      this.hasAnyNormalizedPhrase(normalized, [
+        'oi',
+        'ola',
+        'bom dia',
+        'boa tarde',
+        'boa noite',
+        'ajuda',
+        'cardapio',
+        'catalogo',
+      ])
+    ) {
+      return null;
+    }
+
+    const digitsOnly = sanitized.replace(/\D/g, '');
+    if (digitsOnly.length >= 10 && digitsOnly.length <= 13 && !this.extractOrderNo(sanitized)) {
+      return 'phone';
+    }
+
+    if (['sim', 'confirmar', 'ok'].includes(normalized)) {
+      return 'confirmation';
+    }
+
+    if (['sem', 'nenhum', 'nenhuma'].includes(normalized)) {
+      return 'notes';
+    }
+
+    if (['retirada', 'entrega', 'buscar'].includes(normalized)) {
+      return 'delivery';
+    }
+
+    const addressSignal =
+      /\b(rua|avenida|av|travessa|alameda|estrada|rodovia|bairro|cep|apto|apartamento|casa)\b/.test(
+        normalized,
+      ) && /\d/.test(sanitized);
+    if (
+      addressSignal ||
+      (sanitized.includes(',') && /\d/.test(sanitized) && this.validateAddress(sanitized).valid)
+    ) {
+      return 'address';
+    }
+
+    const nameValidation = this.validateName(sanitized);
+    const wordCount = sanitized.split(/\s+/).filter(Boolean).length;
+    if (
+      nameValidation.valid &&
+      wordCount >= 2 &&
+      wordCount <= 5 &&
+      !this.isPaymentMethodSelection(normalized) &&
+      !this.isOrderIntent(normalized) &&
+      !this.looksLikeOrderStatusQuery(normalized)
+    ) {
+      return 'name';
+    }
+
+    return null;
+  }
+
+  private buildWaitingPaymentStageRecoveryMessage(
+    pedido: Pedido | null,
+    kind: StageRecoveryKind,
+  ): string {
+    const label = this.getStageRecoveryLabel(kind);
+    const intro =
+      kind === 'confirmation'
+        ? 'A revisao final ja foi registrada e o pedido entrou na etapa de pagamento.'
+        : `Nao preciso mais de ${label} para este pedido.`;
+
+    return [
+      intro,
+      pedido ? '' : 'Seu pedido ja esta aguardando a escolha do pagamento.',
+      pedido ? `Pedido: *${pedido.order_no}*` : '',
+      pedido ? `Status atual: *${this.getStatusLabel(pedido.status)}*` : '',
+      '',
+      'Para seguir agora, responda com a forma de pagamento:',
+      '- pix',
+      '- credito',
+      '- debito',
+      '- dinheiro',
+      pedido ? `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  private buildClosedStageRecoveryMessage(
+    pedido: Pedido | null,
+    currentState: ConversationState,
+    kind: StageRecoveryKind,
+  ): string {
+    const label = this.getStageRecoveryLabel(kind);
+    const intro =
+      currentState === 'order_completed'
+        ? `O ${label} ja ficou registrado antes e esse pedido concluiu a jornada.`
+        : `O ${label} ja ficou registrado antes e esse pedido ja esta em andamento.`;
+
+    return [
+      pedido ? `Pedido: *${pedido.order_no}*` : 'Esse pedido ja passou da etapa de cadastro.',
+      pedido ? `Status atual: *${this.getStatusLabel(pedido.status)}*` : '',
+      intro,
+      pedido
+        ? this.getNextStepSummary(pedido, pedido.status)
+        : 'Se quiser, me envie "status do pedido" para acompanhar.',
+      '',
+      pedido
+        ? `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`
+        : 'Envie "status do pedido" para acompanhar.',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  private buildPaymentStageGuardMessage(pedido: Pedido): string {
+    if (pedido.status === PedidoStatus.CANCELADO) {
+      return [
+        `O pedido *${pedido.order_no}* esta cancelado, entao eu nao vou gerar uma nova cobranca por seguranca.`,
+        'Se quiser, eu monto um novo pedido do zero por aqui.',
+        `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+      ].join('\n');
+    }
+
+    return [
+      `O pagamento do pedido *${pedido.order_no}* nao precisa ser escolhido novamente.`,
+      `Status atual: *${this.getStatusLabel(pedido.status)}*`,
+      this.getNextStepSummary(pedido, pedido.status),
+      '',
+      `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+    ].join('\n');
+  }
+
+  private async tryHandleOutOfOrderStageReply(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+    orderNo?: string | null,
+  ): Promise<string | null> {
+    if (
+      !conversation ||
+      !currentState ||
+      !['waiting_payment', 'order_confirmed', 'order_completed'].includes(currentState)
+    ) {
+      return null;
+    }
+
+    const kind = this.classifyOutOfOrderReply(message);
+    if (!kind) {
+      return null;
+    }
+
+    const pedido = await this.resolveRelevantOrder(tenantId, conversation, orderNo);
+
+    if (currentState === 'waiting_payment') {
+      return this.buildWaitingPaymentStageRecoveryMessage(pedido, kind);
+    }
+
+    return this.buildClosedStageRecoveryMessage(pedido, currentState, kind);
   }
 
   private applyCommonChatNormalizations(value: string): string {
@@ -2079,6 +2321,20 @@ export class WhatsappService {
     orderNo?: string | null,
   ): Promise<string> {
     if (!conversation) {
+      if (orderNo) {
+        const pedido = await this.resolveRelevantOrder(tenantId, undefined, orderNo);
+        if (pedido) {
+          return [
+            `Recebi o codigo *${pedido.order_no}*.`,
+            'Por seguranca, eu nao cancelo pedido apenas pelo codigo em uma conversa sem contexto confirmado.',
+            pedido.status === PedidoStatus.PENDENTE_PAGAMENTO
+              ? 'Se essa compra foi iniciada neste mesmo numero, retome o pedido por aqui ou use o portal de acompanhamento.'
+              : 'Para qualquer cancelamento depois da confirmacao, fale com o atendimento humano.',
+            `Acompanhamento: ${this.buildTrackingUrl(pedido.order_no)}`,
+          ].join('\n');
+        }
+      }
+
       return 'Nao encontrei um pedido em andamento para cancelar.\n\nSe quiser, eu posso montar um novo pedido com voce.';
     }
 
@@ -2731,16 +2987,52 @@ export class WhatsappService {
 
     // IMPORTANTE: Verificar seleção de método de pagamento
     const isPaymentSelection = this.isPaymentMethodSelection(message);
-    const hasPaymentContext =
-      currentState === 'waiting_payment' ||
-      !!conversation?.pedido_id ||
-      !!conversation?.context?.pedido_id;
-    if (isPaymentSelection && hasPaymentContext) {
-      return await this.processPaymentSelection(message, tenantId, conversation);
-    }
     if (isPaymentSelection) {
+      const pedidoAtivo = await this.resolveRelevantOrder(tenantId, conversation, orderNo);
+
+      if (pedidoAtivo && pedidoAtivo.status !== PedidoStatus.PENDENTE_PAGAMENTO) {
+        return this.buildPaymentStageGuardMessage(pedidoAtivo);
+      }
+
+      const waitingPaymentContext =
+        currentState === 'waiting_payment' ||
+        conversation?.context?.waiting_payment === true ||
+        pedidoAtivo?.status === PedidoStatus.PENDENTE_PAGAMENTO;
+
+      if (waitingPaymentContext) {
+        const paymentConversation =
+          conversation && pedidoAtivo && !conversation.pedido_id && !conversation.context?.pedido_id
+            ? ({
+                ...conversation,
+                pedido_id: pedidoAtivo.id,
+                context: {
+                  ...(conversation.context || {}),
+                  pedido_id: pedidoAtivo.id,
+                  waiting_payment: true,
+                  state: 'waiting_payment',
+                },
+              } as TypedConversation)
+            : conversation;
+
+        return await this.processPaymentSelection(message, tenantId, paymentConversation);
+      }
+
+      return 'Nao encontrei um pedido pendente para pagamento.\n\nMe diga o produto que voce quer para eu montar um novo pedido com seguranca.';
+    }
+    if (isPaymentSelection && !conversation && currentState === 'collecting_order') {
       return '❌ Não encontrei um pedido pendente para pagamento.\n\n' +
         '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
+    }
+
+    const stageRecoveryMessage = await this.tryHandleOutOfOrderStageReply(
+      message,
+      tenantId,
+      conversation,
+      currentState,
+      orderNo,
+    );
+    if (stageRecoveryMessage) {
+      return stageRecoveryMessage;
     }
 
     if (
@@ -4311,9 +4603,13 @@ export class WhatsappService {
       // Buscar pedido
       const pedidoPendente = await this.ordersService.findOne(pedidoId, tenantId);
 
-      if (!pedidoPendente || pedidoPendente.status !== PedidoStatus.PENDENTE_PAGAMENTO) {
+      if (!pedidoPendente) {
         return '❌ Pedido não está pendente de pagamento.\n\n' +
                '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
+      }
+
+      if (pedidoPendente.status !== PedidoStatus.PENDENTE_PAGAMENTO) {
+        return this.buildPaymentStageGuardMessage(pedidoPendente);
       }
 
       if (metodo === MetodoPagamento.DINHEIRO) {
@@ -4414,10 +4710,15 @@ export class WhatsappService {
     }
 
     const pedidoPendente = await this.ordersService.findOne(pedidoId, tenantId);
-    if (!pedidoPendente || pedidoPendente.status !== PedidoStatus.PENDENTE_PAGAMENTO) {
+    if (!pedidoPendente) {
       await this.conversationService.updateState(conversation.id, 'waiting_payment');
       return '❌ Pedido não está pendente de pagamento.\n\n' +
         '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
+    }
+
+    if (pedidoPendente.status !== PedidoStatus.PENDENTE_PAGAMENTO) {
+      await this.conversationService.updateState(conversation.id, 'waiting_payment');
+      return this.buildPaymentStageGuardMessage(pedidoPendente);
     }
 
     const totalAmount = Number(pedidoPendente.total_amount || 0);
