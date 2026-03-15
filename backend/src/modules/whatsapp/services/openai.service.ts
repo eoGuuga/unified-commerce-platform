@@ -148,6 +148,7 @@ export class OpenAIService {
       .replace(/\b(qria|qria|k(r)?ia|keria)\b/g, 'queria')
       .replace(/\b(presciso|presiso|precizo)\b/g, 'preciso')
       .replace(/\b(naum|naun|num)\b/g, 'nao')
+      .replace(/\b(vcs|vc|ceis|ces)\b/g, 'voce')
       .replace(/\b(dz)\b/g, 'duzia')
       .replace(/\b(pixx|piks|pics|pic)\b/g, 'pix')
       .replace(/\b(credto|crdito|creditoo)\b/g, 'credito')
@@ -158,6 +159,8 @@ export class OpenAIService {
       .replace(/\b(ond|ondee|aond|aondee)\b/g, 'onde')
       .replace(/\b(cardapioo|cadapio|cardpio|cardapo)\b/g, 'cardapio')
       .replace(/\b(encomeda|encomnda|encomendaa)\b/g, 'encomenda')
+      .replace(/\b(praviagem|pra viage[mn])\b/g, 'pra viagem')
+      .replace(/\b(retira|retiraa)\b/g, 'retirada')
       .replace(/([a-z])\1{3,}/g, '$1$1')
       .replace(/\s+/g, ' ')
       .trim();
@@ -199,6 +202,8 @@ export class OpenAIService {
       'me manda',
       'separa',
       'separa pra mim',
+      'separar',
+      'separar pra mim',
       'bota',
       'coloca',
       'traz',
@@ -215,7 +220,7 @@ export class OpenAIService {
     if (orderKeywords.some((keyword) => normalized.includes(keyword))) {
       const withoutKeywords = normalized
         .replace(
-          /\b(quero|preciso|gostaria|vou querer|manda|manda ai|me ve|me manda|separa|separa pra mim|bota|coloca|traz|pedido|comprar|pedir|encomenda|encomendar|quero levar|quero pegar)\b/g,
+          /\b(quero|preciso|gostaria|vou querer|manda|manda ai|me ve|me manda|separa|separa pra mim|separar|separar pra mim|bota|coloca|traz|pedido|comprar|pedir|encomenda|encomendar|quero levar|quero pegar)\b/g,
           ' ',
         )
         .replace(/[?!.,;:]/g, ' ')
@@ -268,7 +273,11 @@ export class OpenAIService {
         '',
       )
       .replace(
-        /\b(quero|preciso|gostaria|vou querer|me ve|me manda|manda|manda ai|separa|separa pra mim|bota|coloca|traz|pedido|comprar|pedir|encomenda|encomendar|quero levar|quero pegar|preco|valor|quanto custa|quanto|custa|tem|disponivel|estoque|status|pedido|meu|acompanhar|ajuda|menu|cardapio|catalogo)\b/g,
+        /^((oi+|ola+|bom dia|boa tarde|boa noite|entao|tipo|assim|queria ver se tem como|queria ver se|eu queria|deixa eu ver|deixa eu|sera que tem como|sera que da pra|ve se tem como|ve se|consegue separar pra mim|consegue separar|consegue|voce consegue|voces conseguem|pode separar pra mim|pode separar)\s+)+/g,
+        '',
+      )
+      .replace(
+        /\b(quero|preciso|gostaria|vou querer|me ve|me manda|manda|manda ai|separa|separa pra mim|separar|separar pra mim|bota|coloca|traz|pedido|comprar|pedir|encomenda|encomendar|quero levar|quero pegar|preco|valor|quanto custa|quanto|custa|tem|disponivel|estoque|status|pedido|meu|acompanhar|ajuda|menu|cardapio|catalogo)\b/g,
         ' ',
       )
       .replace(/\b(um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|meia duzia|uma duzia)\b/g, ' ')

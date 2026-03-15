@@ -21,4 +21,16 @@ export class WhatsappWebhookDto {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, any>;
+
+  @IsOptional()
+  @IsString()
+  messageId?: string;
+
+  @IsOptional()
+  @IsString()
+  messageType?: string;
+
+  @IsOptional()
+  @IsString()
+  mediaUrl?: string;
 }

@@ -8,14 +8,28 @@ $ErrorActionPreference = 'Stop'
 function Invoke-WhatsappTest {
     param(
         [string]$Phone,
-        [string]$Message
+        [string]$Message,
+        [string]$MessageId,
+        [string]$MessageType = "text",
+        [hashtable]$Metadata
     )
 
     $body = @{
         message = $Message
         tenantId = $TenantId
         phoneNumber = $Phone
-    } | ConvertTo-Json -Compress
+        messageType = $MessageType
+    }
+
+    if ($MessageId) {
+        $body.messageId = $MessageId
+    }
+
+    if ($Metadata) {
+        $body.metadata = $Metadata
+    }
+
+    $body = $body | ConvertTo-Json -Compress
 
     return Invoke-RestMethod -Uri $BaseUrl -Method Post -ContentType "application/json" -Body $body
 }
@@ -121,6 +135,12 @@ $scenarios = @(
         )
     },
     @{
+        Name = "audio_transcript_chaotic_multi_item"
+        Steps = @(
+            @{ Message = "oi bom dia queria ver se tem como separar pra mim 1 $primaryProduct e um $secondaryProduct pra retirar no pix ta"; MessageType = "audio"; Metadata = @{ audio = $true; transcriptionSource = "mock-stt" }; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "Estoque insuficiente") }
+        )
+    },
+    @{
         Name = "multi_item_written_quantity"
         Steps = @(
             @{ Message = "quero 1 $primaryProduct e um $secondaryProduct"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "Estoque insuficiente") }
@@ -168,6 +188,13 @@ $scenarios = @(
         )
     },
     @{
+        Name = "replay_same_message_id"
+        Steps = @(
+            @{ Message = "cardapio"; MessageId = "replay-cardapio-001"; ExpectAny = @("CATALOGO DA LOJA", "CARDAPIO", "- ") }
+            @{ Message = "cardapio"; MessageId = "replay-cardapio-001"; ExpectAny = @("CATALOGO DA LOJA", "CARDAPIO", "- ") }
+        )
+    },
+    @{
         Name = "abusive_without_action"
         Steps = @(
             @{ Message = "vai tomar no cu"; ExpectAny = @("objetiva e respeitosa", "Se quiser seguir") }
@@ -178,6 +205,14 @@ $scenarios = @(
         Steps = @(
             @{ Message = "porra quero 1 $primaryProduct e um $secondaryProduct"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "Estoque insuficiente") }
         )
+    },
+    @{
+        Name = "malicious_fuzz_payloads"
+        Steps = @(
+            @{ Message = "'; DROP TABLE pedidos; -- quero 1 $primaryProduct"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "Nao encontrei") }
+            @{ Message = "(({{[[ qro 1 $primaryProduct ]]}))"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO") }
+            @{ Message = "qroooo 1 $primaryProduct!!!!!"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO") }
+        )
     }
 )
 
@@ -186,7 +221,7 @@ for ($scenarioIndex = 0; $scenarioIndex -lt $scenarios.Count; $scenarioIndex++) 
     $phone = "+5511{0:d4}{1:d4}" -f $phonePrefix, ($scenarioIndex + 3000)
 
     foreach ($step in $scenario.Steps) {
-        $response = Invoke-WhatsappTest -Phone $phone -Message $step.Message
+        $response = Invoke-WhatsappTest -Phone $phone -Message $step.Message -MessageId $step.MessageId -MessageType $step.MessageType -Metadata $step.Metadata
         $text = [string]$response.response
 
         $passed = $true

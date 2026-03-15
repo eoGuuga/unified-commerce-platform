@@ -32,7 +32,7 @@ export class WhatsappMessage {
   body: string;
 
   @Column({ type: 'varchar', length: 50, default: 'text' })
-  message_type: 'text' | 'image' | 'document' | 'button';
+  message_type: 'text' | 'image' | 'document' | 'button' | 'audio';
 
   @Column('jsonb', { default: {} })
   metadata: Record<string, any>;

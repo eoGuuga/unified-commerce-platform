@@ -94,6 +94,9 @@ export interface ConversationContext {
   last_inbound_repeat_count?: number;
   last_outbound_preview?: string;
   abuse_count?: number;
+  last_processed_event_key?: string;
+  last_processed_event_at?: string;
+  last_processed_response?: string;
   [key: string]: unknown; // Para permitir extensibilidade
 }
 

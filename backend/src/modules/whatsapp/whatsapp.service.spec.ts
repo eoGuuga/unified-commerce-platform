@@ -237,6 +237,50 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     });
   });
 
+  it('normalizes chaotic audio transcripts into a valid multi-item order', async () => {
+    const { service, conversationService } = createFixture(catalog, {
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(createConversation()),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const response = await service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'oi bom dia queria ver se tem como separar pra mim 1 brigadeiro gourmet e um brownie premium pra retirar no pix ta',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'audio-chaos-1',
+      messageType: 'audio',
+      metadata: {
+        audio: true,
+        transcriptionSource: 'mock-stt',
+      },
+    });
+
+    expect(conversationService.savePendingOrder).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({ produto_name: 'Brigadeiro Gourmet', quantity: 1 }),
+          expect.objectContaining({ produto_name: 'Brownie Premium', quantity: 1 }),
+        ]),
+      }),
+    );
+    expect(conversationService.saveMessage).toHaveBeenCalledWith(
+      'conv-1',
+      'inbound',
+      expect.stringContaining('1 brigadeiro gourmet e um brownie premium'),
+      'audio',
+      expect.objectContaining({
+        messageId: 'audio-chaos-1',
+        transcriptionSource: 'mock-stt',
+      }),
+    );
+    expect(response).toContain('PEDIDO PREPARADO');
+  });
+
   it('detects multi-item orders with written quantities and colloquial connectors', () => {
     const service = createService() as any;
 
@@ -382,6 +426,49 @@ describe('WhatsappService defensive WhatsApp flow', () => {
         last_inbound_repeat_count: 2,
       }),
     );
+  });
+
+  it('replays the previous response when the same webhook event arrives twice', async () => {
+    const seededService = createService() as any;
+    const conversation = createConversation({
+      context: {
+        state: 'idle',
+        last_processed_event_key: seededService.buildInboundEventReplayKey(
+          {
+            from: '5511999999999',
+            body: 'cardapio',
+            tenantId: 'tenant-id',
+            timestamp: new Date().toISOString(),
+            messageId: 'wamid.001',
+          },
+          'cardapio',
+        ),
+        last_processed_event_at: new Date().toISOString(),
+        last_processed_response: 'CATALOGO DA LOJA\n\n- Brigadeiro Gourmet',
+      },
+    });
+
+    const { service, conversationService } = createFixture([], {
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(conversation),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const generateResponseSpy = jest.spyOn(service as any, 'generateResponse');
+    const response = await service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'cardapio',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'wamid.001',
+    });
+
+    expect(generateResponseSpy).not.toHaveBeenCalled();
+    expect(conversationService.saveMessage).not.toHaveBeenCalled();
+    expect(conversationService.updateContext).not.toHaveBeenCalled();
+    expect(response).toContain('CATALOGO DA LOJA');
   });
 
   it('finds the latest order by phone for noisy status requests', async () => {

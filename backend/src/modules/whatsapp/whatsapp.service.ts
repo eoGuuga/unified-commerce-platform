@@ -18,6 +18,10 @@ export interface WhatsappMessage {
   body: string;
   timestamp: string;
   tenantId?: string;
+  messageId?: string;
+  messageType?: 'text' | 'image' | 'document' | 'button' | 'audio';
+  mediaUrl?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ProductInfo {
@@ -303,6 +307,7 @@ export class WhatsappService {
       .replace(/\b(qria|qria|k(r)?ia|keria)\b/g, 'queria')
       .replace(/\b(presciso|presiso|precizo)\b/g, 'preciso')
       .replace(/\b(naum|naun|num)\b/g, 'nao')
+      .replace(/\b(vcs|vc|ceis|ces)\b/g, 'voce')
       .replace(/\b(dz)\b/g, 'duzia')
       .replace(/\b(pixx|piks|pics|pic)\b/g, 'pix')
       .replace(/\b(credto|crdito|creditoo)\b/g, 'credito')
@@ -314,6 +319,8 @@ export class WhatsappService {
       .replace(/\b(cardapioo|cadapio|cardpio|cardapo)\b/g, 'cardapio')
       .replace(/\b(catalogoo|catalogu)\b/g, 'catalogo')
       .replace(/\b(encomeda|encomnda|encomendaa)\b/g, 'encomenda')
+      .replace(/\b(praviagem|pra viage[mn])\b/g, 'pra viagem')
+      .replace(/\b(retira|retiraa)\b/g, 'retirada')
       .replace(/\b(obgd|obrgd|obgdo)\b/g, 'obrigado')
       .replace(/\b(pfv|pfvr)\b/g, 'por favor')
       .replace(/([a-z])\1{3,}/g, '$1$1')
@@ -337,6 +344,40 @@ export class WhatsappService {
       .replace(/[?!.,;:]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  private looksLikeAudioTranscription(message?: WhatsappMessage): boolean {
+    if (!message) {
+      return false;
+    }
+
+    if (message.messageType === 'audio') {
+      return true;
+    }
+
+    const metadata = message.metadata || {};
+    return Boolean(
+      metadata.audio === true ||
+      metadata.voice === true ||
+      metadata.transcript ||
+      metadata.transcription ||
+      metadata.transcriptionSource,
+    );
+  }
+
+  private normalizeIncomingMessageBody(message: WhatsappMessage): string {
+    let normalized = message.body || '';
+
+    if (this.looksLikeAudioTranscription(message)) {
+      normalized = normalized
+        .replace(/[\u200B-\u200D\uFEFF]/g, ' ')
+        .replace(/\b(aham|ahn|ahn?m|hum+|hmm+|eh+|ehh+|tipo|assim|entao|ta bom|beleza)\b/gi, ' ')
+        .replace(/\b(queria ver se tem como|queria ver se|ve se tem como|ve se|sera que tem como|sera que da pra|deixa eu ver|deixa eu)\b/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    return normalized;
   }
 
   private hasAnyNormalizedPhrase(
@@ -379,6 +420,70 @@ export class WhatsappService {
       .replace(/\b\d{10,11}\b/g, 'telefone')
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  private buildInboundEventReplayKey(
+    message: WhatsappMessage,
+    _sanitizedBody: string,
+  ): string | null {
+    const explicitMessageId = String(message.messageId || message.metadata?.['messageId'] || '').trim();
+    if (explicitMessageId) {
+      return `${message.tenantId || 'tenant'}:${message.from}:${explicitMessageId}`;
+    }
+
+    return null;
+  }
+
+  private getInboundReplayWindowMs(): number {
+    return 24 * 60 * 60 * 1000;
+  }
+
+  private shouldReplayPreviousResponse(
+    message: WhatsappMessage,
+    sanitizedBody: string,
+    conversation?: TypedConversation,
+  ): { replay: boolean; eventKey: string | null; response?: string } {
+    const eventKey = this.buildInboundEventReplayKey(message, sanitizedBody);
+    if (!conversation || !eventKey) {
+      return { replay: false, eventKey };
+    }
+
+    const previousKey = String(conversation.context?.last_processed_event_key || '');
+    const previousAt = conversation.context?.last_processed_event_at
+      ? new Date(String(conversation.context.last_processed_event_at)).getTime()
+      : Number.NaN;
+
+    if (!previousKey || previousKey !== eventKey || !Number.isFinite(previousAt)) {
+      return { replay: false, eventKey };
+    }
+
+    if (Date.now() - previousAt > this.getInboundReplayWindowMs()) {
+      return { replay: false, eventKey };
+    }
+
+    const previousResponse = String(
+      conversation.context?.last_processed_response ||
+      conversation.context?.last_outbound_preview ||
+      '',
+    ).trim();
+
+    return {
+      replay: true,
+      eventKey,
+      response:
+        previousResponse ||
+        this.buildDuplicateProtectionMessage(conversation, Number(conversation.context?.last_inbound_repeat_count || 1)),
+    };
+  }
+
+  private buildInboundMessageMetadata(message: WhatsappMessage): Record<string, unknown> {
+    return {
+      messageId: message.messageId || null,
+      messageType: message.messageType || 'text',
+      mediaUrl: message.mediaUrl || null,
+      originalTimestamp: message.timestamp || null,
+      ...(message.metadata || {}),
+    };
   }
 
   private buildResponsePreview(value: string): string {
@@ -2427,7 +2532,8 @@ export class WhatsappService {
       const tenantId = message.tenantId;
       
       // ✅ NOVO: Sanitizar mensagem recebida
-      const sanitizedBody = this.sanitizeInput(message.body || '');
+      const normalizedBody = this.normalizeIncomingMessageBody(message);
+      const sanitizedBody = this.sanitizeInput(normalizedBody);
       if (!sanitizedBody) {
         return '❌ Mensagem vazia ou inválida. Por favor, envie uma mensagem válida.';
       }
@@ -2454,6 +2560,18 @@ export class WhatsappService {
         });
       }
 
+      const replayGuard = this.shouldReplayPreviousResponse(
+        message,
+        sanitizedBody,
+        typedConversation,
+      );
+      if (replayGuard.replay) {
+        this.logger.log(`Replaying previous WhatsApp response for ${message.from}`, {
+          messageId: message.messageId,
+        });
+        return replayGuard.response || this.getPremiumFallbackMessage();
+      }
+
       const duplicateGuard = this.shouldSuppressRepeatedInbound(
         sanitizedBody,
         typedConversation,
@@ -2464,6 +2582,8 @@ export class WhatsappService {
         conversation.id,
         'inbound',
         sanitizedBody,
+        message.messageType || 'text',
+        this.buildInboundMessageMetadata(message),
       );
 
       if (duplicateGuard.suppress) {
@@ -2479,6 +2599,9 @@ export class WhatsappService {
           last_outbound_preview: this.buildResponsePreview(
             duplicateResponse,
           ),
+          last_processed_event_key: replayGuard.eventKey,
+          last_processed_event_at: new Date().toISOString(),
+          last_processed_response: duplicateResponse,
         });
 
         await this.conversationService.saveMessage(
@@ -2515,6 +2638,9 @@ export class WhatsappService {
         last_inbound_repeat_count: 0,
         last_outbound_preview: this.buildResponsePreview(response),
         abuse_count: nextAbuseCount,
+        last_processed_event_key: replayGuard.eventKey,
+        last_processed_event_at: new Date().toISOString(),
+        last_processed_response: response,
       });
 
       this.logger.log(`Response: ${response}`);
@@ -2897,6 +3023,7 @@ export class WhatsappService {
       'quero', 'preciso', 'comprar', 'pedir', 'vou querer', 'gostaria de',
       'desejo', 'vou comprar', 'preciso de', 'queria', 'ia querer',
       'me manda', 'manda', 'manda ai', 'manda pra mim', 'me ve', 'separa', 'separa pra mim',
+      'separar', 'separar pra mim', 'separar para mim',
       'pode ser', 'faz', 'me faz', 'faz pra mim', 'bota', 'coloca', 'traz', 'traz pra mim',
       'pode me enviar', 'tem como', 'dá pra', 'dá pra fazer', 'dá pra me enviar',
       'seria possível', 'poderia', 'pode me mandar', 'me envia', 'envia',
@@ -3387,12 +3514,17 @@ export class WhatsappService {
       /^((ai|ei|hey|opa|oie?|oh|mano|amigo|amiga|moca|moça|porra|caralho|caraio|cacete|merda|lixo|idiota)\s+)+/i,
       '',
     );
+    productName = productName.replace(
+      /^((oi+|ola+|bom dia|boa tarde|boa noite|entao|tipo|assim|queria ver se tem como|queria ver se|eu queria|deixa eu ver|deixa eu|sera que tem como|sera que da pra|ve se tem como|ve se|consegue separar pra mim|consegue separar|consegue|voce consegue|voces conseguem|pode separar pra mim|pode separar)\s+)+/i,
+      '',
+    );
 
     // Lista completa de palavras/frases de ação
     const acoes = [
       'quero', 'preciso', 'comprar', 'pedir', 'vou querer', 'gostaria de',
       'desejo', 'vou comprar', 'preciso de', 'queria', 'ia querer',
       'me manda', 'manda', 'manda ai', 'manda pra mim', 'me ve', 'separa', 'separa pra mim',
+      'separar', 'separar pra mim', 'separar para mim',
       'pode ser', 'faz', 'me faz', 'faz pra mim', 'bota', 'coloca', 'traz', 'traz pra mim',
       'pode me enviar', 'tem como', 'dá pra', 'dá pra fazer', 'dá pra me enviar',
       'seria possível', 'poderia', 'pode me mandar', 'me envia', 'envia',
@@ -3449,7 +3581,7 @@ export class WhatsappService {
     
     // Remover preposições soltas (mas manter "de" quando faz parte do nome)
     productName = productName.replace(/\b(para|pra|pro|pras|pros|com|sem|em|na|no|nas|nos)\b/gi, '');
-    productName = productName.replace(/\b(pix|cartao|cartão|credito|crédito|debito|débito|dinheiro|boleto|retirada|retirar|entrega|entregar|buscar|pegar|agora|hoje|amanha|amanhã|rapidinho|urgente|favor|ai)\b/gi, '');
+    productName = productName.replace(/\b(pix|cartao|cartão|credito|crédito|debito|débito|dinheiro|boleto|retirada|retirar|entrega|entregar|buscar|pegar|agora|hoje|amanha|amanhã|rapidinho|urgente|favor|ai|ta)\b/gi, '');
     
     // Remover palavras de questionamento
     productName = productName.replace(/\b(qual|quais|que|quem|onde|quando|como|porque|por que)\b/gi, '');

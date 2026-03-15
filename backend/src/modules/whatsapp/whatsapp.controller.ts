@@ -20,7 +20,28 @@ export class WhatsappController {
   async webhook(@Body() body: Partial<WhatsappWebhookDto> & Record<string, any>) {
     // ⚠️ Suporta múltiplos formatos de webhook (Twilio, Evolution API, etc)
     const from = body.From || body.from || body.phoneNumber;
-    const messageBody = body.Body || body.body || body.message || body.text;
+    const messageBody =
+      body.Body ||
+      body.body ||
+      body.message ||
+      body.text ||
+      body.transcript ||
+      body.transcription ||
+      body.audioTranscription ||
+      body.audio?.transcription ||
+      body.media?.transcription;
+    const messageId =
+      body.MessageSid ||
+      body.messageId ||
+      body.id ||
+      body.key?.id ||
+      body.data?.key?.id ||
+      body.data?.id;
+    const inferredMessageType =
+      body.messageType ||
+      body.type ||
+      (body.audio || body.voice || body.ptt || body.audioTranscription ? 'audio' : 'text');
+    const mediaUrl = body.MediaUrl0 || body.mediaUrl || body.media?.url || body.audio?.url;
     
     if (!from || !messageBody) {
       throw new BadRequestException('Campos obrigatórios: from/From/phoneNumber e body/Body/message/text');
@@ -41,6 +62,13 @@ export class WhatsappController {
       body: messageBody,
       timestamp: body.Timestamp || body.timestamp || body.timestamp || new Date().toISOString(),
       tenantId,
+      messageId,
+      messageType: inferredMessageType,
+      mediaUrl,
+      metadata: body.metadata || {
+        provider: body.provider || null,
+        transcriptionSource: body.transcriptionSource || null,
+      },
     };
 
     const response = await this.whatsappService.processIncomingMessage(message);
@@ -64,7 +92,15 @@ export class WhatsappController {
   })
   @ApiResponse({ status: 200, description: 'Resposta do bot retornada com sucesso' })
   @ApiResponse({ status: 403, description: 'Tenant ID inválido ou número não autorizado' })
-  async test(@Body() body: { message: string; tenantId: string; phoneNumber?: string }) {
+  async test(@Body() body: {
+    message: string;
+    tenantId: string;
+    phoneNumber?: string;
+    messageId?: string;
+    messageType?: 'text' | 'image' | 'document' | 'button' | 'audio';
+    mediaUrl?: string;
+    metadata?: Record<string, unknown>;
+  }) {
     // ⚠️ CRÍTICO: Em desenvolvimento, tenantId deve ser fornecido explicitamente
     if (!body.tenantId) {
       throw new BadRequestException('tenantId é obrigatório. Em desenvolvimento, use um tenant_id válido.');
@@ -82,6 +118,10 @@ export class WhatsappController {
       body: body.message,
       timestamp: new Date().toISOString(),
       tenantId: body.tenantId,
+      messageId: body.messageId,
+      messageType: body.messageType,
+      mediaUrl: body.mediaUrl,
+      metadata: body.metadata,
     };
 
     const response = await this.whatsappService.processIncomingMessage(message);
