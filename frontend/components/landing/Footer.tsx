@@ -17,6 +17,7 @@ const footerLinks = {
   recursos: [
     { label: "Documentação", href: "/info/documentacao" },
     { label: "Referência da API", href: "/info/api" },
+    { label: "Acompanhar pedido", href: "/pedido" },
     { label: "Status", href: "/info/status" },
     { label: "Suporte", href: "/info/suporte" },
   ],

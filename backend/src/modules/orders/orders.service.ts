@@ -5,8 +5,10 @@ import { randomBytes } from 'crypto';
 import { Pedido, PedidoStatus, CanalVenda } from '../../database/entities/Pedido.entity';
 import { ItemPedido } from '../../database/entities/ItemPedido.entity';
 import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque.entity';
+import { MetodoPagamento, Pagamento, PagamentoStatus } from '../../database/entities/Pagamento.entity';
 import { Produto } from '../../database/entities/Produto.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { TrackPublicOrderDto } from './dto/track-public-order.dto';
 import { IdempotencyService } from '../common/services/idempotency.service';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -17,6 +19,46 @@ import { CouponsService } from '../coupons/coupons.service';
 import { CacheService } from '../common/services/cache.service';
 import { CupomDesconto } from '../../database/entities/CupomDesconto.entity';
 import { DbContextService } from '../common/services/db-context.service';
+
+interface PublicTrackedOrderItem {
+  id: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+}
+
+interface PublicTrackedPayment {
+  id: string;
+  method: MetodoPagamento;
+  status: PagamentoStatus;
+  amount: number;
+  qr_code?: string;
+  qr_code_url?: string;
+  copy_paste?: string;
+}
+
+export interface PublicTrackedOrder {
+  id: string;
+  order_no: string;
+  status: PedidoStatus;
+  channel: CanalVenda;
+  customer_name?: string;
+  customer_email_masked?: string;
+  customer_phone_masked?: string;
+  subtotal: number;
+  discount_amount: number;
+  shipping_amount: number;
+  total_amount: number;
+  coupon_code?: string;
+  delivery_type?: string;
+  delivery_address?: Pedido['delivery_address'];
+  created_at: Date;
+  updated_at: Date;
+  items: PublicTrackedOrderItem[];
+  payment?: PublicTrackedPayment;
+}
 
 @Injectable()
 export class OrdersService {
@@ -396,6 +438,85 @@ export class OrdersService {
     });
   }
 
+  async trackPublicOrder(
+    tenantId: string,
+    trackPublicOrderDto: TrackPublicOrderDto,
+  ): Promise<PublicTrackedOrder> {
+    const normalizedTenantId = (tenantId || '').trim();
+    const normalizedOrderNo = (trackPublicOrderDto.order_no || '').trim().toUpperCase();
+    const normalizedEmail = this.normalizeEmail(trackPublicOrderDto.customer_email);
+    const normalizedPhone = this.normalizePhone(trackPublicOrderDto.customer_phone);
+
+    if (!normalizedTenantId) {
+      throw new BadRequestException('Tenant ID obrigatorio');
+    }
+
+    if (!normalizedOrderNo) {
+      throw new BadRequestException('Codigo do pedido obrigatorio');
+    }
+
+    if (!normalizedEmail && !normalizedPhone) {
+      throw new BadRequestException('Informe o email ou telefone usados na compra');
+    }
+
+    return await this.dataSource.transaction(async (manager) => {
+      await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [normalizedTenantId]);
+
+      const pedido = await manager.getRepository(Pedido).findOne({
+        where: { order_no: normalizedOrderNo, tenant_id: normalizedTenantId },
+        relations: ['itens', 'itens.produto'],
+      });
+
+      if (!pedido) {
+        throw new NotFoundException('Pedido nao encontrado ou dados nao conferem');
+      }
+
+      const emailMatches =
+        normalizedEmail &&
+        this.normalizeEmail(pedido.customer_email) === normalizedEmail;
+      const phoneMatches =
+        normalizedPhone &&
+        this.normalizePhone(pedido.customer_phone) === normalizedPhone;
+
+      if (!emailMatches && !phoneMatches) {
+        throw new NotFoundException('Pedido nao encontrado ou dados nao conferem');
+      }
+
+      const pagamento = await manager.getRepository(Pagamento).findOne({
+        where: { pedido_id: pedido.id, tenant_id: normalizedTenantId },
+        order: { created_at: 'DESC' },
+      });
+
+      return {
+        id: pedido.id,
+        order_no: pedido.order_no,
+        status: pedido.status,
+        channel: pedido.channel,
+        customer_name: pedido.customer_name,
+        customer_email_masked: this.maskEmail(pedido.customer_email),
+        customer_phone_masked: this.maskPhone(pedido.customer_phone),
+        subtotal: Number(pedido.subtotal),
+        discount_amount: Number(pedido.discount_amount),
+        shipping_amount: Number(pedido.shipping_amount),
+        total_amount: Number(pedido.total_amount),
+        coupon_code: pedido.coupon_code,
+        delivery_type: pedido.delivery_type,
+        delivery_address: pedido.delivery_address,
+        created_at: pedido.created_at,
+        updated_at: pedido.updated_at,
+        items: (pedido.itens || []).map((item) => ({
+          id: item.id,
+          product_id: item.produto_id,
+          product_name: item.produto?.name || 'Produto',
+          quantity: item.quantity,
+          unit_price: Number(item.unit_price),
+          subtotal: Number(item.subtotal),
+        })),
+        payment: pagamento ? this.buildPublicPayment(pagamento, pedido.status) : undefined,
+      };
+    });
+  }
+
   async findLatestPendingByCustomerPhone(
     tenantId: string,
     customerPhone: string,
@@ -469,6 +590,72 @@ export class OrdersService {
     }
 
     return updatedPedido;
+  }
+
+  private buildPublicPayment(
+    pagamento: Pagamento,
+    orderStatus: PedidoStatus,
+  ): PublicTrackedPayment {
+    const inferredStatus =
+      orderStatus !== PedidoStatus.PENDENTE_PAGAMENTO &&
+      [PagamentoStatus.PENDING, PagamentoStatus.PROCESSING].includes(pagamento.status)
+        ? PagamentoStatus.PAID
+        : pagamento.status;
+    const exposePixArtifacts =
+      pagamento.method === MetodoPagamento.PIX &&
+      [PagamentoStatus.PENDING, PagamentoStatus.PROCESSING].includes(inferredStatus);
+
+    return {
+      id: pagamento.id,
+      method: pagamento.method,
+      status: inferredStatus,
+      amount: Number(pagamento.amount),
+      qr_code:
+        exposePixArtifacts && typeof pagamento.metadata?.pix_qr_code === 'string'
+          ? pagamento.metadata.pix_qr_code
+          : undefined,
+      qr_code_url:
+        exposePixArtifacts && typeof pagamento.metadata?.pix_qr_code_url === 'string'
+          ? pagamento.metadata.pix_qr_code_url
+          : undefined,
+      copy_paste:
+        exposePixArtifacts && typeof pagamento.metadata?.pix_copy_paste === 'string'
+          ? pagamento.metadata.pix_copy_paste
+          : undefined,
+    };
+  }
+
+  private normalizeEmail(value?: string | null): string {
+    return (value || '').trim().toLowerCase();
+  }
+
+  private normalizePhone(value?: string | null): string {
+    return (value || '').replace(/\D/g, '');
+  }
+
+  private maskEmail(email?: string | null): string | undefined {
+    const normalized = this.normalizeEmail(email);
+    if (!normalized || !normalized.includes('@')) return undefined;
+
+    const [localPart, domain] = normalized.split('@');
+    if (!localPart || !domain) return undefined;
+
+    if (localPart.length <= 2) {
+      return `${localPart[0] || '*'}***@${domain}`;
+    }
+
+    return `${localPart.slice(0, 2)}***@${domain}`;
+  }
+
+  private maskPhone(phone?: string | null): string | undefined {
+    const digits = this.normalizePhone(phone);
+    if (!digits) return undefined;
+
+    if (digits.length <= 4) {
+      return `***${digits}`;
+    }
+
+    return `${digits.slice(0, 2)}*****${digits.slice(-4)}`;
   }
 
   private async generateOrderNumber(tenantId: string): Promise<string> {

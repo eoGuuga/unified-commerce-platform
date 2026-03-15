@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import api from '@/lib/api-client';
 
@@ -20,143 +20,129 @@ interface AuthState {
   isAuthenticated: boolean;
 }
 
-/**
- * Hook para gerenciar autenticação e tenant_id
- * ⚠️ CRÍTICO: tenantId deve vir sempre do JWT, nunca hardcoded
- */
+const EMPTY_AUTH_STATE: AuthState = {
+  user: null,
+  token: null,
+  tenantId: null,
+  isLoading: false,
+  isAuthenticated: false,
+};
+
 export function useAuth() {
   const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    token: null,
-    tenantId: null,
+    ...EMPTY_AUTH_STATE,
     isLoading: true,
-    isAuthenticated: false,
   });
 
-  // Carregar token do localStorage ao montar
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const token = localStorage.getItem('token');
-    if (token) {
-      // ✅ Decodificar JWT usando jwt-decode (suporta UTF-8 e caracteres especiais)
-      try {
-        const payload = jwtDecode<{ tenant_id?: string; exp?: number }>(token);
-        const tenantId = payload.tenant_id;
-        
-        // Verificar se token expirou
-        if (payload.exp && payload.exp * 1000 < Date.now()) {
-          // Token expirado, remover
-          localStorage.removeItem('token');
-          setAuthState({
-            user: null,
-            token: null,
-            tenantId: null,
-            isLoading: false,
-            isAuthenticated: false,
-          });
-          return;
-        }
-
-        setAuthState({
-          token,
-          tenantId: tenantId || null,
-          isLoading: true,
-          isAuthenticated: !!tenantId,
-          user: null, // Será carregado abaixo
-        });
-
-        // Carregar dados do usuário
-        loadUser(token);
-      } catch (error) {
-        console.error('Erro ao decodificar token:', error);
-        localStorage.removeItem('token');
-        setAuthState({
-          user: null,
-          token: null,
-          tenantId: null,
-          isLoading: false,
-          isAuthenticated: false,
-        });
-      }
-    } else {
-      setAuthState({
-        user: null,
-        token: null,
-        tenantId: null,
-        isLoading: false,
-        isAuthenticated: false,
-      });
+  const clearSession = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
     }
+
+    localStorage.removeItem('token');
+    localStorage.removeItem('tenant_id');
   }, []);
 
-  const loadUser = async (token: string) => {
-    try {
-      const user = await api.getCurrentUser();
-      // ✅ Decodificar JWT usando jwt-decode (suporta UTF-8 e caracteres especiais)
-      const payload = jwtDecode<{ tenant_id?: string }>(token);
-      const tenantId = payload.tenant_id || user.tenant_id;
+  const resetAuthState = useCallback(() => {
+    setAuthState(EMPTY_AUTH_STATE);
+  }, []);
 
-      setAuthState({
-        user: user as User,
-        token,
-        tenantId,
-        isLoading: false,
-        isAuthenticated: true,
-      });
-    } catch (error) {
-      console.error('Erro ao carregar usuário:', error);
-      localStorage.removeItem('token');
+  const loadUser = useCallback(
+    async (token: string) => {
+      try {
+        const user = await api.getCurrentUser();
+        const payload = jwtDecode<{ tenant_id?: string }>(token);
+        const tenantId = payload.tenant_id || (user as User).tenant_id;
+
+        setAuthState({
+          user: user as User,
+          token,
+          tenantId,
+          isLoading: false,
+          isAuthenticated: true,
+        });
+      } catch (error) {
+        console.error('Erro ao carregar usuario:', error);
+        clearSession();
+        resetAuthState();
+      }
+    },
+    [clearSession, resetAuthState]
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      resetAuthState();
+      return;
+    }
+
+    try {
+      const payload = jwtDecode<{ tenant_id?: string; exp?: number }>(token);
+      const tenantId = payload.tenant_id;
+
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        clearSession();
+        resetAuthState();
+        return;
+      }
+
       setAuthState({
         user: null,
-        token: null,
-        tenantId: null,
-        isLoading: false,
-        isAuthenticated: false,
+        token,
+        tenantId: tenantId || null,
+        isLoading: true,
+        isAuthenticated: Boolean(tenantId),
       });
-    }
-  };
 
-  const login = useCallback(async (email: string, password: string, tenantId?: string) => {
-    try {
+      void loadUser(token);
+    } catch (error) {
+      console.error('Erro ao decodificar token:', error);
+      clearSession();
+      resetAuthState();
+    }
+  }, [clearSession, loadUser, resetAuthState]);
+
+  const login = useCallback(
+    async (email: string, password: string, tenantId?: string) => {
+      try {
         const response = await api.login(email, password, tenantId);
-      
-      if (response.access_token && typeof window !== 'undefined') {
+
+        if (!response.access_token || typeof window === 'undefined') {
+          throw new Error('Token nao recebido');
+        }
+
         localStorage.setItem('token', response.access_token);
-        
-        // ✅ Extrair tenant_id do JWT usando jwt-decode (suporta UTF-8 e caracteres especiais)
+
         const payload = jwtDecode<{ tenant_id?: string }>(response.access_token);
         const extractedTenantId = payload.tenant_id || tenantId;
 
         if (!extractedTenantId) {
-          throw new Error('Tenant ID não encontrado no token JWT');
+          throw new Error('Tenant ID nao encontrado no token JWT');
         }
 
-          localStorage.setItem('tenant_id', extractedTenantId);
-          await loadUser(response.access_token);
+        localStorage.setItem('tenant_id', extractedTenantId);
+        await loadUser(response.access_token);
 
         return { success: true, tenantId: extractedTenantId };
+      } catch (error: any) {
+        console.error('Erro no login:', error);
+        clearSession();
+        resetAuthState();
+        return { success: false, error: error.message || 'Falha de autenticacao' };
       }
-      
-      throw new Error('Token não recebido');
-    } catch (error: any) {
-      console.error('Erro no login:', error);
-      return { success: false, error: error.message };
-    }
-  }, []);
+    },
+    [clearSession, loadUser, resetAuthState]
+  );
 
   const logout = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('token');
-    }
-    setAuthState({
-      user: null,
-      token: null,
-      tenantId: null,
-      isLoading: false,
-      isAuthenticated: false,
-    });
-  }, []);
+    clearSession();
+    resetAuthState();
+  }, [clearSession, resetAuthState]);
 
   return {
     ...authState,

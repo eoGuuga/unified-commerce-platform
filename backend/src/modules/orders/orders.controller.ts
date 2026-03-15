@@ -13,11 +13,13 @@ import {
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PaginationDto } from './dto/pagination.dto';
+import { TrackPublicOrderDto } from './dto/track-public-order.dto';
 import { PedidoStatus } from '../../database/entities/Pedido.entity';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import { CurrentTenant } from '../../common/decorators/tenant.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { Usuario } from '../../database/entities/Usuario.entity';
 import { TypedRequest, getClientIp, getUserAgent } from '../../common/types/request.types';
 
@@ -80,6 +82,24 @@ export class OrdersController {
   @ApiOperation({ summary: 'Relatorio de vendas' })
   getSalesReport(@CurrentTenant() tenantId: string) {
     return this.ordersService.getSalesReport(tenantId);
+  }
+
+  @Post('public/track')
+  @Public()
+  @ApiOperation({ summary: 'Consultar pedido publicamente por codigo e contato' })
+  @ApiResponse({
+    status: 200,
+    description: 'Pedido encontrado e validado com sucesso',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Pedido nao encontrado ou dados nao conferem',
+  })
+  trackPublicOrder(
+    @Headers('x-tenant-id') tenantId: string,
+    @Body() trackPublicOrderDto: TrackPublicOrderDto,
+  ) {
+    return this.ordersService.trackPublicOrder(tenantId, trackPublicOrderDto);
   }
 
   @Get(':id')

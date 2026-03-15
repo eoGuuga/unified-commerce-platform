@@ -108,10 +108,11 @@ export class WhatsappService {
 
     // Escapar caracteres especiais perigosos
     sanitized = sanitized
+      .replace(/[\u0000-\u001F\u007F]/g, ' ')
       .replace(/[<>]/g, '')
       .replace(/['"]/g, '');
 
-    return sanitized.trim();
+    return sanitized.replace(/\s+/g, ' ').trim();
   }
 
   private getDefaultShippingAmount(): number {
@@ -137,6 +138,1188 @@ export class WhatsappService {
     return Number(value || 0).toFixed(2).replace('.', ',');
   }
 
+  private buildTrackingUrl(orderNo: string): string {
+    const frontendUrl = (this.config.get<string>('FRONTEND_URL') || '').trim();
+    const baseUrl =
+      frontendUrl ||
+      (process.env.NODE_ENV === 'production'
+        ? 'https://gtsofthub.com.br'
+        : 'http://localhost:3000');
+
+    return `${baseUrl.replace(/\/+$/, '')}/pedido?order=${encodeURIComponent(orderNo)}`;
+  }
+
+  private getOrdersPortalUrl(): string {
+    return this.buildTrackingUrl('PED-00000000-000').replace(/\?order=.*$/, '');
+  }
+
+  private getGreetingLine(customerName?: string | null): string {
+    return customerName?.trim() ? `Ola, ${customerName.trim()}!` : 'Ola!';
+  }
+
+  private getStatusLabel(status: PedidoStatus): string {
+    const labels: Record<PedidoStatus, string> = {
+      [PedidoStatus.PENDENTE_PAGAMENTO]: 'Pagamento pendente',
+      [PedidoStatus.CONFIRMADO]: 'Confirmado',
+      [PedidoStatus.EM_PRODUCAO]: 'Em preparacao',
+      [PedidoStatus.PRONTO]: 'Pronto',
+      [PedidoStatus.EM_TRANSITO]: 'Em transito',
+      [PedidoStatus.ENTREGUE]: 'Entregue',
+      [PedidoStatus.CANCELADO]: 'Cancelado',
+    };
+
+    return labels[status] || status;
+  }
+
+  private getDeliveryTypeLabel(deliveryType?: string | null): string {
+    return deliveryType === 'delivery' ? 'Entrega' : 'Retirada';
+  }
+
+  private getNextStepSummary(pedido: Pedido, status: PedidoStatus): string {
+    switch (status) {
+      case PedidoStatus.PENDENTE_PAGAMENTO:
+        return pedido.delivery_type === 'pickup'
+          ? 'Conclua o pagamento para liberar a preparacao e acompanhar quando a retirada estiver pronta.'
+          : 'Conclua o pagamento para liberar a preparacao e acompanhar a entrega sem perder contexto.';
+      case PedidoStatus.CONFIRMADO:
+        return pedido.delivery_type === 'pickup'
+          ? 'Agora a equipe segue para deixar tudo pronto para uma retirada rapida.'
+          : 'Agora a equipe segue para a preparacao e depois para a expedicao do pedido.';
+      case PedidoStatus.EM_PRODUCAO:
+        return pedido.delivery_type === 'pickup'
+          ? 'A proxima virada importante sera quando o pedido estiver pronto para retirada.'
+          : 'A proxima virada importante sera quando o pedido estiver pronto para envio.';
+      case PedidoStatus.PRONTO:
+        return pedido.delivery_type === 'pickup'
+          ? 'Tenha o codigo do pedido em maos para acelerar a retirada.'
+          : 'O pedido concluiu a preparacao e aguarda a saida para entrega.';
+      case PedidoStatus.EM_TRANSITO:
+        return 'O pedido ja saiu e agora caminha para a ultima etapa da jornada.';
+      case PedidoStatus.ENTREGUE:
+        return 'Esse acompanhamento continua valendo como comprovante e referencia da compra.';
+      case PedidoStatus.CANCELADO:
+        return 'Se precisar retomar a compra, o codigo do pedido ajuda a equipe a continuar sem retrabalho.';
+    }
+  }
+
+  private getOrderStatusAction(_pedido: Pedido, status: PedidoStatus): string | null {
+    switch (status) {
+      case PedidoStatus.PENDENTE_PAGAMENTO:
+        return 'Se quiser concluir agora aqui no WhatsApp, responda: "pix", "credito", "debito" ou "dinheiro".';
+      case PedidoStatus.CONFIRMADO:
+      case PedidoStatus.EM_PRODUCAO:
+      case PedidoStatus.PRONTO:
+      case PedidoStatus.EM_TRANSITO:
+        return 'Se quiser voltar a acompanhar por aqui depois, basta enviar: "status do pedido".';
+      case PedidoStatus.ENTREGUE:
+        return 'Se quiser repetir a compra, envie: "repetir pedido".';
+      case PedidoStatus.CANCELADO:
+        return 'Se quiser retomar a compra, envie: "reabrir pedido" ou me diga o produto que deseja.';
+      default:
+        return null;
+    }
+  }
+
+  private buildOrderItemsPreview(pedido: Pedido): string {
+    const items = (pedido.itens || []).slice(0, 4).map((item: {
+      quantity: number;
+      produto?: { name: string } | null;
+      produto_id?: string;
+    }) => `- ${item.quantity}x ${item.produto?.name || item.produto_id || 'Produto'}`);
+
+    if (!items.length) {
+      return '';
+    }
+
+    const hiddenItems = Math.max(0, (pedido.itens || []).length - items.length);
+    return [
+      'Itens:',
+      ...items,
+      hiddenItems > 0 ? `- mais ${hiddenItems} item(ns)` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  private enrichPaymentMessage(
+    baseMessage: string,
+    pedido: Pedido,
+    method: MetodoPagamento,
+  ): string {
+    const followUp =
+      method === MetodoPagamento.PIX
+        ? 'Assim que o pagamento for reconhecido, o pedido avanca automaticamente.'
+        : method === MetodoPagamento.DINHEIRO
+          ? 'Assim que a equipe confirmar o recebimento, o pedido segue para a preparacao.'
+          : 'A proxima atualizacao chega assim que o pagamento avancar.';
+
+    return [
+      baseMessage.trim(),
+      '',
+      followUp,
+      `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+    ].join('\n');
+  }
+
+  private getPremiumPaymentOptionsMessage(total: number): string {
+    const totalAmount = Number(total || 0);
+    const pixAmount = totalAmount > 0 ? totalAmount * 0.95 : 0;
+
+    return [
+      'FORMAS DE PAGAMENTO',
+      '',
+      `1. PIX com 5% de desconto (R$ ${this.formatCurrency(pixAmount)})`,
+      '2. Cartao de credito',
+      '3. Cartao de debito',
+      '4. Dinheiro',
+      '',
+      'Responda com o numero ou o nome do metodo.',
+      'Exemplo: "1", "pix" ou "credito".',
+    ].join('\n');
+  }
+
+  private buildOrderCreatedMessage(pedido: Pedido): string {
+    return [
+      this.getGreetingLine(pedido.customer_name),
+      '',
+      'PEDIDO CRIADO COM SUCESSO',
+      '',
+      `Pedido: *${pedido.order_no}*`,
+      `Recebimento: ${this.getDeliveryTypeLabel(pedido.delivery_type)}`,
+      `Total: R$ ${this.formatCurrency(Number(pedido.total_amount || 0))}`,
+      '',
+      'Seu pedido ja esta reservado e pronto para seguir assim que o pagamento for escolhido.',
+      this.getNextStepSummary(pedido, PedidoStatus.PENDENTE_PAGAMENTO),
+      '',
+      this.getPremiumPaymentOptionsMessage(Number(pedido.total_amount || 0)),
+      '',
+      `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+    ].join('\n');
+  }
+
+  private applyCommonChatNormalizations(value: string): string {
+    return value
+      .replace(/\b(qro|qru|kero|kero|queroo+)\b/g, 'quero')
+      .replace(/\b(qria|qria|k(r)?ia|keria)\b/g, 'queria')
+      .replace(/\b(presciso|presiso|precizo)\b/g, 'preciso')
+      .replace(/\b(pixx|piks|pics|pic)\b/g, 'pix')
+      .replace(/\b(credto|crdito|creditoo)\b/g, 'credito')
+      .replace(/\b(debto|dbito|debitoo)\b/g, 'debito')
+      .replace(/\b(cancela|cancelaa|cancelai|cancela ai)\b/g, 'cancelar')
+      .replace(/\b(desisti|desiste)\b/g, 'desistir')
+      .replace(/\b(kd|qd|cadee)\b/g, 'cade')
+      .replace(/\b(ond|ondee|aond|aondee)\b/g, 'onde')
+      .replace(/\b(cardapioo|cadapio|cardpio|cardapo)\b/g, 'cardapio')
+      .replace(/\b(catalogoo|catalogu)\b/g, 'catalogo')
+      .replace(/\b(encomeda|encomnda|encomendaa)\b/g, 'encomenda')
+      .replace(/\b(obgd|obrgd|obgdo)\b/g, 'obrigado')
+      .replace(/\b(pfv|pfvr)\b/g, 'por favor')
+      .replace(/([a-z])\1{3,}/g, '$1$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private normalizeForSearch(value: string): string {
+    return this.applyCommonChatNormalizations(
+      (value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[\u0000-\u001F\u007F]/g, ' ')
+      .trim(),
+    );
+  }
+
+  private normalizeIntentText(value: string): string {
+    return this.normalizeForSearch(value)
+      .replace(/[?!.,;:]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private hasAnyNormalizedPhrase(
+    normalizedValue: string,
+    phrases: string[],
+  ): boolean {
+    return phrases.some((phrase) =>
+      normalizedValue.includes(this.normalizeIntentText(phrase)),
+    );
+  }
+
+  private hasActiveOrderContext(
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): boolean {
+    const activeStates = new Set<ConversationState>([
+      'collecting_order',
+      'collecting_name',
+      'collecting_address',
+      'collecting_phone',
+      'collecting_notes',
+      'collecting_cash_change',
+      'confirming_order',
+      'confirming_stock_adjustment',
+      'waiting_payment',
+      'order_confirmed',
+      'order_completed',
+    ]);
+
+    return (
+      !!conversation?.pedido_id ||
+      !!conversation?.context?.pedido_id ||
+      (!!currentState && activeStates.has(currentState))
+    );
+  }
+
+  private async getCatalogProducts(tenantId: string): Promise<ProductWithStock[]> {
+    const result = await this.productsService.findAll(tenantId);
+    const products = Array.isArray(result) ? result : result.data;
+    return products.filter((product) => !!product?.name);
+  }
+
+  private getPremiumPhonePrompt(): string {
+    return [
+      'TELEFONE DE CONTATO',
+      '',
+      'Antes de fechar, preciso do melhor numero para atualizar voce sobre o pedido.',
+      'Pode enviar no formato:',
+      '- (11) 98765-4321',
+      '- 11987654321',
+    ].join('\n');
+  }
+
+  private getPremiumNotesPrompt(): string {
+    return [
+      'OBSERVACOES DO PEDIDO',
+      '',
+      'Se quiser, me diga algum detalhe importante para a equipe.',
+      'Exemplo: "sem acucar", "entregar na portaria" ou "caprichar na embalagem".',
+      '',
+      'Se nao houver observacoes, responda: "sem".',
+    ].join('\n');
+  }
+
+  private getPremiumDeliveryChoicePrompt(customerName?: string): string {
+    return [
+      customerName ? `Perfeito, ${customerName}.` : 'Perfeito.',
+      '',
+      'Como voce prefere receber esse pedido?',
+      '1. Entrega',
+      '2. Retirada',
+      '',
+      'Responda com "1", "2", "entrega" ou "retirada".',
+    ].join('\n');
+  }
+
+  private getPremiumAddressPrompt(): string {
+    return [
+      'ENDERECO DE ENTREGA',
+      '',
+      'Me envie o endereco completo para a entrega sair sem atrito.',
+      'Inclua rua, numero, complemento, bairro, cidade, estado e CEP.',
+      '',
+      'Exemplo: "Rua das Flores, 123, Apto 45, Centro, Sao Paulo, SP, 01234-567".',
+    ].join('\n');
+  }
+
+  private getPremiumScheduleMessage(): string {
+    return [
+      'HORARIO DE ATENDIMENTO',
+      '',
+      this.HORARIO_FUNCIONAMENTO,
+      '',
+      'Se quiser, eu ja posso te ajudar a montar o pedido agora.',
+    ].join('\n');
+  }
+
+  private getPremiumHelpMessage(): string {
+    return [
+      'COMO POSSO AJUDAR',
+      '',
+      'Voce pode falar comigo de forma natural ou usar atalhos como:',
+      '- "cardapio" para ver a vitrine da loja',
+      '- "preco de brigadeiro" para consultar um item',
+      '- "estoque de bolo de chocolate" para ver disponibilidade',
+      '- "quero 10 brigadeiros" para montar um pedido',
+      '- "status do pedido" para acompanhar a compra',
+      '- "reabrir pedido" para retomar um pagamento pendente',
+      '',
+      'Tambem posso recomendar produtos se voce disser algo como:',
+      '"me indica algo para presente" ou "o que voce tem com chocolate?"',
+    ].join('\n');
+  }
+
+  private getPremiumGreetingMessage(): string {
+    return [
+      'Ola! Sou o concierge da loja no WhatsApp.',
+      '',
+      'Posso te ajudar a descobrir produtos, montar o pedido, acompanhar a compra e retomar pagamento sem perder contexto.',
+      '',
+      'Se quiser um atalho, envie "ajuda".',
+    ].join('\n');
+  }
+
+  private getPremiumFallbackMessage(): string {
+    return [
+      'Nao quero te deixar preso num menu engessado.',
+      '',
+      'Posso te ajudar se voce disser, por exemplo:',
+      '- "quero 10 brigadeiros"',
+      '- "me indica algo para presente"',
+      '- "preco de brownie"',
+      '- "status do pedido"',
+      '',
+      'Se preferir, envie "ajuda" que eu te mostro os caminhos principais.',
+    ].join('\n');
+  }
+
+  private buildPremiumPendingOrderIntro(
+    pendingOrder: PendingOrder,
+    nextStep: string,
+  ): string {
+    return [
+      'PEDIDO PREPARADO',
+      '',
+      this.formatPendingOrderSummaryPremium(pendingOrder).trim(),
+      '',
+      nextStep,
+    ].join('\n');
+  }
+
+  private buildPremiumOrderConfirmationMessage(
+    pendingOrder: PendingOrder,
+    customerData?: CustomerData,
+  ): string {
+    const lines: string[] = ['REVISAO FINAL DO PEDIDO', ''];
+
+    lines.push('Itens');
+    pendingOrder.items.forEach((item: PendingOrderItem) => {
+      lines.push(`- ${item.quantity}x ${item.produto_name} | R$ ${this.formatCurrency(Number(item.unit_price || 0))}`);
+    });
+
+    lines.push('');
+    lines.push('Valores');
+    lines.push(`- Subtotal: R$ ${this.formatCurrency(Number(pendingOrder.subtotal || 0))}`);
+    if (pendingOrder.coupon_code) {
+      lines.push(`- Cupom: ${String(pendingOrder.coupon_code).toUpperCase()}`);
+    }
+    if (Number(pendingOrder.discount_amount || 0) > 0) {
+      lines.push(`- Desconto: R$ ${this.formatCurrency(Number(pendingOrder.discount_amount || 0))}`);
+    }
+    if (Number(pendingOrder.shipping_amount || 0) > 0) {
+      lines.push(`- Frete: R$ ${this.formatCurrency(Number(pendingOrder.shipping_amount || 0))}`);
+    }
+    lines.push(`- Total: R$ ${this.formatCurrency(Number(pendingOrder.total_amount || 0))}`);
+
+    if (customerData?.name || customerData?.phone || customerData?.notes || customerData?.delivery_type) {
+      lines.push('');
+      lines.push('Cliente');
+      if (customerData?.name) lines.push(`- Nome: ${customerData.name}`);
+      if (customerData?.phone) lines.push(`- Telefone: ${customerData.phone}`);
+      if (customerData?.notes?.trim()) lines.push(`- Observacoes: ${customerData.notes.trim()}`);
+
+      if (customerData?.delivery_type === 'delivery' && customerData.address) {
+        const number = customerData.address.number ? `, ${customerData.address.number}` : '';
+        const complement = customerData.address.complement ? `, ${customerData.address.complement}` : '';
+        lines.push(
+          `- Entrega: ${customerData.address.street}${number}${complement}, ${customerData.address.neighborhood}, ${customerData.address.city} - ${customerData.address.state}`,
+        );
+      } else if (customerData?.delivery_type === 'pickup') {
+        lines.push('- Recebimento: retirada na loja');
+      }
+    }
+
+    lines.push('');
+    lines.push('Se estiver tudo certo, responda: "sim" ou "confirmar".');
+    lines.push('Se quiser interromper, responda: "cancelar".');
+
+    return lines.join('\n');
+  }
+
+  private formatPendingOrderSummaryPremium(pendingOrder: PendingOrder): string {
+    const lines: string[] = [];
+    pendingOrder.items.forEach((item: PendingOrderItem) => {
+      lines.push(`${item.produto_name}`);
+      lines.push(`- Quantidade: ${item.quantity} unidade(s)`);
+      lines.push(`- Preco unitario: R$ ${this.formatCurrency(Number(item.unit_price || 0))}`);
+      lines.push('');
+    });
+    lines.push(`Total do pedido: R$ ${this.formatCurrency(Number(pendingOrder.total_amount || 0))}`);
+    return lines.join('\n');
+  }
+
+  private extractCatalogQuery(message: string): string {
+    return this.normalizeForSearch(message)
+      .replace(
+        /\b(preco|valor|quanto|custa|estoque|tem|disponivel|menu|cardapio|catalogo|catalogue|quais|qual|quero|pedido|recomenda|recomendar|indica|indicar|sugere|sugerir|algo|opcao|opcoes|para|com|de|do|da|dos|das|me|uma|um|uns|umas|por favor|favor)\b/g,
+        ' ',
+      )
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private formatProductHeadline(product: ProductWithStock): string {
+    const category = product.categoria?.name ? ` | ${product.categoria.name}` : '';
+    return `${product.name} | R$ ${this.formatCurrency(Number(product.price || 0))}${category}`;
+  }
+
+  private buildProductInsightMessage(
+    product: ProductWithStock,
+    mode: 'price' | 'stock' | 'recommendation' | 'insight',
+  ): string {
+    const available = Number(product.available_stock || 0);
+    const minStock = Number(product.min_stock || 0);
+    const stockLine =
+      available <= 0
+        ? 'Disponibilidade: indisponivel no momento'
+        : available <= Math.max(1, minStock)
+          ? `Disponibilidade: ${available} unidade(s), estoque sensivel`
+          : `Disponibilidade: ${available} unidade(s) prontas para venda`;
+
+    const intro =
+      mode === 'recommendation'
+        ? 'Achei uma opcao que combina bem com o que voce pediu.'
+        : mode === 'stock'
+          ? 'Aqui esta a leitura mais util deste item agora.'
+          : 'Aqui esta a leitura mais clara deste item.';
+
+    return [
+      intro,
+      '',
+      this.formatProductHeadline(product),
+      stockLine,
+      '',
+      `Se quiser seguir, diga: "quero X ${product.name}".`,
+    ].join('\n');
+  }
+
+  private buildSuggestionMessage(
+    query: string,
+    suggestions: ProductWithStock[],
+    intro: string,
+  ): string {
+    return [
+      intro,
+      '',
+      ...suggestions.slice(0, 4).map((product) => `- ${this.formatProductHeadline(product)}`),
+      '',
+      query
+        ? `Se quiser, me diga o nome completo do item ou envie: "quero 1 ${suggestions[0].name}".`
+        : 'Se quiser, me diga o nome completo do item que chamou sua atencao.',
+    ].join('\n');
+  }
+
+  private pickRecommendationProducts(
+    products: ProductWithStock[],
+    query: string,
+  ): ProductWithStock[] {
+    const normalizedQuery = this.normalizeForSearch(query);
+    const queryWords = normalizedQuery.split(/\s+/).filter((word) => word.length >= 2);
+
+    const scored = products
+      .map((product) => {
+        const normalizedName = this.normalizeForSearch(product.name);
+        const normalizedCategory = this.normalizeForSearch(product.categoria?.name || '');
+        const available = Number(product.available_stock || 0);
+
+        let score = available > 0 ? 20 : -20;
+        queryWords.forEach((word) => {
+          if (normalizedName.includes(word)) score += 14;
+          if (normalizedCategory.includes(word)) score += 8;
+        });
+
+        if (normalizedQuery.includes('presente') || normalizedQuery.includes('gift')) {
+          if (/(kit|caixa|combo|box)/.test(normalizedName)) score += 18;
+        }
+
+        if (normalizedQuery.includes('festa') || normalizedQuery.includes('anivers')) {
+          if (/(bolo|torta|kit|combo)/.test(normalizedName)) score += 16;
+        }
+
+        if (normalizedQuery.includes('chocolate') && normalizedName.includes('chocolate')) {
+          score += 18;
+        }
+
+        score += Math.min(available, 20);
+        return { product, score };
+      })
+      .sort((left, right) => right.score - left.score);
+
+    return scored
+      .filter((item) => item.score > 0)
+      .slice(0, 3)
+      .map((item) => item.product);
+  }
+
+  private async getPremiumCardapio(tenantId: string): Promise<string> {
+    try {
+      const products = await this.getCatalogProducts(tenantId);
+      if (!products.length) {
+        return 'CATALOGO DA LOJA\n\nAinda nao ha produtos publicados para este tenant.';
+      }
+
+      const grouped = new Map<string, ProductWithStock[]>();
+      products.forEach((product) => {
+        const category = product.categoria?.name || 'Destaques';
+        const current = grouped.get(category) || [];
+        current.push(product);
+        grouped.set(category, current);
+      });
+
+      const lines: string[] = [
+        'CATALOGO DA LOJA',
+        '',
+        `Temos ${products.length} produto(s) publicado(s) e ${products.filter((product) => Number(product.available_stock || 0) > 0).length} com estoque ativo agora.`,
+        '',
+      ];
+
+      Array.from(grouped.entries())
+        .slice(0, 4)
+        .forEach(([category, items]) => {
+          lines.push(category.toUpperCase());
+          items.slice(0, 4).forEach((item) => {
+            lines.push(`- ${item.name} | R$ ${this.formatCurrency(Number(item.price || 0))}`);
+          });
+          lines.push('');
+        });
+
+      lines.push('Se quiser, eu transformo qualquer item em pedido por aqui.');
+      lines.push('Exemplo: "quero 10 brigadeiros".');
+
+      return lines.join('\n');
+    } catch (error) {
+      this.logger.error('Error getting premium WhatsApp catalog', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { tenantId },
+      });
+      return 'Nao consegui abrir o catalogo agora. Tente novamente em instantes.';
+    }
+  }
+
+  private async getPremiumPriceResponse(message: string, tenantId: string): Promise<string> {
+    try {
+      const products = await this.getCatalogProducts(tenantId);
+      const query = this.extractCatalogQuery(message);
+
+      if (query) {
+        const result = this.findProductByName(products, query);
+        if (result.produto) {
+          return this.buildProductInsightMessage(result.produto, 'price');
+        }
+
+        if (result.sugestoes?.length) {
+          return this.buildSuggestionMessage(
+            query,
+            result.sugestoes,
+            `Nao encontrei um item exatamente como "${query}", mas achei estas opcoes proximas:`,
+          );
+        }
+      }
+
+      if (!products.length) {
+        return 'Ainda nao ha produtos publicados para consultar preco.';
+      }
+
+      return [
+        'REFERENCIA RAPIDA DE PRECOS',
+        '',
+        ...products
+          .slice(0, 5)
+          .map((product) => `- ${product.name}: R$ ${this.formatCurrency(Number(product.price || 0))}`),
+        '',
+        'Se quiser um item especifico, envie: "preco de brigadeiro".',
+      ].join('\n');
+    } catch (error) {
+      this.logger.error('Error getting premium price response', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { tenantId, query: message?.substring(0, 80) },
+      });
+      return 'Nao consegui consultar o preco agora. Tente novamente em instantes.';
+    }
+  }
+
+  private async getPremiumStockResponse(message: string, tenantId: string): Promise<string> {
+    try {
+      const products = await this.getCatalogProducts(tenantId);
+      const query = this.extractCatalogQuery(message);
+
+      if (query) {
+        const result = this.findProductByName(products, query);
+        if (result.produto) {
+          return this.buildProductInsightMessage(result.produto, 'stock');
+        }
+
+        if (result.sugestoes?.length) {
+          return this.buildSuggestionMessage(
+            query,
+            result.sugestoes,
+            `Nao achei o item "${query}" do jeito que voce escreveu, mas estas opcoes parecem proximas:`,
+          );
+        }
+      }
+
+      const lowStock = products.filter((product) => {
+        const available = Number(product.available_stock || 0);
+        const minStock = Number(product.min_stock || 5);
+        return available > 0 && available <= minStock;
+      });
+
+      if (lowStock.length) {
+        return [
+          'ESTOQUE SENSIVEL',
+          '',
+          ...lowStock.slice(0, 5).map((product) => `- ${product.name}: ${product.available_stock} unidade(s)`),
+          '',
+          'Se quiser checar um item especifico, envie: "estoque de brownie".',
+        ].join('\n');
+      }
+
+      return 'Me diga o nome do item para eu verificar a disponibilidade. Exemplo: "estoque de brigadeiro".';
+    } catch (error) {
+      this.logger.error('Error getting premium stock response', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { tenantId, query: message?.substring(0, 80) },
+      });
+      return 'Nao consegui verificar o estoque agora. Tente novamente em instantes.';
+    }
+  }
+
+  private async tryAIAssistedRouting(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): Promise<string | null> {
+    if (currentState && !['idle', 'waiting_payment'].includes(currentState)) {
+      return null;
+    }
+
+    const intent = await this.openAIService.processMessage(message);
+
+    if (intent.intent === 'cancelar' && conversation) {
+      return await this.handleCancelIntent(tenantId, conversation, currentState);
+    }
+
+    if (intent.intent === 'fazer_pedido' && intent.product) {
+      const quantity = intent.quantity || 1;
+      return await this.processOrder(`quero ${quantity} ${intent.product}`, tenantId, conversation);
+    }
+
+    if (intent.intent === 'consultar' && intent.product) {
+      return await this.getPremiumPriceResponse(`preco de ${intent.product}`, tenantId);
+    }
+
+    return null;
+  }
+
+  private async trySmartConciergeResponse(
+    message: string,
+    tenantId: string,
+  ): Promise<string | null> {
+    const normalized = this.normalizeForSearch(message);
+    const recommendationKeywords = [
+      'recomenda',
+      'indica',
+      'sugere',
+      'melhor',
+      'mais vendido',
+      'algo para',
+      'opcao',
+      'opcoes',
+      'presente',
+      'festa',
+      'anivers',
+      'chocolate',
+    ];
+
+    if (!recommendationKeywords.some((keyword) => normalized.includes(keyword))) {
+      return null;
+    }
+
+    const products = await this.getCatalogProducts(tenantId);
+    if (!products.length) {
+      return 'Ainda nao ha produtos publicados para eu recomendar agora.';
+    }
+
+    const query = this.extractCatalogQuery(message);
+    const recommendations = this.pickRecommendationProducts(products, query);
+
+    if (!recommendations.length) {
+      return 'Nao encontrei uma recomendacao forte com esse contexto, mas posso te mostrar o catalogo se voce enviar "cardapio".';
+    }
+
+    const intro = query
+      ? `Pelo que voce descreveu sobre "${query}", estas sao as melhores opcoes que achei agora:`
+      : 'Separei algumas opcoes fortes para voce:';
+
+    return [
+      intro,
+      '',
+      ...recommendations.map((product) => `- ${this.formatProductHeadline(product)}`),
+      '',
+      `Se quiser, eu ja monto o pedido por aqui. Exemplo: "quero 1 ${recommendations[0].name}".`,
+    ].join('\n');
+  }
+
+  private async applyPendingOrderAndProceedPremium(
+    pendingOrder: PendingOrder,
+    tenantId: string,
+    conversation: TypedConversation,
+  ): Promise<string> {
+    if (!conversation.context?.order_attempt_id) {
+      const attemptId = crypto.randomUUID();
+      await this.conversationService.updateContext(conversation.id, {
+        order_attempt_id: attemptId,
+      });
+      conversation.context = {
+        ...(conversation.context || {}),
+        order_attempt_id: attemptId,
+      };
+    }
+
+    await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
+
+    const customerData = conversation?.context?.customer_data as CustomerData | undefined;
+
+    if (customerData?.name) {
+      if (!customerData.address && !customerData.delivery_type) {
+        await this.conversationService.updateState(conversation.id, 'collecting_address');
+        return this.buildPremiumPendingOrderIntro(
+          pendingOrder,
+          this.getPremiumDeliveryChoicePrompt(customerData.name),
+        );
+      }
+
+      if (customerData.delivery_type === 'delivery' && !customerData.address) {
+        await this.conversationService.updateState(conversation.id, 'collecting_address');
+        return this.getPremiumAddressPrompt();
+      }
+
+      if (!customerData.phone) {
+        await this.conversationService.updateState(conversation.id, 'collecting_phone');
+        return this.getPremiumPhonePrompt();
+      }
+
+      if (customerData.notes === undefined) {
+        await this.conversationService.updateState(conversation.id, 'collecting_notes');
+        return this.getPremiumNotesPrompt();
+      }
+
+      await this.conversationService.updateState(conversation.id, 'confirming_order');
+      return await this.showOrderConfirmationPremium(tenantId, conversation);
+    }
+
+    await this.conversationService.updateState(conversation.id, 'collecting_name');
+    return this.buildPremiumPendingOrderIntro(
+      pendingOrder,
+      'Antes de fechar, me diga o nome completo de quem vai receber o pedido.',
+    );
+  }
+
+  private async processCustomerNamePremium(
+    message: string,
+    _tenantId: string,
+    conversation?: TypedConversation,
+  ): Promise<string> {
+    if (!conversation) {
+      return 'Nao consegui continuar a coleta agora. Tente novamente.';
+    }
+
+    const stateValidation = this.validateConversationState(conversation);
+    if (!stateValidation.valid) {
+      return `Nao consegui seguir: ${stateValidation.error}`;
+    }
+
+    const sanitizedName = this.sanitizeInput(message.trim());
+    const nameValidation = this.validateName(sanitizedName);
+    if (!nameValidation.valid) {
+      return `Nome invalido: ${nameValidation.error}`;
+    }
+
+    await this.conversationService.saveCustomerData(conversation.id, { name: sanitizedName });
+
+    const pendingOrder = conversation.context?.pending_order;
+    if (pendingOrder) {
+      const orderValidation = this.validatePendingOrder(pendingOrder);
+      if (!orderValidation.valid) {
+        this.logger.error(`Invalid pending order: ${orderValidation.error}`, {
+          conversationId: conversation.id,
+          customerPhone: conversation.customer_phone,
+        });
+        await this.conversationService.clearPendingOrder(conversation.id);
+        await this.conversationService.updateState(conversation.id, 'idle');
+        return 'Encontrei um problema no pedido pendente. Vamos recomecar para ficar seguro.';
+      }
+
+      await this.conversationService.updateState(conversation.id, 'collecting_address');
+      return this.getPremiumDeliveryChoicePrompt(sanitizedName);
+    }
+
+    await this.conversationService.updateState(conversation.id, 'idle');
+    return `Nome salvo com sucesso, ${sanitizedName}.\n\nComo posso te ajudar agora?`;
+  }
+
+  private async processCustomerAddressPremium(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+  ): Promise<string> {
+    if (!conversation) {
+      return 'Nao consegui continuar a coleta agora. Tente novamente.';
+    }
+
+    const stateValidation = this.validateConversationState(conversation);
+    if (!stateValidation.valid) {
+      return `Nao consegui seguir: ${stateValidation.error}`;
+    }
+
+    const sanitizedMessage = this.sanitizeInput(message.trim());
+    const lowerMessage = sanitizedMessage.toLowerCase().trim();
+
+    if (lowerMessage === '1' || lowerMessage.includes('entrega')) {
+      await this.conversationService.saveCustomerData(conversation.id, { delivery_type: 'delivery' });
+      const pendingOrder = conversation.context?.pending_order;
+      if (pendingOrder) {
+        pendingOrder.shipping_amount = this.getDefaultShippingAmount();
+        pendingOrder.total_amount =
+          Number(pendingOrder.subtotal || 0) -
+          Number(pendingOrder.discount_amount || 0) +
+          Number(pendingOrder.shipping_amount || 0);
+        await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
+      }
+      await this.conversationService.updateState(conversation.id, 'collecting_address');
+      return this.getPremiumAddressPrompt();
+    }
+
+    if (lowerMessage === '2' || lowerMessage.includes('retirada') || lowerMessage.includes('buscar')) {
+      await this.conversationService.saveCustomerData(conversation.id, { delivery_type: 'pickup' });
+      const pendingOrder = conversation.context?.pending_order;
+      if (pendingOrder) {
+        pendingOrder.shipping_amount = 0;
+        pendingOrder.total_amount =
+          Number(pendingOrder.subtotal || 0) -
+          Number(pendingOrder.discount_amount || 0) +
+          Number(pendingOrder.shipping_amount || 0);
+        await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
+      }
+      if (!conversation.context?.customer_data?.phone) {
+        await this.conversationService.updateState(conversation.id, 'collecting_phone');
+        return this.getPremiumPhonePrompt();
+      }
+      await this.conversationService.updateState(conversation.id, 'collecting_notes');
+      return this.getPremiumNotesPrompt();
+    }
+
+    const addressValidation = this.validateAddress(sanitizedMessage);
+    if (!addressValidation.valid) {
+      return `Endereco invalido: ${addressValidation.error}`;
+    }
+
+    const addressParts = this.parseAddress(sanitizedMessage);
+
+    if (!addressParts) {
+      await this.conversationService.saveCustomerData(conversation.id, {
+        delivery_type: 'delivery',
+        address: {
+          street: sanitizedMessage,
+          number: '',
+          neighborhood: '',
+          city: '',
+          state: '',
+          zipCode: '',
+          zipcode: '',
+        },
+      });
+
+      const pendingOrder = conversation.context?.pending_order;
+      if (pendingOrder && Number(pendingOrder.shipping_amount || 0) === 0) {
+        pendingOrder.shipping_amount = this.getDefaultShippingAmount();
+        pendingOrder.total_amount =
+          Number(pendingOrder.subtotal || 0) -
+          Number(pendingOrder.discount_amount || 0) +
+          Number(pendingOrder.shipping_amount || 0);
+        await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
+      }
+
+      await this.conversationService.updateState(conversation.id, 'confirming_order');
+      return await this.showOrderConfirmationPremium(tenantId, conversation);
+    }
+
+    await this.conversationService.saveCustomerData(conversation.id, {
+      delivery_type: 'delivery',
+      address: {
+        ...addressParts,
+        zipcode: addressParts.zipCode || '',
+      },
+    });
+
+    const pendingOrder = conversation.context?.pending_order;
+    if (pendingOrder && Number(pendingOrder.shipping_amount || 0) === 0) {
+      pendingOrder.shipping_amount = this.getDefaultShippingAmount();
+      pendingOrder.total_amount =
+        Number(pendingOrder.subtotal || 0) -
+        Number(pendingOrder.discount_amount || 0) +
+        Number(pendingOrder.shipping_amount || 0);
+      await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
+    }
+
+    if (!conversation.context?.customer_data?.phone) {
+      await this.conversationService.updateState(conversation.id, 'collecting_phone');
+      return this.getPremiumPhonePrompt();
+    }
+
+    await this.conversationService.updateState(conversation.id, 'collecting_notes');
+    return this.getPremiumNotesPrompt();
+  }
+
+  private async processCustomerNotesPremium(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+  ): Promise<string> {
+    if (!conversation) {
+      return 'Nao consegui continuar a coleta agora. Tente novamente.';
+    }
+
+    const stateValidation = this.validateConversationState(conversation);
+    if (!stateValidation.valid) {
+      return `Nao consegui seguir: ${stateValidation.error}`;
+    }
+
+    const sanitizedMessage = this.sanitizeInput(message.trim());
+    const lowerMessage = sanitizedMessage.toLowerCase().trim();
+    const wantsPaymentShortcut = this.isPaymentMethodSelection(sanitizedMessage);
+
+    const noNotes =
+      !lowerMessage ||
+      lowerMessage === 'sem' ||
+      lowerMessage === 'nao' ||
+      lowerMessage === 'não' ||
+      lowerMessage === 'nenhuma' ||
+      lowerMessage === 'nenhum' ||
+      lowerMessage === 'sim' ||
+      lowerMessage === 'ok' ||
+      wantsPaymentShortcut;
+
+    if (!noNotes && sanitizedMessage.length > this.MAX_NOTES_LENGTH) {
+      return `As observacoes devem ter no maximo ${this.MAX_NOTES_LENGTH} caracteres.`;
+    }
+
+    await this.conversationService.saveCustomerData(conversation.id, {
+      notes: noNotes ? '' : sanitizedMessage,
+    });
+
+    await this.conversationService.updateState(conversation.id, 'confirming_order');
+
+    if (wantsPaymentShortcut) {
+      const fastTrackConversation = {
+        ...conversation,
+        context: {
+          ...(conversation.context || {}),
+          state: 'confirming_order',
+          customer_data: {
+            ...((conversation.context?.customer_data as CustomerData | undefined) || {}),
+            notes: '',
+          },
+        },
+      } as TypedConversation;
+
+      return await this.processOrderConfirmationPremium(sanitizedMessage, tenantId, fastTrackConversation);
+    }
+
+    return await this.showOrderConfirmationPremium(tenantId, conversation);
+  }
+
+  private async showOrderConfirmationPremium(
+    _tenantId: string,
+    conversation?: TypedConversation,
+  ): Promise<string> {
+    if (!conversation) {
+      return 'Nao consegui montar a revisao final agora. Tente novamente.';
+    }
+
+    const refreshed = await this.conversationService.findById(conversation.id);
+    const activeConversation = refreshed ? toTypedConversation(refreshed) : conversation;
+    const pendingOrder = activeConversation.context?.pending_order;
+    const customerData = activeConversation.context?.customer_data as CustomerData | undefined;
+
+    if (!pendingOrder) {
+      return 'Nao encontrei um pedido pendente para revisar. Vamos montar um novo?';
+    }
+
+    if (customerData?.delivery_type === 'pickup' && !customerData.phone) {
+      await this.conversationService.updateState(conversation.id, 'collecting_phone');
+      return this.getPremiumPhonePrompt();
+    }
+
+    return this.buildPremiumOrderConfirmationMessage(pendingOrder, customerData);
+  }
+
+  private async processOrderConfirmationPremium(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+  ): Promise<string> {
+    if (!conversation) {
+      return 'Nao consegui continuar a confirmacao agora. Tente novamente.';
+    }
+
+    const stateValidation = this.validateConversationState(conversation);
+    if (!stateValidation.valid) {
+      return `Nao consegui seguir: ${stateValidation.error}`;
+    }
+
+    const sanitizedMessage = this.sanitizeInput(message.trim());
+    const lowerMessage = sanitizedMessage.toLowerCase().trim();
+    const wantsImmediatePayment = this.isPaymentMethodSelection(sanitizedMessage);
+
+    if (this.isOrderIntent(lowerMessage)) {
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.clearCustomerData(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      conversation.context = {
+        ...(conversation.context || {}),
+        state: 'idle',
+      };
+      return await this.processOrder(message, tenantId, conversation);
+    }
+
+    if (
+      this.isCancelIntent(lowerMessage, conversation, 'confirming_order') ||
+      (lowerMessage.includes('nao') && !lowerMessage.includes('sim')) ||
+      lowerMessage.includes('não')
+    ) {
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return 'Pedido cancelado.\n\nSe quiser recomecar, eu monto um novo com voce por aqui.';
+    }
+
+    if (
+      !wantsImmediatePayment &&
+      !lowerMessage.includes('sim') &&
+      !lowerMessage.includes('confirmar') &&
+      !lowerMessage.includes('ok')
+    ) {
+      return 'Para seguir, responda "sim" ou "confirmar". Se quiser interromper, responda "cancelar".';
+    }
+
+    const pendingOrder = conversation.context?.pending_order;
+    const customerData = conversation.context?.customer_data as CustomerData | undefined;
+
+    if (!pendingOrder) {
+      return 'Nao encontrei o pedido pendente. Vamos recomecar com seguranca.';
+    }
+
+    const orderValidation = this.validatePendingOrder(pendingOrder);
+    if (!orderValidation.valid) {
+      this.logger.error(`Invalid pending order: ${orderValidation.error}`, {
+        conversationId: conversation.id,
+        customerPhone: conversation.customer_phone,
+      });
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return 'Encontrei um problema no pedido pendente. Vamos montar um novo para garantir consistencia.';
+    }
+
+    if (!customerData?.name) {
+      return 'Preciso do nome do cliente antes de fechar. Vamos continuar a coleta.';
+    }
+
+    if (!customerData?.phone) {
+      await this.conversationService.updateState(conversation.id, 'collecting_phone');
+      return this.getPremiumPhonePrompt();
+    }
+
+    const nameValidation = this.validateName(customerData.name);
+    if (!nameValidation.valid) {
+      return `Nome invalido: ${nameValidation.error}.`;
+    }
+
+    if (customerData.delivery_type === 'delivery' && customerData.address) {
+      const addressString = `${customerData.address.street}, ${customerData.address.number}, ${customerData.address.neighborhood}, ${customerData.address.city}, ${customerData.address.state}`;
+      const addressValidation = this.validateAddress(addressString);
+      if (!addressValidation.valid) {
+        return `Endereco invalido: ${addressValidation.error}.`;
+      }
+    }
+
+    try {
+      const idempotencyKey = this.buildWhatsAppOrderIdempotencyKey(
+        conversation,
+        pendingOrder,
+        customerData,
+      );
+
+      const pedido = await this.ordersService.create({
+        channel: CanalVenda.WHATSAPP,
+        customer_name: customerData.name,
+        customer_phone: customerData.phone || conversation.customer_phone,
+        customer_notes: customerData.notes?.trim() || undefined,
+        delivery_type: customerData.delivery_type,
+        delivery_address:
+          customerData.delivery_type === 'delivery' && customerData.address
+            ? {
+                street: customerData.address.street,
+                number: customerData.address.number,
+                complement: customerData.address.complement,
+                neighborhood: customerData.address.neighborhood,
+                city: customerData.address.city,
+                state: customerData.address.state,
+                zipcode:
+                  (customerData.address as { zipcode?: string; zipCode?: string }).zipcode ||
+                  (customerData.address as { zipcode?: string; zipCode?: string }).zipCode ||
+                  '',
+              }
+            : undefined,
+        items: pendingOrder.items.map((item: PendingOrderItem) => ({
+          produto_id: item.produto_id,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+        })),
+        coupon_code: pendingOrder.coupon_code || undefined,
+        discount_amount: pendingOrder.discount_amount,
+        shipping_amount: pendingOrder.shipping_amount,
+      }, tenantId, undefined, idempotencyKey);
+
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.setPedidoId(conversation.id, pedido.id);
+      await this.conversationService.updateState(conversation.id, 'waiting_payment');
+
+      if (wantsImmediatePayment) {
+        const paymentConversation = {
+          ...conversation,
+          pedido_id: pedido.id,
+          context: {
+            ...(conversation.context || {}),
+            pedido_id: pedido.id,
+            state: 'waiting_payment',
+          },
+        } as TypedConversation;
+
+        const paymentResponse = await this.processPaymentSelection(sanitizedMessage, tenantId, paymentConversation);
+        return `Pedido *${pedido.order_no}* confirmado.\n\n${paymentResponse}`;
+      }
+
+      return this.buildOrderCreatedMessage(pedido);
+    } catch (error) {
+      this.logger.error('Error creating confirmed premium order', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: {
+          tenantId,
+          customerPhone: conversation?.customer_phone,
+          pendingOrder,
+        },
+      });
+
+      return 'Nao consegui concluir o pedido agora. Tente novamente em instantes.';
+    }
+  }
+
   private parseCurrencyAmount(raw: string): number | null {
     const text = (raw || '').trim();
     if (!text) return null;
@@ -159,10 +1342,12 @@ export class WhatsappService {
     const text = (message || '').trim();
     if (!text) return null;
     if (!/^[A-Za-z0-9_-]{2,50}$/.test(text)) return null;
+    if (/^\d+$/.test(text)) return null;
     const upper = text.toUpperCase();
     const reserved = new Set([
       'SIM',
       'NAO',
+      'SEM',
       'OK',
       'CANCELAR',
       'PIX',
@@ -180,19 +1365,61 @@ export class WhatsappService {
   }
 
   private extractOrderNo(message: string): string | null {
-    const m = (message || '').toUpperCase().match(/\bPED-\d{8}-\d{3}\b/);
-    return m ? m[0] : null;
+    const normalized = this.normalizeForSearch(message).toUpperCase();
+    const directMatch = normalized.match(/\bPED-\d{8}-[A-Z0-9]{3,}\b/);
+    if (directMatch) {
+      return directMatch[0];
+    }
+
+    const flexibleMatch = normalized.match(/\bPED[\s-]?(\d{8})[\s-]?([A-Z0-9]{3,})\b/);
+    if (!flexibleMatch) {
+      return null;
+    }
+
+    return `PED-${flexibleMatch[1]}-${flexibleMatch[2]}`;
   }
 
-  private isCancelIntent(lowerMessage: string): boolean {
-    const lm = (lowerMessage || '').trim();
+  private isCancelIntent(
+    lowerMessage: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): boolean {
+    const lm = this.normalizeIntentText(lowerMessage);
     if (!lm) return false;
-    return (
-      lm.includes('cancelar') ||
-      lm.includes('cancelamento') ||
-      lm.includes('desistir') ||
-      lm.includes('anular')
-    );
+
+    if (this.hasAnyNormalizedPhrase(lm, [
+      'cancelar',
+      'cancelamento',
+      'cancela',
+      'cancelar pedido',
+      'cancelar meu pedido',
+      'desistir',
+      'anular',
+      'anula',
+      'desfazer pedido',
+    ])) {
+      return true;
+    }
+
+    if (!this.hasActiveOrderContext(conversation, currentState) && !this.extractOrderNo(lm)) {
+      return false;
+    }
+
+    return this.hasAnyNormalizedPhrase(lm, [
+      'nao quero mais',
+      'nao vou querer',
+      'nao vou mais querer',
+      'nao quero seguir',
+      'quero desistir',
+      'deixa pra la',
+      'deixa para la',
+      'deixa pra depois',
+      'parar pedido',
+      'parar compra',
+      'interromper pedido',
+      'interromper compra',
+      'abandonar pedido',
+    ]);
   }
 
   private isReopenIntent(lowerMessage: string): boolean {
@@ -233,11 +1460,87 @@ export class WhatsappService {
     );
   }
 
-  private looksLikeOrderStatusQuery(lowerMessage: string): boolean {
-    const lm = (lowerMessage || '').trim();
+  private looksLikeOrderStatusQuery(
+    lowerMessage: string,
+    conversation?: TypedConversation,
+  ): boolean {
+    const lm = this.normalizeIntentText(lowerMessage);
     if (!lm) return false;
-    if (lm.includes('meu pedido') || lm.includes('status do pedido') || lm.startsWith('status')) return true;
-    return /\bped-\d{8}-\d{3}\b/i.test(lm);
+    const currentState = conversation?.context?.state as ConversationState | undefined;
+    if (this.isCancelIntent(lm, conversation, currentState)) return false;
+    if (this.extractOrderNo(lm)) return true;
+
+    if (this.hasAnyNormalizedPhrase(lm, [
+      'meu pedido',
+      'status do pedido',
+      'status pedido',
+      'acompanhar pedido',
+      'acompanha pedido',
+      'rastrear pedido',
+      'rastreia pedido',
+      'cade meu pedido',
+      'cade o pedido',
+      'onde ta meu pedido',
+      'onde ta o pedido',
+      'aonde ta meu pedido',
+      'como ta meu pedido',
+      'qual status do pedido',
+      'quando chega meu pedido',
+      'quando chega minha entrega',
+      'onde ta minha encomenda',
+      'cade minha encomenda',
+      'andamento do pedido',
+      'atualizacao do pedido',
+      'atualizacao da entrega',
+      'pedido saiu',
+      'ja saiu meu pedido',
+      'saiu para entrega',
+    ])) {
+      return true;
+    }
+
+    const hasOrderKeyword = ['pedido', 'encomenda', 'entrega'].some((keyword) =>
+      lm.includes(keyword),
+    );
+    const hasStatusSignal = this.hasAnyNormalizedPhrase(lm, [
+      'status',
+      'acompanhar',
+      'acompanha',
+      'rastrear',
+      'rastreia',
+      'cade',
+      'onde ta',
+      'aonde ta',
+      'como ta',
+      'quando chega',
+      'demora',
+      'andamento',
+      'atualizacao',
+      'ja saiu',
+      'saiu',
+    ]);
+
+    if (hasOrderKeyword && hasStatusSignal) {
+      return true;
+    }
+
+    if (this.hasActiveOrderContext(conversation, currentState)) {
+      return this.hasAnyNormalizedPhrase(lm, [
+        'cade',
+        'onde ta',
+        'aonde ta',
+        'como ta',
+        'quando chega',
+        'demora',
+        'ja saiu',
+        'saiu',
+        'ta pronto',
+        'ficou pronto',
+        'status',
+      ]);
+    }
+
+    return false;
   }
 
   private async handleOrderStatusQuery(
@@ -378,6 +1681,204 @@ export class WhatsappService {
     );
   }
 
+  private async handlePremiumOrderStatusQuery(
+    tenantId: string,
+    conversation: TypedConversation | undefined,
+    orderNo: string | null,
+  ): Promise<string> {
+    try {
+      let pedido: Pedido | null = null;
+
+      if (orderNo) {
+        pedido = await this.ordersService.findByOrderNo(orderNo, tenantId);
+      }
+
+      if (!pedido) {
+        const pedidoId = conversation?.pedido_id || conversation?.context?.pedido_id;
+        if (pedidoId) {
+          pedido = await this.ordersService.findOne(pedidoId, tenantId);
+        }
+      }
+
+      if (!pedido && conversation?.customer_phone) {
+        pedido = await this.ordersService.findLatestByCustomerPhone(
+          tenantId,
+          conversation.customer_phone,
+        );
+      }
+
+      if (!pedido) {
+        return [
+          'ACOMPANHAR PEDIDO',
+          '',
+          'Me envie o codigo do pedido (ex.: *PED-20260108-001*).',
+          'Se a compra foi finalizada aqui, eu tambem consigo localizar pelo historico desta conversa.',
+          '',
+          `Portal de acompanhamento: ${this.getOrdersPortalUrl()}`,
+        ].join('\n');
+      }
+
+      const itemsPreview = this.buildOrderItemsPreview(pedido);
+      const action = this.getOrderStatusAction(pedido, pedido.status);
+
+      return [
+        this.getGreetingLine(pedido.customer_name),
+        '',
+        'ACOMPANHAMENTO DO PEDIDO',
+        '',
+        `Pedido: *${pedido.order_no}*`,
+        `Status atual: *${this.getStatusLabel(pedido.status)}*`,
+        `Recebimento: ${this.getDeliveryTypeLabel(pedido.delivery_type)}`,
+        `Total: R$ ${this.formatCurrency(Number(pedido.total_amount || 0))}`,
+        itemsPreview ? '' : '',
+        itemsPreview,
+        '',
+        this.getNextStepSummary(pedido, pedido.status),
+        action || '',
+        '',
+        `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+      ]
+        .filter(Boolean)
+        .join('\n');
+    } catch (error) {
+      this.logger.error('Error handling premium order status query', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { tenantId, orderNo, conversationId: conversation?.id },
+      });
+      return 'Nao consegui buscar o status agora. Tente novamente em instantes.';
+    }
+  }
+
+  private async handlePremiumReopenIntent(
+    tenantId: string,
+    conversation: TypedConversation | undefined,
+  ): Promise<string> {
+    if (!conversation) {
+      return 'Nao encontrei um pedido para retomar.';
+    }
+
+    const pedidoId = conversation.pedido_id || conversation.context?.pedido_id;
+    let pedido: Pedido | null = null;
+
+    if (pedidoId) {
+      pedido = await this.ordersService.findOne(pedidoId, tenantId);
+    }
+
+    if (!pedido || pedido.status !== PedidoStatus.PENDENTE_PAGAMENTO) {
+      pedido = await this.ordersService.findLatestPendingByCustomerPhone(
+        tenantId,
+        conversation.customer_phone,
+      );
+    }
+
+    if (!pedido) {
+      await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return 'Nao encontrei um pedido pendente para retomar.\n\nSe quiser, faca um novo pedido digitando: "Quero X [produto]".';
+    }
+
+    await this.conversationService.setPedidoId(conversation.id, pedido.id);
+    await this.conversationService.updateState(conversation.id, 'waiting_payment');
+
+    return [
+      this.getGreetingLine(pedido.customer_name),
+      '',
+      `Pedido *${pedido.order_no}* retomado.`,
+      `Recebimento: ${this.getDeliveryTypeLabel(pedido.delivery_type)}`,
+      `Total: R$ ${this.formatCurrency(Number(pedido.total_amount || 0))}`,
+      '',
+      'Seu pedido continua preservado e voce pode concluir o pagamento agora.',
+      this.getNextStepSummary(pedido, PedidoStatus.PENDENTE_PAGAMENTO),
+      '',
+      this.getPremiumPaymentOptionsMessage(Number(pedido.total_amount || 0)),
+      '',
+      `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+    ].join('\n');
+  }
+
+  private async handlePremiumCancelIntent(
+    tenantId: string,
+    conversation: TypedConversation | undefined,
+    currentState?: ConversationState,
+    orderNo?: string | null,
+  ): Promise<string> {
+    if (!conversation) {
+      return 'Nao encontrei um pedido em andamento para cancelar.\n\nSe quiser, eu posso montar um novo pedido com voce.';
+    }
+
+    const collectingStates: ConversationState[] = [
+      'collecting_order',
+      'collecting_name',
+      'collecting_address',
+      'collecting_phone',
+      'collecting_notes',
+      'collecting_cash_change',
+      'confirming_order',
+      'confirming_stock_adjustment',
+    ];
+
+    if (currentState && collectingStates.includes(currentState)) {
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.clearCustomerData(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return 'Pedido interrompido com sucesso.\n\nQuando quiser, eu monto outro com voce do zero.';
+    }
+
+    let pedido: Pedido | null = null;
+
+    if (orderNo) {
+      pedido = await this.ordersService.findByOrderNo(orderNo, tenantId);
+    }
+
+    if (!pedido) {
+      const pedidoId = conversation.pedido_id || conversation.context?.pedido_id;
+      if (pedidoId) {
+        pedido = await this.ordersService.findOne(pedidoId, tenantId);
+      }
+    }
+
+    if (!pedido && conversation.customer_phone) {
+      pedido = await this.ordersService.findLatestByCustomerPhone(
+        tenantId,
+        conversation.customer_phone,
+      );
+    }
+
+    if (!pedido) {
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.clearCustomerData(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return 'Nao encontrei um pedido pendente para cancelar.\n\nSe quiser, posso te ajudar a montar um novo agora.';
+    }
+
+    if (pedido.status === PedidoStatus.PENDENTE_PAGAMENTO) {
+      await this.ordersService.updateStatus(pedido.id, PedidoStatus.CANCELADO, tenantId);
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.clearCustomerData(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return [
+        `Pedido *${pedido.order_no}* cancelado.`,
+        '',
+        'Se quiser recomecar, me diga o produto que voce deseja.',
+        `Acompanhamento: ${this.buildTrackingUrl(pedido.order_no)}`,
+      ].join('\n');
+    }
+
+    if (pedido.status === PedidoStatus.CANCELADO) {
+      await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return `Pedido *${pedido.order_no}* ja estava cancelado.\n\nSe quiser, podemos montar outro em seguida.`;
+    }
+
+    return [
+      `Pedido *${pedido.order_no}* ja esta em *${this.getStatusLabel(pedido.status)}*.`,
+      'Depois da confirmacao, o cancelamento precisa passar pelo atendimento humano para evitar erro operacional.',
+      `Acompanhe aqui: ${this.buildTrackingUrl(pedido.order_no)}`,
+    ].join('\n');
+  }
+
   private async handleRepeatOrderIntent(
     tenantId: string,
     conversation: TypedConversation | undefined,
@@ -467,7 +1968,7 @@ export class WhatsappService {
       total_amount: subtotal,
     };
 
-    return await this.applyPendingOrderAndProceed(pendingOrder, tenantId, conversation);
+    return await this.applyPendingOrderAndProceedPremium(pendingOrder, tenantId, conversation);
   }
 
   private async applyCouponToPendingOrder(
@@ -537,15 +2038,15 @@ export class WhatsappService {
    */
   private validateQuantity(quantity: number): { valid: boolean; error?: string } {
     if (!Number.isInteger(quantity)) {
-      return { valid: false, error: 'Quantidade deve ser um número inteiro' };
+      return { valid: false, error: 'Quantidade deve ser um numero inteiro' };
     }
 
     if (quantity < this.MIN_QUANTITY) {
-      return { valid: false, error: `Quantidade mínima é ${this.MIN_QUANTITY}` };
+      return { valid: false, error: `Quantidade minima e ${this.MIN_QUANTITY}` };
     }
 
     if (quantity > this.MAX_QUANTITY) {
-      return { valid: false, error: `Quantidade máxima é ${this.MAX_QUANTITY}` };
+      return { valid: false, error: `Quantidade maxima e ${this.MAX_QUANTITY}` };
     }
 
     return { valid: true };
@@ -558,16 +2059,51 @@ export class WhatsappService {
     const sanitized = this.sanitizeInput(name);
 
     if (sanitized.length < this.MIN_NAME_LENGTH) {
-      return { valid: false, error: `Nome deve ter no mínimo ${this.MIN_NAME_LENGTH} caracteres` };
+      return { valid: false, error: `Nome deve ter no minimo ${this.MIN_NAME_LENGTH} caracteres` };
     }
 
     if (sanitized.length > this.MAX_NAME_LENGTH) {
-      return { valid: false, error: `Nome deve ter no máximo ${this.MAX_NAME_LENGTH} caracteres` };
+      return { valid: false, error: `Nome deve ter no maximo ${this.MAX_NAME_LENGTH} caracteres` };
     }
 
     // Validar caracteres permitidos (letras, espaços, acentos, hífen)
     if (!/^[a-zA-ZÀ-ÿ\s\-']+$/.test(sanitized)) {
-      return { valid: false, error: 'Nome contém caracteres inválidos' };
+      return { valid: false, error: 'Nome contem caracteres invalidos' };
+    }
+
+    const normalized = sanitized
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+
+    const reservedNames = new Set([
+      'sim',
+      'ok',
+      'pix',
+      'credito',
+      'debito',
+      'dinheiro',
+      'entrega',
+      'retirada',
+      'cancelar',
+      'ajuda',
+      'cardapio',
+      'menu',
+      'status',
+      'pedido',
+      'quero',
+      'comprar',
+      'pedir',
+      'preco',
+      'valor',
+      'estoque',
+      'sem',
+      'nao',
+    ]);
+
+    if (reservedNames.has(normalized)) {
+      return { valid: false, error: 'Preciso do nome da pessoa, nao de um comando' };
     }
 
     return { valid: true };
@@ -580,11 +2116,11 @@ export class WhatsappService {
     const sanitized = this.sanitizeInput(address);
 
     if (sanitized.length < this.MIN_ADDRESS_LENGTH) {
-      return { valid: false, error: `Endereço deve ter no mínimo ${this.MIN_ADDRESS_LENGTH} caracteres` };
+      return { valid: false, error: `Endereco deve ter no minimo ${this.MIN_ADDRESS_LENGTH} caracteres` };
     }
 
     if (sanitized.length > this.MAX_ADDRESS_LENGTH) {
-      return { valid: false, error: `Endereço deve ter no máximo ${this.MAX_ADDRESS_LENGTH} caracteres` };
+      return { valid: false, error: `Endereco deve ter no maximo ${this.MAX_ADDRESS_LENGTH} caracteres` };
     }
 
     return { valid: true };
@@ -597,7 +2133,7 @@ export class WhatsappService {
     const digitsOnly = phone.replace(/\D/g, '');
 
     if (digitsOnly.length < 10 || digitsOnly.length > 11) {
-      return { valid: false, error: 'Telefone deve ter 10 ou 11 dígitos (com DDD)' };
+      return { valid: false, error: 'Telefone deve ter 10 ou 11 digitos (com DDD)' };
     }
 
     return { valid: true };
@@ -608,15 +2144,15 @@ export class WhatsappService {
    */
   private validatePrice(price: number): { valid: boolean; error?: string } {
     if (typeof price !== 'number' || isNaN(price)) {
-      return { valid: false, error: 'Preço deve ser um número válido' };
+      return { valid: false, error: 'Preco deve ser um numero valido' };
     }
 
     if (price <= 0) {
-      return { valid: false, error: 'Preço deve ser maior que zero' };
+      return { valid: false, error: 'Preco deve ser maior que zero' };
     }
 
     if (price > this.MAX_PRICE) {
-      return { valid: false, error: `Preço máximo é R$ ${this.MAX_PRICE.toLocaleString('pt-BR')}` };
+      return { valid: false, error: `Preco maximo e R$ ${this.MAX_PRICE.toLocaleString('pt-BR')}` };
     }
 
     return { valid: true };
@@ -791,7 +2327,7 @@ export class WhatsappService {
     tenantId: string,
     conversation?: TypedConversation,
   ): Promise<string> {
-    const lowerMessage = message.toLowerCase().trim();
+    const lowerMessage = this.normalizeIntentText(message);
 
     // ✅ NOVO: Verificar estado da conversa PRIMEIRO (antes de qualquer outra coisa)
     const currentState = conversation?.context?.state as ConversationState | undefined;
@@ -810,16 +2346,16 @@ export class WhatsappService {
     }
 
     const orderNo = this.extractOrderNo(message);
-    if (this.looksLikeOrderStatusQuery(lowerMessage)) {
-      return await this.handleOrderStatusQuery(tenantId, conversation, orderNo);
+    if (this.looksLikeOrderStatusQuery(lowerMessage, conversation)) {
+      return await this.handlePremiumOrderStatusQuery(tenantId, conversation, orderNo);
     }
 
-    if (this.isCancelIntent(lowerMessage)) {
-      return await this.handleCancelIntent(tenantId, conversation, currentState);
+    if (this.isCancelIntent(lowerMessage, conversation, currentState)) {
+      return await this.handlePremiumCancelIntent(tenantId, conversation, currentState, orderNo);
     }
 
     if (this.isReopenIntent(lowerMessage)) {
-      return await this.handleReopenIntent(tenantId, conversation);
+      return await this.handlePremiumReopenIntent(tenantId, conversation);
     }
 
     if (this.isRepeatOrderIntent(lowerMessage)) {
@@ -836,11 +2372,11 @@ export class WhatsappService {
     
     // Se está coletando dados do cliente, processar isso primeiro
     if (currentState === 'collecting_name') {
-      return await this.processCustomerName(message, tenantId, conversation);
+      return await this.processCustomerNamePremium(message, tenantId, conversation);
     }
     
     if (currentState === 'collecting_address') {
-      return await this.processCustomerAddress(message, tenantId, conversation);
+      return await this.processCustomerAddressPremium(message, tenantId, conversation);
     }
     
     if (currentState === 'collecting_phone') {
@@ -848,11 +2384,11 @@ export class WhatsappService {
     }
 
     if (currentState === 'collecting_notes') {
-      return await this.processCustomerNotes(message, tenantId, conversation);
+      return await this.processCustomerNotesPremium(message, tenantId, conversation);
     }
     
     if (currentState === 'confirming_order') {
-      return await this.processOrderConfirmation(message, tenantId, conversation);
+      return await this.processOrderConfirmationPremium(message, tenantId, conversation);
     }
 
     // IMPORTANTE: Verificar seleção de método de pagamento
@@ -867,6 +2403,34 @@ export class WhatsappService {
     if (isPaymentSelection) {
       return '❌ Não encontrei um pedido pendente para pagamento.\n\n' +
         '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
+    }
+
+    const isIdleLikeState =
+      !currentState ||
+      currentState === 'idle' ||
+      currentState === 'order_confirmed' ||
+      currentState === 'order_completed';
+    const normalizedIntent = this.normalizeIntentText(lowerMessage);
+    if (
+      isIdleLikeState &&
+      this.hasAnyNormalizedPhrase(normalizedIntent, [
+        'nao quero',
+        'nao quero mais',
+        'nao vou querer',
+        'nao vou mais querer',
+        'quero desistir',
+        'deixa pra la',
+        'deixa para la',
+      ])
+    ) {
+      return this.getPremiumSoftResetMessage();
+    }
+    if (isIdleLikeState && this.isLooseReplyWithoutContext(lowerMessage)) {
+      return this.getPremiumContextRecoveryMessage();
+    }
+
+    if (this.isBareOrderIntent(lowerMessage)) {
+      return this.getPremiumOrderNudgeMessage();
     }
 
     // IMPORTANTE: Verificar pedidos (antes de outras respostas)
@@ -892,37 +2456,47 @@ export class WhatsappService {
 
     // Comando: Cardápio / Menu
     if (lowerMessage.includes('cardapio') || lowerMessage.includes('menu') || lowerMessage.includes('produtos')) {
-      return await this.getCardapio(tenantId);
+      return await this.getPremiumCardapio(tenantId);
     }
 
     // Comando: Preço de [produto]
     if (lowerMessage.includes('preco') || lowerMessage.includes('valor') || lowerMessage.includes('quanto custa')) {
-      return await this.getPreco(message, tenantId);
+      return await this.getPremiumPriceResponse(message, tenantId);
     }
 
     // Comando: Estoque de [produto]
     if (lowerMessage.includes('estoque') || lowerMessage.includes('tem') || lowerMessage.includes('disponivel')) {
-      return await this.getEstoque(message, tenantId);
+      return await this.getPremiumStockResponse(message, tenantId);
     }
 
     // Comando: Horário
     if (lowerMessage.includes('horario') || lowerMessage.includes('funciona') || lowerMessage.includes('aberto')) {
-      return this.getHorario();
+      return this.getPremiumScheduleMessage();
     }
 
     // Comando: Ajuda
     if (lowerMessage.includes('ajuda') || lowerMessage.includes('help') || lowerMessage.includes('comandos')) {
-      return this.getAjuda();
+      return this.getPremiumHelpMessage();
     }
 
     // Saudação
     if (lowerMessage.includes('ola') || lowerMessage.includes('oi') || lowerMessage.includes('bom dia') || 
         lowerMessage.includes('boa tarde') || lowerMessage.includes('boa noite')) {
-      return this.getSaudacao();
+      return this.getPremiumGreetingMessage();
     }
 
     // Resposta padrão
-    return this.getRespostaPadrao();
+    const conciergeResponse = await this.trySmartConciergeResponse(message, tenantId);
+    if (conciergeResponse) {
+      return conciergeResponse;
+    }
+
+    const aiRouted = await this.tryAIAssistedRouting(message, tenantId, conversation, currentState);
+    if (aiRouted) {
+      return aiRouted;
+    }
+
+    return this.getPremiumFallbackMessage();
   }
 
   private looksLikeMultiItemOrder(message: string): boolean {
@@ -933,7 +2507,123 @@ export class WhatsappService {
     return hasConnector && nums.length >= 2;
   }
 
+  private isBareOrderIntent(lowerMessage: string): boolean {
+    const normalized = this.normalizeForSearch(lowerMessage)
+      .replace(/[?!.,;:]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!normalized) {
+      return false;
+    }
+
+    const bareOrderPhrases = new Set([
+      'quero',
+      'pedido',
+      'pedir',
+      'comprar',
+      'preciso',
+      'quero pedir',
+      'quero comprar',
+      'vou querer',
+      'me manda',
+      'manda',
+      'gostaria de',
+      'quero fazer um pedido',
+    ]);
+
+    return bareOrderPhrases.has(normalized);
+  }
+
+  private getPremiumOrderNudgeMessage(): string {
+    return [
+      'Eu monto o pedido inteiro por aqui.',
+      '',
+      'Me envie quantidade + produto para eu seguir sem erro.',
+      'Exemplos:',
+      '- "quero 6 brigadeiros"',
+      '- "1 bolo de chocolate"',
+      '- "me mostra o cardapio"',
+    ].join('\n');
+  }
+
+  private isLooseReplyWithoutContext(lowerMessage: string): boolean {
+    const normalized = this.normalizeIntentText(lowerMessage);
+
+    if (!normalized) {
+      return false;
+    }
+
+    if (/^\d{10,11}$/.test(normalized)) {
+      return true;
+    }
+
+    const looseReplies = new Set([
+      'sim',
+      'ok',
+      'nao',
+      'retirada',
+      'entrega',
+      'pix',
+      'credito',
+      'debito',
+      'dinheiro',
+      'cartao',
+      'boleto',
+      '1',
+      '2',
+      '3',
+      '4',
+    ]);
+
+    return looseReplies.has(normalized);
+  }
+
+  private getPremiumContextRecoveryMessage(): string {
+    return [
+      'Ainda nao tenho um pedido em andamento com esse contexto.',
+      '',
+      'Se quiser comprar, me envie quantidade + produto.',
+      'Exemplos:',
+      '- "quero 2 brigadeiros"',
+      '- "1 bolo de chocolate"',
+      '- "cardapio"',
+    ].join('\n');
+  }
+
+  private getPremiumSoftResetMessage(): string {
+    return [
+      'Sem problema.',
+      '',
+      'Quando quiser retomar, eu monto um novo pedido com voce sem perder tempo.',
+      'Se preferir, envie "cardapio" para ver os itens ou "ajuda" para ver os atalhos.',
+    ].join('\n');
+  }
+
   private isOrderIntent(lowerMessage: string): boolean {
+    const normalized = this.normalizeForSearch(lowerMessage);
+
+    if (this.isBareOrderIntent(normalized)) {
+      return false;
+    }
+
+    if (this.hasAnyNormalizedPhrase(normalized, [
+      'nao quero',
+      'nao quero mais',
+      'nao vou querer',
+      'nao vou mais querer',
+      'quero desistir',
+      'deixa pra la',
+      'deixa para la',
+    ])) {
+      return false;
+    }
+
+    const extractedOrder = this.extractOrderInfo(normalized);
+    if (extractedOrder.quantity !== null && !!extractedOrder.productName) {
+      return true;
+    }
+
     const palavrasPedido = [
       'quero', 'preciso', 'comprar', 'pedir', 'vou querer', 'gostaria de',
       'desejo', 'vou comprar', 'preciso de', 'queria', 'ia querer',
@@ -947,7 +2637,7 @@ export class WhatsappService {
       'quero fazer encomenda', 'preciso fazer encomenda', 'quero fazer', 'preciso fazer',
     ];
 
-    return palavrasPedido.some((palavra) => lowerMessage.includes(palavra));
+    return palavrasPedido.some((palavra) => normalized.includes(this.normalizeForSearch(palavra)));
   }
 
   private extractMultipleOrderInfos(
@@ -966,7 +2656,7 @@ export class WhatsappService {
     const parsed: Array<{ quantity: number; productName: string }> = [];
     for (const part of parts) {
       const info = this.extractOrderInfo(part);
-      if (!info.quantity || !info.productName) {
+      if (info.quantity === null || !info.productName) {
         return null;
       }
       parsed.push({ quantity: info.quantity, productName: info.productName });
@@ -1057,7 +2747,7 @@ export class WhatsappService {
       total_amount: subtotal,
     };
 
-    return await this.applyPendingOrderAndProceed(pendingOrder, tenantId, conversation);
+    return await this.applyPendingOrderAndProceedPremium(pendingOrder, tenantId, conversation);
   }
 
   private formatPendingOrderSummary(pendingOrder: PendingOrder): string {
@@ -1112,12 +2802,12 @@ export class WhatsappService {
 
       if (!customerData.phone) {
         await this.conversationService.updateState(conversation.id, 'collecting_phone');
-        return this.getPhonePrompt();
+        return this.getPremiumPhonePrompt();
       }
 
       if (customerData.notes === undefined) {
         await this.conversationService.updateState(conversation.id, 'collecting_notes');
-        return this.getNotesPrompt();
+        return this.getPremiumNotesPrompt();
       }
 
       await this.conversationService.updateState(conversation.id, 'confirming_order');
@@ -1143,33 +2833,41 @@ export class WhatsappService {
       const orderInfo = this.extractOrderInfo(message);
       
       this.logger.debug(`Order extraction: quantity=${orderInfo.quantity}, productName="${orderInfo.productName}"`);
+
+      const hasQuantity = orderInfo.quantity !== null;
+      const hasProduct = !!orderInfo.productName;
+
+      if (hasQuantity && orderInfo.quantity !== null) {
+        const quantityValidation = this.validateQuantity(orderInfo.quantity);
+        if (!quantityValidation.valid) {
+          return `❌ ${quantityValidation.error}.\n\n` +
+            'Exemplo de pedido valido:\n' +
+            '- "quero 6 brigadeiros"\n' +
+            '- "1 bolo de chocolate"';
+        }
+      }
       
       // Se não tem quantidade, perguntar ao usuário
-      if (!orderInfo.quantity && orderInfo.productName) {
+      if (!hasQuantity && hasProduct) {
         return `❓ Quantos *${orderInfo.productName}* você gostaria?\n\n` +
                '💬 Digite a quantidade, por exemplo:\n' +
                '*"5 brigadeiros"* ou *"uma dúzia"*';
       }
       
       // Se não tem produto, mas tem quantidade, perguntar qual produto
-      if (orderInfo.quantity && !orderInfo.productName) {
+      if (hasQuantity && !hasProduct) {
         return `❓ Qual produto você gostaria de ${orderInfo.quantity} unidades?\n\n` +
                '💬 Digite *"cardápio"* para ver nossos produtos disponíveis.';
       }
       
       // Se não tem nem quantidade nem produto
-      if (!orderInfo.quantity || !orderInfo.productName) {
-        return '❌ Não consegui entender seu pedido.\n\n' +
-               '💬 Por favor, digite no formato:\n' +
-               '*"Quero 10 brigadeiros"*\n' +
-               '*"Me manda 5 bolos de chocolate"*\n' +
-               '*"Preciso de uma dúzia de brigadeiros"*\n\n' +
-               '💡 Ou digite *"ajuda"* para ver mais exemplos.';
+      if (!hasQuantity || !hasProduct) {
+        return this.getPremiumOrderNudgeMessage();
       }
 
       // A partir daqui, temos certeza que quantity e productName não são null
-      const quantity = orderInfo.quantity;
-      const productName = orderInfo.productName;
+      const quantity = orderInfo.quantity as number;
+      const productName = orderInfo.productName as string;
 
       // Buscar produto (sem paginação para WhatsApp - retorna array)
       const produtosResult = await this.productsService.findAll(tenantId);
@@ -1276,11 +2974,15 @@ export class WhatsappService {
     // ✅ NOVO: Validar estoque
     if (produto.available_stock < quantity) {
       if (produto.available_stock <= 0) {
-        return `❌ Estoque insuficiente!\n\n` +
-               `*${produto.name}*\n` +
-               `Solicitado: ${quantity} unidades\n` +
-               `Disponível: 0 unidades\n\n` +
-               `💬 Digite *"cardápio"* para ver outros produtos.`;
+        return [
+          'No momento esse item ficou sem estoque.',
+          '',
+          `Produto: *${produto.name}*`,
+          `Quantidade pedida: ${quantity} unidade(s)`,
+          'Disponivel agora: 0 unidade(s)',
+          '',
+          'Se quiser, eu posso te mostrar o cardapio para escolher outra opcao.',
+        ].join('\n');
       }
 
       const stockAdjustment: StockAdjustmentContext = {
@@ -1296,12 +2998,16 @@ export class WhatsappService {
       });
       await this.conversationService.updateState(conversation.id, 'confirming_stock_adjustment');
 
-      return `❌ Estoque insuficiente!\n\n` +
-             `*${produto.name}*\n` +
-             `Solicitado: ${quantity} unidades\n` +
-             `Disponível: ${produto.available_stock} unidades\n\n` +
-             `💬 Posso seguir com *${produto.available_stock}* unidade(s)?\n` +
-             `Digite *"sim"* para confirmar ou envie outra quantidade (até ${produto.available_stock}).`;
+      return [
+        'Estoque insuficiente neste momento.',
+        '',
+        `Produto: *${produto.name}*`,
+        `Quantidade pedida: ${quantity} unidade(s)`,
+        `Disponivel agora: ${produto.available_stock} unidade(s)`,
+        '',
+        `Posso ajustar para *${produto.available_stock}* unidade(s)?`,
+        `Responda *"sim"* para confirmar ou envie outra quantidade de 1 a ${produto.available_stock}.`,
+      ].join('\n');
     }
 
     // ✅ NOVO: Calcular valores do pedido
@@ -1323,16 +3029,17 @@ export class WhatsappService {
       total_amount: totalAmount,
     };
 
-    return await this.applyPendingOrderAndProceed(pendingOrder, tenantId, conversation);
+    return await this.applyPendingOrderAndProceedPremium(pendingOrder, tenantId, conversation);
   }
 
   private extractOrderInfo(message: string): { quantity: number | null; productName: string | null } {
-    const lowerMessage = message.toLowerCase().trim();
+    const lowerMessage = this.normalizeForSearch(message);
     
     // ============================================
     // ETAPA 1: EXTRAIR QUANTIDADE (múltiplas formas)
     // ============================================
     let quantity: number | null = null;
+    const hasExplicitNegative = /(^|\s)-\d+/.test(lowerMessage);
     
     // 1.1. Expressões de quantidade PRIMEIRO (dúzia, meia dúzia, quilo, etc.)
     // IMPORTANTE: Verificar ANTES de números por extenso para evitar conflitos
@@ -1389,9 +3096,9 @@ export class WhatsappService {
     
     // 1.3. Números digitais (5, 10, 100, etc.)
     if (!quantity) {
-      const quantityMatch = lowerMessage.match(/(\d+)/);
+      const quantityMatch = lowerMessage.match(/-?\d+/);
       if (quantityMatch) {
-        quantity = parseInt(quantityMatch[1]);
+        quantity = parseInt(quantityMatch[0]);
       }
     }
     
@@ -1488,6 +3195,26 @@ export class WhatsappService {
     // Normalizar diminutivos comuns (brigadinho → brigadeiro, bolinho → bolo)
     productName = productName.replace(/inho\b/gi, '');
     productName = productName.replace(/inha\b/gi, '');
+
+    const meaninglessNames = new Set([
+      'quero',
+      'pedido',
+      'pedir',
+      'comprar',
+      'produto',
+      'produtos',
+      'algo',
+      'alguma coisa',
+      'coisa',
+    ]);
+
+    if (meaninglessNames.has(productName)) {
+      productName = '';
+    }
+
+    if (hasExplicitNegative && typeof quantity === 'number' && quantity > 0) {
+      quantity = -quantity;
+    }
     
     this.logger.debug(`ExtractOrderInfo: original="${message}", quantity=${quantity}, productName="${productName}"`);
 
@@ -1502,10 +3229,7 @@ export class WhatsappService {
 
     // Normalizar: remover acentos para busca mais flexivel
     const normalize = (str: string) => {
-      return str
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase();
+      return this.normalizeForSearch(str);
     };
 
     const pickBestProduct = (
@@ -1565,10 +3289,11 @@ export class WhatsappService {
     }
 
     // 2) Fallback: tokenizacao (mantem tokens numericos mesmo com 1 char)
+    const stopWords = new Set(['de', 'do', 'da', 'dos', 'das', 'com', 'sem', 'pra', 'para', 'o', 'a', 'os', 'as', 'um', 'uma']);
     const palavras = productName
       .toLowerCase()
       .split(/\s+/)
-      .filter((p) => p.length >= 2 || /^\d+$/.test(p));
+      .filter((p) => (p.length >= 2 || /^\d+$/.test(p)) && !stopWords.has(normalize(p)));
 
     if (palavras.length === 0) return { produto: null };
 
@@ -1641,6 +3366,39 @@ export class WhatsappService {
 
     // Estrategia 5: Busca por similaridade (erros de digitacao comuns)
     if (!produto) {
+      const allowDirectFuzzyMatch =
+        queryNormalized.length >= 7 || palavras.length >= 2;
+
+      if (allowDirectFuzzyMatch) {
+        const strongFuzzyMatches = produtos
+          .map((product) => {
+            const normalizedName = normalize(product.name);
+            const tokens = normalizedName
+              .split(/\s+/)
+              .filter((token) => token.length >= 3 && !stopWords.has(token));
+            const fullScore = this.calculateSimilarity(queryNormalized, normalizedName);
+            const tokenScore = tokens.reduce((best, token) => {
+              return Math.max(best, this.calculateSimilarity(queryNormalized, token));
+            }, 0);
+
+            return {
+              product,
+              score: Math.max(fullScore, tokenScore),
+            };
+          })
+          .filter((item) => item.score >= 0.78)
+          .sort((left, right) => right.score - left.score);
+
+        const best = strongFuzzyMatches[0];
+        const second = strongFuzzyMatches[1];
+        if (best && (!second || best.score - second.score >= 0.08)) {
+          produto = best.product;
+        }
+      }
+    }
+
+    // Estrategia 6: Busca por similaridade (erros de digitacao comuns)
+    if (!produto) {
       // Mapeamento de erros comuns de digitacao
       const correcoes: Record<string, string[]> = {
         'brigadeiro': ['brigadeiro', 'brigadeiros', 'brigadinho', 'brigadinha'],
@@ -1670,6 +3428,21 @@ export class WhatsappService {
       }
     }
 
+    const broadMatches = produtos.filter((product) => {
+      return normalize(product.name).includes(queryNormalized);
+    });
+    const ambiguousSingleWordQuery =
+      palavras.length === 1 &&
+      queryNormalized.length < 8 &&
+      broadMatches.length > 1;
+
+    if (produto && ambiguousSingleWordQuery) {
+      return {
+        produto: null,
+        sugestoes: broadMatches.slice(0, 5),
+      };
+    }
+
     // Se encontrou produto, retornar
     if (produto) {
       return { produto };
@@ -1685,14 +3458,14 @@ export class WhatsappService {
     if (!productName || productName.length < 2) return [];
 
     const normalize = (str: string) => {
-      return str
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase();
+      return this.normalizeForSearch(str);
     };
 
     const queryNormalized = normalize(productName);
-    const palavras = queryNormalized.split(/\s+/).filter(p => p.length >= 2);
+    const stopWords = new Set(['de', 'do', 'da', 'dos', 'das', 'com', 'sem', 'pra', 'para', 'o', 'a', 'os', 'as', 'um', 'uma']);
+    const palavras = queryNormalized
+      .split(/\s+/)
+      .filter((p) => p.length >= 2 && !stopWords.has(p));
     
     if (palavras.length === 0) return [];
 
@@ -1737,17 +3510,56 @@ export class WhatsappService {
   }
 
   private calculateSimilarity(str1: string, str2: string): number {
-    // Similaridade simples baseada em caracteres em comum
-    const chars1 = new Set(str1.split(''));
-    const chars2 = new Set(str2.split(''));
-    
-    let common = 0;
-    chars1.forEach(char => {
-      if (chars2.has(char)) common++;
-    });
+    const left = this.normalizeForSearch(str1);
+    const right = this.normalizeForSearch(str2);
 
-    const total = Math.max(chars1.size, chars2.size);
-    return total > 0 ? common / total : 0;
+    if (!left || !right) {
+      return 0;
+    }
+
+    const tokens = right.split(/\s+/).filter(Boolean);
+    const candidates = tokens.length ? [right, ...tokens] : [right];
+
+    return candidates.reduce((best, candidate) => {
+      const distance = this.calculateLevenshteinDistance(left, candidate);
+      const maxLength = Math.max(left.length, candidate.length);
+      const similarity = maxLength > 0 ? 1 - distance / maxLength : 0;
+      return Math.max(best, similarity);
+    }, 0);
+  }
+
+  private calculateLevenshteinDistance(left: string, right: string): number {
+    if (left === right) {
+      return 0;
+    }
+
+    if (!left.length) {
+      return right.length;
+    }
+
+    if (!right.length) {
+      return left.length;
+    }
+
+    const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+
+    for (let row = 1; row <= left.length; row += 1) {
+      let diagonal = previous[0];
+      previous[0] = row;
+
+      for (let column = 1; column <= right.length; column += 1) {
+        const current = previous[column];
+        const cost = left[row - 1] === right[column - 1] ? 0 : 1;
+        previous[column] = Math.min(
+          previous[column] + 1,
+          previous[column - 1] + 1,
+          diagonal + cost,
+        );
+        diagonal = current;
+      }
+    }
+
+    return previous[right.length];
   }
 
   private formatStatus(status: PedidoStatus): string {
@@ -1999,7 +3811,7 @@ export class WhatsappService {
    * Verifica se a mensagem é uma seleção de método de pagamento
    */
   private isPaymentMethodSelection(message: string): boolean {
-    const lowerMessage = message.toLowerCase().trim();
+    const lowerMessage = this.normalizeIntentText(message);
     
     // Verificar números (1, 2, 3, 4)
     if (/^[1-4]$/.test(lowerMessage)) {
@@ -2028,7 +3840,7 @@ export class WhatsappService {
         return '❌ Não encontrei um pedido pendente para pagamento.\n\n' +
           '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
       }
-      const lowerMessage = message.toLowerCase().trim();
+      const lowerMessage = this.normalizeIntentText(message);
       
       // Extrair método de pagamento
       let metodo: MetodoPagamento | null = null;
@@ -2112,10 +3924,18 @@ export class WhatsappService {
       if (metodo === MetodoPagamento.PIX && paymentResult.qr_code) {
         // Em produção, enviar imagem do QR Code via WhatsApp
         // Por enquanto, retornar mensagem com instruções
-        return paymentResult.message || 'Pagamento Pix processado';
+        return this.enrichPaymentMessage(
+          paymentResult.message || 'Pagamento Pix processado',
+          pedidoPendente,
+          metodo,
+        );
       }
 
-      return paymentResult.message || 'Pagamento processado com sucesso!';
+      return this.enrichPaymentMessage(
+        paymentResult.message || 'Pagamento processado com sucesso!',
+        pedidoPendente,
+        metodo,
+      );
     } catch (error) {
       this.logger.error('Error processing WhatsApp payment selection', {
         error: error instanceof Error ? error.message : String(error),
@@ -2240,13 +4060,21 @@ export class WhatsappService {
 
     if (changeFor) {
       return (
-        (paymentResult.message || 'Pagamento processado com sucesso!') +
+        this.enrichPaymentMessage(
+          paymentResult.message || 'Pagamento processado com sucesso!',
+          pedidoPendente,
+          MetodoPagamento.DINHEIRO,
+        ) +
         `\n\n💵 Troco para: R$ ${this.formatCurrency(changeFor)}` +
         `\n🧾 Troco: R$ ${this.formatCurrency(changeAmount)}`
       );
     }
 
-    return (paymentResult.message || 'Pagamento processado com sucesso!') +
+    return this.enrichPaymentMessage(
+      paymentResult.message || 'Pagamento processado com sucesso!',
+      pedidoPendente,
+      MetodoPagamento.DINHEIRO,
+    ) +
       '\n\n💵 Pagamento em dinheiro sem troco.';
   }
 
@@ -2276,7 +4104,7 @@ export class WhatsappService {
     if (lowerMessage.includes('cancelar') || lowerMessage.includes('nao') || lowerMessage.includes('não')) {
       await this.conversationService.updateContext(conversation.id, { stock_adjustment: null });
       await this.conversationService.updateState(conversation.id, 'idle');
-      return '❌ Pedido cancelado.\n\n💬 Como posso ajudar você?';
+      return 'Pedido interrompido.\n\nQuando quiser, eu monto outro pedido com voce.';
     }
 
     let chosenQty: number | null = null;
@@ -2288,9 +4116,12 @@ export class WhatsappService {
     }
 
     if (!chosenQty || chosenQty <= 0 || chosenQty > adjustment.available_qty) {
-      return `❌ Quantidade inválida.\n\n` +
-             `Disponível: ${adjustment.available_qty} unidade(s).\n` +
-             `💬 Digite um número até ${adjustment.available_qty} ou *"cancelar"*.`;
+      return [
+        'Quantidade invalida.',
+        '',
+        `Disponivel agora: ${adjustment.available_qty} unidade(s).`,
+        `Envie um numero de 1 a ${adjustment.available_qty} ou responda *"cancelar"*.`,
+      ].join('\n');
     }
 
     const pendingOrder: PendingOrder = {
@@ -2307,7 +4138,7 @@ export class WhatsappService {
     };
 
     await this.conversationService.updateContext(conversation.id, { stock_adjustment: null });
-    return await this.applyPendingOrderAndProceed(pendingOrder, tenantId, conversation);
+    return await this.applyPendingOrderAndProceedPremium(pendingOrder, tenantId, conversation);
   }
 
   /**
@@ -2435,10 +4266,10 @@ export class WhatsappService {
       }
       if (!conversation.context?.customer_data?.phone) {
         await this.conversationService.updateState(conversation.id, 'collecting_phone');
-        return this.getPhonePrompt();
+        return this.getPremiumPhonePrompt();
       }
       await this.conversationService.updateState(conversation.id, 'collecting_notes');
-      return this.getNotesPrompt();
+      return this.getPremiumNotesPrompt();
     }
     
     // ✅ NOVO: Validar endereço
@@ -2496,11 +4327,11 @@ export class WhatsappService {
 
     if (!conversation.context?.customer_data?.phone) {
       await this.conversationService.updateState(conversation.id, 'collecting_phone');
-      return this.getPhonePrompt();
+      return this.getPremiumPhonePrompt();
     }
 
     await this.conversationService.updateState(conversation.id, 'collecting_notes');
-    return this.getNotesPrompt();
+    return this.getPremiumNotesPrompt();
   }
 
   /**
@@ -2614,7 +4445,7 @@ export class WhatsappService {
     await this.conversationService.saveCustomerData(conversation.id, { phone: formattedPhone });
 
     await this.conversationService.updateState(conversation.id, 'collecting_notes');
-    return this.getNotesPrompt();
+    return this.getPremiumNotesPrompt();
   }
 
   private async processCustomerNotes(
@@ -2714,7 +4545,7 @@ export class WhatsappService {
 
       if (!customerData.phone) {
         await this.conversationService.updateState(conversation.id, 'collecting_phone');
-        return this.getPhonePrompt();
+        return this.getPremiumPhonePrompt();
       }
       message += `📍 *Retirada* (cliente busca)\n`;
     }
@@ -2799,7 +4630,7 @@ export class WhatsappService {
 
     if (!customerData?.phone) {
       await this.conversationService.updateState(conversation.id, 'collecting_phone');
-      return this.getPhonePrompt();
+      return this.getPremiumPhonePrompt();
     }
 
     const nameValidation = this.validateName(customerData.name);
@@ -2861,17 +4692,7 @@ export class WhatsappService {
       await this.conversationService.setPedidoId(conversation.id, pedido.id);
       await this.conversationService.updateState(conversation.id, 'waiting_payment');
 
-      const total = pendingOrder.total_amount;
-      
-      return `✅ *PEDIDO CRIADO COM SUCESSO!*\n\n` +
-             `🆔 Código do pedido: *${pedido.order_no}*\n\n` +
-             `💳 *ESCOLHA A FORMA DE PAGAMENTO:*\n\n` +
-             `1️⃣ *PIX* - Desconto de 5% (R$ ${(total * 0.95).toFixed(2).replace('.', ',')})\n` +
-             `2️⃣ *Cartão de Crédito*\n` +
-             `3️⃣ *Cartão de Débito*\n` +
-             `4️⃣ *Dinheiro* (retirada)\n\n` +
-             `💬 Digite o número ou o nome do método de pagamento.\n` +
-             `Exemplo: "1", "pix", "cartão de crédito"`;
+      return this.buildOrderCreatedMessage(pedido);
     } catch (error) {
       this.logger.error('Error creating confirmed order', {
         error: error instanceof Error ? error.message : String(error),

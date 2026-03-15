@@ -623,8 +623,6 @@ export class PaymentsService {
     await this.db.getRepository(Pagamento).save(pagamento);
 
     const pedido = pagamento.pedido;
-    const oldStatus = pedido.status;
-
     if (pedido.status === PedidoStatus.PENDENTE_PAGAMENTO) {
       pedido.status = PedidoStatus.CONFIRMADO;
       await this.db.getRepository(Pedido).save(pedido);
@@ -649,25 +647,6 @@ export class PaymentsService {
         });
       }
 
-      try {
-        await this.notificationsService.notifyOrderStatusChange(
-          pagamento.tenant_id,
-          pedido,
-          oldStatus,
-          PedidoStatus.CONFIRMADO,
-        );
-      } catch (error) {
-        this.logger.error('Error sending order status change notification', {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          context: {
-            tenantId: pagamento.tenant_id,
-            pedidoId: pagamento.pedido_id,
-            oldStatus,
-            newStatus: PedidoStatus.CONFIRMADO,
-          },
-        });
-      }
     }
 
     return pagamento;

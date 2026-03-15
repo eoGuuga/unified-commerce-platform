@@ -6,6 +6,12 @@ interface ApiOptions extends RequestInit {
   params?: Record<string, string>;
 }
 
+export interface PublicOrderTrackingPayload {
+  order_no: string;
+  customer_email?: string;
+  customer_phone?: string;
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -128,6 +134,18 @@ class ApiClient {
     return this.request(`/orders/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
+    });
+  }
+
+  async trackPublicOrder(payload: PublicOrderTrackingPayload, tenantId?: string) {
+    const tid =
+      tenantId ||
+      (typeof window !== 'undefined' ? localStorage.getItem('tenant_id') : null) ||
+      TENANT_ID;
+    return this.request('/orders/public/track', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: tid ? { 'x-tenant-id': tid } : undefined,
     });
   }
 

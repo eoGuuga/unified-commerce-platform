@@ -1,7 +1,6 @@
 ﻿import React from "react"
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
 const inter = Inter({ 
@@ -11,10 +10,13 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'GTSoftHub | Estoque único para varejo omnichannel',
+  title: {
+    default: 'GTSoftHub | Estoque unico para varejo omnichannel',
+    template: '%s | GTSoftHub',
+  },
   description: 'Plataforma para varejistas omnichannel com estoque único entre loja física, e-commerce e WhatsApp — sem risco de overselling.',
   keywords: ['estoque', 'omnichannel', 'e-commerce', 'pdv', 'whatsapp', 'sincronização', 'varejo'],
-  generator: 'v0.app'
+  applicationName: 'GTSoftHub',
 }
 
 export const viewport: Viewport = {
@@ -30,10 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className={inter.variable}>
-      <body className="font-sans antialiased">
-        {children}
-        <Analytics />
-      </body>
+      <body className="font-sans antialiased">{children}</body>
     </html>
   )
 }
