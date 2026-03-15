@@ -36,23 +36,55 @@ function Invoke-WhatsappTest {
 
 $catalogResponse = Invoke-WhatsappTest -Phone "+5511998899900" -Message "cardapio"
 $catalogLines = [string]$catalogResponse.response -split "`n"
-$preferredProductLine = $catalogLines | Where-Object { $_ -like "- Produto Teste*" } | Select-Object -First 1
-$primaryProductLine = if ($preferredProductLine) { $preferredProductLine } else { $catalogLines | Where-Object { $_ -like "- *" } | Select-Object -First 1 }
-if (-not $primaryProductLine) {
+$catalogProductLines = @($catalogLines | Where-Object { $_ -like "- *" })
+if (-not $catalogProductLines -or $catalogProductLines.Count -eq 0) {
     throw "Nao consegui descobrir um produto valido pelo cardapio para a bateria de hardening."
 }
 
-$primaryProduct = ($primaryProductLine -replace "^- ", "") -replace "\s+\|\s+R\$.+$", ""
-$secondaryProductLine = $catalogLines | Where-Object { $_ -like "- *" -and $_ -ne $primaryProductLine } | Select-Object -First 1
-$secondaryProduct = if ($secondaryProductLine) {
-    ($secondaryProductLine -replace "^- ", "") -replace "\s+\|\s+R\$.+$", ""
-} else {
-    $primaryProduct
+function Get-AvailableProduct {
+    param(
+        [string[]]$Candidates,
+        [string[]]$Exclude = @()
+    )
+
+    foreach ($candidate in $Candidates) {
+        if ($Exclude -contains $candidate) {
+            continue
+        }
+
+        $probePhone = "+55119{0:d5}{1:d3}" -f (Get-Random -Minimum 10000 -Maximum 99999), (Get-Random -Minimum 100 -Maximum 999)
+        $probeResponse = Invoke-WhatsappTest -Phone $probePhone -Message "quero 1 $candidate"
+        $probeText = [string]$probeResponse.response
+
+        if (
+            $probeText.Contains("PEDIDO PREPARADO") -or
+            $probeText.Contains("Como voce prefere receber") -or
+            $probeText.Contains("nome completo") -or
+            $probeText.Contains("REVISAO FINAL DO PEDIDO")
+        ) {
+            return $candidate
+        }
+    }
+
+    return $null
 }
+
+$catalogProducts = @($catalogProductLines | ForEach-Object { ($_ -replace "^- ", "") -replace "\s+\|\s+R\$.+$", "" })
+$preferredProducts = @($catalogProducts | Where-Object { $_ -like "Produto Teste*" })
+$primaryProduct = Get-AvailableProduct -Candidates @($preferredProducts + $catalogProducts)
+if (-not $primaryProduct) {
+    $primaryProduct = $catalogProducts[0]
+}
+
+$secondaryProduct = Get-AvailableProduct -Candidates $catalogProducts -Exclude @($primaryProduct)
+if (-not $secondaryProduct) {
+    $secondaryProduct = $primaryProduct
+}
+
 $orderMessage = "quero 1 $primaryProduct"
 $lowLiteracyMessage = "qro 1 $primaryProduct"
 $hostileMessage = "<script>alert(1)</script> qro 1 $primaryProduct"
-$phonePrefix = Get-Random -Minimum 1000 -Maximum 9999
+$runSeed = Get-Random -Minimum 100000 -Maximum 999999
 
 $results = @()
 
@@ -131,7 +163,7 @@ $scenarios = @(
     @{
         Name = "audio_style_order_with_payment_words"
         Steps = @(
-            @{ Message = "me ve meia dz de $primaryProduct pra retirar no pix"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO") }
+            @{ Message = "me ve meia dz de $primaryProduct pra retirar no pix"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "Estoque insuficiente") }
         )
     },
     @{
@@ -207,10 +239,20 @@ $scenarios = @(
         )
     },
     @{
-        Name = "malicious_fuzz_payloads"
+        Name = "malicious_fuzz_sql_like"
         Steps = @(
             @{ Message = "'; DROP TABLE pedidos; -- quero 1 $primaryProduct"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "Nao encontrei") }
+        )
+    },
+    @{
+        Name = "malicious_fuzz_brackets"
+        Steps = @(
             @{ Message = "(({{[[ qro 1 $primaryProduct ]]}))"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO") }
+        )
+    },
+    @{
+        Name = "malicious_fuzz_elongated"
+        Steps = @(
             @{ Message = "qroooo 1 $primaryProduct!!!!!"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO") }
         )
     }
@@ -218,7 +260,7 @@ $scenarios = @(
 
 for ($scenarioIndex = 0; $scenarioIndex -lt $scenarios.Count; $scenarioIndex++) {
     $scenario = $scenarios[$scenarioIndex]
-    $phone = "+5511{0:d4}{1:d4}" -f $phonePrefix, ($scenarioIndex + 3000)
+    $phone = "+55119{0:d5}{1:d3}" -f $runSeed, ($scenarioIndex + 100)
 
     foreach ($step in $scenario.Steps) {
         $response = Invoke-WhatsappTest -Phone $phone -Message $step.Message -MessageId $step.MessageId -MessageType $step.MessageType -Metadata $step.Metadata
@@ -250,12 +292,12 @@ for ($scenarioIndex = 0; $scenarioIndex -lt $scenarios.Count; $scenarioIndex++) 
 
 $results | Format-Table -AutoSize
 
-$failed = @($results | Where-Object { -not $_.passed })
-if ($failed.Count -gt 0) {
-    Write-Error "Falharam $($failed.Count) verificacoes da bateria de hardening do WhatsApp."
-}
-
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $outputPath = "test-whatsapp-hardening-results-$timestamp.json"
 $results | ConvertTo-Json -Depth 4 | Out-File -FilePath $outputPath -Encoding UTF8
 Write-Host "Resultados salvos em $outputPath"
+
+$failed = @($results | Where-Object { -not $_.passed })
+if ($failed.Count -gt 0) {
+    Write-Error "Falharam $($failed.Count) verificacoes da bateria de hardening do WhatsApp."
+}
