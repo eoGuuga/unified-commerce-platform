@@ -29,6 +29,12 @@ if (-not $primaryProductLine) {
 }
 
 $primaryProduct = ($primaryProductLine -replace "^- ", "") -replace "\s+\|\s+R\$.+$", ""
+$secondaryProductLine = $catalogLines | Where-Object { $_ -like "- *" -and $_ -ne $primaryProductLine } | Select-Object -First 1
+$secondaryProduct = if ($secondaryProductLine) {
+    ($secondaryProductLine -replace "^- ", "") -replace "\s+\|\s+R\$.+$", ""
+} else {
+    $primaryProduct
+}
 $orderMessage = "quero 1 $primaryProduct"
 $lowLiteracyMessage = "qro 1 $primaryProduct"
 $hostileMessage = "<script>alert(1)</script> qro 1 $primaryProduct"
@@ -117,7 +123,7 @@ $scenarios = @(
     @{
         Name = "multi_item_written_quantity"
         Steps = @(
-            @{ Message = "quero 2 $primaryProduct e um brownie premium"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO") }
+            @{ Message = "quero 1 $primaryProduct e um $secondaryProduct"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "Estoque insuficiente") }
         )
     },
     @{
@@ -170,7 +176,7 @@ $scenarios = @(
     @{
         Name = "abusive_with_valid_order"
         Steps = @(
-            @{ Message = "porra quero 2 $primaryProduct e um brownie premium"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO") }
+            @{ Message = "porra quero 1 $primaryProduct e um $secondaryProduct"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "Estoque insuficiente") }
         )
     }
 )
