@@ -264,6 +264,10 @@ export class OpenAIService {
   private extractProductCandidate(message: string): string | null {
     const cleaned = this.normalizeText(message)
       .replace(
+        /^((ai|ei|hey|opa|oie?|oh|mano|amigo|amiga|moca|porra|caralho|caraio|cacete|merda|lixo|idiota)\s+)+/g,
+        '',
+      )
+      .replace(
         /\b(quero|preciso|gostaria|vou querer|me ve|me manda|manda|manda ai|separa|separa pra mim|bota|coloca|traz|pedido|comprar|pedir|encomenda|encomendar|quero levar|quero pegar|preco|valor|quanto custa|quanto|custa|tem|disponivel|estoque|status|pedido|meu|acompanhar|ajuda|menu|cardapio|catalogo)\b/g,
         ' ',
       )

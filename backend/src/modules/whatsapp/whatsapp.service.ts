@@ -373,6 +373,174 @@ export class WhatsappService {
     );
   }
 
+  private buildInboundSignature(value: string): string {
+    return this.normalizeIntentText(value)
+      .replace(/\bped[\s-]?\d{8}[\s-]?[a-z0-9]{3,}\b/gi, 'pedido_codigo')
+      .replace(/\b\d{10,11}\b/g, 'telefone')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private buildResponsePreview(value: string): string {
+    return (value || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 180);
+  }
+
+  private getMessageRepeatWindowMs(): number {
+    return 15000;
+  }
+
+  private shouldSuppressRepeatedInbound(
+    message: string,
+    conversation?: TypedConversation,
+  ): { suppress: boolean; repeatCount: number } {
+    if (!conversation) {
+      return { suppress: false, repeatCount: 0 };
+    }
+
+    const currentState = conversation.context?.state as ConversationState | undefined;
+    const signature = this.buildInboundSignature(message);
+    const previousSignature = String(conversation.context?.last_inbound_signature || '');
+    const previousAt = conversation.context?.last_inbound_at
+      ? new Date(String(conversation.context.last_inbound_at)).getTime()
+      : Number.NaN;
+    const repeatCount = Number(conversation.context?.last_inbound_repeat_count || 0);
+
+    if (!signature || signature !== previousSignature || !Number.isFinite(previousAt)) {
+      return { suppress: false, repeatCount: 0 };
+    }
+
+    const ageMs = Date.now() - previousAt;
+    if (ageMs > this.getMessageRepeatWindowMs()) {
+      return { suppress: false, repeatCount: 0 };
+    }
+
+    const actionable =
+      this.isPaymentMethodSelection(message) ||
+      this.isCancelIntent(message, conversation, currentState) ||
+      this.looksLikeOrderStatusQuery(message, conversation) ||
+      this.isReopenIntent(message) ||
+      this.isRepeatOrderIntent(message) ||
+      this.isBareOrderIntent(message) ||
+      this.isOrderIntent(message) ||
+      this.looksLikeMultiItemOrder(message) ||
+      ['ajuda', 'cardapio', 'menu', 'catálogo', 'catalogo'].includes(signature);
+
+    if (!actionable) {
+      return { suppress: false, repeatCount: 0 };
+    }
+
+    return { suppress: true, repeatCount: repeatCount + 1 };
+  }
+
+  private buildDuplicateProtectionMessage(
+    conversation?: TypedConversation,
+    repeatCount = 1,
+  ): string {
+    const currentState = conversation?.context?.state as ConversationState | undefined;
+    const lastPreview =
+      typeof conversation?.context?.last_outbound_preview === 'string'
+        ? String(conversation.context.last_outbound_preview)
+        : '';
+
+    const intro =
+      currentState === 'waiting_payment'
+        ? 'Ja recebi essa mesma mensagem e estou evitando pagamento ou processamento em duplicidade.'
+        : 'Ja recebi essa mesma mensagem ha instantes e estou evitando duplicidade por seguranca.';
+
+    const followUp =
+      repeatCount >= 2
+        ? 'Se voce quiser mudar o pedido, me envie a proxima instrucao com mais detalhes.'
+        : 'Se quiser corrigir algo, me envie a proxima instrucao com mais detalhes.';
+
+    return [
+      intro,
+      '',
+      lastPreview ? `Ultima orientacao: ${lastPreview}` : '',
+      followUp,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  private containsAbusiveLanguage(lowerMessage: string): boolean {
+    const normalized = this.normalizeIntentText(lowerMessage);
+    if (!normalized) return false;
+
+    return [
+      'idiota',
+      'burro',
+      'burr0',
+      'lixo',
+      'merda',
+      'porra',
+      'caralho',
+      'caraio',
+      'cacete',
+      'otario',
+      'otaria',
+      'imbecil',
+      'vtnc',
+      'vsf',
+      'fdp',
+      'filho da puta',
+      'vai tomar no cu',
+      'vai se fuder',
+    ].some((term) => normalized.includes(this.normalizeIntentText(term)));
+  }
+
+  private hasActionableIntent(
+    lowerMessage: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): boolean {
+    const normalized = this.normalizeIntentText(lowerMessage);
+    if (!normalized) return false;
+
+    return (
+      this.isPaymentMethodSelection(normalized) ||
+      this.isCancelIntent(normalized, conversation, currentState) ||
+      this.looksLikeOrderStatusQuery(normalized, conversation) ||
+      this.isReopenIntent(normalized) ||
+      this.isRepeatOrderIntent(normalized) ||
+      this.isBareOrderIntent(normalized) ||
+      this.isOrderIntent(normalized) ||
+      this.looksLikeMultiItemOrder(normalized) ||
+      this.hasAnyNormalizedPhrase(normalized, [
+        'ajuda',
+        'cardapio',
+        'catalogo',
+        'catalogo',
+        'menu',
+        'preco',
+        'valor',
+        'quanto custa',
+        'estoque',
+        'tem',
+        'disponivel',
+        'horario',
+      ])
+    );
+  }
+
+  private getPremiumBoundaryMessage(abuseCount = 0): string {
+    const tone =
+      abuseCount >= 2
+        ? 'Eu sigo disponivel para ajudar, mas preciso que a mensagem venha objetiva e respeitosa.'
+        : 'Posso te ajudar melhor se a mensagem vier objetiva e respeitosa.';
+
+    return [
+      tone,
+      '',
+      'Se quiser seguir, me diga o que precisa. Exemplos:',
+      '- "quero 2 brigadeiros e 1 brownie"',
+      '- "status do pedido"',
+      '- "cardapio"',
+    ].join('\n');
+  }
+
   private async getCatalogProducts(tenantId: string): Promise<ProductWithStock[]> {
     const result = await this.productsService.findAll(tenantId);
     const products = Array.isArray(result) ? result : result.data;
@@ -2286,12 +2454,42 @@ export class WhatsappService {
         });
       }
 
+      const duplicateGuard = this.shouldSuppressRepeatedInbound(
+        sanitizedBody,
+        typedConversation,
+      );
+
       // Salvar mensagem recebida (sanitizada)
       await this.conversationService.saveMessage(
         conversation.id,
         'inbound',
         sanitizedBody,
       );
+
+      if (duplicateGuard.suppress) {
+        const duplicateResponse = this.buildDuplicateProtectionMessage(
+          typedConversation,
+          duplicateGuard.repeatCount,
+        );
+
+        await this.conversationService.updateContext(conversation.id, {
+          last_inbound_signature: this.buildInboundSignature(sanitizedBody),
+          last_inbound_at: new Date().toISOString(),
+          last_inbound_repeat_count: duplicateGuard.repeatCount,
+          last_outbound_preview: this.buildResponsePreview(
+            duplicateResponse,
+          ),
+        });
+
+        await this.conversationService.saveMessage(
+          conversation.id,
+          'outbound',
+          duplicateResponse,
+        );
+
+        this.logger.log(`Response: ${duplicateResponse}`);
+        return duplicateResponse;
+      }
 
       // Gerar resposta (usar mensagem sanitizada)
       const response = await this.generateResponse(
@@ -2306,6 +2504,18 @@ export class WhatsappService {
         'outbound',
         response,
       );
+
+      const nextAbuseCount = this.containsAbusiveLanguage(sanitizedBody)
+        ? Number(typedConversation.context?.abuse_count || 0) + 1
+        : 0;
+
+      await this.conversationService.updateContext(conversation.id, {
+        last_inbound_signature: this.buildInboundSignature(sanitizedBody),
+        last_inbound_at: new Date().toISOString(),
+        last_inbound_repeat_count: 0,
+        last_outbound_preview: this.buildResponsePreview(response),
+        abuse_count: nextAbuseCount,
+      });
 
       this.logger.log(`Response: ${response}`);
       return response;
@@ -2407,6 +2617,15 @@ export class WhatsappService {
         '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
     }
 
+    if (
+      this.containsAbusiveLanguage(lowerMessage) &&
+      !this.hasActionableIntent(lowerMessage, conversation, currentState)
+    ) {
+      return this.getPremiumBoundaryMessage(
+        Number(conversation?.context?.abuse_count || 0),
+      );
+    }
+
     const isIdleLikeState =
       !currentState ||
       currentState === 'idle' ||
@@ -2501,12 +2720,60 @@ export class WhatsappService {
     return this.getPremiumFallbackMessage();
   }
 
+  private getMultiItemQuantityLeadPattern(): string {
+    return [
+      '\\d+',
+      'meia\\s+duzia',
+      'uma\\s+duzia',
+      'duas\\s+duzias?',
+      'tres\\s+duzias?',
+      'um',
+      'uma',
+      'dois',
+      'duas',
+      'tres',
+      'quatro',
+      'cinco',
+      'seis',
+      'sete',
+      'oito',
+      'nove',
+      'dez',
+      'onze',
+      'doze',
+    ].join('|');
+  }
+
+  private splitMultiItemOrderParts(message: string): string[] {
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return [];
+    }
+
+    const quantityLead = this.getMultiItemQuantityLeadPattern();
+    return normalized
+      .split(
+        new RegExp(
+          `\\s*(?:,|\\+|\\be\\b|\\bmais\\b)\\s*(?=(?:${quantityLead})\\b)`,
+          'gi',
+        ),
+      )
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }
+
   private looksLikeMultiItemOrder(message: string): boolean {
-    const lower = (message || '').toLowerCase();
-    // Heurística simples: tem conector " e " / "," e mais de um número na frase
-    const hasConnector = lower.includes(' e ') || lower.includes(',');
-    const nums = lower.match(/\d+/g) || [];
-    return hasConnector && nums.length >= 2;
+    const parts = this.splitMultiItemOrderParts(message);
+    if (parts.length < 2) {
+      return false;
+    }
+
+    const parsedParts = parts.filter((part) => {
+      const info = this.extractOrderInfo(part);
+      return info.quantity !== null && !!info.productName;
+    });
+
+    return parsedParts.length >= 2;
   }
 
   private isBareOrderIntent(lowerMessage: string): boolean {
@@ -2646,13 +2913,7 @@ export class WhatsappService {
   private extractMultipleOrderInfos(
     message: string,
   ): Array<{ quantity: number; productName: string }> | null {
-    const lower = (message || '').toLowerCase();
-    const parts = lower
-      // Divide itens apenas quando "e" for seguido de um número (ex.: "... e 1 brownie")
-      // Isso evita quebrar nomes de produtos que contenham " e " dentro do próprio nome.
-      .split(/\s+e\s+(?=\d+\s)|,/g)
-      .map((p) => p.trim())
-      .filter(Boolean);
+    const parts = this.splitMultiItemOrderParts(message);
 
     if (parts.length < 2) return null;
 
@@ -3120,7 +3381,13 @@ export class WhatsappService {
     // ETAPA 2: REMOVER PALAVRAS DE AÇÃO (múltiplas variações)
     // ============================================
     let productName = lowerMessage;
-    
+
+    // Remover vícios de fala, interjeições e xingamentos no começo para não poluir o produto
+    productName = productName.replace(
+      /^((ai|ei|hey|opa|oie?|oh|mano|amigo|amiga|moca|moça|porra|caralho|caraio|cacete|merda|lixo|idiota)\s+)+/i,
+      '',
+    );
+
     // Lista completa de palavras/frases de ação
     const acoes = [
       'quero', 'preciso', 'comprar', 'pedir', 'vou querer', 'gostaria de',

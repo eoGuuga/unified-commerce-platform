@@ -70,6 +70,8 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       clearCustomerData: jest.fn(),
       saveCustomerData: jest.fn(),
       savePendingOrder: jest.fn(),
+      getOrCreateConversation: jest.fn(),
+      saveMessage: jest.fn(),
       updateContext: jest.fn(),
       setPedidoId: jest.fn(),
       findById: jest.fn(),
@@ -137,6 +139,23 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     ...pendingOrder,
     status: PedidoStatus.CONFIRMADO,
   };
+
+  const createConversation = (overrides?: Record<string, unknown>) => ({
+    id: 'conv-1',
+    tenant_id: 'tenant-id',
+    customer_phone: '5511999999999',
+    customer_name: undefined,
+    status: 'active',
+    context: {
+      state: 'idle',
+    },
+    pedido_id: undefined,
+    started_at: new Date('2026-03-15T00:00:00.000Z'),
+    last_message_at: new Date('2026-03-15T00:00:00.000Z'),
+    completed_at: undefined,
+    metadata: {},
+    ...(overrides || {}),
+  });
 
   it('rejects command words as customer name', () => {
     const service = createService() as any;
@@ -218,6 +237,21 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     });
   });
 
+  it('detects multi-item orders with written quantities and colloquial connectors', () => {
+    const service = createService() as any;
+
+    expect(service.looksLikeMultiItemOrder('quero 2 brigadeiros e um brownie')).toBe(true);
+    expect(service.looksLikeMultiItemOrder('me ve 2 brigadeiros mais 1 brownie no pix')).toBe(true);
+    expect(service.extractMultipleOrderInfos('quero 2 brigadeiros e um brownie')).toEqual([
+      { quantity: 2, productName: 'brigadeiros' },
+      { quantity: 1, productName: 'brownie' },
+    ]);
+    expect(service.extractMultipleOrderInfos('porra quero 2 brigadeiros e um brownie')).toEqual([
+      { quantity: 2, productName: 'brigadeiros' },
+      { quantity: 1, productName: 'brownie' },
+    ]);
+  });
+
   it('finds products even with common misspellings', () => {
     const service = createService(catalog) as any;
 
@@ -278,6 +312,76 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(service.isPaymentMethodSelection('debto')).toBe(true);
     expect(service.isPaymentMethodSelection('pode ser pix')).toBe(true);
     expect(service.isPaymentMethodSelection('quero 2 brigadeiros no pix')).toBe(false);
+  });
+
+  it('returns a premium boundary message for abusive inputs without actionable intent', async () => {
+    const service = createService() as any;
+
+    const response = await service.generateResponse('vai tomar no cu', 'tenant-id');
+
+    expect(response).toContain('objetiva e respeitosa');
+    expect(response).toContain('quero 2 brigadeiros e 1 brownie');
+  });
+
+  it('keeps helping when the message is rude but still contains a valid order intent', async () => {
+    const { service, conversationService } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'porra quero 2 brigadeiros e um brownie',
+      'tenant-id',
+      createConversation(),
+    );
+
+    expect(conversationService.savePendingOrder).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({ produto_name: 'Brigadeiro Gourmet', quantity: 2 }),
+          expect.objectContaining({ produto_name: 'Brownie Premium', quantity: 1 }),
+        ]),
+      }),
+    );
+    expect(conversationService.savePendingOrder).toHaveBeenCalled();
+    expect(response).toContain('PEDIDO PREPARADO');
+  });
+
+  it('suppresses repeated actionable messages in a short time window', async () => {
+    const previousSignature = createService() as any;
+    const conversation = createConversation({
+      context: {
+        state: 'idle',
+        last_inbound_signature: previousSignature.buildInboundSignature('cardapio'),
+        last_inbound_at: new Date().toISOString(),
+        last_inbound_repeat_count: 1,
+        last_outbound_preview: 'Aqui esta o cardapio premium.',
+      },
+    });
+
+    const { service, conversationService } = createFixture([], {
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(conversation),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const generateResponseSpy = jest.spyOn(service as any, 'generateResponse');
+    const response = await service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'cardapio',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+    });
+
+    expect(generateResponseSpy).not.toHaveBeenCalled();
+    expect(response).toContain('evitando duplicidade');
+    expect(response).toContain('Aqui esta o cardapio premium.');
+    expect(conversationService.updateContext).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        last_inbound_repeat_count: 2,
+      }),
+    );
   });
 
   it('finds the latest order by phone for noisy status requests', async () => {

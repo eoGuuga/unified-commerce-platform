@@ -89,6 +89,11 @@ export interface ConversationContext {
   pending_order?: PendingOrder;        // Pedido pendente (antes de confirmar)
   stock_adjustment?: StockAdjustmentContext; // Ajuste de quantidade por estoque
   order_attempt_id?: string;            // Identificador do intento de pedido
+  last_inbound_signature?: string;
+  last_inbound_at?: string;
+  last_inbound_repeat_count?: number;
+  last_outbound_preview?: string;
+  abuse_count?: number;
   [key: string]: unknown; // Para permitir extensibilidade
 }
 

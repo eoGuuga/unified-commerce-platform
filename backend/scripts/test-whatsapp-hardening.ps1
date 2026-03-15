@@ -115,6 +115,12 @@ $scenarios = @(
         )
     },
     @{
+        Name = "multi_item_written_quantity"
+        Steps = @(
+            @{ Message = "quero 2 $primaryProduct e um brownie premium"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO") }
+        )
+    },
+    @{
         Name = "payment_keyword_noise"
         Steps = @(
             @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "No momento esse item ficou sem estoque") }
@@ -146,6 +152,25 @@ $scenarios = @(
             @{ Message = "11966665555"; Expect = "OBSERVACOES DO PEDIDO" }
             @{ Message = "pix"; ExpectAny = @("PAGAMENTO PIX", "Acompanhamento completo") }
             @{ Message = "nao vou querer mais"; ExpectAny = @("cancelado", "atendimento humano") }
+        )
+    },
+    @{
+        Name = "duplicate_actionable_message"
+        Steps = @(
+            @{ Message = "cardapio"; ExpectAny = @("CARDAPIO", "catalogo", "- ") }
+            @{ Message = "cardapio"; ExpectAny = @("evitando duplicidade", "Ultima orientacao") }
+        )
+    },
+    @{
+        Name = "abusive_without_action"
+        Steps = @(
+            @{ Message = "vai tomar no cu"; ExpectAny = @("objetiva e respeitosa", "Se quiser seguir") }
+        )
+    },
+    @{
+        Name = "abusive_with_valid_order"
+        Steps = @(
+            @{ Message = "porra quero 2 $primaryProduct e um brownie premium"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO") }
         )
     }
 )
