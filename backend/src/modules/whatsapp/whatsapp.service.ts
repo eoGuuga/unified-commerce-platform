@@ -302,6 +302,8 @@ export class WhatsappService {
       .replace(/\b(qro|qru|kero|kero|queroo+)\b/g, 'quero')
       .replace(/\b(qria|qria|k(r)?ia|keria)\b/g, 'queria')
       .replace(/\b(presciso|presiso|precizo)\b/g, 'preciso')
+      .replace(/\b(naum|naun|num)\b/g, 'nao')
+      .replace(/\b(dz)\b/g, 'duzia')
       .replace(/\b(pixx|piks|pics|pic)\b/g, 'pix')
       .replace(/\b(credto|crdito|creditoo)\b/g, 'credito')
       .replace(/\b(debto|dbito|debitoo)\b/g, 'debito')
@@ -2627,10 +2629,11 @@ export class WhatsappService {
     const palavrasPedido = [
       'quero', 'preciso', 'comprar', 'pedir', 'vou querer', 'gostaria de',
       'desejo', 'vou comprar', 'preciso de', 'queria', 'ia querer',
-      'me manda', 'manda', 'pode ser', 'faz', 'me faz', 'faz pra mim',
+      'me manda', 'manda', 'manda ai', 'manda pra mim', 'me ve', 'separa', 'separa pra mim',
+      'pode ser', 'faz', 'me faz', 'faz pra mim', 'bota', 'coloca', 'traz', 'traz pra mim',
       'pode me enviar', 'tem como', 'dá pra', 'dá pra fazer', 'dá pra me enviar',
       'seria possível', 'poderia', 'pode me mandar', 'me envia', 'envia',
-      'vou pedir', 'quero comprar', 'preciso comprar', 'quero pedir',
+      'vou pedir', 'quero comprar', 'preciso comprar', 'quero pedir', 'quero levar', 'quero pegar',
       'preciso pedir', 'quero encomendar', 'preciso encomendar',
       'quero fazer pedido', 'preciso fazer pedido', 'quero fazer um pedido',
       'preciso fazer um pedido', 'quero fazer uma encomenda', 'preciso fazer uma encomenda',
@@ -3043,16 +3046,16 @@ export class WhatsappService {
     
     // 1.1. Expressões de quantidade PRIMEIRO (dúzia, meia dúzia, quilo, etc.)
     // IMPORTANTE: Verificar ANTES de números por extenso para evitar conflitos
-    if (lowerMessage.includes('meia duzia') || lowerMessage.includes('meia dúzia')) {
+    if (lowerMessage.includes('meia duzia') || lowerMessage.includes('meia dúzia') || lowerMessage.includes('meia dz')) {
       quantity = 6;
     } else if (lowerMessage.includes('duzia') || lowerMessage.includes('dúzia')) {
       // Verificar se tem número antes de "dúzia" (duas dúzias, três dúzias, etc.)
-      const duziaMatch = lowerMessage.match(/(\d+)\s*(duzia|dúzia)/);
+      const duziaMatch = lowerMessage.match(/(\d+)\s*(duzia|dúzia|dz)/);
       if (duziaMatch) {
         quantity = parseInt(duziaMatch[1]) * 12;
-      } else if (lowerMessage.includes('uma duzia') || lowerMessage.includes('uma dúzia')) {
+      } else if (lowerMessage.includes('uma duzia') || lowerMessage.includes('uma dúzia') || lowerMessage.includes('uma dz')) {
         quantity = 12;
-      } else if (lowerMessage.includes('duas duzias') || lowerMessage.includes('duas dúzias')) {
+      } else if (lowerMessage.includes('duas duzias') || lowerMessage.includes('duas dúzias') || lowerMessage.includes('duas dz')) {
         quantity = 24;
       } else if (lowerMessage.includes('tres duzias') || lowerMessage.includes('três dúzias')) {
         quantity = 36;
@@ -3122,10 +3125,11 @@ export class WhatsappService {
     const acoes = [
       'quero', 'preciso', 'comprar', 'pedir', 'vou querer', 'gostaria de',
       'desejo', 'vou comprar', 'preciso de', 'queria', 'ia querer',
-      'me manda', 'manda', 'pode ser', 'faz', 'me faz', 'faz pra mim',
+      'me manda', 'manda', 'manda ai', 'manda pra mim', 'me ve', 'separa', 'separa pra mim',
+      'pode ser', 'faz', 'me faz', 'faz pra mim', 'bota', 'coloca', 'traz', 'traz pra mim',
       'pode me enviar', 'tem como', 'dá pra', 'dá pra fazer', 'dá pra me enviar',
       'seria possível', 'poderia', 'pode me mandar', 'me envia', 'envia',
-      'vou pedir', 'vou comprar', 'quero comprar', 'preciso comprar',
+      'vou pedir', 'vou comprar', 'quero comprar', 'preciso comprar', 'quero levar', 'quero pegar',
       'quero pedir', 'preciso pedir', 'quero encomendar', 'preciso encomendar',
       'quero encomendar', 'preciso encomendar', 'quero fazer pedido',
       'preciso fazer pedido', 'quero fazer um pedido', 'preciso fazer um pedido',
@@ -3162,7 +3166,7 @@ export class WhatsappService {
     }
     
     // Remover expressões de quantidade
-    productName = productName.replace(/\b(duzia|dúzia|meia duzia|meia dúzia|quilo|kg|kilo|gramas?|g)\b/gi, '');
+    productName = productName.replace(/\b(dz|duzia|dúzia|meia duzia|meia dúzia|meia dz|quilo|kg|kilo|gramas?|g)\b/gi, '');
     productName = productName.replace(/\b(unidades?|unidade|un|peças?|peça|pç)\b/gi, '');
     
     // Remover palavras de quantidade indefinida
@@ -3177,7 +3181,8 @@ export class WhatsappService {
     productName = productName.replace(/\s+(o|a|os|as|um|uma|d[eo]|d[ao]s|d[ae]s)\s*$/gi, '');
     
     // Remover preposições soltas (mas manter "de" quando faz parte do nome)
-    productName = productName.replace(/\b(para|pra|com|sem|em|na|no|nas|nos)\b/gi, '');
+    productName = productName.replace(/\b(para|pra|pro|pras|pros|com|sem|em|na|no|nas|nos)\b/gi, '');
+    productName = productName.replace(/\b(pix|cartao|cartão|credito|crédito|debito|débito|dinheiro|boleto|retirada|retirar|entrega|entregar|buscar|pegar|agora|hoje|amanha|amanhã|rapidinho|urgente|favor|ai)\b/gi, '');
     
     // Remover palavras de questionamento
     productName = productName.replace(/\b(qual|quais|que|quem|onde|quando|como|porque|por que)\b/gi, '');
@@ -3807,24 +3812,50 @@ export class WhatsappService {
            '💬 Digite *ajuda* para ver como posso ajudar você!';
   }
 
+  private resolvePaymentMethodSelection(message: string): MetodoPagamento | null {
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return null;
+    }
+
+    const extractedOrder = this.extractOrderInfo(normalized);
+    if (
+      this.looksLikeMultiItemOrder(normalized) ||
+      (extractedOrder.quantity !== null && !!extractedOrder.productName)
+    ) {
+      return null;
+    }
+
+    if (/^[1-4]$/.test(normalized)) {
+      return (
+        {
+          '1': MetodoPagamento.PIX,
+          '2': MetodoPagamento.CREDITO,
+          '3': MetodoPagamento.DEBITO,
+          '4': MetodoPagamento.DINHEIRO,
+        } as Record<string, MetodoPagamento>
+      )[normalized];
+    }
+
+    const reduced = normalized
+      .replace(/\b(quero pagar|pagar|pagamento|pago|prefiro|pode ser|vai ser|seria|por favor|pfv|pf|agora|via|no|na|em)\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (['pix'].includes(reduced)) return MetodoPagamento.PIX;
+    if (['cartao credito', 'credito', 'cartao de credito'].includes(reduced)) return MetodoPagamento.CREDITO;
+    if (['cartao debito', 'debito', 'cartao de debito'].includes(reduced)) return MetodoPagamento.DEBITO;
+    if (['dinheiro'].includes(reduced)) return MetodoPagamento.DINHEIRO;
+    if (['boleto'].includes(reduced)) return MetodoPagamento.BOLETO;
+
+    return null;
+  }
+
   /**
    * Verifica se a mensagem é uma seleção de método de pagamento
    */
   private isPaymentMethodSelection(message: string): boolean {
-    const lowerMessage = this.normalizeIntentText(message);
-    
-    // Verificar números (1, 2, 3, 4)
-    if (/^[1-4]$/.test(lowerMessage)) {
-      return true;
-    }
-
-    // Verificar palavras-chave de métodos de pagamento
-    const metodos = [
-      'pix', 'cartão', 'cartao', 'credito', 'crédito', 'debito', 'débito',
-      'dinheiro', 'dinheiro', 'boleto'
-    ];
-
-    return metodos.some(metodo => lowerMessage.includes(metodo));
+    return this.resolvePaymentMethodSelection(message) !== null;
   }
 
   /**
@@ -3840,23 +3871,7 @@ export class WhatsappService {
         return '❌ Não encontrei um pedido pendente para pagamento.\n\n' +
           '💬 Faça um pedido primeiro digitando: "Quero X [produto]"';
       }
-      const lowerMessage = this.normalizeIntentText(message);
-      
-      // Extrair método de pagamento
-      let metodo: MetodoPagamento | null = null;
-
-      // Por número
-      if (lowerMessage === '1' || lowerMessage.includes('pix')) {
-        metodo = MetodoPagamento.PIX;
-      } else if (lowerMessage === '2' || lowerMessage.includes('credito') || lowerMessage.includes('crédito')) {
-        metodo = MetodoPagamento.CREDITO;
-      } else if (lowerMessage === '3' || lowerMessage.includes('debito') || lowerMessage.includes('débito')) {
-        metodo = MetodoPagamento.DEBITO;
-      } else if (lowerMessage === '4' || lowerMessage.includes('dinheiro')) {
-        metodo = MetodoPagamento.DINHEIRO;
-      } else if (lowerMessage.includes('boleto')) {
-        metodo = MetodoPagamento.BOLETO;
-      }
+      const metodo = this.resolvePaymentMethodSelection(message);
 
       if (!metodo) {
         return '❌ Método de pagamento não reconhecido.\n\n' +

@@ -68,6 +68,12 @@ $scenarios = @(
         )
     },
     @{
+        Name = "regional_negative_without_context"
+        Steps = @(
+            @{ Message = "num vou querer mais"; ExpectAny = @("Sem problema.", "Nao quero te deixar preso", "Como posso ajudar") }
+        )
+    },
+    @{
         Name = "status_without_context"
         Steps = @(
             @{ Message = "cade meu pedido"; ExpectAny = @("ACOMPANHAR PEDIDO", "Portal de acompanhamento") }
@@ -100,6 +106,12 @@ $scenarios = @(
             @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
             @{ Message = "11999999999"; Expect = "OBSERVACOES DO PEDIDO" }
             @{ Message = "pix"; ExpectAny = @("PAGAMENTO PIX", "Acompanhamento completo") }
+        )
+    },
+    @{
+        Name = "audio_style_order_with_payment_words"
+        Steps = @(
+            @{ Message = "me ve meia dz de $primaryProduct pra retirar no pix"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO") }
         )
     },
     @{

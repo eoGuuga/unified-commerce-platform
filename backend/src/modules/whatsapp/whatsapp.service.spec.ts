@@ -169,6 +169,14 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Sem problema.');
   });
 
+  it('normalizes colloquial negative phrases without context', async () => {
+    const service = createService() as any;
+
+    const response = await service.generateResponse('num vou querer mais', 'tenant-id');
+
+    expect(response).toContain('Sem problema.');
+  });
+
   it('rejects zero and negative quantities before product lookup', async () => {
     const service = createService() as any;
 
@@ -197,7 +205,17 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(service.isOrderIntent('qro 2 brigadeiro')).toBe(true);
     expect(service.isOrderIntent('kero 1 bolo')).toBe(true);
     expect(service.isOrderIntent('precizo 3 brigadeiro')).toBe(true);
+    expect(service.isOrderIntent('me ve meia dz de brigadeiro pra retirar no pix')).toBe(true);
     expect(service.isOrderIntent('nao vou querer mais')).toBe(false);
+  });
+
+  it('extracts audio-like order phrases without keeping payment or delivery noise', () => {
+    const service = createService() as any;
+
+    expect(service.extractOrderInfo('me ve meia dz de brigadeiro pra retirar no pix')).toEqual({
+      quantity: 6,
+      productName: 'brigadeiro',
+    });
   });
 
   it('finds products even with common misspellings', () => {
@@ -258,6 +276,8 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(service.isPaymentMethodSelection('piks')).toBe(true);
     expect(service.isPaymentMethodSelection('creditoo')).toBe(true);
     expect(service.isPaymentMethodSelection('debto')).toBe(true);
+    expect(service.isPaymentMethodSelection('pode ser pix')).toBe(true);
+    expect(service.isPaymentMethodSelection('quero 2 brigadeiros no pix')).toBe(false);
   });
 
   it('finds the latest order by phone for noisy status requests', async () => {
