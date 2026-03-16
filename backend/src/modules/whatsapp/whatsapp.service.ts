@@ -383,7 +383,11 @@ export class WhatsappService {
       return null;
     }
 
-    if (this.isPaymentProofIntent(normalized) || this.isPostOrderCourtesyIntent(normalized)) {
+    if (
+      this.isPaymentProofIntent(normalized) ||
+      this.isPostOrderCourtesyIntent(normalized) ||
+      this.isPostOrderChangeIntent(normalized)
+    ) {
       return null;
     }
 
@@ -555,8 +559,11 @@ export class WhatsappService {
       .replace(/\b(n|nao|num)\s+vo(u)?\b/g, 'nao vou')
       .replace(/\b(naum|naun|num)\b/g, 'nao')
       .replace(/\b(vcs|vc|ceis|ces)\b/g, 'voce')
+      .replace(/\b(nois|noix)\b/g, 'nos')
       .replace(/\b(mim\s+ve|mi\s+ve|me\s+veja|mim\s+veja)\b/g, 'me ve')
       .replace(/\b(mim\s+manda|mi\s+manda|manda\s+pra\s+nois|manda\s+pra\s+nos)\b/g, 'me manda')
+      .replace(/\b(manda\s+a[ie]|manda\s+aii+)\b/g, 'me manda')
+      .replace(/\b(me\s+arruma|arruma\s+pra\s+mim|arruma\s+ai)\b/g, 'separa')
       .replace(/\b(dz)\b/g, 'duzia')
       .replace(/\b(pixx|piks|pics|pic)\b/g, 'pix')
       .replace(/\b(credto|crdito|creditoo)\b/g, 'credito')
@@ -623,8 +630,8 @@ export class WhatsappService {
     if (this.looksLikeAudioTranscription(message)) {
       normalized = normalized
         .replace(/[\u200B-\u200D\uFEFF]/g, ' ')
-        .replace(/\b(aham|ahn|ahn?m|hum+|hmm+|eh+|ehh+|tipo|assim|entao|ta bom|beleza|visse|viu|ne|oxe|oxente|uai|eita|vixe|vish|rapaz|mano|minha fia|meu fi|meu filho|minha filha)\b/gi, ' ')
-        .replace(/\b(queria ver se tem como|queria ver se|ve se tem como|ve se|sera que tem como|sera que da pra|deixa eu ver|deixa eu|deixa eu te falar|to querendo|estou querendo)\b/gi, ' ')
+        .replace(/\b(aham|ahn|ahn?m|hum+|hmm+|eh+|ehh+|tipo|assim|entao|ta bom|beleza|visse|viu|ne|oxe|oxente|uai|eita|vixe|vish|rapaz|mano|minha fia|meu fi|meu filho|minha filha|kkk+|rs+|rsrs+|hein|seguinte|patrao|chefia|parceiro|meu rei|minha rainha|moca|moco)\b/gi, ' ')
+        .replace(/\b(queria ver se tem como|queria ver se|ve se tem como|ve se|sera que tem como|sera que da pra|deixa eu ver|deixa eu|deixa eu te falar|to querendo|estou querendo|negocio e o seguinte|me ajuda ai|me ajuda ae|faz favor|se tiver como|tem como)\b/gi, ' ')
         .replace(/\s+/g, ' ')
         .trim();
     }
@@ -653,6 +660,13 @@ export class WhatsappService {
       'enviei comprovante',
       'ja mandei comprovante',
       'comprovante enviado',
+      'ta pago',
+      'pix caiu',
+      'pix caiu ai',
+      'enviei o pix',
+      'paguei ja',
+      'comprovante ta ai',
+      'passei no cartao',
     ]);
   }
 
@@ -677,7 +691,88 @@ export class WhatsappService {
       'certinho',
       'tamo junto',
       'top',
+      'tmj',
+      'brigado',
+      'obrigadao',
+      'deus abencoe',
+      'deus te abencoe',
     ]);
+  }
+
+  private isPostOrderChangeIntent(lowerMessage: string): boolean {
+    const normalized = this.normalizeIntentText(lowerMessage);
+    if (!normalized) {
+      return false;
+    }
+
+    if (this.hasAnyNormalizedPhrase(normalized, [
+      'muda meu endereco',
+      'mudar endereco',
+      'trocar endereco',
+      'troca meu endereco',
+      'alterar endereco',
+      'corrigir endereco',
+      'novo endereco',
+      'muda para retirada',
+      'muda pra retirada',
+      'troca para retirada',
+      'troca pra retirada',
+      'muda para entrega',
+      'muda pra entrega',
+      'troca para entrega',
+      'troca pra entrega',
+      'mudar forma de pagamento',
+      'trocar forma de pagamento',
+      'trocar pagamento',
+      'muda pagamento',
+      'alterar pagamento',
+      'acrescenta',
+      'acrescentar',
+      'adiciona',
+      'adicionar mais',
+      'remover item',
+      'tirar item',
+      'trocar item',
+      'mudar item',
+      'alterar pedido',
+      'mudar pedido',
+      'trocar pedido',
+      'corrigir pedido',
+    ])) {
+      return true;
+    }
+
+    const hasChangeVerb = this.hasAnyNormalizedPhrase(normalized, [
+      'mudar',
+      'trocar',
+      'alterar',
+      'corrigir',
+      'acrescentar',
+      'adicionar',
+      'remover',
+      'tirar',
+      'ajustar',
+    ]);
+    const hasOrderTarget = this.hasAnyNormalizedPhrase(normalized, [
+      'endereco',
+      'entrega',
+      'retirada',
+      'pagamento',
+      'pix',
+      'credito',
+      'debito',
+      'cartao',
+      'item',
+      'produto',
+      'pedido',
+      'sabor',
+    ]);
+    const orderInfo = this.extractOrderInfo(normalized);
+
+    return hasChangeVerb && (
+      hasOrderTarget ||
+      (Number(orderInfo.quantity || 0) > 0 && Boolean(orderInfo.productName))
+    );
   }
 
   private buildPaymentProofGuidanceMessage(pedido: Pedido): string {
@@ -723,6 +818,39 @@ export class WhatsappService {
       pedido.status === PedidoStatus.ENTREGUE
         ? 'Se quiser, posso te ajudar a repetir o pedido ou encontrar algo parecido.'
         : this.getNextStepSummary(pedido, pedido.status),
+      '',
+      `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+    ].join('\n');
+  }
+
+  private buildPostOrderChangeGuardMessage(
+    pedido: Pedido,
+    currentState?: ConversationState,
+  ): string {
+    const isWaitingPayment =
+      currentState === 'waiting_payment' || pedido.status === PedidoStatus.PENDENTE_PAGAMENTO;
+    const intro = isWaitingPayment
+      ? 'Esse pedido ja esta montado e aguardando pagamento.'
+      : pedido.status === PedidoStatus.ENTREGUE
+        ? 'Esse pedido ja foi concluido.'
+        : 'Esse pedido ja esta em andamento.';
+    const safetyLine = isWaitingPayment
+      ? 'Para evitar cobranca ou cadastro errado, eu nao altero itens, endereco ou forma de recebimento automaticamente nessa fase.'
+      : 'Para evitar erro operacional com o cliente, eu nao altero itens, endereco ou forma de recebimento automaticamente nessa fase.';
+    const nextLine = isWaitingPayment
+      ? 'Se precisar ajustar algo agora, o caminho seguro e atendimento humano ou cancelar esse pedido para montar outro do zero.'
+      : pedido.status === PedidoStatus.ENTREGUE
+        ? 'Se voce quiser repetir a compra ou registrar um ajuste, eu te direciono para atendimento humano.'
+        : 'Se precisar ajustar algo agora, o caminho seguro e atendimento humano.';
+
+    return [
+      this.getGreetingLine(pedido.customer_name),
+      '',
+      `Pedido: *${pedido.order_no}*`,
+      `Status atual: *${this.getStatusLabel(pedido.status)}*`,
+      intro,
+      safetyLine,
+      nextLine,
       '',
       `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
     ].join('\n');
@@ -926,6 +1054,7 @@ export class WhatsappService {
       'idiota',
       'burro',
       'burr0',
+      'burra',
       'lixo',
       'merda',
       'porra',
@@ -941,6 +1070,16 @@ export class WhatsappService {
       'filho da puta',
       'vai tomar no cu',
       'vai se fuder',
+      'sacanagem',
+      'ridiculo',
+      'ridicula',
+      'inutil',
+      'lerdo',
+      'lerda',
+      'palhacada',
+      'patetico',
+      'patetica',
+      'responde direito',
     ].some((term) => normalized.includes(this.normalizeIntentText(term)));
   }
 
@@ -955,6 +1094,7 @@ export class WhatsappService {
     return (
       this.isPaymentMethodSelection(normalized) ||
       this.isPaymentProofIntent(normalized) ||
+      this.isPostOrderChangeIntent(normalized) ||
       this.isCancelIntent(normalized, conversation, currentState) ||
       this.looksLikeOrderStatusQuery(normalized, conversation) ||
       this.isReopenIntent(normalized) ||
@@ -2115,12 +2255,19 @@ export class WhatsappService {
       'quando chega minha entrega',
       'onde ta minha encomenda',
       'cade minha encomenda',
+      'cade o motoboy',
+      'onde ta o motoboy',
+      'cade o entregador',
+      'onde ta o entregador',
+      'ja saiu com o motoboy',
+      'ja saiu com o entregador',
       'andamento do pedido',
       'atualizacao do pedido',
       'atualizacao da entrega',
       'pedido saiu',
       'ja saiu meu pedido',
       'saiu para entrega',
+      'chega que horas',
     ])) {
       return true;
     }
@@ -2160,6 +2307,9 @@ export class WhatsappService {
         'demora',
         'ja saiu',
         'saiu',
+        'motoboy',
+        'entregador',
+        'chega que horas',
         'ta pronto',
         'ficou pronto',
         'status',
@@ -3161,6 +3311,10 @@ export class WhatsappService {
 
     if (postFlowOrder && this.isPaymentProofIntent(lowerMessage)) {
       return this.buildPaymentProofGuidanceMessage(postFlowOrder);
+    }
+
+    if (postFlowOrder && this.isPostOrderChangeIntent(lowerMessage)) {
+      return this.buildPostOrderChangeGuardMessage(postFlowOrder, currentState);
     }
 
     if (postFlowOrder && this.isPostOrderCourtesyIntent(lowerMessage)) {

@@ -214,6 +214,12 @@ $scenarios = @(
         )
     },
     @{
+        Name = "audio_regional_extreme_noise"
+        Steps = @(
+            @{ Message = "eita meu rei seguinte kkk me arruma 2 $primaryProduct e 1 $secondaryProduct pra nois retirar no piks hein"; MessageType = "audio"; Metadata = @{ audio = $true; transcriptionSource = "mock-stt-regional-noisy" }; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "Estoque insuficiente", "No momento esse item ficou sem estoque") }
+        )
+    },
+    @{
         Name = "multi_item_written_quantity"
         Steps = @(
             @{ Message = "quero 1 $primaryProduct e um $secondaryProduct"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "Estoque insuficiente") }
@@ -266,6 +272,18 @@ $scenarios = @(
         )
     },
     @{
+        Name = "provocative_payment_proof_after_waiting_payment"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo") }
+            @{ Message = "Cliente Provocacao"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
+            @{ Message = "11966554432"; Expect = "OBSERVACOES DO PEDIDO" }
+            @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
+            @{ Message = "sim"; ExpectAny = @("FORMAS DE PAGAMENTO", "ESCOLHA A FORMA DE PAGAMENTO") }
+            @{ Message = "ja fiz o pix e voces tao de sacanagem"; ExpectAny = @("nao vou gerar outra cobranca", "operadora confirmar", "Acompanhamento completo") }
+        )
+    },
+    @{
         Name = "courtesy_after_waiting_payment"
         Steps = @(
             @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo") }
@@ -275,6 +293,30 @@ $scenarios = @(
             @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
             @{ Message = "sim"; ExpectAny = @("FORMAS DE PAGAMENTO", "ESCOLHA A FORMA DE PAGAMENTO") }
             @{ Message = "valeu fechou"; ExpectAny = @("Fico acompanhando", "Acompanhamento completo", "pedido avanca") }
+        )
+    },
+    @{
+        Name = "post_payment_address_change"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo") }
+            @{ Message = "Cliente Endereco 2"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
+            @{ Message = "11966443321"; Expect = "OBSERVACOES DO PEDIDO" }
+            @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
+            @{ Message = "sim"; ExpectAny = @("FORMAS DE PAGAMENTO", "ESCOLHA A FORMA DE PAGAMENTO") }
+            @{ Message = "muda meu endereco pra rua das flores 123 centro sao paulo sp"; ExpectAny = @("nao altero itens, endereco ou forma de recebimento automaticamente", "atendimento humano", "Acompanhamento completo") }
+        )
+    },
+    @{
+        Name = "post_payment_item_change"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo") }
+            @{ Message = "Cliente Item 2"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
+            @{ Message = "11966443320"; Expect = "OBSERVACOES DO PEDIDO" }
+            @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
+            @{ Message = "sim"; ExpectAny = @("FORMAS DE PAGAMENTO", "ESCOLHA A FORMA DE PAGAMENTO") }
+            @{ Message = "acrescenta 1 $secondaryProduct"; ExpectAny = @("nao altero itens, endereco ou forma de recebimento automaticamente", "cancelar esse pedido", "Acompanhamento completo") }
         )
     },
     @{
@@ -295,6 +337,12 @@ $scenarios = @(
         Name = "abusive_without_action"
         Steps = @(
             @{ Message = "vai tomar no cu"; ExpectAny = @("objetiva e respeitosa", "Se quiser seguir") }
+        )
+    },
+    @{
+        Name = "ironic_provocation_without_action"
+        Steps = @(
+            @{ Message = "que bot ridiculo responde direito"; ExpectAny = @("objetiva e respeitosa", "Se quiser seguir") }
         )
     },
     @{

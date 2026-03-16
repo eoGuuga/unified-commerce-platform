@@ -316,6 +316,40 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('PEDIDO PREPARADO');
   });
 
+  it('understands extremely noisy regional audio transcripts without paid AI', async () => {
+    const { service, conversationService } = createFixture(catalog, {
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(createConversation()),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const response = await service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'eita meu rei seguinte kkk me arruma 2 brigadeiro gourmet e 1 brownie premium pra nois retirar no piks hein',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'audio-regional-2',
+      messageType: 'audio',
+      metadata: {
+        audio: true,
+        transcriptionSource: 'mock-stt-regional-noisy',
+      },
+    });
+
+    expect(conversationService.savePendingOrder).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({ produto_name: 'Brigadeiro Gourmet', quantity: 2 }),
+          expect.objectContaining({ produto_name: 'Brownie Premium', quantity: 1 }),
+        ]),
+      }),
+    );
+    expect(response).toContain('PEDIDO PREPARADO');
+  });
+
   it('detects multi-item orders with written quantities and colloquial connectors', () => {
     const service = createService() as any;
 
@@ -365,6 +399,12 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       service.looksLikeOrderStatusQuery('ja saiu?', {
         pedido_id: 'ord-1',
         context: { state: 'waiting_payment' },
+      }),
+    ).toBe(true);
+    expect(
+      service.looksLikeOrderStatusQuery('cade o motoboy', {
+        pedido_id: 'ord-1',
+        context: { state: 'order_confirmed' },
       }),
     ).toBe(true);
   });
@@ -418,6 +458,14 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     expect(response).toContain('Eu nao vou seguir nesse tom');
     expect(response).toContain('status do pedido');
+  });
+
+  it('treats ironic provocations without explicit profanity as a boundary case', async () => {
+    const service = createService() as any;
+
+    const response = await service.generateResponse('que bot ridiculo responde direito', 'tenant-id');
+
+    expect(response).toContain('objetiva e respeitosa');
   });
 
   it('keeps helping when the message is rude but still contains a valid order intent', async () => {
@@ -635,6 +683,31 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('/pedido?order=PED-20260315-CACE');
   });
 
+  it('keeps payment-proof guidance even when the customer complains in the same message', async () => {
+    const { service, paymentsService } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue(pendingOrder),
+      },
+    });
+
+    const response = await service.generateResponse(
+      'ja fiz o pix e voces tao de sacanagem',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'waiting_payment',
+          waiting_payment: true,
+          pedido_id: 'ord-1',
+        },
+      }),
+    );
+
+    expect(paymentsService.createPayment).not.toHaveBeenCalled();
+    expect(response).toContain('nao vou gerar outra cobranca');
+    expect(response).toContain('/pedido?order=PED-20260315-CACE');
+  });
+
   it('does not create a second payment when the order is already confirmed', async () => {
     const { service, paymentsService } = createFixture([], {
       orders: {
@@ -683,6 +756,56 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(paymentsService.createPayment).not.toHaveBeenCalled();
     expect(response).toContain('O pedido segue na trilha certa');
     expect(response).toContain('/pedido?order=PED-20260315-CACE');
+  });
+
+  it('routes address change requests to safe manual handling after confirmation', async () => {
+    const { service, paymentsService } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue(confirmedOrder),
+      },
+    });
+
+    const response = await service.generateResponse(
+      'muda meu endereco pra rua das flores 123 centro sao paulo sp',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'order_confirmed',
+          waiting_payment: false,
+          pedido_id: 'ord-1',
+        },
+      }),
+    );
+
+    expect(paymentsService.createPayment).not.toHaveBeenCalled();
+    expect(response).toContain('nao altero itens, endereco ou forma de recebimento automaticamente');
+    expect(response).toContain('atendimento humano');
+  });
+
+  it('routes item change requests to safe manual handling while waiting payment', async () => {
+    const { service, paymentsService } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue(pendingOrder),
+      },
+    });
+
+    const response = await service.generateResponse(
+      'acrescenta 1 brownie premium',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'waiting_payment',
+          waiting_payment: true,
+          pedido_id: 'ord-1',
+        },
+      }),
+    );
+
+    expect(paymentsService.createPayment).not.toHaveBeenCalled();
+    expect(response).toContain('nao altero itens, endereco ou forma de recebimento automaticamente');
+    expect(response).toContain('cancelar esse pedido');
   });
 
   it('redirects stale address replies to tracking after order completion', async () => {
