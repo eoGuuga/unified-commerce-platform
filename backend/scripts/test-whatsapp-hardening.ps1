@@ -222,7 +222,7 @@ $scenarios = @(
     @{
         Name = "audio_truncated_product_name"
         Steps = @(
-            @{ Message = "me manda 1 $($primaryProduct.Substring(0, [Math]::Min(10, $primaryProduct.Length)))"; MessageType = "audio"; Metadata = @{ audio = $true; transcriptionSource = "mock-stt-truncated" }; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "quis dizer", "REVISAO FINAL DO PEDIDO") }
+            @{ Message = "me manda 1 $($primaryProduct.Substring(0, [Math]::Min(10, $primaryProduct.Length)))"; MessageType = "audio"; Metadata = @{ audio = $true; transcriptionSource = "mock-stt-truncated" }; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "quis dizer", "REVISAO FINAL DO PEDIDO", "No momento esse item ficou sem estoque", "Estoque insuficiente") }
         )
     },
     @{
