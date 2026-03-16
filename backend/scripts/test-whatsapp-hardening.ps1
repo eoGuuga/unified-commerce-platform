@@ -208,6 +208,12 @@ $scenarios = @(
         )
     },
     @{
+        Name = "audio_regional_multi_item"
+        Steps = @(
+            @{ Message = "oxe meu fi mim ve 2 $primaryProduct e 1 $secondaryProduct pra viagem no pix visse"; MessageType = "audio"; Metadata = @{ audio = $true; transcriptionSource = "mock-stt-regional" }; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "Estoque insuficiente", "No momento esse item ficou sem estoque") }
+        )
+    },
+    @{
         Name = "multi_item_written_quantity"
         Steps = @(
             @{ Message = "quero 1 $primaryProduct e um $secondaryProduct"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "Estoque insuficiente") }
@@ -248,6 +254,30 @@ $scenarios = @(
         )
     },
     @{
+        Name = "payment_proof_after_waiting_payment"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo") }
+            @{ Message = "Cliente Pix"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
+            @{ Message = "11966554433"; Expect = "OBSERVACOES DO PEDIDO" }
+            @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
+            @{ Message = "sim"; ExpectAny = @("FORMAS DE PAGAMENTO", "ESCOLHA A FORMA DE PAGAMENTO") }
+            @{ Message = "ja fiz o pix visse"; ExpectAny = @("nao vou gerar outra cobranca", "operadora confirmar", "Acompanhamento completo") }
+        )
+    },
+    @{
+        Name = "courtesy_after_waiting_payment"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo") }
+            @{ Message = "Cliente Valeu"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
+            @{ Message = "11966443322"; Expect = "OBSERVACOES DO PEDIDO" }
+            @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
+            @{ Message = "sim"; ExpectAny = @("FORMAS DE PAGAMENTO", "ESCOLHA A FORMA DE PAGAMENTO") }
+            @{ Message = "valeu fechou"; ExpectAny = @("Fico acompanhando", "Acompanhamento completo", "pedido avanca") }
+        )
+    },
+    @{
         Name = "duplicate_actionable_message"
         Steps = @(
             @{ Message = "cardapio"; ExpectAny = @("CARDAPIO", "catalogo", "- ") }
@@ -265,6 +295,14 @@ $scenarios = @(
         Name = "abusive_without_action"
         Steps = @(
             @{ Message = "vai tomar no cu"; ExpectAny = @("objetiva e respeitosa", "Se quiser seguir") }
+        )
+    },
+    @{
+        Name = "abusive_escalation_without_action"
+        Steps = @(
+            @{ Message = "vai tomar no cu"; ExpectAny = @("objetiva e respeitosa", "Se quiser seguir") }
+            @{ Message = "seu idiota do caralho"; ExpectAny = @("objetiva e respeitosa", "Eu sigo disponivel") }
+            @{ Message = "bot lixo do cacete"; ExpectAny = @("Eu nao vou seguir nesse tom", "mensagem objetiva e respeitosa") }
         )
     },
     @{

@@ -383,6 +383,10 @@ export class WhatsappService {
       return null;
     }
 
+    if (this.isPaymentProofIntent(normalized) || this.isPostOrderCourtesyIntent(normalized)) {
+      return null;
+    }
+
     if (
       this.hasAnyNormalizedPhrase(normalized, [
         'oi',
@@ -548,8 +552,11 @@ export class WhatsappService {
       .replace(/\b(qro|qru|kero|kero|queroo+)\b/g, 'quero')
       .replace(/\b(qria|qria|k(r)?ia|keria)\b/g, 'queria')
       .replace(/\b(presciso|presiso|precizo)\b/g, 'preciso')
+      .replace(/\b(n|nao|num)\s+vo(u)?\b/g, 'nao vou')
       .replace(/\b(naum|naun|num)\b/g, 'nao')
       .replace(/\b(vcs|vc|ceis|ces)\b/g, 'voce')
+      .replace(/\b(mim\s+ve|mi\s+ve|me\s+veja|mim\s+veja)\b/g, 'me ve')
+      .replace(/\b(mim\s+manda|mi\s+manda|manda\s+pra\s+nois|manda\s+pra\s+nos)\b/g, 'me manda')
       .replace(/\b(dz)\b/g, 'duzia')
       .replace(/\b(pixx|piks|pics|pic)\b/g, 'pix')
       .replace(/\b(credto|crdito|creditoo)\b/g, 'credito')
@@ -564,6 +571,9 @@ export class WhatsappService {
       .replace(/\b(praviagem|pra viage[mn])\b/g, 'pra viagem')
       .replace(/\b(retira|retiraa)\b/g, 'retirada')
       .replace(/\b(obgd|obrgd|obgdo)\b/g, 'obrigado')
+      .replace(/\b(vlw+|valeeu+)\b/g, 'valeu')
+      .replace(/\b(blz+|belezinha)\b/g, 'beleza')
+      .replace(/\b(fecho+|fexo+)\b/g, 'fechou')
       .replace(/\b(pfv|pfvr)\b/g, 'por favor')
       .replace(/([a-z])\1{3,}/g, '$1$1')
       .replace(/\s+/g, ' ')
@@ -613,13 +623,109 @@ export class WhatsappService {
     if (this.looksLikeAudioTranscription(message)) {
       normalized = normalized
         .replace(/[\u200B-\u200D\uFEFF]/g, ' ')
-        .replace(/\b(aham|ahn|ahn?m|hum+|hmm+|eh+|ehh+|tipo|assim|entao|ta bom|beleza)\b/gi, ' ')
-        .replace(/\b(queria ver se tem como|queria ver se|ve se tem como|ve se|sera que tem como|sera que da pra|deixa eu ver|deixa eu)\b/gi, ' ')
+        .replace(/\b(aham|ahn|ahn?m|hum+|hmm+|eh+|ehh+|tipo|assim|entao|ta bom|beleza|visse|viu|ne|oxe|oxente|uai|eita|vixe|vish|rapaz|mano|minha fia|meu fi|meu filho|minha filha)\b/gi, ' ')
+        .replace(/\b(queria ver se tem como|queria ver se|ve se tem como|ve se|sera que tem como|sera que da pra|deixa eu ver|deixa eu|deixa eu te falar|to querendo|estou querendo)\b/gi, ' ')
         .replace(/\s+/g, ' ')
         .trim();
     }
 
     return normalized;
+  }
+
+  private isPaymentProofIntent(lowerMessage: string): boolean {
+    const normalized = this.normalizeIntentText(lowerMessage);
+    if (!normalized || this.isPaymentMethodSelection(normalized)) {
+      return false;
+    }
+
+    return this.hasAnyNormalizedPhrase(normalized, [
+      'ja paguei',
+      'paguei',
+      'ja fiz o pix',
+      'fiz o pix',
+      'ja fiz pix',
+      'pix pago',
+      'pagamento feito',
+      'pagamento concluido',
+      'ja transferi',
+      'transferi',
+      'mandei comprovante',
+      'enviei comprovante',
+      'ja mandei comprovante',
+      'comprovante enviado',
+    ]);
+  }
+
+  private isPostOrderCourtesyIntent(lowerMessage: string): boolean {
+    const normalized = this.normalizeIntentText(lowerMessage);
+    if (!normalized) {
+      return false;
+    }
+
+    return this.hasAnyNormalizedPhrase(normalized, [
+      'obrigado',
+      'obrigada',
+      'obg',
+      'valeu',
+      'vlw',
+      'fechou',
+      'show',
+      'beleza',
+      'blz',
+      'tranquilo',
+      'perfeito',
+      'certinho',
+      'tamo junto',
+      'top',
+    ]);
+  }
+
+  private buildPaymentProofGuidanceMessage(pedido: Pedido): string {
+    if (pedido.status !== PedidoStatus.PENDENTE_PAGAMENTO) {
+      return this.buildPaymentStageGuardMessage(pedido);
+    }
+
+    return [
+      this.getGreetingLine(pedido.customer_name),
+      '',
+      `Recebi sua sinalizacao sobre o pagamento do pedido *${pedido.order_no}*.`,
+      'Se voce ja concluiu o Pix ou o cartao, eu nao vou gerar outra cobranca por aqui.',
+      'Assim que a operadora confirmar, o pedido avanca automaticamente.',
+      this.getNextStepSummary(pedido, pedido.status),
+      '',
+      `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+    ].join('\n');
+  }
+
+  private buildPostOrderCourtesyMessage(
+    pedido: Pedido,
+    currentState?: ConversationState,
+  ): string {
+    if (pedido.status === PedidoStatus.CANCELADO) {
+      return [
+        'Sem problema.',
+        'Se quiser retomar a compra depois, eu monto um novo pedido por aqui.',
+        `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+      ].join('\n');
+    }
+
+    const contextualLine =
+      currentState === 'waiting_payment' || pedido.status === PedidoStatus.PENDENTE_PAGAMENTO
+        ? 'Fico acompanhando por aqui e o pedido avanca assim que o pagamento for confirmado.'
+        : pedido.status === PedidoStatus.ENTREGUE
+          ? 'Fico feliz em ajudar. Quando quiser repetir a compra, e so me chamar.'
+          : 'Perfeito. O pedido segue na trilha certa e eu continuo disponivel por aqui.';
+
+    return [
+      this.getGreetingLine(pedido.customer_name),
+      '',
+      contextualLine,
+      pedido.status === PedidoStatus.ENTREGUE
+        ? 'Se quiser, posso te ajudar a repetir o pedido ou encontrar algo parecido.'
+        : this.getNextStepSummary(pedido, pedido.status),
+      '',
+      `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+    ].join('\n');
   }
 
   private hasAnyNormalizedPhrase(
@@ -848,6 +954,7 @@ export class WhatsappService {
 
     return (
       this.isPaymentMethodSelection(normalized) ||
+      this.isPaymentProofIntent(normalized) ||
       this.isCancelIntent(normalized, conversation, currentState) ||
       this.looksLikeOrderStatusQuery(normalized, conversation) ||
       this.isReopenIntent(normalized) ||
@@ -875,13 +982,15 @@ export class WhatsappService {
   private getPremiumBoundaryMessage(abuseCount = 0): string {
     const tone =
       abuseCount >= 2
+        ? 'Eu nao vou seguir nesse tom. Se quiser atendimento, me envie uma mensagem objetiva e respeitosa.'
+        : abuseCount >= 1
         ? 'Eu sigo disponivel para ajudar, mas preciso que a mensagem venha objetiva e respeitosa.'
         : 'Posso te ajudar melhor se a mensagem vier objetiva e respeitosa.';
 
     return [
       tone,
       '',
-      'Se quiser seguir, me diga o que precisa. Exemplos:',
+      abuseCount >= 2 ? 'Escolha um caminho claro para eu continuar sem ruido:' : 'Se quiser seguir, me diga o que precisa. Exemplos:',
       '- "quero 2 brigadeiros e 1 brownie"',
       '- "status do pedido"',
       '- "cardapio"',
@@ -3040,8 +3149,22 @@ export class WhatsappService {
       !this.hasActionableIntent(lowerMessage, conversation, currentState)
     ) {
       return this.getPremiumBoundaryMessage(
-        Number(conversation?.context?.abuse_count || 0),
+        Number(conversation?.context?.abuse_count || 0) + 1,
       );
+    }
+
+    const shouldResolvePostFlowOrder =
+      !!currentState && ['waiting_payment', 'order_confirmed', 'order_completed'].includes(currentState);
+    const postFlowOrder = shouldResolvePostFlowOrder
+      ? await this.resolveRelevantOrder(tenantId, conversation, orderNo)
+      : null;
+
+    if (postFlowOrder && this.isPaymentProofIntent(lowerMessage)) {
+      return this.buildPaymentProofGuidanceMessage(postFlowOrder);
+    }
+
+    if (postFlowOrder && this.isPostOrderCourtesyIntent(lowerMessage)) {
+      return this.buildPostOrderCourtesyMessage(postFlowOrder, currentState);
     }
 
     const isIdleLikeState =

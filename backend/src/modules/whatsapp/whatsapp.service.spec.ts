@@ -282,6 +282,40 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('PEDIDO PREPARADO');
   });
 
+  it('understands heavily regional audio-like phrasing without paid AI', async () => {
+    const { service, conversationService } = createFixture(catalog, {
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(createConversation()),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const response = await service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'oxe meu fi mim ve 2 brigadeiro gourmet e 1 brownie premium pra viagem no pix visse',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'audio-regional-1',
+      messageType: 'audio',
+      metadata: {
+        audio: true,
+        transcriptionSource: 'mock-stt-regional',
+      },
+    });
+
+    expect(conversationService.savePendingOrder).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({ produto_name: 'Brigadeiro Gourmet', quantity: 2 }),
+          expect.objectContaining({ produto_name: 'Brownie Premium', quantity: 1 }),
+        ]),
+      }),
+    );
+    expect(response).toContain('PEDIDO PREPARADO');
+  });
+
   it('detects multi-item orders with written quantities and colloquial connectors', () => {
     const service = createService() as any;
 
@@ -366,6 +400,24 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     expect(response).toContain('objetiva e respeitosa');
     expect(response).toContain('quero 2 brigadeiros e 1 brownie');
+  });
+
+  it('hardens the boundary when abuse is repeated many times', async () => {
+    const service = createService() as any;
+
+    const response = await service.generateResponse(
+      'vai tomar no cu',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          abuse_count: 4,
+        },
+      }),
+    );
+
+    expect(response).toContain('Eu nao vou seguir nesse tom');
+    expect(response).toContain('status do pedido');
   });
 
   it('keeps helping when the message is rude but still contains a valid order intent', async () => {
@@ -558,6 +610,31 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('PED-20260315-CACE');
   });
 
+  it('acknowledges payment proof without creating a second charge while waiting payment', async () => {
+    const { service, paymentsService } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue(pendingOrder),
+      },
+    });
+
+    const response = await service.generateResponse(
+      'ja fiz o pix visse',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'waiting_payment',
+          waiting_payment: true,
+          pedido_id: 'ord-1',
+        },
+      }),
+    );
+
+    expect(paymentsService.createPayment).not.toHaveBeenCalled();
+    expect(response).toContain('nao vou gerar outra cobranca');
+    expect(response).toContain('/pedido?order=PED-20260315-CACE');
+  });
+
   it('does not create a second payment when the order is already confirmed', async () => {
     const { service, paymentsService } = createFixture([], {
       orders: {
@@ -581,6 +658,31 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(paymentsService.createPayment).not.toHaveBeenCalled();
     expect(response).toContain('nao precisa ser escolhido novamente');
     expect(response).toContain('PED-20260315-CACE');
+  });
+
+  it('responds with contextual courtesy after confirmation', async () => {
+    const { service, paymentsService } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue(confirmedOrder),
+      },
+    });
+
+    const response = await service.generateResponse(
+      'valeu fechou',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'order_confirmed',
+          waiting_payment: false,
+          pedido_id: 'ord-1',
+        },
+      }),
+    );
+
+    expect(paymentsService.createPayment).not.toHaveBeenCalled();
+    expect(response).toContain('O pedido segue na trilha certa');
+    expect(response).toContain('/pedido?order=PED-20260315-CACE');
   });
 
   it('redirects stale address replies to tracking after order completion', async () => {
