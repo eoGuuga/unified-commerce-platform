@@ -856,6 +856,26 @@ export class WhatsappService {
     ].join('\n');
   }
 
+  private buildPostOrderStatusAndChangeGuardMessage(
+    pedido: Pedido,
+    currentState?: ConversationState,
+  ): string {
+    return [
+      this.getGreetingLine(pedido.customer_name),
+      '',
+      `Pedido: *${pedido.order_no}*`,
+      `Status atual: *${this.getStatusLabel(pedido.status)}*`,
+      this.getNextStepSummary(pedido, pedido.status),
+      '',
+      currentState === 'waiting_payment'
+        ? 'Tambem entendi que voce quer alterar o pedido, mas eu nao faco essa mudanca automaticamente enquanto ele aguarda pagamento.'
+        : 'Tambem entendi que voce quer alterar o pedido, mas eu nao faco essa mudanca automaticamente nessa fase.',
+      'Se precisar ajustar item, endereco, entrega ou pagamento, o caminho seguro e atendimento humano.',
+      '',
+      `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+    ].join('\n');
+  }
+
   private hasAnyNormalizedPhrase(
     normalizedValue: string,
     phrases: string[],
@@ -888,6 +908,126 @@ export class WhatsappService {
       !!conversation?.context?.pedido_id ||
       (!!currentState && activeStates.has(currentState))
     );
+  }
+
+  private isAmbiguousChoiceOrderIntent(lowerMessage: string): boolean {
+    const normalized = this.normalizeIntentText(lowerMessage);
+    if (!normalized) {
+      return false;
+    }
+
+    const orderInfo = this.extractOrderInfo(normalized);
+    const hasOrderShape =
+      this.looksLikeMultiItemOrder(normalized) ||
+      (Number(orderInfo.quantity || 0) > 0 && Boolean(orderInfo.productName)) ||
+      this.hasAnyNormalizedPhrase(normalized, [
+        'quero',
+        'me ve',
+        'me manda',
+        'separa',
+        'comprar',
+        'pedir',
+      ]);
+
+    if (!hasOrderShape) {
+      return false;
+    }
+
+    const hasUncertainty = this.hasAnyNormalizedPhrase(normalized, [
+      'nao sei',
+      'to em duvida',
+      'estou em duvida',
+      'em duvida',
+      'talvez',
+      'quem sabe',
+      'qual voce indica',
+      'qual vc indica',
+      'qual e melhor',
+      'qual eh melhor',
+      'me indica',
+      'me sugere',
+    ]);
+
+    return hasUncertainty || normalized.includes(' ou ');
+  }
+
+  private getPremiumOrderChoiceClarificationMessage(): string {
+    return [
+      'Eu prefiro fechar uma decisao por vez para nao montar o item errado.',
+      '',
+      'Me envie uma opcao clara para eu seguir sem risco.',
+      'Exemplos:',
+      '- "quero 1 brigadeiro gourmet"',
+      '- "me indica entre brownie e brigadeiro"',
+      '- "cardapio"',
+    ].join('\n');
+  }
+
+  private shouldGuardPostFlowMutation(
+    lowerMessage: string,
+    currentState?: ConversationState,
+  ): boolean {
+    const normalized = this.normalizeIntentText(lowerMessage);
+    if (!normalized || !currentState || !['waiting_payment', 'order_confirmed'].includes(currentState)) {
+      return false;
+    }
+
+    if (
+      this.isPaymentMethodSelection(normalized) ||
+      this.isPaymentProofIntent(normalized) ||
+      this.isPostOrderCourtesyIntent(normalized)
+    ) {
+      return false;
+    }
+
+    return (
+      this.isPostOrderChangeIntent(normalized) ||
+      this.looksLikeMultiItemOrder(normalized) ||
+      this.isOrderIntent(normalized)
+    );
+  }
+
+  private isMixedStatusAndMutationIntent(
+    lowerMessage: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): boolean {
+    const normalized = this.normalizeIntentText(lowerMessage);
+    if (!normalized || !currentState || !['waiting_payment', 'order_confirmed'].includes(currentState)) {
+      return false;
+    }
+
+    return (
+      this.looksLikeOrderStatusQuery(normalized, conversation) &&
+      this.shouldGuardPostFlowMutation(normalized, currentState)
+    );
+  }
+
+  private isMixedStatusAndFreshOrderIntent(
+    lowerMessage: string,
+    conversation?: TypedConversation,
+  ): boolean {
+    const normalized = this.normalizeIntentText(lowerMessage);
+    if (!normalized) {
+      return false;
+    }
+
+    return (
+      this.looksLikeOrderStatusQuery(normalized, conversation) &&
+      (this.looksLikeMultiItemOrder(normalized) || this.isOrderIntent(normalized))
+    );
+  }
+
+  private getMixedIntentClarificationMessage(): string {
+    return [
+      'Entendi mais de um objetivo na mesma mensagem.',
+      '',
+      'Para eu nao tomar a acao errada, me envie uma coisa por vez.',
+      'Exemplos:',
+      '- "status do pedido"',
+      '- "quero 2 brigadeiros"',
+      '- "mudar endereco do pedido"',
+    ].join('\n');
   }
 
   private buildInboundSignature(value: string): string {
@@ -3199,6 +3339,26 @@ export class WhatsappService {
     }
 
     const orderNo = this.extractOrderNo(message);
+    const mixedStatusAndPostFlowMutation = this.isMixedStatusAndMutationIntent(
+      lowerMessage,
+      conversation,
+      currentState,
+    );
+    if (mixedStatusAndPostFlowMutation) {
+      const pedido = await this.resolveRelevantOrder(tenantId, conversation, orderNo);
+      if (pedido) {
+        return this.buildPostOrderStatusAndChangeGuardMessage(pedido, currentState);
+      }
+    }
+
+    if (this.isMixedStatusAndFreshOrderIntent(lowerMessage, conversation)) {
+      return this.getMixedIntentClarificationMessage();
+    }
+
+    if (this.isAmbiguousChoiceOrderIntent(lowerMessage)) {
+      return this.getPremiumOrderChoiceClarificationMessage();
+    }
+
     if (this.looksLikeOrderStatusQuery(lowerMessage, conversation)) {
       return await this.handlePremiumOrderStatusQuery(tenantId, conversation, orderNo);
     }
@@ -3311,6 +3471,10 @@ export class WhatsappService {
 
     if (postFlowOrder && this.isPaymentProofIntent(lowerMessage)) {
       return this.buildPaymentProofGuidanceMessage(postFlowOrder);
+    }
+
+    if (postFlowOrder && this.shouldGuardPostFlowMutation(lowerMessage, currentState)) {
+      return this.buildPostOrderChangeGuardMessage(postFlowOrder, currentState);
     }
 
     if (postFlowOrder && this.isPostOrderChangeIntent(lowerMessage)) {
@@ -4335,6 +4499,29 @@ export class WhatsappService {
         }),
         queryNormalized,
       );
+    }
+
+    if (!produto && queryNormalized.length >= 5) {
+      const prefixMatches = produtos.filter((p) => {
+        const normalizedName = normalize(p.name);
+        const tokens = normalizedName
+          .split(/\s+/)
+          .filter((token) => token.length >= 3 && !stopWords.has(token));
+
+        return (
+          normalizedName.startsWith(queryNormalized) ||
+          tokens.some((token) => token.startsWith(queryNormalized))
+        );
+      });
+
+      if (prefixMatches.length === 1) {
+        produto = prefixMatches[0];
+      } else if (prefixMatches.length > 1 && palavras.length === 1) {
+        return {
+          produto: null,
+          sugestoes: prefixMatches.slice(0, 5),
+        };
+      }
     }
 
     // Estrategia 5: Busca por similaridade (erros de digitacao comuns)

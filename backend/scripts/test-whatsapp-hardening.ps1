@@ -220,6 +220,12 @@ $scenarios = @(
         )
     },
     @{
+        Name = "audio_truncated_product_name"
+        Steps = @(
+            @{ Message = "me manda 1 $($primaryProduct.Substring(0, [Math]::Min(10, $primaryProduct.Length)))"; MessageType = "audio"; Metadata = @{ audio = $true; transcriptionSource = "mock-stt-truncated" }; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "quis dizer", "REVISAO FINAL DO PEDIDO") }
+        )
+    },
+    @{
         Name = "multi_item_written_quantity"
         Steps = @(
             @{ Message = "quero 1 $primaryProduct e um $secondaryProduct"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "Estoque insuficiente") }
@@ -317,6 +323,36 @@ $scenarios = @(
             @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
             @{ Message = "sim"; ExpectAny = @("FORMAS DE PAGAMENTO", "ESCOLHA A FORMA DE PAGAMENTO") }
             @{ Message = "acrescenta 1 $secondaryProduct"; ExpectAny = @("nao altero itens, endereco ou forma de recebimento automaticamente", "cancelar esse pedido", "Acompanhamento completo") }
+        )
+    },
+    @{
+        Name = "fresh_order_while_waiting_payment"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo") }
+            @{ Message = "Cliente Mais Um"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
+            @{ Message = "11966443319"; Expect = "OBSERVACOES DO PEDIDO" }
+            @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
+            @{ Message = "sim"; ExpectAny = @("FORMAS DE PAGAMENTO", "ESCOLHA A FORMA DE PAGAMENTO") }
+            @{ Message = "quero mais 1 $secondaryProduct"; ExpectAny = @("nao altero itens, endereco ou forma de recebimento automaticamente", "cancelar esse pedido", "Acompanhamento completo") }
+        )
+    },
+    @{
+        Name = "mixed_status_and_change_after_pending_order"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo") }
+            @{ Message = "Cliente Misto"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
+            @{ Message = "11966443318"; Expect = "OBSERVACOES DO PEDIDO" }
+            @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
+            @{ Message = "sim"; ExpectAny = @("FORMAS DE PAGAMENTO", "ESCOLHA A FORMA DE PAGAMENTO") }
+            @{ Message = "cade meu pedido e muda para entrega"; ExpectAny = @("Status atual", "nao faco essa mudanca automaticamente", "Acompanhamento completo") }
+        )
+    },
+    @{
+        Name = "ambiguous_choice_order"
+        Steps = @(
+            @{ Message = "quero 1 $primaryProduct ou 1 $secondaryProduct nao sei"; ExpectAny = @("uma decisao por vez", "me indica entre brownie e brigadeiro", "opcao clara") }
         )
     },
     @{
