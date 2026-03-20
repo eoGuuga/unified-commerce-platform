@@ -143,6 +143,18 @@ $scenarios = @(
         )
     },
     @{
+        Name = "loose_fragment_without_context_number"
+        Steps = @(
+            @{ Message = "123"; ExpectAny = @("Ainda nao tenho um pedido em andamento", "quantidade + produto") }
+        )
+    },
+    @{
+        Name = "loose_fragment_without_context_neighborhood"
+        Steps = @(
+            @{ Message = "centro"; ExpectAny = @("Ainda nao tenho um pedido em andamento", "quantidade + produto") }
+        )
+    },
+    @{
         Name = "low_literacy_keyword"
         Steps = @(
             @{ Message = $lowLiteracyMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "No momento esse item ficou sem estoque") }
@@ -195,6 +207,15 @@ $scenarios = @(
             @{ Message = "Cliente Telefone"; Expect = "Como voce prefere receber esse pedido?" }
             @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
             @{ Message = "Rua das Flores, 123, Centro, Sao Paulo, SP"; ExpectAny = @("preciso do telefone de contato", "telefone de contato com DDD") }
+        )
+    },
+    @{
+        Name = "resume_mid_collection_phone_stage"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "No momento esse item ficou sem estoque") }
+            @{ Message = "Ana Paula"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
+            @{ Message = "quero continuar pedido"; ExpectAny = @("Vamos continuar de onde paramos", "TELEFONE DE CONTATO") }
         )
     },
     @{
@@ -383,6 +404,31 @@ $scenarios = @(
             @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
             @{ Message = "sim"; ExpectAny = @("FORMAS DE PAGAMENTO", "ESCOLHA A FORMA DE PAGAMENTO") }
             @{ Message = "cade meu pedido e muda para entrega"; ExpectAny = @("Status atual", "nao faco essa mudanca automaticamente", "Acompanhamento completo") }
+        )
+    },
+    @{
+        Name = "conflicting_cancel_and_continue_after_pending_order"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo") }
+            @{ Message = "Cliente Confuso"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
+            @{ Message = "11966443317"; Expect = "OBSERVACOES DO PEDIDO" }
+            @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
+            @{ Message = "sim"; ExpectAny = @("FORMAS DE PAGAMENTO", "ESCOLHA A FORMA DE PAGAMENTO") }
+            @{ Message = "cancela nao continua meu pedido"; ExpectAny = @("mistura cancelar e continuar", "\"cancelar pedido\"", "\"continuar pedido\"") }
+        )
+    },
+    @{
+        Name = "reopen_after_cancelled_order"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo") }
+            @{ Message = "Cliente Cancelado"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
+            @{ Message = "11966443316"; Expect = "OBSERVACOES DO PEDIDO" }
+            @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
+            @{ Message = "sim"; ExpectAny = @("FORMAS DE PAGAMENTO", "ESCOLHA A FORMA DE PAGAMENTO") }
+            @{ Message = "cancela meu pedido"; ExpectAny = @("cancelado", "atendimento humano") }
+            @{ Message = "quero continuar pedido"; ExpectAny = @("ja foi cancelado", "nao pode ser reativado automaticamente", "monto um novo pedido") }
         )
     },
     @{

@@ -141,6 +141,11 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     status: PedidoStatus.CONFIRMADO,
   };
 
+  const cancelledOrder = {
+    ...pendingOrder,
+    status: PedidoStatus.CANCELADO,
+  };
+
   const pendingConversationOrder = {
     items: [
       {
@@ -331,6 +336,17 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     );
 
     expect(response).toContain('preciso do telefone de contato');
+  });
+
+  it('recovers loose collection fragments without context instead of guessing intent', async () => {
+    const service = createService(catalog) as any;
+
+    await expect(service.generateResponse('123', 'tenant-id')).resolves.toContain(
+      'Ainda nao tenho um pedido em andamento',
+    );
+    await expect(service.generateResponse('centro', 'tenant-id')).resolves.toContain(
+      'Ainda nao tenho um pedido em andamento',
+    );
   });
 
   it('returns safe guidance for bare order intents', async () => {
@@ -645,6 +661,73 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     expect(response).toContain('uma decisao por vez');
     expect(response).toContain('me indica entre brownie e brigadeiro');
+  });
+
+  it('asks for a single safe instruction when cancel and continue are mixed together', async () => {
+    const { service } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue(pendingOrder),
+      },
+    });
+
+    const response = await service.generateResponse(
+      'cancela nao continua meu pedido',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'waiting_payment',
+          waiting_payment: true,
+          pedido_id: 'ord-1',
+        },
+      }),
+    );
+
+    expect(response).toContain('mistura cancelar e continuar');
+    expect(response).toContain('"cancelar pedido"');
+  });
+
+  it('resumes interrupted collection when the customer asks to continue the order', async () => {
+    const service = createService(catalog) as any;
+
+    const response = await service.handlePremiumReopenIntent(
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_phone',
+          pending_order: pendingConversationOrder,
+          customer_data: {
+            name: 'Ana Paula',
+            delivery_type: 'pickup',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Vamos continuar de onde paramos');
+    expect(response).toContain('TELEFONE DE CONTATO');
+  });
+
+  it('does not promise reopening when the latest order is already cancelled', async () => {
+    const { service, conversationService } = createFixture([], {
+      orders: {
+        findLatestPendingByCustomerPhone: jest.fn().mockResolvedValue(null),
+        findLatestByCustomerPhone: jest.fn().mockResolvedValue(cancelledOrder),
+      },
+    });
+
+    const response = await service.handlePremiumReopenIntent(
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+        },
+      }),
+    );
+
+    expect(conversationService.updateState).toHaveBeenCalledWith('conv-1', 'idle');
+    expect(response).toContain('ja foi cancelado');
+    expect(response).toContain('nao pode ser reativado automaticamente');
   });
 
   it('keeps helping when the message is rude but still contains a valid order intent', async () => {

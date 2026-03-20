@@ -440,6 +440,15 @@ export class WhatsappService {
       return 'phone';
     }
 
+    if (
+      digitsOnly.length >= 1 &&
+      digitsOnly.length <= 8 &&
+      !this.extractOrderNo(sanitized) &&
+      /^\d{1,8}[A-Za-z]?$/.test(sanitized)
+    ) {
+      return 'address';
+    }
+
     if (['sim', 'confirmar', 'ok'].includes(normalized)) {
       return 'confirmation';
     }
@@ -458,9 +467,15 @@ export class WhatsappService {
       ) && /\d/.test(sanitized);
     if (
       addressSignal ||
+      this.hasAddressFragmentSignal(sanitized) ||
       (sanitized.includes(',') && /\d/.test(sanitized) && this.validateAddress(sanitized).valid)
     ) {
       return 'address';
+    }
+
+    const extractedName = this.extractCustomerNameCandidate(sanitized);
+    if (extractedName !== sanitized && this.validateName(extractedName).valid) {
+      return 'name';
     }
 
     const nameValidation = this.validateName(sanitized);
@@ -701,6 +716,51 @@ export class WhatsappService {
     return /\b(rua|avenida|av|travessa|alameda|estrada|rodovia|bairro|cep|apto|apartamento|bloco|sala|quadra|lote|condominio|condomínio|casa)\b/i.test(
       this.normalizeIntentText(text),
     );
+  }
+
+  private hasAddressFragmentSignal(text: string): boolean {
+    const normalized = this.normalizeIntentText(text);
+    if (!normalized) {
+      return false;
+    }
+
+    if (this.hasAddressKeyword(normalized)) {
+      return true;
+    }
+
+    if (['centro', 'jardim', 'jd', 'vila', 'bairro', 'cep', 'apto', 'apartamento', 'bloco', 'quadra', 'lote', 'fundos', 'portaria', 'casa'].includes(normalized)) {
+      return true;
+    }
+
+    return new RegExp(
+      `\\b(?:${Array.from(this.BRAZIL_STATE_CODES).join('|')})\\b`,
+      'i',
+    ).test(normalized);
+  }
+
+  private looksLikeCollectionFragmentWithoutContext(message: string): boolean {
+    const sanitized = this.sanitizeInput((message || '').trim());
+    const normalized = this.normalizeIntentText(sanitized);
+    if (!normalized) {
+      return false;
+    }
+
+    const digitsOnly = sanitized.replace(/\D/g, '');
+    if (
+      digitsOnly.length >= 1 &&
+      digitsOnly.length <= 8 &&
+      !this.extractOrderNo(sanitized) &&
+      /^\d{1,8}[A-Za-z]?$/.test(sanitized)
+    ) {
+      return true;
+    }
+
+    if (this.hasAddressFragmentSignal(normalized)) {
+      return true;
+    }
+
+    const extractedName = this.extractCustomerNameCandidate(sanitized);
+    return extractedName !== sanitized && this.validateName(extractedName).valid;
   }
 
   private getAddressDraftParts(conversation?: TypedConversation): string[] {
@@ -2682,16 +2742,26 @@ export class WhatsappService {
   }
 
   private isReopenIntent(lowerMessage: string): boolean {
-    const lm = (lowerMessage || '').trim();
+    const lm = this.normalizeIntentText(lowerMessage);
     if (!lm) return false;
-    return (
-      lm.includes('reabrir') ||
-      lm.includes('reabre') ||
-      lm.includes('retomar') ||
-      lm.includes('reativar') ||
-      lm.includes('voltar pedido') ||
-      lm.includes('continuar pedido')
-    );
+    return this.hasAnyNormalizedPhrase(lm, [
+      'reabrir',
+      'reabre',
+      'retomar',
+      'retoma',
+      'reativar',
+      'voltar pedido',
+      'continuar pedido',
+      'continuar compra',
+      'continuar meu pedido',
+      'quero continuar',
+      'quero retomar',
+      'pode continuar',
+      'pode retomar',
+      'voltar de onde parei',
+      'de onde parei',
+      'onde paramos',
+    ]);
   }
 
   private isRepeatOrderIntent(lowerMessage: string): boolean {
@@ -2703,6 +2773,45 @@ export class WhatsappService {
       lm.includes('repetir meu pedido') ||
       lm.includes('refazer pedido')
     );
+  }
+
+  private isAmbiguousFlowControlIntent(
+    lowerMessage: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): boolean {
+    const normalized = this.normalizeIntentText(lowerMessage);
+    if (!normalized || !this.hasActiveOrderContext(conversation, currentState)) {
+      return false;
+    }
+
+    const hasCancel = this.isCancelIntent(normalized, conversation, currentState);
+    const hasResume = this.isReopenIntent(normalized);
+
+    if (hasCancel && hasResume) {
+      return true;
+    }
+
+    return this.hasAnyNormalizedPhrase(normalized, [
+      'nao cancela',
+      'cancela nao',
+      'cancelar nao',
+      'nao cancelar',
+      'nao desiste',
+      'desiste nao',
+      'desistir nao',
+    ]);
+  }
+
+  private getPremiumFlowControlClarificationMessage(): string {
+    return [
+      'Sua mensagem mistura cancelar e continuar o pedido.',
+      '',
+      'Para eu agir sem erro, responda com uma opcao por vez:',
+      '- "cancelar pedido"',
+      '- "continuar pedido"',
+      '- "status do pedido"',
+    ].join('\n');
   }
 
   private getPaymentOptionsMessage(total: number): string {
@@ -3028,7 +3137,69 @@ export class WhatsappService {
     }
 
     const pedidoId = conversation.pedido_id || conversation.context?.pedido_id;
+    const currentState = conversation.context?.state as ConversationState | undefined;
     let pedido: Pedido | null = null;
+
+    const collectingStates = new Set<ConversationState>([
+      'collecting_order',
+      'collecting_name',
+      'collecting_address',
+      'collecting_phone',
+      'collecting_notes',
+      'collecting_cash_change',
+      'confirming_order',
+      'confirming_stock_adjustment',
+    ]);
+
+    if (currentState && collectingStates.has(currentState)) {
+      const pendingOrder = conversation.context?.pending_order as PendingOrder | undefined;
+      if (currentState === 'collecting_name' && pendingOrder && this.validatePendingOrder(pendingOrder).valid) {
+        return [
+          'Vamos continuar de onde paramos.',
+          '',
+          this.buildPremiumPendingOrderIntro(
+            pendingOrder,
+            'Antes de fechar, me diga o nome completo de quem vai receber o pedido.',
+          ),
+        ].join('\n');
+      }
+
+      if (currentState === 'collecting_address' && pendingOrder && this.validatePendingOrder(pendingOrder).valid) {
+        const customerData = conversation.context?.customer_data as CustomerData | undefined;
+        const draftText = this.buildAddressDraftText(this.getAddressDraftParts(conversation));
+
+        if (!customerData?.delivery_type) {
+          return [
+            'Vamos continuar de onde paramos.',
+            '',
+            this.buildPremiumPendingOrderIntro(
+              pendingOrder,
+              this.getPremiumDeliveryChoicePrompt(customerData?.name),
+            ),
+          ].join('\n');
+        }
+
+        if (customerData.delivery_type === 'delivery' && !customerData.address) {
+          return [
+            'Vamos continuar de onde paramos.',
+            '',
+            draftText ? this.buildPremiumAddressDraftPrompt(draftText) : this.getPremiumAddressPrompt(),
+          ].join('\n');
+        }
+      }
+
+      if (currentState === 'collecting_phone') {
+        return ['Vamos continuar de onde paramos.', '', this.getPremiumPhonePrompt()].join('\n');
+      }
+
+      if (currentState === 'collecting_notes') {
+        return ['Vamos continuar de onde paramos.', '', this.getPremiumNotesPrompt()].join('\n');
+      }
+
+      if (currentState === 'confirming_order' && pendingOrder && this.validatePendingOrder(pendingOrder).valid) {
+        return ['Vamos continuar de onde paramos.', '', await this.showOrderConfirmationPremium(tenantId, conversation)].join('\n');
+      }
+    }
 
     if (pedidoId) {
       pedido = await this.ordersService.findOne(pedidoId, tenantId);
@@ -3042,6 +3213,21 @@ export class WhatsappService {
     }
 
     if (!pedido) {
+      const latest = await this.ordersService.findLatestByCustomerPhone(
+        tenantId,
+        conversation.customer_phone,
+      );
+
+      if (latest?.status === PedidoStatus.CANCELADO) {
+        await this.conversationService.clearPedido(conversation.id);
+        await this.conversationService.updateState(conversation.id, 'idle');
+        return [
+          `O pedido *${latest.order_no}* ja foi cancelado e nao pode ser reativado automaticamente.`,
+          'Se quiser, eu monto um novo pedido do zero sem reaproveitar nada por engano.',
+          `Acompanhamento: ${this.buildTrackingUrl(latest.order_no)}`,
+        ].join('\n');
+      }
+
       await this.conversationService.clearPedido(conversation.id);
       await this.conversationService.updateState(conversation.id, 'idle');
       return 'Nao encontrei um pedido pendente para retomar.\n\nSe quiser, faca um novo pedido digitando: "Quero X [produto]".';
@@ -3708,6 +3894,10 @@ export class WhatsappService {
       return this.getMixedIntentClarificationMessage();
     }
 
+    if (this.isAmbiguousFlowControlIntent(lowerMessage, conversation, currentState)) {
+      return this.getPremiumFlowControlClarificationMessage();
+    }
+
     if (this.isAmbiguousChoiceOrderIntent(lowerMessage)) {
       return this.getPremiumOrderChoiceClarificationMessage();
     }
@@ -4053,6 +4243,10 @@ export class WhatsappService {
     }
 
     if (/^\d{10,11}$/.test(normalized)) {
+      return true;
+    }
+
+    if (this.looksLikeCollectionFragmentWithoutContext(normalized)) {
       return true;
     }
 
