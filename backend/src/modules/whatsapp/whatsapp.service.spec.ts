@@ -141,6 +141,21 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     status: PedidoStatus.CONFIRMADO,
   };
 
+  const pendingConversationOrder = {
+    items: [
+      {
+        produto_id: 'p1',
+        produto_name: 'Brigadeiro Gourmet',
+        quantity: 1,
+        unit_price: 10.5,
+      },
+    ],
+    subtotal: 10.5,
+    discount_amount: 0,
+    shipping_amount: 0,
+    total_amount: 10.5,
+  };
+
   const createConversation = (overrides?: Record<string, unknown>) => ({
     id: 'conv-1',
     tenant_id: 'tenant-id',
@@ -171,6 +186,151 @@ describe('WhatsappService defensive WhatsApp flow', () => {
         valid: false,
       }),
     );
+  });
+
+  it('extracts natural name phrases before saving the customer name', async () => {
+    const { service, conversationService } = createFixture(catalog);
+
+    const response = await service.processCustomerNamePremium(
+      'me chamo Ana Paula',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_name',
+          pending_order: pendingConversationOrder,
+          customer_data: {},
+        },
+      }),
+    );
+
+    expect(conversationService.saveCustomerData).toHaveBeenCalledWith('conv-1', {
+      name: 'Ana Paula',
+    });
+    expect(response).toContain('Como voce prefere receber esse pedido?');
+  });
+
+  it('does not accept a partial street as a complete delivery address', async () => {
+    const { service, conversationService } = createFixture(catalog);
+
+    const response = await service.processCustomerAddressPremium(
+      'Rua das Flores',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_address',
+          pending_order: pendingConversationOrder,
+          customer_data: {
+            name: 'Ana Paula',
+            delivery_type: 'delivery',
+          },
+        },
+      }),
+    );
+
+    expect(conversationService.saveCustomerData).not.toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        address: expect.anything(),
+      }),
+    );
+    expect(conversationService.updateContext).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        address_draft_parts: ['Rua das Flores'],
+      }),
+    );
+    expect(response).toContain('Estou montando o endereco por etapas');
+    expect(response).toContain('Agora me envie o numero');
+  });
+
+  it('assembles interrupted address fragments before moving on', async () => {
+    const { service, conversationService } = createFixture(catalog);
+
+    const response = await service.processCustomerAddressPremium(
+      'Centro, Sao Paulo, SP',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_address',
+          pending_order: pendingConversationOrder,
+          customer_data: {
+            name: 'Ana Paula',
+            delivery_type: 'delivery',
+          },
+          address_draft_parts: ['Rua das Flores', '123'],
+        },
+      }),
+    );
+
+    expect(conversationService.saveCustomerData).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        delivery_type: 'delivery',
+        address: expect.objectContaining({
+          street: 'Rua das Flores',
+          number: '123',
+          neighborhood: 'Centro',
+          city: 'Sao Paulo',
+          state: 'SP',
+        }),
+      }),
+    );
+    expect(response).toContain('TELEFONE DE CONTATO');
+  });
+
+  it('parses loose audio-like addresses without commas', async () => {
+    const { service, conversationService } = createFixture(catalog);
+
+    const response = await service.processCustomerAddressPremium(
+      'meu endereco e rua das flores 123 centro sao paulo sp',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_address',
+          pending_order: pendingConversationOrder,
+          customer_data: {
+            name: 'Ana Paula',
+            delivery_type: 'delivery',
+          },
+        },
+      }),
+    );
+
+    expect(conversationService.saveCustomerData).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        delivery_type: 'delivery',
+        address: expect.objectContaining({
+          street: 'rua das flores',
+          number: '123',
+          neighborhood: 'centro',
+          city: 'sao paulo',
+          state: 'SP',
+        }),
+      }),
+    );
+    expect(response).toContain('TELEFONE DE CONTATO');
+  });
+
+  it('realigns the flow when an address is sent during phone collection', async () => {
+    const service = createService(catalog) as any;
+
+    const response = await service.generateResponse(
+      'Rua das Flores, 123, Centro, Sao Paulo, SP',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_phone',
+          pending_order: pendingConversationOrder,
+          customer_data: {
+            name: 'Ana Paula',
+            delivery_type: 'delivery',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('preciso do telefone de contato');
   });
 
   it('returns safe guidance for bare order intents', async () => {

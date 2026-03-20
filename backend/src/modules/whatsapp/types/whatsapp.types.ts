@@ -97,6 +97,7 @@ export interface ConversationContext {
   last_processed_event_key?: string;
   last_processed_event_at?: string;
   last_processed_response?: string;
+  address_draft_parts?: string[] | null;
   [key: string]: unknown; // Para permitir extensibilidade
 }
 

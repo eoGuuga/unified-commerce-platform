@@ -54,6 +54,35 @@ export class WhatsappService {
   private readonly MAX_QUANTITY = 1000;
   private readonly MIN_QUANTITY = 1;
   private readonly MAX_PRICE = 1000000; // R$ 1.000.000,00
+  private readonly BRAZIL_STATE_CODES = new Set([
+    'AC',
+    'AL',
+    'AP',
+    'AM',
+    'BA',
+    'CE',
+    'DF',
+    'ES',
+    'GO',
+    'MA',
+    'MT',
+    'MS',
+    'MG',
+    'PA',
+    'PB',
+    'PR',
+    'PE',
+    'PI',
+    'RJ',
+    'RN',
+    'RS',
+    'RO',
+    'RR',
+    'SC',
+    'SP',
+    'SE',
+    'TO',
+  ]);
   // frete simples (dev/whatsapp) - configurável via env WHATSAPP_DEFAULT_SHIPPING_AMOUNT (fallback 10)
 
   constructor(
@@ -637,6 +666,262 @@ export class WhatsappService {
     }
 
     return normalized;
+  }
+
+  private extractCustomerNameCandidate(message: string): string {
+    return this.sanitizeInput(message.trim())
+      .replace(
+        /^(?:meu\s+nome\s+[eé]|o\s+nome\s+[eé]|nome\s+[eé]|me\s+chamo|eu\s+sou|sou\s+(?:o|a)|pode\s+colocar\s+no\s+nome\s+de|coloca\s+no\s+nome\s+de|anota\s+no\s+nome\s+de|prazer[,:\s]*)\s+/i,
+        '',
+      )
+      .replace(/\b(?:ta\s+bom|t[aá]|ok|beleza|blz|valeu|obrigad[oa]|por\s+favor)\b$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private extractPhoneDigitsCandidate(message: string): string {
+    return this.sanitizeInput(message).replace(/\D/g, '');
+  }
+
+  private normalizeAddressCandidate(message: string): string {
+    return this.sanitizeInput(message.trim())
+      .replace(
+        /^(?:meu\s+endere[cç]o\s+[eé]|o\s+endere[cç]o\s+[eé]|endere[cç]o\s+[eé]|entrega\s+[eé]\s+(?:na|no)|pode\s+entregar\s+(?:na|no)|entrega\s+(?:na|no)|manda\s+(?:na|no)|fica\s+(?:na|no)|anota\s+a[ií]|segue\s+o\s+endere[cç]o|[eé]\s+na)\s+/i,
+        '',
+      )
+      .replace(/\b(?:n[ºo]?|numero)\s*(\d+[A-Za-z]?)\b/gi, '$1')
+      .replace(/\b(?:cep)\s+(\d{5}-?\d{3})\b/gi, '$1')
+      .replace(/\s+-\s+/g, ', ')
+      .replace(/\b(?:ta\s+bom|ok|beleza|blz|valeu|obrigad[oa]|por\s+favor)\b$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private hasAddressKeyword(text: string): boolean {
+    return /\b(rua|avenida|av|travessa|alameda|estrada|rodovia|bairro|cep|apto|apartamento|bloco|sala|quadra|lote|condominio|condomínio|casa)\b/i.test(
+      this.normalizeIntentText(text),
+    );
+  }
+
+  private getAddressDraftParts(conversation?: TypedConversation): string[] {
+    const draft = conversation?.context?.address_draft_parts;
+    return Array.isArray(draft)
+      ? draft
+          .filter((part): part is string => typeof part === 'string')
+          .map((part) => part.trim())
+          .filter(Boolean)
+      : [];
+  }
+
+  private mergeAddressDraftParts(parts: string[], nextPart: string): string[] {
+    const sanitizedPart = this.normalizeAddressCandidate(nextPart);
+    if (!sanitizedPart) {
+      return parts;
+    }
+
+    const normalizedPart = this.normalizeIntentText(sanitizedPart);
+    if (!normalizedPart) {
+      return parts;
+    }
+
+    const merged = [...parts];
+    const existingIndex = merged.findIndex(
+      (part) => this.normalizeIntentText(part) === normalizedPart,
+    );
+    if (existingIndex >= 0) {
+      merged[existingIndex] = sanitizedPart;
+      return merged;
+    }
+
+    return [...merged.slice(-4), sanitizedPart];
+  }
+
+  private buildAddressDraftText(parts: string[]): string {
+    return parts
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(', ')
+      .replace(/,\s*,+/g, ', ')
+      .replace(/\s+,/g, ',')
+      .trim();
+  }
+
+  private isAddressDraftWorthy(text: string): boolean {
+    const normalized = this.normalizeIntentText(text);
+    if (!normalized) {
+      return false;
+    }
+
+    return (
+      this.hasAddressKeyword(normalized) ||
+      /^\d+[A-Za-z]?$/.test(text.trim()) ||
+      /\b\d{5}-?\d{3}\b/.test(text)
+    );
+  }
+
+  private parseLooseAddress(addressText: string): {
+    street: string;
+    number: string;
+    complement?: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  } | null {
+    const sanitized = this.normalizeAddressCandidate(addressText);
+    if (!sanitized || sanitized.includes(',')) {
+      return null;
+    }
+
+    let working = sanitized.replace(/\bcep\b/gi, ' ').replace(/\s+/g, ' ').trim();
+    let zipCode = '';
+    const zipMatch = working.match(/\b(\d{5}-?\d{3})\b/);
+    if (zipMatch) {
+      zipCode = zipMatch[1].replace('-', '');
+      working = working.replace(zipMatch[0], ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    const tokens = working.split(/\s+/).filter(Boolean);
+    if (tokens.length < 4) {
+      return null;
+    }
+
+    let state = '';
+    const lastToken = tokens[tokens.length - 1].replace(/[^A-Za-z]/g, '').toUpperCase();
+    if (this.BRAZIL_STATE_CODES.has(lastToken)) {
+      state = lastToken;
+      tokens.pop();
+    }
+
+    const numberIndex = tokens.findIndex((token) => /^\d+[A-Za-z]?$/.test(token));
+    if (numberIndex <= 0) {
+      return null;
+    }
+
+    const street = tokens.slice(0, numberIndex).join(' ').trim();
+    const number = tokens[numberIndex];
+    const remainder = tokens.slice(numberIndex + 1);
+    if (!street || remainder.length === 0) {
+      return null;
+    }
+
+    const complementKeywords = new Set([
+      'apto',
+      'apartamento',
+      'bloco',
+      'bl',
+      'casa',
+      'fundos',
+      'sala',
+      'sl',
+      'cj',
+      'conjunto',
+      'loja',
+      'andar',
+      'cobertura',
+      'cob',
+      'quadra',
+      'qd',
+      'lote',
+      'lt',
+    ]);
+    const complementParts: string[] = [];
+    while (remainder.length > 2 && complementKeywords.has(remainder[0].toLowerCase())) {
+      complementParts.push(remainder.shift() as string);
+      if (remainder.length > 2) {
+        complementParts.push(remainder.shift() as string);
+      }
+    }
+
+    if (remainder.length < 2) {
+      return null;
+    }
+
+    let cityTokenCount = 1;
+    if (state && remainder.length >= 3) {
+      cityTokenCount = Math.min(2, remainder.length - 1);
+    }
+
+    const city = remainder.slice(-cityTokenCount).join(' ').trim();
+    const neighborhood = remainder.slice(0, -cityTokenCount).join(' ').trim();
+    if (!city || !neighborhood) {
+      return null;
+    }
+
+    return {
+      street,
+      number,
+      complement: complementParts.length > 0 ? complementParts.join(' ') : undefined,
+      neighborhood,
+      city,
+      state,
+      zipCode,
+    };
+  }
+
+  private parseAddressCandidate(addressText: string): {
+    street: string;
+    number: string;
+    complement?: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  } | null {
+    const normalizedCandidate = this.normalizeAddressCandidate(addressText);
+    return this.parseAddress(normalizedCandidate) || this.parseLooseAddress(normalizedCandidate);
+  }
+
+  private isAddressLikelyComplete(addressText: string): boolean {
+    const candidate = this.normalizeAddressCandidate(addressText);
+    if (!candidate || !this.validateAddress(candidate).valid) {
+      return false;
+    }
+
+    const parsed = this.parseAddressCandidate(candidate);
+    if (parsed) {
+      const hasStreet = !!parsed.street?.trim();
+      const hasNumber = !!parsed.number?.trim();
+      const hasLocality =
+        !!parsed.neighborhood?.trim() ||
+        !!parsed.city?.trim() ||
+        !!parsed.state?.trim() ||
+        !!parsed.zipCode?.trim();
+      return hasStreet && hasNumber && hasLocality;
+    }
+
+    const commaCount = (candidate.match(/,/g) || []).length;
+    const hasNumber = /\d/.test(candidate);
+    const hasCep = /\b\d{5}-?\d{3}\b/.test(candidate);
+    const hasState = new RegExp(
+      `\\b(?:${Array.from(this.BRAZIL_STATE_CODES).join('|')})\\b`,
+      'i',
+    ).test(candidate);
+
+    return hasNumber && this.hasAddressKeyword(candidate) && (commaCount >= 2 || hasCep || hasState);
+  }
+
+  private buildPremiumAddressDraftPrompt(draftText: string): string {
+    const hasNumber = /\d/.test(draftText);
+    const hasCep = /\b\d{5}-?\d{3}\b/.test(draftText);
+    const hasState = new RegExp(
+      `\\b(?:${Array.from(this.BRAZIL_STATE_CODES).join('|')})\\b`,
+      'i',
+    ).test(draftText);
+
+    const nextStep = !hasNumber
+      ? 'Agora me envie o numero.'
+      : !hasState && !hasCep
+        ? 'Agora complete com bairro, cidade e estado.'
+        : 'Se puder, complete com complemento ou CEP para reduzir erro na entrega.';
+
+    return [
+      'Estou montando o endereco por etapas para evitar erro de entrega.',
+      '',
+      `Rascunho atual: ${draftText}`,
+      nextStep,
+      'Exemplo completo: "Rua das Flores, 123, Apto 45, Centro, Sao Paulo, SP, 01234-567".',
+    ].join('\n');
   }
 
   private isPaymentProofIntent(lowerMessage: string): boolean {
@@ -1839,7 +2124,28 @@ export class WhatsappService {
       return `Nao consegui seguir: ${stateValidation.error}`;
     }
 
-    const sanitizedName = this.sanitizeInput(message.trim());
+    const sanitizedMessage = this.sanitizeInput(message.trim());
+    const digitsOnly = this.extractPhoneDigitsCandidate(sanitizedMessage);
+    if (digitsOnly.length >= 10 && digitsOnly.length <= 11) {
+      return 'Recebi um telefone, mas antes preciso do nome completo de quem vai receber o pedido.';
+    }
+
+    if (
+      this.isAddressLikelyComplete(sanitizedMessage) ||
+      this.hasAddressKeyword(sanitizedMessage)
+    ) {
+      return 'Recebi um endereco, mas antes preciso do nome completo de quem vai receber o pedido.';
+    }
+
+    const normalizedIntent = this.normalizeIntentText(sanitizedMessage);
+    if (
+      ['1', '2', 'entrega', 'retirada', 'buscar'].includes(normalizedIntent) ||
+      this.isPaymentMethodSelection(normalizedIntent)
+    ) {
+      return 'Antes de escolher entrega ou pagamento, preciso do nome completo de quem vai receber o pedido.';
+    }
+
+    const sanitizedName = this.extractCustomerNameCandidate(sanitizedMessage);
     const nameValidation = this.validateName(sanitizedName);
     if (!nameValidation.valid) {
       return `Nome invalido: ${nameValidation.error}`;
@@ -1883,10 +2189,11 @@ export class WhatsappService {
     }
 
     const sanitizedMessage = this.sanitizeInput(message.trim());
-    const lowerMessage = sanitizedMessage.toLowerCase().trim();
+    const lowerMessage = this.normalizeIntentText(sanitizedMessage);
 
     if (lowerMessage === '1' || lowerMessage.includes('entrega')) {
       await this.conversationService.saveCustomerData(conversation.id, { delivery_type: 'delivery' });
+      await this.conversationService.updateContext(conversation.id, { address_draft_parts: null });
       const pendingOrder = conversation.context?.pending_order;
       if (pendingOrder) {
         pendingOrder.shipping_amount = this.getDefaultShippingAmount();
@@ -1902,6 +2209,7 @@ export class WhatsappService {
 
     if (lowerMessage === '2' || lowerMessage.includes('retirada') || lowerMessage.includes('buscar')) {
       await this.conversationService.saveCustomerData(conversation.id, { delivery_type: 'pickup' });
+      await this.conversationService.updateContext(conversation.id, { address_draft_parts: null });
       const pendingOrder = conversation.context?.pending_order;
       if (pendingOrder) {
         pendingOrder.shipping_amount = 0;
@@ -1919,18 +2227,61 @@ export class WhatsappService {
       return this.getPremiumNotesPrompt();
     }
 
-    const addressValidation = this.validateAddress(sanitizedMessage);
+    const digitsOnly = this.extractPhoneDigitsCandidate(sanitizedMessage);
+    if (digitsOnly.length >= 10 && digitsOnly.length <= 11) {
+      return 'Recebi um telefone, mas nesta etapa preciso primeiro do endereco de entrega.';
+    }
+
+    const nameCandidate = this.extractCustomerNameCandidate(sanitizedMessage);
+    if (
+      this.getAddressDraftParts(conversation).length === 0 &&
+      !/\d/.test(sanitizedMessage) &&
+      !this.hasAddressKeyword(sanitizedMessage) &&
+      this.validateName(nameCandidate).valid
+    ) {
+      return 'Agora preciso do endereco de entrega. Me envie rua, numero, bairro, cidade e estado.';
+    }
+
+    let addressCandidate = this.normalizeAddressCandidate(sanitizedMessage);
+    let draftParts = this.getAddressDraftParts(conversation);
+    const shouldUseDraft =
+      draftParts.length > 0 || this.isAddressDraftWorthy(addressCandidate);
+
+    if (shouldUseDraft) {
+      draftParts = this.mergeAddressDraftParts(draftParts, addressCandidate);
+      const draftText = this.buildAddressDraftText(draftParts);
+      if (!this.isAddressLikelyComplete(draftText)) {
+        await this.conversationService.updateContext(conversation.id, {
+          address_draft_parts: draftParts,
+        });
+        return this.buildPremiumAddressDraftPrompt(draftText || addressCandidate);
+      }
+
+      addressCandidate = draftText;
+    }
+
+    const addressValidation = this.validateAddress(addressCandidate);
     if (!addressValidation.valid) {
       return `Endereco invalido: ${addressValidation.error}`;
     }
 
-    const addressParts = this.parseAddress(sanitizedMessage);
+    const addressParts = this.parseAddressCandidate(addressCandidate);
 
     if (!addressParts) {
+      if (!this.isAddressLikelyComplete(addressCandidate)) {
+        await this.conversationService.updateContext(conversation.id, {
+          address_draft_parts: this.mergeAddressDraftParts(draftParts, addressCandidate),
+        });
+        return this.buildPremiumAddressDraftPrompt(
+          this.buildAddressDraftText(this.mergeAddressDraftParts(draftParts, addressCandidate)) ||
+            addressCandidate,
+        );
+      }
+
       await this.conversationService.saveCustomerData(conversation.id, {
         delivery_type: 'delivery',
         address: {
-          street: sanitizedMessage,
+          street: addressCandidate,
           number: '',
           neighborhood: '',
           city: '',
@@ -1950,6 +2301,7 @@ export class WhatsappService {
         await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
       }
 
+      await this.conversationService.updateContext(conversation.id, { address_draft_parts: null });
       await this.conversationService.updateState(conversation.id, 'confirming_order');
       return await this.showOrderConfirmationPremium(tenantId, conversation);
     }
@@ -1972,6 +2324,7 @@ export class WhatsappService {
       await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
     }
 
+    await this.conversationService.updateContext(conversation.id, { address_draft_parts: null });
     if (!conversation.context?.customer_data?.phone) {
       await this.conversationService.updateState(conversation.id, 'collecting_phone');
       return this.getPremiumPhonePrompt();
@@ -3393,6 +3746,23 @@ export class WhatsappService {
     }
     
     if (currentState === 'collecting_phone') {
+      if (this.isAddressLikelyComplete(message) || this.hasAddressKeyword(message)) {
+        return 'Recebi um endereco, mas agora preciso do telefone de contato com DDD para seguir.';
+      }
+
+      const extractedName = this.extractCustomerNameCandidate(message);
+      if (
+        !/\d/.test(message) &&
+        !this.hasAddressKeyword(message) &&
+        this.validateName(extractedName).valid
+      ) {
+        return 'Nome certo. Agora preciso do telefone de contato com DDD para seguir.';
+      }
+
+      if (['sim', 'ok', 'sem'].includes(lowerMessage)) {
+        return 'Antes de seguir, preciso do telefone de contato com DDD. Exemplo: 11987654321.';
+      }
+
       return await this.processCustomerPhone(message, tenantId, conversation);
     }
 

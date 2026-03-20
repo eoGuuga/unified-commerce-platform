@@ -162,6 +162,42 @@ $scenarios = @(
         )
     },
     @{
+        Name = "natural_name_phrase"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "No momento esse item ficou sem estoque") }
+            @{ Message = "me chamo Ana Paula"; Expect = "Como voce prefere receber esse pedido?" }
+        )
+    },
+    @{
+        Name = "fragmented_delivery_address"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "No momento esse item ficou sem estoque") }
+            @{ Message = "Ana Paula"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "entrega"; Expect = "ENDERECO DE ENTREGA" }
+            @{ Message = "Rua das Flores"; ExpectAny = @("Estou montando o endereco por etapas", "Agora me envie o numero") }
+            @{ Message = "123"; ExpectAny = @("Agora complete com bairro, cidade e estado", "Rascunho atual") }
+            @{ Message = "Centro, Sao Paulo, SP"; Expect = "TELEFONE DE CONTATO" }
+        )
+    },
+    @{
+        Name = "loose_audio_delivery_address"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "No momento esse item ficou sem estoque") }
+            @{ Message = "Ana Paula"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "entrega"; Expect = "ENDERECO DE ENTREGA" }
+            @{ Message = "meu endereco e rua das flores 123 centro sao paulo sp"; MessageType = "audio"; Metadata = @{ audio = $true; transcriptionSource = "mock-stt-address" }; Expect = "TELEFONE DE CONTATO" }
+        )
+    },
+    @{
+        Name = "address_during_phone_stage"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "No momento esse item ficou sem estoque") }
+            @{ Message = "Cliente Telefone"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
+            @{ Message = "Rua das Flores, 123, Centro, Sao Paulo, SP"; ExpectAny = @("preciso do telefone de contato", "telefone de contato com DDD") }
+        )
+    },
+    @{
         Name = "payment_shortcut"
         Steps = @(
             @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "No momento esse item ficou sem estoque") }
