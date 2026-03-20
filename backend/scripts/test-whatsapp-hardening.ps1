@@ -415,7 +415,7 @@ $scenarios = @(
             @{ Message = "11966443317"; Expect = "OBSERVACOES DO PEDIDO" }
             @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
             @{ Message = "sim"; ExpectAny = @("FORMAS DE PAGAMENTO", "ESCOLHA A FORMA DE PAGAMENTO") }
-            @{ Message = "cancela nao continua meu pedido"; ExpectAny = @("mistura cancelar e continuar", "\"cancelar pedido\"", "\"continuar pedido\"") }
+            @{ Message = "cancela nao continua meu pedido"; ExpectAny = @("mistura cancelar e continuar", "cancelar pedido", "continuar pedido") }
         )
     },
     @{
