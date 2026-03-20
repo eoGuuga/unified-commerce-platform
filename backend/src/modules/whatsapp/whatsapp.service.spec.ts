@@ -1,5 +1,6 @@
 import { PedidoStatus } from '../../database/entities/Pedido.entity';
 import { WhatsappService } from './whatsapp.service';
+import { MessageIntelligenceService } from './services/message-intelligence.service';
 
 describe('WhatsappService defensive WhatsApp flow', () => {
   const catalog = [
@@ -98,9 +99,12 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       ...(overrides?.payments || {}),
     };
 
+    const messageIntelligenceService = new MessageIntelligenceService();
+
     const service = new WhatsappService(
       config as any,
       openAIService as any,
+      messageIntelligenceService as any,
       conversationService as any,
       productsService as any,
       ordersService as any,
@@ -604,6 +608,20 @@ describe('WhatsappService defensive WhatsApp flow', () => {
         'waiting_payment',
       ),
     ).toBe(true);
+  });
+
+  it('detects conversational resume intent without depending on a single hardcoded sentence', () => {
+    const service = createService() as any;
+
+    expect(service.isReopenIntent('bora continuar meu pedido de onde parei')).toBe(true);
+    expect(service.isReopenIntent('pode retomar aqui pra mim')).toBe(true);
+  });
+
+  it('detects natural order intent from noisy free-form messages', () => {
+    const service = createService() as any;
+
+    expect(service.isOrderIntent('to querendo 2 brigadeiro gourmet pfv')).toBe(true);
+    expect(service.isOrderIntent('quero 1 brownie premium')).toBe(true);
   });
 
   it('accepts noisy payment keywords after normalization', () => {

@@ -161,6 +161,32 @@ $scenarios = @(
         )
     },
     @{
+        Name = "free_form_message_order"
+        Steps = @(
+            @{ Message = "to querendo 2 $primaryProduct por favor"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "No momento esse item ficou sem estoque") }
+        )
+    },
+    @{
+        Name = "colloquial_resume_message"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "No momento esse item ficou sem estoque") }
+            @{ Message = "Cliente Contexto"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
+            @{ Message = "bora continuar meu pedido de onde parei"; ExpectAny = @("Vamos continuar de onde paramos", "TELEFONE DE CONTATO") }
+        )
+    },
+    @{
+        Name = "colloquial_status_message"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo") }
+            @{ Message = "Maria Serena"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
+            @{ Message = "11977776666"; Expect = "OBSERVACOES DO PEDIDO" }
+            @{ Message = "pix"; ExpectAny = @("PAGAMENTO PIX", "Acompanhamento completo") }
+            @{ Message = "kd o motoboy"; ExpectAny = @("ACOMPANHAMENTO DO PEDIDO", "Status atual") }
+        )
+    },
+    @{
         Name = "hostile_payload"
         Steps = @(
             @{ Message = $hostileMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "No momento esse item ficou sem estoque") }

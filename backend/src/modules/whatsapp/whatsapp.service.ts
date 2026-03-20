@@ -1,6 +1,7 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OpenAIService } from './services/openai.service';
+import { MessageIntelligenceService } from './services/message-intelligence.service';
 import { ConversationService } from './services/conversation.service';
 import { ProductsService } from '../products/products.service';
 import { OrdersService } from '../orders/orders.service';
@@ -88,6 +89,7 @@ export class WhatsappService {
   constructor(
     private config: ConfigService,
     private openAIService: OpenAIService,
+    private messageIntelligenceService: MessageIntelligenceService,
     private conversationService: ConversationService,
     private productsService: ProductsService,
     private ordersService: OrdersService,
@@ -643,10 +645,7 @@ export class WhatsappService {
   }
 
   private normalizeIntentText(value: string): string {
-    return this.normalizeForSearch(value)
-      .replace(/[?!.,;:]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    return this.messageIntelligenceService.normalizeText(value);
   }
 
   private looksLikeAudioTranscription(message?: WhatsappMessage): boolean {
@@ -1225,9 +1224,7 @@ export class WhatsappService {
     normalizedValue: string,
     phrases: string[],
   ): boolean {
-    return phrases.some((phrase) =>
-      normalizedValue.includes(this.normalizeIntentText(phrase)),
-    );
+    return this.messageIntelligenceService.hasAnyPhrase(normalizedValue, phrases);
   }
 
   private hasActiveOrderContext(
@@ -2703,65 +2700,26 @@ export class WhatsappService {
     conversation?: TypedConversation,
     currentState?: ConversationState,
   ): boolean {
-    const lm = this.normalizeIntentText(lowerMessage);
-    if (!lm) return false;
+    const analysis = this.messageIntelligenceService.analyze(lowerMessage);
+    if (!analysis.normalizedText) return false;
 
-    if (this.hasAnyNormalizedPhrase(lm, [
-      'cancelar',
-      'cancelamento',
-      'cancela',
-      'cancelar pedido',
-      'cancelar meu pedido',
-      'desistir',
-      'anular',
-      'anula',
-      'desfazer pedido',
-    ])) {
+    if (analysis.flags.explicitCancel || analysis.scores.cancel >= 0.88) {
       return true;
     }
 
-    if (!this.hasActiveOrderContext(conversation, currentState) && !this.extractOrderNo(lm)) {
+    if (
+      !this.hasActiveOrderContext(conversation, currentState) &&
+      !this.extractOrderNo(analysis.normalizedText)
+    ) {
       return false;
     }
 
-    return this.hasAnyNormalizedPhrase(lm, [
-      'nao quero mais',
-      'nao vou querer',
-      'nao vou mais querer',
-      'nao quero seguir',
-      'quero desistir',
-      'deixa pra la',
-      'deixa para la',
-      'deixa pra depois',
-      'parar pedido',
-      'parar compra',
-      'interromper pedido',
-      'interromper compra',
-      'abandonar pedido',
-    ]);
+    return analysis.flags.contextualCancel || analysis.scores.cancel >= 0.72;
   }
 
   private isReopenIntent(lowerMessage: string): boolean {
-    const lm = this.normalizeIntentText(lowerMessage);
-    if (!lm) return false;
-    return this.hasAnyNormalizedPhrase(lm, [
-      'reabrir',
-      'reabre',
-      'retomar',
-      'retoma',
-      'reativar',
-      'voltar pedido',
-      'continuar pedido',
-      'continuar compra',
-      'continuar meu pedido',
-      'quero continuar',
-      'quero retomar',
-      'pode continuar',
-      'pode retomar',
-      'voltar de onde parei',
-      'de onde parei',
-      'onde paramos',
-    ]);
+    const analysis = this.messageIntelligenceService.analyze(lowerMessage);
+    return analysis.scores.reopen >= 0.72;
   }
 
   private isRepeatOrderIntent(lowerMessage: string): boolean {
@@ -2832,11 +2790,13 @@ export class WhatsappService {
     lowerMessage: string,
     conversation?: TypedConversation,
   ): boolean {
-    const lm = this.normalizeIntentText(lowerMessage);
+    const analysis = this.messageIntelligenceService.analyze(lowerMessage);
+    const lm = analysis.normalizedText;
     if (!lm) return false;
     const currentState = conversation?.context?.state as ConversationState | undefined;
     if (this.isCancelIntent(lm, conversation, currentState)) return false;
-    if (this.extractOrderNo(lm)) return true;
+    if (analysis.flags.hasOrderCode || this.extractOrderNo(lm)) return true;
+    if (analysis.scores.status >= 0.72) return true;
 
     if (this.hasAnyNormalizedPhrase(lm, [
       'meu pedido',
@@ -4293,26 +4253,27 @@ export class WhatsappService {
   }
 
   private isOrderIntent(lowerMessage: string): boolean {
+    const analysis = this.messageIntelligenceService.analyze(lowerMessage);
     const normalized = this.normalizeForSearch(lowerMessage);
 
     if (this.isBareOrderIntent(normalized)) {
       return false;
     }
 
-    if (this.hasAnyNormalizedPhrase(normalized, [
-      'nao quero',
-      'nao quero mais',
-      'nao vou querer',
-      'nao vou mais querer',
-      'quero desistir',
-      'deixa pra la',
-      'deixa para la',
-    ])) {
+    if (analysis.flags.negativeOrder) {
       return false;
     }
 
     const extractedOrder = this.extractOrderInfo(normalized);
     if (extractedOrder.quantity !== null && !!extractedOrder.productName) {
+      return true;
+    }
+
+    if (
+      analysis.primaryIntent === 'fazer_pedido' &&
+      analysis.scores.order >= 0.72 &&
+      !analysis.flags.uncertainChoice
+    ) {
       return true;
     }
 
