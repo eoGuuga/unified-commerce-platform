@@ -20,3 +20,18 @@
 - WhatsApp: /api/v1/whatsapp/test => PEDIDO PREPARADO
 - Observacao: npm audit reportou 19 vulnerabilidades (2 low, 6 moderate, 11 high)
 
+2026-03-20
+- Ambiente: DEV/TESTE (VPS) /opt/ucm-test-repo e PRODUCAO /opt/ucm
+- Commit: 31cce65
+- Escopo: motor local de inteligencia para mensagens do WhatsApp, sem depender de IA paga
+- Validacao local: npm.cmd run test:unit => 94/94 PASS; npm.cmd run lint => PASS; npm.cmd run build => PASS
+- Bateria real WhatsApp: powershell -ExecutionPolicy Bypass -File backend/scripts/test-whatsapp-hardening.ps1
+- Relatorio: C:\Users\gusta\OneDrive\Desktop\sas\test-whatsapp-hardening-results-20260320-201436.json
+- Resultado bateria: 55 cenarios / 0 falhas
+- DEV/TESTE: https://dev.gtsofthub.com.br/api/v1/health => ok
+- DEV/TESTE: https://dev.gtsofthub.com.br/api/v1/whatsapp/health => ok
+- PRODUCAO: https://gtsofthub.com.br/api/v1/health => ok
+- PRODUCAO: https://gtsofthub.com.br/api/v1/whatsapp/health => ok
+- Backup DEV/TESTE: /opt/ucm-test-repo/backups/whatsapp-message-intelligence-fix-20260320-200712
+- Backup PRODUCAO: /opt/ucm/backups/whatsapp-message-intelligence-20260320-201535
+
