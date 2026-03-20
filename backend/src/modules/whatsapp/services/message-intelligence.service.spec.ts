@@ -12,6 +12,14 @@ describe('MessageIntelligenceService', () => {
     expect(analysis.scores.order).toBeGreaterThanOrEqual(0.72);
   });
 
+  it('understands conversational wanting phrasing as order intent', () => {
+    const analysis = service.analyze('to querendo 2 brigadeiro gourmet por favor');
+
+    expect(analysis.primaryIntent).toBe('fazer_pedido');
+    expect(analysis.quantity).toBe(2);
+    expect(analysis.productCandidate).toContain('brigadeiro gourmet');
+  });
+
   it('detects explicit cancel intent', () => {
     const analysis = service.analyze('cancela meu pedido agora');
 

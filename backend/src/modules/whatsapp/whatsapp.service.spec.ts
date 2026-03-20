@@ -624,6 +624,12 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(service.isOrderIntent('quero 1 brownie premium')).toBe(true);
   });
 
+  it('does not confuse conversational order phrasing with loose context recovery', () => {
+    const service = createService() as any;
+
+    expect(service.isLooseReplyWithoutContext('to querendo 2 brigadeiro gourmet por favor')).toBe(false);
+  });
+
   it('accepts noisy payment keywords after normalization', () => {
     const service = createService() as any;
 

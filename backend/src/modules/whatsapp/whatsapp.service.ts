@@ -601,6 +601,7 @@ export class WhatsappService {
     return value
       .replace(/\b(qro|qru|kero|kero|queroo+)\b/g, 'quero')
       .replace(/\b(qria|qria|k(r)?ia|keria)\b/g, 'queria')
+      .replace(/\b(to|tava|estou)\s+querendo\b/g, 'quero')
       .replace(/\b(presciso|presiso|precizo)\b/g, 'preciso')
       .replace(/\b(n|nao|num)\s+vo(u)?\b/g, 'nao vou')
       .replace(/\b(naum|naun|num)\b/g, 'nao')
@@ -4196,9 +4197,18 @@ export class WhatsappService {
   }
 
   private isLooseReplyWithoutContext(lowerMessage: string): boolean {
+    const analysis = this.messageIntelligenceService.analyze(lowerMessage);
     const normalized = this.normalizeIntentText(lowerMessage);
 
     if (!normalized) {
+      return false;
+    }
+
+    if (
+      analysis.primaryIntent === 'fazer_pedido' ||
+      analysis.scores.order >= 0.6 ||
+      (analysis.quantity !== null && !!analysis.productCandidate)
+    ) {
       return false;
     }
 

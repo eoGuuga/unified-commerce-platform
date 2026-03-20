@@ -39,6 +39,7 @@ export class MessageIntelligenceService {
     { pattern: /[\u0000-\u001F\u007F]/g, replacement: ' ' },
     { pattern: /\b(qro|qru|kero|queroo+)\b/g, replacement: 'quero' },
     { pattern: /\b(qria|k(r)?ia|keria)\b/g, replacement: 'queria' },
+    { pattern: /\b(to|tava|estou)\s+querendo\b/g, replacement: 'quero' },
     { pattern: /\b(presciso|presiso|precizo)\b/g, replacement: 'preciso' },
     { pattern: /\b(n|nao|num)\s+vo(u)?\b/g, replacement: 'nao vou' },
     { pattern: /\b(naum|naun|num)\b/g, replacement: 'nao' },
@@ -380,6 +381,10 @@ export class MessageIntelligenceService {
       .trim();
 
     if (!cleaned || cleaned.length < 2) {
+      return null;
+    }
+
+    if (/^\d+$/.test(cleaned)) {
       return null;
     }
 
