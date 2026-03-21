@@ -83,3 +83,19 @@
 - Backup DEV/TESTE: /opt/ucm-test-repo/backups/whatsapp-sales-strategy-20260321-025351
 - Backup PRODUCAO: /opt/ucm/backups/whatsapp-sales-strategy-20260321-031108
 
+2026-03-21
+- Ambiente: LOCAL + DEV/TESTE (VPS) /opt/ucm-test-repo + PRODUCAO /opt/ucm
+- Commit funcional publicado: bcf192d
+- Escopo: pacotes comerciais por vertical para a IA do WhatsApp, com fechamento, qualificacao e cross-sell proprio por nicho
+- Commits desta rodada: bcf192d (vertical sales packs para restaurante, farmacia, servicos e demais verticais sobre a estrategia comercial)
+- Validacao local: npm.cmd run test:unit => 127/127 PASS; npm.cmd run lint => PASS; npm.cmd run build => PASS
+- Bateria real WhatsApp: powershell -ExecutionPolicy Bypass -File backend/scripts/test-whatsapp-hardening.ps1
+- Relatorio final: C:\Users\gusta\OneDrive\Desktop\sas\test-whatsapp-hardening-results-20260321-004802.json
+- Resultado bateria: 65 cenarios / 0 falhas
+- DEV/TESTE: https://dev.gtsofthub.com.br/api/v1/health => ok
+- DEV/TESTE: https://dev.gtsofthub.com.br/api/v1/whatsapp/health => ok
+- PRODUCAO: https://gtsofthub.com.br/api/v1/health => ok
+- PRODUCAO: https://gtsofthub.com.br/api/v1/whatsapp/health => ok
+- Backup DEV/TESTE: /opt/ucm-test-repo/backups/whatsapp-vertical-packs-20260321-034115
+- Backup PRODUCAO: /opt/ucm/backups/whatsapp-vertical-packs-20260321-034904
+
