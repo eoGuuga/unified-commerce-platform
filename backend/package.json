@@ -20,7 +20,8 @@
     "seed": "npm run seed:mae",
     "test:acid": "node scripts/test-acid-wrapper.js",
     "seed:mae": "node scripts/seed-mae-wrapper.js",
-    "seed:usuario": "node scripts/seed-usuario-wrapper.js"
+    "seed:usuario": "node scripts/seed-usuario-wrapper.js",
+    "seed:catalog": "node scripts/seed-client-catalog-wrapper.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",

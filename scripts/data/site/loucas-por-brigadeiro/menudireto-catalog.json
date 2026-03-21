@@ -1,0 +1,2992 @@
+{
+  "extracted_at": "2026-03-21T14:32:50.257Z",
+  "source": {
+    "platform": "MenuDireto",
+    "store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+    "restauranteN": 756,
+    "endpoints": {
+      "scroll_menu": "https://menudireto.com/sources/MODELO/getScrollMenu.php?restauranteN=756",
+      "products": "https://menudireto.com/sources/MODELO/getProducts6.php?restauranteN=756"
+    }
+  },
+  "store": {
+    "name": "Loucas Por Brigadeiro",
+    "slug": "loucas-por-brigadeiro",
+    "restauranteN": 756,
+    "appName": "com.menudireto.loucasporbrigadeiro",
+    "address": "Avenida Pires do Rio, 1949 - Jardim São Sebastião - SAO PAULO",
+    "phone": "(11) 95109-3485",
+    "schedule": "13:00 às 17:30",
+    "description": "Agora você pode fazer seu pedido no Loucas Por Brigadeiro com apenas alguns toques! Baixe o app para ainda mais comodidade",
+    "logoUrl": "https://menudireto.com/loucas-por-brigadeiro/images/logo.jpg?1612885620",
+    "coverUrl": "https://menudireto.com/loucas-por-brigadeiro/images/cover.jpg?1612885620",
+    "sourceUrl": "https://menudireto.com/loucas-por-brigadeiro/#12"
+  },
+  "categories": [
+    {
+      "external_id": "12",
+      "name": "Informações",
+      "slug": "informacoes",
+      "position": 1
+    },
+    {
+      "external_id": "6",
+      "name": "Açaí",
+      "slug": "acai",
+      "position": 2
+    },
+    {
+      "external_id": "4",
+      "name": "Docinhos",
+      "slug": "docinhos",
+      "position": 3
+    },
+    {
+      "external_id": "1",
+      "name": "Bolo no Pote 220 ml",
+      "slug": "bolo-no-pote-220-ml",
+      "position": 4
+    },
+    {
+      "external_id": "2",
+      "name": "Bolos Gelados e Fatias de Bolo",
+      "slug": "bolos-gelados-e-fatias-de-bolo",
+      "position": 5
+    },
+    {
+      "external_id": "37",
+      "name": "Bolo Vulcão",
+      "slug": "bolo-vulcao",
+      "position": 6
+    },
+    {
+      "external_id": "3",
+      "name": "Delícias",
+      "slug": "delicias",
+      "position": 7
+    },
+    {
+      "external_id": "36",
+      "name": "Bala de Coco Artesanal 120g",
+      "slug": "bala-de-coco-artesanal-120g",
+      "position": 8
+    },
+    {
+      "external_id": "8",
+      "name": "Bebidas",
+      "slug": "bebidas",
+      "position": 9
+    },
+    {
+      "external_id": "16",
+      "name": "Presentear",
+      "slug": "presentear",
+      "position": 10
+    }
+  ],
+  "products": [
+    {
+      "external_id": "292",
+      "position": 1,
+      "name": "Pagamento no PIX",
+      "description": "O pagamento via pix é feito pelo QR-code na entrega.",
+      "price": 0,
+      "price_display": "R$ 0.00",
+      "source_price_from_onclick": 0,
+      "category_external_id": "12",
+      "category_name": "Informações",
+      "category_slug": "informacoes",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/292.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": false,
+      "kind": "informational",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "278",
+      "position": 2,
+      "name": "Estamos no iFood",
+      "description": "Horário de funcionamento do app de segunda á sábado das 12:30 ás 17:30. Faça o seu pedido!",
+      "price": 0,
+      "price_display": "R$ 0.00",
+      "source_price_from_onclick": 0,
+      "category_external_id": "12",
+      "category_name": "Informações",
+      "category_slug": "informacoes",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e278.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": false,
+      "kind": "informational",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "27",
+      "position": 3,
+      "name": "Açaí 400 ml",
+      "description": "Escolha até 4 acompanhamentos. Acompanha colher!",
+      "price": 16,
+      "price_display": "R$ 16.00",
+      "source_price_from_onclick": 16,
+      "category_external_id": "6",
+      "category_name": "Açaí",
+      "category_slug": "acai",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e27.png",
+      "add_on_group_ids": [
+        "16"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "copo",
+      "add_on_groups": [
+        {
+          "external_id": "16",
+          "title": "Complementos",
+          "rule_text": "Escolha até 4 opções",
+          "minimum": 0,
+          "maximum": 4,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "1",
+              "name": "Farofa de paçoca",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "2",
+              "name": "Leite em pó",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "3",
+              "name": "Leite condensado",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "4",
+              "name": "Granola",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "5",
+              "name": "Chocoball",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "6",
+              "name": "Confete",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "7",
+              "name": "Sucrilhos",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "10",
+              "name": "Morango",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "11",
+              "name": "Uva",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "12",
+              "name": "Banana",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "27",
+          "product_name": "Açaí 400 ml",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=27&catAdicionalId=16&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "28",
+      "position": 4,
+      "name": "Açaí trufado com nutella 400ml",
+      "description": "Escolha até 4 acompanhamentos. Acompanha colher!",
+      "price": 23,
+      "price_display": "R$ 23.00",
+      "source_price_from_onclick": 23,
+      "category_external_id": "6",
+      "category_name": "Açaí",
+      "category_slug": "acai",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee28.png",
+      "add_on_group_ids": [
+        "17"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "copo",
+      "add_on_groups": [
+        {
+          "external_id": "17",
+          "title": "Complementos",
+          "rule_text": "Escolha até 4 opções",
+          "minimum": 0,
+          "maximum": 4,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "21",
+              "name": "Farofa de paçoca",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "22",
+              "name": "Leite em pó",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "23",
+              "name": "Leite condensado",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "24",
+              "name": "Granola",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "25",
+              "name": "Chocoball",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "26",
+              "name": "Confete",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "27",
+              "name": "Sucrilhos",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "30",
+              "name": "Morango",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "31",
+              "name": "Uva",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "32",
+              "name": "Banana",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "28",
+          "product_name": "Açaí trufado com nutella 400ml",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=28&catAdicionalId=17&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "288",
+      "position": 5,
+      "name": "3 Brigadeiros tradicionais",
+      "description": "Brigadeiro ao leite, coberto com granulado tradicional.",
+      "price": 12,
+      "price_display": "R$ 12.00",
+      "source_price_from_onclick": 12,
+      "category_external_id": "4",
+      "category_name": "Docinhos",
+      "category_slug": "docinhos",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e288.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "640",
+      "position": 6,
+      "name": "6 Brigadeiros tradicionais",
+      "description": "Brigadeiro ao leite, coberto com granulado tradicional.",
+      "price": 18,
+      "price_display": "R$ 18.00",
+      "source_price_from_onclick": 18,
+      "category_external_id": "4",
+      "category_name": "Docinhos",
+      "category_slug": "docinhos",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/640.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "18",
+      "position": 7,
+      "name": "10 Brigadeiros tradicionais",
+      "description": "Brigadeiro ao leite, coberto com granulado tradicional.",
+      "price": 25,
+      "price_display": "R$ 25.00",
+      "source_price_from_onclick": 25,
+      "category_external_id": "4",
+      "category_name": "Docinhos",
+      "category_slug": "docinhos",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e18.jpg",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "289",
+      "position": 8,
+      "name": "3 Beijinhos de coco",
+      "description": "",
+      "price": 12,
+      "price_display": "R$ 12.00",
+      "source_price_from_onclick": 12,
+      "category_external_id": "4",
+      "category_name": "Docinhos",
+      "category_slug": "docinhos",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e289.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "642",
+      "position": 9,
+      "name": "6 Beijinhos de coco",
+      "description": "",
+      "price": 18,
+      "price_display": "R$ 18.00",
+      "source_price_from_onclick": 18,
+      "category_external_id": "4",
+      "category_name": "Docinhos",
+      "category_slug": "docinhos",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/642.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "15",
+      "position": 10,
+      "name": "10 Beijinhos de coco",
+      "description": "",
+      "price": 25,
+      "price_display": "R$ 25.00",
+      "source_price_from_onclick": 25,
+      "category_external_id": "4",
+      "category_name": "Docinhos",
+      "category_slug": "docinhos",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e15.jpg",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "2",
+      "position": 11,
+      "name": "Bolo no pote Ninho e brigadeiro",
+      "description": "Bolo de chocolate, com brigadeiro ao leite e branquinho. Embalagem 220 ml.",
+      "price": 16,
+      "price_display": "R$ 16.00",
+      "source_price_from_onclick": 16,
+      "category_external_id": "1",
+      "category_name": "Bolo no Pote 220 ml",
+      "category_slug": "bolo-no-pote-220-ml",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeeee2.jpg",
+      "add_on_group_ids": [
+        "27"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "pote",
+      "add_on_groups": [
+        {
+          "external_id": "27",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "60",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "2",
+          "product_name": "Bolo no pote Ninho e brigadeiro",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=2&catAdicionalId=27&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "533",
+      "position": 12,
+      "name": "Bolo no pote Prestígio",
+      "description": "Massa de chocolate, recheio beijinho de coco e brigadeiro cremoso ao leite.",
+      "price": 16,
+      "price_display": "R$ 16.00",
+      "source_price_from_onclick": 16,
+      "category_external_id": "1",
+      "category_name": "Bolo no Pote 220 ml",
+      "category_slug": "bolo-no-pote-220-ml",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e533.png",
+      "add_on_group_ids": [
+        "69"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "pote",
+      "add_on_groups": [
+        {
+          "external_id": "69",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "145",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "533",
+          "product_name": "Bolo no pote Prestígio",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=533&catAdicionalId=69&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "677",
+      "position": 13,
+      "name": "Bolo no pote brigaleite",
+      "description": "Massa de chocolate, recheio de brigadeiro ao leite e doce de leite artesanal.",
+      "price": 16,
+      "price_display": "R$ 16.00",
+      "source_price_from_onclick": 16,
+      "category_external_id": "1",
+      "category_name": "Bolo no Pote 220 ml",
+      "category_slug": "bolo-no-pote-220-ml",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeeeee677.png",
+      "add_on_group_ids": [
+        "100"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "pote",
+      "add_on_groups": [
+        {
+          "external_id": "100",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "207",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "677",
+          "product_name": "Bolo no pote brigaleite",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=677&catAdicionalId=100&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "650",
+      "position": 14,
+      "name": "Bolo no pote trufado de maracujá",
+      "description": "Massa de chocolate, recheado com mousse de maracujá e brigadeiro ao leite.",
+      "price": 16,
+      "price_display": "R$ 16.00",
+      "source_price_from_onclick": 16,
+      "category_external_id": "1",
+      "category_name": "Bolo no Pote 220 ml",
+      "category_slug": "bolo-no-pote-220-ml",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/650.png",
+      "add_on_group_ids": [
+        "93"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "pote",
+      "add_on_groups": [
+        {
+          "external_id": "93",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "194",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "650",
+          "product_name": "Bolo no pote trufado de maracujá",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=650&catAdicionalId=93&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "673",
+      "position": 15,
+      "name": "Bolo gelado briganinho",
+      "description": "Massa branca, recheio duo de brigadeiro ao leite e brigadeiro branquinho de ninho.",
+      "price": 12,
+      "price_display": "R$ 12.00",
+      "source_price_from_onclick": 12,
+      "category_external_id": "2",
+      "category_name": "Bolos Gelados e Fatias de Bolo",
+      "category_slug": "bolos-gelados-e-fatias-de-bolo",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/673.png",
+      "add_on_group_ids": [
+        "98"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "fatia",
+      "add_on_groups": [
+        {
+          "external_id": "98",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "204",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "673",
+          "product_name": "Bolo gelado briganinho",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=673&catAdicionalId=98&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "149",
+      "position": 16,
+      "name": "Bolo gelado Prestígio",
+      "description": "Massa de chocolate, creme de coco e brigadeiro ao leite. Média 120 grs",
+      "price": 12,
+      "price_display": "R$ 12.00",
+      "source_price_from_onclick": 12,
+      "category_external_id": "2",
+      "category_name": "Bolos Gelados e Fatias de Bolo",
+      "category_slug": "bolos-gelados-e-fatias-de-bolo",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e149.png",
+      "add_on_group_ids": [
+        "41"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "fatia",
+      "add_on_groups": [
+        {
+          "external_id": "41",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "88",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "149",
+          "product_name": "Bolo gelado Prestígio",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=149&catAdicionalId=41&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "450",
+      "position": 17,
+      "name": "Bolo gelado doce de leite com coco",
+      "description": "Massa branca, doce de leite suave artesanal com côco. Média 120 grs",
+      "price": 12,
+      "price_display": "R$ 12.00",
+      "source_price_from_onclick": 12,
+      "category_external_id": "2",
+      "category_name": "Bolos Gelados e Fatias de Bolo",
+      "category_slug": "bolos-gelados-e-fatias-de-bolo",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/450.png",
+      "add_on_group_ids": [
+        "32"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "fatia",
+      "add_on_groups": [
+        {
+          "external_id": "32",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "70",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "450",
+          "product_name": "Bolo gelado doce de leite com coco",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=450&catAdicionalId=32&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "105",
+      "position": 18,
+      "name": "Fatia de prestígio",
+      "description": "Fatia de bolo massa de chocolate, recheio de coco cremoso, coberto com brigadeiro ao leite e chantilly. Média 200 gramas fatia. Não retiramos o chantilly",
+      "price": 17,
+      "price_display": "R$ 17.00",
+      "source_price_from_onclick": 17,
+      "category_external_id": "2",
+      "category_name": "Bolos Gelados e Fatias de Bolo",
+      "category_slug": "bolos-gelados-e-fatias-de-bolo",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeeeee105.png",
+      "add_on_group_ids": [
+        "49"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "fatia",
+      "add_on_groups": [
+        {
+          "external_id": "49",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "104",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "105",
+          "product_name": "Fatia de prestígio",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=105&catAdicionalId=49&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "505",
+      "position": 19,
+      "name": "Fatia casadinho",
+      "description": "Massa de chocolate, recheada de brigadeiro ao leite e ninho. Pesa em média 200 gramas. Não retiramos o chantilly!",
+      "price": 17,
+      "price_display": "R$ 17.00",
+      "source_price_from_onclick": 17,
+      "category_external_id": "2",
+      "category_name": "Bolos Gelados e Fatias de Bolo",
+      "category_slug": "bolos-gelados-e-fatias-de-bolo",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee505.png",
+      "add_on_group_ids": [
+        "36"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "fatia",
+      "add_on_groups": [
+        {
+          "external_id": "36",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "78",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "505",
+          "product_name": "Fatia casadinho",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=505&catAdicionalId=36&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "556",
+      "position": 20,
+      "name": "Mini vulcão mesclado",
+      "description": "Mini bolinho, massa de chocolate coberto com brigadeiro tradicional e branquinho. Serve 1 pessoa.",
+      "price": 12,
+      "price_display": "R$ 12.00",
+      "source_price_from_onclick": 12,
+      "category_external_id": "37",
+      "category_name": "Bolo Vulcão",
+      "category_slug": "bolo-vulcao",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee556.png",
+      "add_on_group_ids": [
+        "54"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "54",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "114",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "556",
+          "product_name": "Mini vulcão mesclado",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=556&catAdicionalId=54&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "551",
+      "position": 21,
+      "name": "Bolo vulcão de cenoura cobertura de brigadeiro",
+      "description": "Bolo caseiro de cenoura, com cobertura de brigadeiro. Obs: MASSA ARTESANAL, FOFINHA, PODENDO RACHAR NO TRANSPORTE DE MOTO. Serve em média 6 pessoas.",
+      "price": 52,
+      "price_display": "R$ 52.00",
+      "source_price_from_onclick": 52,
+      "category_external_id": "37",
+      "category_name": "Bolo Vulcão",
+      "category_slug": "bolo-vulcao",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e551.png",
+      "add_on_group_ids": [
+        "37"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "37",
+          "title": "",
+          "rule_text": "",
+          "minimum": 0,
+          "maximum": 0,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [],
+          "product_external_id": "551",
+          "product_name": "Bolo vulcão de cenoura cobertura de brigadeiro",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=551&catAdicionalId=37&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "570",
+      "position": 22,
+      "name": "Canjica cremosa",
+      "description": "Canjica, 250ml.",
+      "price": 14,
+      "price_display": "R$ 14.00",
+      "source_price_from_onclick": 14,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/570.png",
+      "add_on_group_ids": [
+        "64",
+        "65"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "64",
+          "title": "Escolha seu acompanhamento",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "134",
+              "name": "Farofa de paçoca",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "135",
+              "name": "Canela",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            },
+            {
+              "external_id": "136",
+              "name": "Côco",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "570",
+          "product_name": "Canjica cremosa",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=570&catAdicionalId=64&restauranteN=756"
+        },
+        {
+          "external_id": "65",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "137",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "570",
+          "product_name": "Canjica cremosa",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=570&catAdicionalId=65&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "6",
+      "position": 23,
+      "name": "Bala de brigadeiro",
+      "description": "Deliciosa bala de brigadeiro ao leite, cacau 50%. 100gramas",
+      "price": 12,
+      "price_display": "R$ 12.00",
+      "source_price_from_onclick": 12,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee6.jpg",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "51",
+      "position": 24,
+      "name": "Dose de doçura Brigadeiro e Ninho",
+      "description": "Brigadeiro de colher:Brigadeiro ao leite cremoso,e brigadeiro ninho, 220 ml. Não é refrigerado, temperatura ambiente!",
+      "price": 22,
+      "price_display": "R$ 22.00",
+      "source_price_from_onclick": 22,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee51.png",
+      "add_on_group_ids": [
+        "60"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "60",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "126",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "51",
+          "product_name": "Dose de doçura Brigadeiro e Ninho",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=51&catAdicionalId=60&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "217",
+      "position": 25,
+      "name": "Dose de doçura Brigadeiro ao leite",
+      "description": "Brigadeiro ao leite cremoso de colher, 220 ml. Não é refrigerado, temperatura ambiente!",
+      "price": 22,
+      "price_display": "R$ 22.00",
+      "source_price_from_onclick": 22,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee217.png",
+      "add_on_group_ids": [
+        "61"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "61",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "128",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "217",
+          "product_name": "Dose de doçura Brigadeiro ao leite",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=217&catAdicionalId=61&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "157",
+      "position": 26,
+      "name": "Dose doçura Ninho com nutella",
+      "description": "Brigadeiro de colher: sabor ninho intercalado com nutella, 220 ml. Não é refrigerado, temperatura ambiente!",
+      "price": 22,
+      "price_display": "R$ 22.00",
+      "source_price_from_onclick": 22,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee157.png",
+      "add_on_group_ids": [
+        "62"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "62",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "130",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "157",
+          "product_name": "Dose doçura Ninho com nutella",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=157&catAdicionalId=62&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "103",
+      "position": 27,
+      "name": "Mini Pastelzinho de leite em pó com nutella",
+      "description": "NÃO é frito. Massa deliciosa de leite em pó recheada com nutella pura.",
+      "price": 11,
+      "price_display": "R$ 11.00",
+      "source_price_from_onclick": 11,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee103.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "165",
+      "position": 28,
+      "name": "Pão de mel doce de leite",
+      "description": "Recheado com delicioso e cremoso doce de leite artesanal.",
+      "price": 13,
+      "price_display": "R$ 13.00",
+      "source_price_from_onclick": 13,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e165.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "34",
+      "position": 29,
+      "name": "Combo 3 unidades Surpresa de uva",
+      "description": "Uva,brigadeiro branquinho,banhada no chocolate.",
+      "price": 15,
+      "price_display": "R$ 15.00",
+      "source_price_from_onclick": 15,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeee34.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "8",
+      "position": 30,
+      "name": "Bombom de uva",
+      "description": "Brigadeiro ao leite, uvas, creme branquinho.",
+      "price": 18,
+      "price_display": "R$ 18.00",
+      "source_price_from_onclick": 18,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeee8.jpg",
+      "add_on_group_ids": [
+        "55"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "55",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "116",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "8",
+          "product_name": "Bombom de uva",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=8&catAdicionalId=55&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "59",
+      "position": 31,
+      "name": "Bombom de morango",
+      "description": "Brigadeiro ao leite, morangos frescos e creme branquinho. Obs.: Consumo imediato!",
+      "price": 18,
+      "price_display": "R$ 18.00",
+      "source_price_from_onclick": 18,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeeeee59.png",
+      "add_on_group_ids": [
+        "57"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "57",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "120",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "59",
+          "product_name": "Bombom de morango",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=59&catAdicionalId=57&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "11",
+      "position": 32,
+      "name": "Pudim de leite condensado",
+      "description": "Pudim individual de leite condensado, com deliciosa calda de caramelo.",
+      "price": 14,
+      "price_display": "R$ 14.00",
+      "source_price_from_onclick": 14,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e11.jpg",
+      "add_on_group_ids": [
+        "25"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "25",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "56",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "11",
+          "product_name": "Pudim de leite condensado",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=11&catAdicionalId=25&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "625",
+      "position": 33,
+      "name": "Torta Supreme de morango",
+      "description": "Massa de biscoito de chocolate, recheio de ninho com morangos, finalizado com ganache de chocolate. Obs.: consumo imediato!",
+      "price": 16,
+      "price_display": "R$ 16.00",
+      "source_price_from_onclick": 16,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/625.png",
+      "add_on_group_ids": [
+        "87"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "87",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "182",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "625",
+          "product_name": "Torta Supreme de morango",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=625&catAdicionalId=87&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "326",
+      "position": 34,
+      "name": "Brownie no copo uva",
+      "description": "Brigadeiro branco cremoso, uvas, brownie 50% cacau, brigadeiro ao leite e chantilly.",
+      "price": 18,
+      "price_display": "R$ 18.00",
+      "source_price_from_onclick": 18,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee326.png",
+      "add_on_group_ids": [
+        "50"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "50",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "106",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "326",
+          "product_name": "Brownie no copo uva",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=326&catAdicionalId=50&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "12",
+      "position": 35,
+      "name": "Banoffe ( torta de banana)",
+      "description": "Farofa de biscoito, banana caramelada, creme belga especial, fina camada de doce de leite e chantilly.",
+      "price": 18,
+      "price_display": "R$ 18.00",
+      "source_price_from_onclick": 18,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeeee12.jpg",
+      "add_on_group_ids": [
+        "56"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "56",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "118",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "12",
+          "product_name": "Banoffe ( torta de banana)",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=12&catAdicionalId=56&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "510",
+      "position": 36,
+      "name": "Brownie tradicional",
+      "description": "Brownie tradicional, 50% cacau. 60g",
+      "price": 10,
+      "price_display": "R$ 10.00",
+      "source_price_from_onclick": 10,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e510.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "715",
+      "position": 37,
+      "name": "Brownie bites",
+      "description": "Linda caixinha com pedaços de brownie tradicional e 1 mini copo de brigadeiro ao leite e brigadeiro branquinho, para você se deliciar.",
+      "price": 19.99,
+      "price_display": "R$ 19.99",
+      "source_price_from_onclick": 19.99,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/715.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "335",
+      "position": 38,
+      "name": "Brownie ninho e nutella",
+      "description": "Brownie tradicional, coberto com ninho e nutella.",
+      "price": 12,
+      "price_display": "R$ 12.00",
+      "source_price_from_onclick": 12,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeee335.png",
+      "add_on_group_ids": [
+        "72"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "72",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "151",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "335",
+          "product_name": "Brownie ninho e nutella",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=335&catAdicionalId=72&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "562",
+      "position": 39,
+      "name": "Brownie c/ ninho nutella e kinder",
+      "description": "Pedaço de brownie tradicional, coberto com ninho, nutella e pedaço de kinder.",
+      "price": 13,
+      "price_display": "R$ 13.00",
+      "source_price_from_onclick": 13,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e562.png",
+      "add_on_group_ids": [
+        "73"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "73",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "153",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "562",
+          "product_name": "Brownie c/ ninho nutella e kinder",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=562&catAdicionalId=73&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "599",
+      "position": 40,
+      "name": "Cestinha de brownie ninho e brigadeiro",
+      "description": "Cestinha banhada na cobertura bland, contendo pedaços de brownie 50% cacau, finalizado com ninho e brigadeiro.",
+      "price": 22,
+      "price_display": "R$ 22.00",
+      "source_price_from_onclick": 22,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e599.png",
+      "add_on_group_ids": [
+        "81"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "81",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "170",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "599",
+          "product_name": "Cestinha de brownie ninho e brigadeiro",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=599&catAdicionalId=81&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "600",
+      "position": 41,
+      "name": "Cestinha de brownie brigadeiro ao leite",
+      "description": "Casquinha banhada na cobertura bland, contendo pedaços de brownie 50% cacau, finalizado com brigadeiro ao leite cremoso.",
+      "price": 22,
+      "price_display": "R$ 22.00",
+      "source_price_from_onclick": 22,
+      "category_external_id": "3",
+      "category_name": "Delícias",
+      "category_slug": "delicias",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e600.png",
+      "add_on_group_ids": [
+        "82"
+      ],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": [
+        {
+          "external_id": "82",
+          "title": "Colher descartável?",
+          "rule_text": "Escolha 1 opção",
+          "minimum": 0,
+          "maximum": 1,
+          "divide_value": 0,
+          "use_highest_value": 0,
+          "split_quantity": 0,
+          "split_price": 0,
+          "options": [
+            {
+              "external_id": "172",
+              "name": "Adicionar colher",
+              "description": "",
+              "price": 0,
+              "price_display": "R$ 0.00"
+            }
+          ],
+          "product_external_id": "600",
+          "product_name": "Cestinha de brownie brigadeiro ao leite",
+          "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=600&catAdicionalId=82&restauranteN=756"
+        }
+      ]
+    },
+    {
+      "external_id": "547",
+      "position": 42,
+      "name": "Bala de coco tradicional",
+      "description": "Desmancha na boca...",
+      "price": 12,
+      "price_display": "R$ 12.00",
+      "source_price_from_onclick": 12,
+      "category_external_id": "36",
+      "category_name": "Bala de Coco Artesanal 120g",
+      "category_slug": "bala-de-coco-artesanal-120g",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/547.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "550",
+      "position": 43,
+      "name": "Bala de coco beijinho",
+      "description": "Desmancha na boca...",
+      "price": 12,
+      "price_display": "R$ 12.00",
+      "source_price_from_onclick": 12,
+      "category_external_id": "36",
+      "category_name": "Bala de Coco Artesanal 120g",
+      "category_slug": "bala-de-coco-artesanal-120g",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e550.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "429",
+      "position": 44,
+      "name": "Água crystal sem gás",
+      "description": "500 ml",
+      "price": 4,
+      "price_display": "R$ 4.00",
+      "source_price_from_onclick": 4,
+      "category_external_id": "8",
+      "category_name": "Bebidas",
+      "category_slug": "bebidas",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e429.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "399",
+      "position": 45,
+      "name": "Água crystal com gás",
+      "description": "Conteúdo 500ml",
+      "price": 5,
+      "price_display": "R$ 5.00",
+      "source_price_from_onclick": 5,
+      "category_external_id": "8",
+      "category_name": "Bebidas",
+      "category_slug": "bebidas",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee399.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "339",
+      "position": 46,
+      "name": "Mini Fanta laranja 200 ml",
+      "description": "",
+      "price": 3.5,
+      "price_display": "R$ 3.50",
+      "source_price_from_onclick": 3.5,
+      "category_external_id": "8",
+      "category_name": "Bebidas",
+      "category_slug": "bebidas",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e339.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "36",
+      "position": 47,
+      "name": "Coca-cola mini 200 ml",
+      "description": "",
+      "price": 3.5,
+      "price_display": "R$ 3.50",
+      "source_price_from_onclick": 3.5,
+      "category_external_id": "8",
+      "category_name": "Bebidas",
+      "category_slug": "bebidas",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee36.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "35",
+      "position": 48,
+      "name": "Coca cola lata 350ml",
+      "description": "",
+      "price": 6,
+      "price_display": "R$ 6.00",
+      "source_price_from_onclick": 6,
+      "category_external_id": "8",
+      "category_name": "Bebidas",
+      "category_slug": "bebidas",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee35.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "518",
+      "position": 49,
+      "name": "Coca-cola lata zero",
+      "description": "Coca-cola lata, zero açúcar, 350ML.",
+      "price": 6,
+      "price_display": "R$ 6.00",
+      "source_price_from_onclick": 6,
+      "category_external_id": "8",
+      "category_name": "Bebidas",
+      "category_slug": "bebidas",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee518.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "607",
+      "position": 50,
+      "name": "Fanta laranja zero açúcar",
+      "description": "Lata 350ml",
+      "price": 6,
+      "price_display": "R$ 6.00",
+      "source_price_from_onclick": 6,
+      "category_external_id": "8",
+      "category_name": "Bebidas",
+      "category_slug": "bebidas",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee607.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "609",
+      "position": 51,
+      "name": "Fanta uva 350ml",
+      "description": "Refrigerante de lata, sabor uva.",
+      "price": 6,
+      "price_display": "R$ 6.00",
+      "source_price_from_onclick": 6,
+      "category_external_id": "8",
+      "category_name": "Bebidas",
+      "category_slug": "bebidas",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/609.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "252",
+      "position": 52,
+      "name": "Cartão recadinho",
+      "description": "A escrita é feita a mão, envie o que deseja em \"observação\" ou no WhatsApp. Frase curta!",
+      "price": 2.5,
+      "price_display": "R$ 2.50",
+      "source_price_from_onclick": 2.5,
+      "category_external_id": "16",
+      "category_name": "Presentear",
+      "category_slug": "presentear",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e252.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "672",
+      "position": 53,
+      "name": "Brigadeiro individual mimo",
+      "description": "Blister contendo 1 brigadeiro tradicional ao leite.",
+      "price": 6,
+      "price_display": "R$ 6.00",
+      "source_price_from_onclick": 6,
+      "category_external_id": "16",
+      "category_name": "Presentear",
+      "category_slug": "presentear",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/672.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "638",
+      "position": 54,
+      "name": "Bala de brigadeiro presenteàvel",
+      "description": "Deliciosa bala de brigadeiro ao leite, cacau 50%. Embalagem 100g",
+      "price": 15,
+      "price_display": "R$ 15.00",
+      "source_price_from_onclick": 15,
+      "category_external_id": "16",
+      "category_name": "Presentear",
+      "category_slug": "presentear",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/638.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "575",
+      "position": 55,
+      "name": "Mini bomboniere bala de brigadeiro",
+      "description": "Mini bomboniere de vidro. Contém 150g da nossa deliciosa bala de brigadeiro. ACOMPANHA SACOLA!",
+      "price": 29.9,
+      "price_display": "R$ 29.90",
+      "source_price_from_onclick": 29.9,
+      "category_external_id": "16",
+      "category_name": "Presentear",
+      "category_slug": "presentear",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e575.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "321",
+      "position": 56,
+      "name": "Caixa presenteàvel com 6 brigadeiros tradicionais",
+      "description": "Acompanha Sacola!",
+      "price": 26,
+      "price_display": "R$ 26.00",
+      "source_price_from_onclick": 26,
+      "category_external_id": "16",
+      "category_name": "Presentear",
+      "category_slug": "presentear",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee321.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "caixa",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "574",
+      "position": 57,
+      "name": "Caixa presenteàvel 12 brigadeiros tradicionais",
+      "description": "Acompanha Sacola!",
+      "price": 48,
+      "price_display": "R$ 48.00",
+      "source_price_from_onclick": 48,
+      "category_external_id": "16",
+      "category_name": "Presentear",
+      "category_slug": "presentear",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/574.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "caixa",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "231",
+      "position": 58,
+      "name": "Kit Doce presente",
+      "description": "Kit contém: 1 bala de brigadeiro 100g, 1 dose de doçura sabor ninho e brigadeiro 220ml, 1 caixinha com 6 unidades de brigadeiro ao leite. ACOMPANHA SACOLA!",
+      "price": 54,
+      "price_display": "R$ 54.00",
+      "source_price_from_onclick": 54,
+      "category_external_id": "16",
+      "category_name": "Presentear",
+      "category_slug": "presentear",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee231.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "358",
+      "position": 59,
+      "name": "Sacola Luxo P",
+      "description": "Sacola tamanho pequeno.",
+      "price": 5,
+      "price_display": "R$ 5.00",
+      "source_price_from_onclick": 5,
+      "category_external_id": "16",
+      "category_name": "Presentear",
+      "category_slug": "presentear",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/358.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "359",
+      "position": 60,
+      "name": "Sacola Luxo M",
+      "description": "Sacola tamanho Médio.",
+      "price": 6.5,
+      "price_display": "R$ 6.50",
+      "source_price_from_onclick": 6.5,
+      "category_external_id": "16",
+      "category_name": "Presentear",
+      "category_slug": "presentear",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/359.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "211",
+      "position": 61,
+      "name": "Sacola Kraft personalizada P",
+      "description": "",
+      "price": 2.5,
+      "price_display": "R$ 2.50",
+      "source_price_from_onclick": 2.5,
+      "category_external_id": "16",
+      "category_name": "Presentear",
+      "category_slug": "presentear",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee211.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "210",
+      "position": 62,
+      "name": "Sacola Kraft personalizada M",
+      "description": "",
+      "price": 2.8,
+      "price_display": "R$ 2.80",
+      "source_price_from_onclick": 2.8,
+      "category_external_id": "16",
+      "category_name": "Presentear",
+      "category_slug": "presentear",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee210.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    },
+    {
+      "external_id": "318",
+      "position": 63,
+      "name": "Sacola Kraft personalizada G",
+      "description": "",
+      "price": 3,
+      "price_display": "R$ 3.00",
+      "source_price_from_onclick": 3,
+      "category_external_id": "16",
+      "category_name": "Presentear",
+      "category_slug": "presentear",
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e318.png",
+      "add_on_group_ids": [],
+      "raw_count": 0,
+      "orderable": true,
+      "kind": "product",
+      "unit_hint": "unidade",
+      "add_on_groups": []
+    }
+  ],
+  "add_on_groups": [
+    {
+      "external_id": "16",
+      "title": "Complementos",
+      "rule_text": "Escolha até 4 opções",
+      "minimum": 0,
+      "maximum": 4,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "1",
+          "name": "Farofa de paçoca",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "2",
+          "name": "Leite em pó",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "3",
+          "name": "Leite condensado",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "4",
+          "name": "Granola",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "5",
+          "name": "Chocoball",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "6",
+          "name": "Confete",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "7",
+          "name": "Sucrilhos",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "10",
+          "name": "Morango",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "11",
+          "name": "Uva",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "12",
+          "name": "Banana",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "27",
+      "product_name": "Açaí 400 ml",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=27&catAdicionalId=16&restauranteN=756"
+    },
+    {
+      "external_id": "17",
+      "title": "Complementos",
+      "rule_text": "Escolha até 4 opções",
+      "minimum": 0,
+      "maximum": 4,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "21",
+          "name": "Farofa de paçoca",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "22",
+          "name": "Leite em pó",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "23",
+          "name": "Leite condensado",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "24",
+          "name": "Granola",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "25",
+          "name": "Chocoball",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "26",
+          "name": "Confete",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "27",
+          "name": "Sucrilhos",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "30",
+          "name": "Morango",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "31",
+          "name": "Uva",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "32",
+          "name": "Banana",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "28",
+      "product_name": "Açaí trufado com nutella 400ml",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=28&catAdicionalId=17&restauranteN=756"
+    },
+    {
+      "external_id": "27",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "60",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "2",
+      "product_name": "Bolo no pote Ninho e brigadeiro",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=2&catAdicionalId=27&restauranteN=756"
+    },
+    {
+      "external_id": "69",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "145",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "533",
+      "product_name": "Bolo no pote Prestígio",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=533&catAdicionalId=69&restauranteN=756"
+    },
+    {
+      "external_id": "100",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "207",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "677",
+      "product_name": "Bolo no pote brigaleite",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=677&catAdicionalId=100&restauranteN=756"
+    },
+    {
+      "external_id": "93",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "194",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "650",
+      "product_name": "Bolo no pote trufado de maracujá",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=650&catAdicionalId=93&restauranteN=756"
+    },
+    {
+      "external_id": "98",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "204",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "673",
+      "product_name": "Bolo gelado briganinho",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=673&catAdicionalId=98&restauranteN=756"
+    },
+    {
+      "external_id": "41",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "88",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "149",
+      "product_name": "Bolo gelado Prestígio",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=149&catAdicionalId=41&restauranteN=756"
+    },
+    {
+      "external_id": "32",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "70",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "450",
+      "product_name": "Bolo gelado doce de leite com coco",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=450&catAdicionalId=32&restauranteN=756"
+    },
+    {
+      "external_id": "49",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "104",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "105",
+      "product_name": "Fatia de prestígio",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=105&catAdicionalId=49&restauranteN=756"
+    },
+    {
+      "external_id": "36",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "78",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "505",
+      "product_name": "Fatia casadinho",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=505&catAdicionalId=36&restauranteN=756"
+    },
+    {
+      "external_id": "54",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "114",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "556",
+      "product_name": "Mini vulcão mesclado",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=556&catAdicionalId=54&restauranteN=756"
+    },
+    {
+      "external_id": "37",
+      "title": "",
+      "rule_text": "",
+      "minimum": 0,
+      "maximum": 0,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [],
+      "product_external_id": "551",
+      "product_name": "Bolo vulcão de cenoura cobertura de brigadeiro",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=551&catAdicionalId=37&restauranteN=756"
+    },
+    {
+      "external_id": "64",
+      "title": "Escolha seu acompanhamento",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "134",
+          "name": "Farofa de paçoca",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "135",
+          "name": "Canela",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        },
+        {
+          "external_id": "136",
+          "name": "Côco",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "570",
+      "product_name": "Canjica cremosa",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=570&catAdicionalId=64&restauranteN=756"
+    },
+    {
+      "external_id": "65",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "137",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "570",
+      "product_name": "Canjica cremosa",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=570&catAdicionalId=65&restauranteN=756"
+    },
+    {
+      "external_id": "60",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "126",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "51",
+      "product_name": "Dose de doçura Brigadeiro e Ninho",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=51&catAdicionalId=60&restauranteN=756"
+    },
+    {
+      "external_id": "61",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "128",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "217",
+      "product_name": "Dose de doçura Brigadeiro ao leite",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=217&catAdicionalId=61&restauranteN=756"
+    },
+    {
+      "external_id": "62",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "130",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "157",
+      "product_name": "Dose doçura Ninho com nutella",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=157&catAdicionalId=62&restauranteN=756"
+    },
+    {
+      "external_id": "55",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "116",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "8",
+      "product_name": "Bombom de uva",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=8&catAdicionalId=55&restauranteN=756"
+    },
+    {
+      "external_id": "57",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "120",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "59",
+      "product_name": "Bombom de morango",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=59&catAdicionalId=57&restauranteN=756"
+    },
+    {
+      "external_id": "25",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "56",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "11",
+      "product_name": "Pudim de leite condensado",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=11&catAdicionalId=25&restauranteN=756"
+    },
+    {
+      "external_id": "87",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "182",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "625",
+      "product_name": "Torta Supreme de morango",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=625&catAdicionalId=87&restauranteN=756"
+    },
+    {
+      "external_id": "50",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "106",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "326",
+      "product_name": "Brownie no copo uva",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=326&catAdicionalId=50&restauranteN=756"
+    },
+    {
+      "external_id": "56",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "118",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "12",
+      "product_name": "Banoffe ( torta de banana)",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=12&catAdicionalId=56&restauranteN=756"
+    },
+    {
+      "external_id": "72",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "151",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "335",
+      "product_name": "Brownie ninho e nutella",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=335&catAdicionalId=72&restauranteN=756"
+    },
+    {
+      "external_id": "73",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "153",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "562",
+      "product_name": "Brownie c/ ninho nutella e kinder",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=562&catAdicionalId=73&restauranteN=756"
+    },
+    {
+      "external_id": "81",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "170",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "599",
+      "product_name": "Cestinha de brownie ninho e brigadeiro",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=599&catAdicionalId=81&restauranteN=756"
+    },
+    {
+      "external_id": "82",
+      "title": "Colher descartável?",
+      "rule_text": "Escolha 1 opção",
+      "minimum": 0,
+      "maximum": 1,
+      "divide_value": 0,
+      "use_highest_value": 0,
+      "split_quantity": 0,
+      "split_price": 0,
+      "options": [
+        {
+          "external_id": "172",
+          "name": "Adicionar colher",
+          "description": "",
+          "price": 0,
+          "price_display": "R$ 0.00"
+        }
+      ],
+      "product_external_id": "600",
+      "product_name": "Cestinha de brownie brigadeiro ao leite",
+      "source_url": "https://menudireto.com/sources/MODELO/getAdd5.php?productsid=600&catAdicionalId=82&restauranteN=756"
+    }
+  ],
+  "summary": {
+    "total_categories": 10,
+    "total_products": 63,
+    "orderable_products": 61,
+    "informational_products": 2,
+    "add_on_groups": 28,
+    "add_on_options": 47,
+    "categories": [
+      {
+        "external_id": "12",
+        "name": "Informações",
+        "total_products": 2,
+        "orderable_products": 0
+      },
+      {
+        "external_id": "6",
+        "name": "Açaí",
+        "total_products": 2,
+        "orderable_products": 2
+      },
+      {
+        "external_id": "4",
+        "name": "Docinhos",
+        "total_products": 6,
+        "orderable_products": 6
+      },
+      {
+        "external_id": "1",
+        "name": "Bolo no Pote 220 ml",
+        "total_products": 4,
+        "orderable_products": 4
+      },
+      {
+        "external_id": "2",
+        "name": "Bolos Gelados e Fatias de Bolo",
+        "total_products": 5,
+        "orderable_products": 5
+      },
+      {
+        "external_id": "37",
+        "name": "Bolo Vulcão",
+        "total_products": 2,
+        "orderable_products": 2
+      },
+      {
+        "external_id": "3",
+        "name": "Delícias",
+        "total_products": 20,
+        "orderable_products": 20
+      },
+      {
+        "external_id": "36",
+        "name": "Bala de Coco Artesanal 120g",
+        "total_products": 2,
+        "orderable_products": 2
+      },
+      {
+        "external_id": "8",
+        "name": "Bebidas",
+        "total_products": 8,
+        "orderable_products": 8
+      },
+      {
+        "external_id": "16",
+        "name": "Presentear",
+        "total_products": 12,
+        "orderable_products": 12
+      }
+    ]
+  }
+}

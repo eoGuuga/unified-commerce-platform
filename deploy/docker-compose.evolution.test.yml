@@ -1,0 +1,23 @@
+version: '3.9'
+
+services:
+  evolution-api:
+    image: atendai/evolution-api:v2.1.1
+    container_name: ucm-evolution-test
+    restart: unless-stopped
+    env_file:
+      - ./evolution.test.env
+    volumes:
+      - evolution_test_instances:/evolution/instances
+    ports:
+      - "127.0.0.1:8081:8080"
+    networks:
+      - ucmtest-net
+
+volumes:
+  evolution_test_instances:
+
+networks:
+  ucmtest-net:
+    external: true
+    name: ucmtest_ucm-test-net

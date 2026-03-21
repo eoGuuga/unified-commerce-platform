@@ -127,6 +127,16 @@ O que isso faz:
 
 ---
 
+## WhatsApp barato para homologacao
+
+Para homologacao com numero de teste e baixo custo, existe um fluxo separado com Evolution API:
+
+- guia: `deploy/EVOLUTION-TEST-SETUP.md`
+- compose: `deploy/docker-compose.evolution.test.yml`
+- configuracao da instancia: `deploy/scripts/configure-evolution-instance.sh`
+
+---
+
 ## SSL / dominio
 Status atual deste projeto:
 - `gtsofthub.com.br` com HTTPS ativo

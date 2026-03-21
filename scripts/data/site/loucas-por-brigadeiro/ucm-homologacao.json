@@ -1,0 +1,2229 @@
+{
+  "fonte": "https://menudireto.com/loucas-por-brigadeiro/#12",
+  "dataExtracao": "2026-03-21T14:32:50.257Z",
+  "observacao": "Estoque e min_stock nesta estrutura sao sinteticos, usados apenas para homologacao inicial de bot, PDV e estoque. Os dados comerciais reais devem ser preenchidos na fase oficial.",
+  "loja": {
+    "nome": "Loucas Por Brigadeiro",
+    "slug": "loucas-por-brigadeiro",
+    "telefone": "(11) 95109-3485",
+    "endereco": "Avenida Pires do Rio, 1949 - Jardim São Sebastião - SAO PAULO",
+    "horario": "13:00 às 17:30",
+    "restauranteN": 756,
+    "vertical": "chocolateria"
+  },
+  "categorias": [
+    {
+      "external_id": "12",
+      "name": "Informações",
+      "slug": "informacoes",
+      "ordem": 1
+    },
+    {
+      "external_id": "6",
+      "name": "Açaí",
+      "slug": "acai",
+      "ordem": 2
+    },
+    {
+      "external_id": "4",
+      "name": "Docinhos",
+      "slug": "docinhos",
+      "ordem": 3
+    },
+    {
+      "external_id": "1",
+      "name": "Bolo no Pote 220 ml",
+      "slug": "bolo-no-pote-220-ml",
+      "ordem": 4
+    },
+    {
+      "external_id": "2",
+      "name": "Bolos Gelados e Fatias de Bolo",
+      "slug": "bolos-gelados-e-fatias-de-bolo",
+      "ordem": 5
+    },
+    {
+      "external_id": "37",
+      "name": "Bolo Vulcão",
+      "slug": "bolo-vulcao",
+      "ordem": 6
+    },
+    {
+      "external_id": "3",
+      "name": "Delícias",
+      "slug": "delicias",
+      "ordem": 7
+    },
+    {
+      "external_id": "36",
+      "name": "Bala de Coco Artesanal 120g",
+      "slug": "bala-de-coco-artesanal-120g",
+      "ordem": 8
+    },
+    {
+      "external_id": "8",
+      "name": "Bebidas",
+      "slug": "bebidas",
+      "ordem": 9
+    },
+    {
+      "external_id": "16",
+      "name": "Presentear",
+      "slug": "presentear",
+      "ordem": 10
+    }
+  ],
+  "produtos": {
+    "informacoes": [],
+    "acai": [
+      {
+        "name": "Açaí 400 ml",
+        "price": 16,
+        "description": "Escolha até 4 acompanhamentos. Acompanha colher!",
+        "categoria": "Açaí",
+        "unit": "copo",
+        "estoque": 20,
+        "min_stock": 5,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e27.png",
+        "adicionais": [
+          {
+            "nome": "Complementos",
+            "regra": "Escolha até 4 opções",
+            "minimo": 0,
+            "maximo": 4,
+            "opcoes": [
+              {
+                "nome": "Farofa de paçoca",
+                "preco": 0
+              },
+              {
+                "nome": "Leite em pó",
+                "preco": 0
+              },
+              {
+                "nome": "Leite condensado",
+                "preco": 0
+              },
+              {
+                "nome": "Granola",
+                "preco": 0
+              },
+              {
+                "nome": "Chocoball",
+                "preco": 0
+              },
+              {
+                "nome": "Confete",
+                "preco": 0
+              },
+              {
+                "nome": "Sucrilhos",
+                "preco": 0
+              },
+              {
+                "nome": "Morango",
+                "preco": 0
+              },
+              {
+                "nome": "Uva",
+                "preco": 0
+              },
+              {
+                "nome": "Banana",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "27",
+          "source_category_id": "6",
+          "source_category_slug": "acai",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "acai",
+            "acessorio"
+          ]
+        }
+      },
+      {
+        "name": "Açaí trufado com nutella 400ml",
+        "price": 23,
+        "description": "Escolha até 4 acompanhamentos. Acompanha colher!",
+        "categoria": "Açaí",
+        "unit": "copo",
+        "estoque": 20,
+        "min_stock": 5,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee28.png",
+        "adicionais": [
+          {
+            "nome": "Complementos",
+            "regra": "Escolha até 4 opções",
+            "minimo": 0,
+            "maximo": 4,
+            "opcoes": [
+              {
+                "nome": "Farofa de paçoca",
+                "preco": 0
+              },
+              {
+                "nome": "Leite em pó",
+                "preco": 0
+              },
+              {
+                "nome": "Leite condensado",
+                "preco": 0
+              },
+              {
+                "nome": "Granola",
+                "preco": 0
+              },
+              {
+                "nome": "Chocoball",
+                "preco": 0
+              },
+              {
+                "nome": "Confete",
+                "preco": 0
+              },
+              {
+                "nome": "Sucrilhos",
+                "preco": 0
+              },
+              {
+                "nome": "Morango",
+                "preco": 0
+              },
+              {
+                "nome": "Uva",
+                "preco": 0
+              },
+              {
+                "nome": "Banana",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "28",
+          "source_category_id": "6",
+          "source_category_slug": "acai",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "nutella",
+            "acai",
+            "trufado",
+            "acessorio"
+          ]
+        }
+      }
+    ],
+    "docinhos": [
+      {
+        "name": "3 Brigadeiros tradicionais",
+        "price": 12,
+        "description": "Brigadeiro ao leite, coberto com granulado tradicional.",
+        "categoria": "Docinhos",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e288.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "288",
+          "source_category_id": "4",
+          "source_category_slug": "docinhos",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro"
+          ]
+        }
+      },
+      {
+        "name": "6 Brigadeiros tradicionais",
+        "price": 18,
+        "description": "Brigadeiro ao leite, coberto com granulado tradicional.",
+        "categoria": "Docinhos",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/640.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "640",
+          "source_category_id": "4",
+          "source_category_slug": "docinhos",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro"
+          ]
+        }
+      },
+      {
+        "name": "10 Brigadeiros tradicionais",
+        "price": 25,
+        "description": "Brigadeiro ao leite, coberto com granulado tradicional.",
+        "categoria": "Docinhos",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e18.jpg",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "18",
+          "source_category_id": "4",
+          "source_category_slug": "docinhos",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro"
+          ]
+        }
+      },
+      {
+        "name": "3 Beijinhos de coco",
+        "price": 12,
+        "description": "",
+        "categoria": "Docinhos",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e289.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "289",
+          "source_category_id": "4",
+          "source_category_slug": "docinhos",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "coco"
+          ]
+        }
+      },
+      {
+        "name": "6 Beijinhos de coco",
+        "price": 18,
+        "description": "",
+        "categoria": "Docinhos",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/642.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "642",
+          "source_category_id": "4",
+          "source_category_slug": "docinhos",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "coco"
+          ]
+        }
+      },
+      {
+        "name": "10 Beijinhos de coco",
+        "price": 25,
+        "description": "",
+        "categoria": "Docinhos",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e15.jpg",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "15",
+          "source_category_id": "4",
+          "source_category_slug": "docinhos",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "coco"
+          ]
+        }
+      }
+    ],
+    "bolo-no-pote-220-ml": [
+      {
+        "name": "Bolo no pote Ninho e brigadeiro",
+        "price": 16,
+        "description": "Bolo de chocolate, com brigadeiro ao leite e branquinho. Embalagem 220 ml.",
+        "categoria": "Bolo no Pote 220 ml",
+        "unit": "pote",
+        "estoque": 25,
+        "min_stock": 6,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeeee2.jpg",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "2",
+          "source_category_id": "1",
+          "source_category_slug": "bolo-no-pote-220-ml",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "ninho",
+            "bolo",
+            "pote"
+          ]
+        }
+      },
+      {
+        "name": "Bolo no pote Prestígio",
+        "price": 16,
+        "description": "Massa de chocolate, recheio beijinho de coco e brigadeiro cremoso ao leite.",
+        "categoria": "Bolo no Pote 220 ml",
+        "unit": "pote",
+        "estoque": 25,
+        "min_stock": 6,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e533.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "533",
+          "source_category_id": "1",
+          "source_category_slug": "bolo-no-pote-220-ml",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "coco",
+            "bolo",
+            "pote"
+          ]
+        }
+      },
+      {
+        "name": "Bolo no pote brigaleite",
+        "price": 16,
+        "description": "Massa de chocolate, recheio de brigadeiro ao leite e doce de leite artesanal.",
+        "categoria": "Bolo no Pote 220 ml",
+        "unit": "pote",
+        "estoque": 25,
+        "min_stock": 6,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeeeee677.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "677",
+          "source_category_id": "1",
+          "source_category_slug": "bolo-no-pote-220-ml",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "bolo",
+            "pote"
+          ]
+        }
+      },
+      {
+        "name": "Bolo no pote trufado de maracujá",
+        "price": 16,
+        "description": "Massa de chocolate, recheado com mousse de maracujá e brigadeiro ao leite.",
+        "categoria": "Bolo no Pote 220 ml",
+        "unit": "pote",
+        "estoque": 25,
+        "min_stock": 6,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/650.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "650",
+          "source_category_id": "1",
+          "source_category_slug": "bolo-no-pote-220-ml",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "maracuja",
+            "bolo",
+            "pote",
+            "trufado"
+          ]
+        }
+      }
+    ],
+    "bolos-gelados-e-fatias-de-bolo": [
+      {
+        "name": "Bolo gelado briganinho",
+        "price": 12,
+        "description": "Massa branca, recheio duo de brigadeiro ao leite e brigadeiro branquinho de ninho.",
+        "categoria": "Bolos Gelados e Fatias de Bolo",
+        "unit": "fatia",
+        "estoque": 10,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/673.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "673",
+          "source_category_id": "2",
+          "source_category_slug": "bolos-gelados-e-fatias-de-bolo",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "ninho",
+            "bolo"
+          ]
+        }
+      },
+      {
+        "name": "Bolo gelado Prestígio",
+        "price": 12,
+        "description": "Massa de chocolate, creme de coco e brigadeiro ao leite. Média 120 grs",
+        "categoria": "Bolos Gelados e Fatias de Bolo",
+        "unit": "fatia",
+        "estoque": 10,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e149.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "149",
+          "source_category_id": "2",
+          "source_category_slug": "bolos-gelados-e-fatias-de-bolo",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "coco",
+            "bolo"
+          ]
+        }
+      },
+      {
+        "name": "Bolo gelado doce de leite com coco",
+        "price": 12,
+        "description": "Massa branca, doce de leite suave artesanal com côco. Média 120 grs",
+        "categoria": "Bolos Gelados e Fatias de Bolo",
+        "unit": "fatia",
+        "estoque": 10,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/450.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "450",
+          "source_category_id": "2",
+          "source_category_slug": "bolos-gelados-e-fatias-de-bolo",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "coco",
+            "bolo"
+          ]
+        }
+      },
+      {
+        "name": "Fatia de prestígio",
+        "price": 17,
+        "description": "Fatia de bolo massa de chocolate, recheio de coco cremoso, coberto com brigadeiro ao leite e chantilly. Média 200 gramas fatia. Não retiramos o chantilly",
+        "categoria": "Bolos Gelados e Fatias de Bolo",
+        "unit": "fatia",
+        "estoque": 10,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeeeee105.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "105",
+          "source_category_id": "2",
+          "source_category_slug": "bolos-gelados-e-fatias-de-bolo",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "coco",
+            "bolo"
+          ]
+        }
+      },
+      {
+        "name": "Fatia casadinho",
+        "price": 17,
+        "description": "Massa de chocolate, recheada de brigadeiro ao leite e ninho. Pesa em média 200 gramas. Não retiramos o chantilly!",
+        "categoria": "Bolos Gelados e Fatias de Bolo",
+        "unit": "fatia",
+        "estoque": 10,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee505.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "505",
+          "source_category_id": "2",
+          "source_category_slug": "bolos-gelados-e-fatias-de-bolo",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "ninho",
+            "bolo"
+          ]
+        }
+      }
+    ],
+    "bolo-vulcao": [
+      {
+        "name": "Mini vulcão mesclado",
+        "price": 12,
+        "description": "Mini bolinho, massa de chocolate coberto com brigadeiro tradicional e branquinho. Serve 1 pessoa.",
+        "categoria": "Bolo Vulcão",
+        "unit": "unidade",
+        "estoque": 8,
+        "min_stock": 2,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee556.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "556",
+          "source_category_id": "37",
+          "source_category_slug": "bolo-vulcao",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "bolo"
+          ]
+        }
+      },
+      {
+        "name": "Bolo vulcão de cenoura cobertura de brigadeiro",
+        "price": 52,
+        "description": "Bolo caseiro de cenoura, com cobertura de brigadeiro. Obs: MASSA ARTESANAL, FOFINHA, PODENDO RACHAR NO TRANSPORTE DE MOTO. Serve em média 6 pessoas.",
+        "categoria": "Bolo Vulcão",
+        "unit": "unidade",
+        "estoque": 8,
+        "min_stock": 2,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e551.png",
+        "adicionais": [
+          {
+            "nome": "",
+            "regra": "",
+            "minimo": 0,
+            "maximo": 0,
+            "opcoes": []
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "551",
+          "source_category_id": "37",
+          "source_category_slug": "bolo-vulcao",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "bolo"
+          ]
+        }
+      }
+    ],
+    "delicias": [
+      {
+        "name": "Canjica cremosa",
+        "price": 14,
+        "description": "Canjica, 250ml.",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/570.png",
+        "adicionais": [
+          {
+            "nome": "Escolha seu acompanhamento",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Farofa de paçoca",
+                "preco": 0
+              },
+              {
+                "nome": "Canela",
+                "preco": 0
+              },
+              {
+                "nome": "Côco",
+                "preco": 0
+              }
+            ]
+          },
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "570",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria"
+          ]
+        }
+      },
+      {
+        "name": "Bala de brigadeiro",
+        "price": 12,
+        "description": "Deliciosa bala de brigadeiro ao leite, cacau 50%. 100gramas",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee6.jpg",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "6",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro"
+          ]
+        }
+      },
+      {
+        "name": "Dose de doçura Brigadeiro e Ninho",
+        "price": 22,
+        "description": "Brigadeiro de colher:Brigadeiro ao leite cremoso,e brigadeiro ninho, 220 ml. Não é refrigerado, temperatura ambiente!",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee51.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "51",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "ninho",
+            "acessorio"
+          ]
+        }
+      },
+      {
+        "name": "Dose de doçura Brigadeiro ao leite",
+        "price": 22,
+        "description": "Brigadeiro ao leite cremoso de colher, 220 ml. Não é refrigerado, temperatura ambiente!",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee217.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "217",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "acessorio"
+          ]
+        }
+      },
+      {
+        "name": "Dose doçura Ninho com nutella",
+        "price": 22,
+        "description": "Brigadeiro de colher: sabor ninho intercalado com nutella, 220 ml. Não é refrigerado, temperatura ambiente!",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee157.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "157",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "ninho",
+            "nutella",
+            "acessorio"
+          ]
+        }
+      },
+      {
+        "name": "Mini Pastelzinho de leite em pó com nutella",
+        "price": 11,
+        "description": "NÃO é frito. Massa deliciosa de leite em pó recheada com nutella pura.",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee103.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "103",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "nutella"
+          ]
+        }
+      },
+      {
+        "name": "Pão de mel doce de leite",
+        "price": 13,
+        "description": "Recheado com delicioso e cremoso doce de leite artesanal.",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e165.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "165",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria"
+          ]
+        }
+      },
+      {
+        "name": "Combo 3 unidades Surpresa de uva",
+        "price": 15,
+        "description": "Uva,brigadeiro branquinho,banhada no chocolate.",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeee34.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "34",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "uva"
+          ]
+        }
+      },
+      {
+        "name": "Bombom de uva",
+        "price": 18,
+        "description": "Brigadeiro ao leite, uvas, creme branquinho.",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeee8.jpg",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "8",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "uva"
+          ]
+        }
+      },
+      {
+        "name": "Bombom de morango",
+        "price": 18,
+        "description": "Brigadeiro ao leite, morangos frescos e creme branquinho. Obs.: Consumo imediato!",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeeeee59.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "59",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "morango"
+          ]
+        }
+      },
+      {
+        "name": "Pudim de leite condensado",
+        "price": 14,
+        "description": "Pudim individual de leite condensado, com deliciosa calda de caramelo.",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e11.jpg",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "11",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria"
+          ]
+        }
+      },
+      {
+        "name": "Torta Supreme de morango",
+        "price": 16,
+        "description": "Massa de biscoito de chocolate, recheio de ninho com morangos, finalizado com ganache de chocolate. Obs.: consumo imediato!",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/625.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "625",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "ninho",
+            "morango"
+          ]
+        }
+      },
+      {
+        "name": "Brownie no copo uva",
+        "price": 18,
+        "description": "Brigadeiro branco cremoso, uvas, brownie 50% cacau, brigadeiro ao leite e chantilly.",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee326.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "326",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "uva"
+          ]
+        }
+      },
+      {
+        "name": "Banoffe ( torta de banana)",
+        "price": 18,
+        "description": "Farofa de biscoito, banana caramelada, creme belga especial, fina camada de doce de leite e chantilly.",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeeee12.jpg",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "12",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria"
+          ]
+        }
+      },
+      {
+        "name": "Brownie tradicional",
+        "price": 10,
+        "description": "Brownie tradicional, 50% cacau. 60g",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e510.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "510",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria"
+          ]
+        }
+      },
+      {
+        "name": "Brownie bites",
+        "price": 19.99,
+        "description": "Linda caixinha com pedaços de brownie tradicional e 1 mini copo de brigadeiro ao leite e brigadeiro branquinho, para você se deliciar.",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/715.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "715",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro"
+          ]
+        }
+      },
+      {
+        "name": "Brownie ninho e nutella",
+        "price": 12,
+        "description": "Brownie tradicional, coberto com ninho e nutella.",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eeeee335.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "335",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "ninho",
+            "nutella"
+          ]
+        }
+      },
+      {
+        "name": "Brownie c/ ninho nutella e kinder",
+        "price": 13,
+        "description": "Pedaço de brownie tradicional, coberto com ninho, nutella e pedaço de kinder.",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e562.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "562",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "ninho",
+            "nutella"
+          ]
+        }
+      },
+      {
+        "name": "Cestinha de brownie ninho e brigadeiro",
+        "price": 22,
+        "description": "Cestinha banhada na cobertura bland, contendo pedaços de brownie 50% cacau, finalizado com ninho e brigadeiro.",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e599.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "599",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "ninho"
+          ]
+        }
+      },
+      {
+        "name": "Cestinha de brownie brigadeiro ao leite",
+        "price": 22,
+        "description": "Casquinha banhada na cobertura bland, contendo pedaços de brownie 50% cacau, finalizado com brigadeiro ao leite cremoso.",
+        "categoria": "Delícias",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e600.png",
+        "adicionais": [
+          {
+            "nome": "Colher descartável?",
+            "regra": "Escolha 1 opção",
+            "minimo": 0,
+            "maximo": 1,
+            "opcoes": [
+              {
+                "nome": "Adicionar colher",
+                "preco": 0
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "600",
+          "source_category_id": "3",
+          "source_category_slug": "delicias",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro"
+          ]
+        }
+      }
+    ],
+    "bala-de-coco-artesanal-120g": [
+      {
+        "name": "Bala de coco tradicional",
+        "price": 12,
+        "description": "Desmancha na boca...",
+        "categoria": "Bala de Coco Artesanal 120g",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/547.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "547",
+          "source_category_id": "36",
+          "source_category_slug": "bala-de-coco-artesanal-120g",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "coco"
+          ]
+        }
+      },
+      {
+        "name": "Bala de coco beijinho",
+        "price": 12,
+        "description": "Desmancha na boca...",
+        "categoria": "Bala de Coco Artesanal 120g",
+        "unit": "unidade",
+        "estoque": 40,
+        "min_stock": 10,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e550.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "550",
+          "source_category_id": "36",
+          "source_category_slug": "bala-de-coco-artesanal-120g",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "coco"
+          ]
+        }
+      }
+    ],
+    "bebidas": [
+      {
+        "name": "Água crystal sem gás",
+        "price": 4,
+        "description": "500 ml",
+        "categoria": "Bebidas",
+        "unit": "unidade",
+        "estoque": 20,
+        "min_stock": 5,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e429.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "429",
+          "source_category_id": "8",
+          "source_category_slug": "bebidas",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "bebida"
+          ]
+        }
+      },
+      {
+        "name": "Água crystal com gás",
+        "price": 5,
+        "description": "Conteúdo 500ml",
+        "categoria": "Bebidas",
+        "unit": "unidade",
+        "estoque": 20,
+        "min_stock": 5,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee399.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "399",
+          "source_category_id": "8",
+          "source_category_slug": "bebidas",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "bebida"
+          ]
+        }
+      },
+      {
+        "name": "Mini Fanta laranja 200 ml",
+        "price": 3.5,
+        "description": "",
+        "categoria": "Bebidas",
+        "unit": "unidade",
+        "estoque": 20,
+        "min_stock": 5,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e339.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "339",
+          "source_category_id": "8",
+          "source_category_slug": "bebidas",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "bebida"
+          ]
+        }
+      },
+      {
+        "name": "Coca-cola mini 200 ml",
+        "price": 3.5,
+        "description": "",
+        "categoria": "Bebidas",
+        "unit": "unidade",
+        "estoque": 20,
+        "min_stock": 5,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee36.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "36",
+          "source_category_id": "8",
+          "source_category_slug": "bebidas",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "bebida"
+          ]
+        }
+      },
+      {
+        "name": "Coca cola lata 350ml",
+        "price": 6,
+        "description": "",
+        "categoria": "Bebidas",
+        "unit": "unidade",
+        "estoque": 20,
+        "min_stock": 5,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee35.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "35",
+          "source_category_id": "8",
+          "source_category_slug": "bebidas",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "bebida"
+          ]
+        }
+      },
+      {
+        "name": "Coca-cola lata zero",
+        "price": 6,
+        "description": "Coca-cola lata, zero açúcar, 350ML.",
+        "categoria": "Bebidas",
+        "unit": "unidade",
+        "estoque": 20,
+        "min_stock": 5,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee518.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "518",
+          "source_category_id": "8",
+          "source_category_slug": "bebidas",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "bebida"
+          ]
+        }
+      },
+      {
+        "name": "Fanta laranja zero açúcar",
+        "price": 6,
+        "description": "Lata 350ml",
+        "categoria": "Bebidas",
+        "unit": "unidade",
+        "estoque": 20,
+        "min_stock": 5,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/ee607.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "607",
+          "source_category_id": "8",
+          "source_category_slug": "bebidas",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "bebida"
+          ]
+        }
+      },
+      {
+        "name": "Fanta uva 350ml",
+        "price": 6,
+        "description": "Refrigerante de lata, sabor uva.",
+        "categoria": "Bebidas",
+        "unit": "unidade",
+        "estoque": 20,
+        "min_stock": 5,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/609.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "609",
+          "source_category_id": "8",
+          "source_category_slug": "bebidas",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "uva",
+            "bebida"
+          ]
+        }
+      }
+    ],
+    "presentear": [
+      {
+        "name": "Cartão recadinho",
+        "price": 2.5,
+        "description": "A escrita é feita a mão, envie o que deseja em \"observação\" ou no WhatsApp. Frase curta!",
+        "categoria": "Presentear",
+        "unit": "unidade",
+        "estoque": 12,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e252.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "252",
+          "source_category_id": "16",
+          "source_category_slug": "presentear",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "presente"
+          ]
+        }
+      },
+      {
+        "name": "Brigadeiro individual mimo",
+        "price": 6,
+        "description": "Blister contendo 1 brigadeiro tradicional ao leite.",
+        "categoria": "Presentear",
+        "unit": "unidade",
+        "estoque": 12,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/672.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "672",
+          "source_category_id": "16",
+          "source_category_slug": "presentear",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "presente"
+          ]
+        }
+      },
+      {
+        "name": "Bala de brigadeiro presenteàvel",
+        "price": 15,
+        "description": "Deliciosa bala de brigadeiro ao leite, cacau 50%. Embalagem 100g",
+        "categoria": "Presentear",
+        "unit": "unidade",
+        "estoque": 12,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/638.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "638",
+          "source_category_id": "16",
+          "source_category_slug": "presentear",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "presente"
+          ]
+        }
+      },
+      {
+        "name": "Mini bomboniere bala de brigadeiro",
+        "price": 29.9,
+        "description": "Mini bomboniere de vidro. Contém 150g da nossa deliciosa bala de brigadeiro. ACOMPANHA SACOLA!",
+        "categoria": "Presentear",
+        "unit": "unidade",
+        "estoque": 12,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e575.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "575",
+          "source_category_id": "16",
+          "source_category_slug": "presentear",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "presente"
+          ]
+        }
+      },
+      {
+        "name": "Caixa presenteàvel com 6 brigadeiros tradicionais",
+        "price": 26,
+        "description": "Acompanha Sacola!",
+        "categoria": "Presentear",
+        "unit": "caixa",
+        "estoque": 12,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee321.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "321",
+          "source_category_id": "16",
+          "source_category_slug": "presentear",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "presente",
+            "caixa"
+          ]
+        }
+      },
+      {
+        "name": "Caixa presenteàvel 12 brigadeiros tradicionais",
+        "price": 48,
+        "description": "Acompanha Sacola!",
+        "categoria": "Presentear",
+        "unit": "caixa",
+        "estoque": 12,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/574.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "574",
+          "source_category_id": "16",
+          "source_category_slug": "presentear",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "presente",
+            "caixa"
+          ]
+        }
+      },
+      {
+        "name": "Kit Doce presente",
+        "price": 54,
+        "description": "Kit contém: 1 bala de brigadeiro 100g, 1 dose de doçura sabor ninho e brigadeiro 220ml, 1 caixinha com 6 unidades de brigadeiro ao leite. ACOMPANHA SACOLA!",
+        "categoria": "Presentear",
+        "unit": "unidade",
+        "estoque": 12,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee231.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "231",
+          "source_category_id": "16",
+          "source_category_slug": "presentear",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "brigadeiro",
+            "ninho",
+            "presente",
+            "kit"
+          ]
+        }
+      },
+      {
+        "name": "Sacola Luxo P",
+        "price": 5,
+        "description": "Sacola tamanho pequeno.",
+        "categoria": "Presentear",
+        "unit": "unidade",
+        "estoque": 12,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/358.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "358",
+          "source_category_id": "16",
+          "source_category_slug": "presentear",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "presente"
+          ]
+        }
+      },
+      {
+        "name": "Sacola Luxo M",
+        "price": 6.5,
+        "description": "Sacola tamanho Médio.",
+        "categoria": "Presentear",
+        "unit": "unidade",
+        "estoque": 12,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/359.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "359",
+          "source_category_id": "16",
+          "source_category_slug": "presentear",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "presente"
+          ]
+        }
+      },
+      {
+        "name": "Sacola Kraft personalizada P",
+        "price": 2.5,
+        "description": "",
+        "categoria": "Presentear",
+        "unit": "unidade",
+        "estoque": 12,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee211.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "211",
+          "source_category_id": "16",
+          "source_category_slug": "presentear",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "presente"
+          ]
+        }
+      },
+      {
+        "name": "Sacola Kraft personalizada M",
+        "price": 2.8,
+        "description": "",
+        "categoria": "Presentear",
+        "unit": "unidade",
+        "estoque": 12,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/eee210.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "210",
+          "source_category_id": "16",
+          "source_category_slug": "presentear",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "presente"
+          ]
+        }
+      },
+      {
+        "name": "Sacola Kraft personalizada G",
+        "price": 3,
+        "description": "",
+        "categoria": "Presentear",
+        "unit": "unidade",
+        "estoque": 12,
+        "min_stock": 3,
+        "disponivel": true,
+        "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e318.png",
+        "adicionais": [],
+        "metadata": {
+          "source": "menudireto",
+          "store_slug": "loucas-por-brigadeiro",
+          "source_product_id": "318",
+          "source_category_id": "16",
+          "source_category_slug": "presentear",
+          "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+          "kind": "product",
+          "homologation_stock_is_synthetic": true,
+          "sales_tags": [
+            "chocolateria",
+            "presente"
+          ]
+        }
+      }
+    ]
+  },
+  "informativos": [
+    {
+      "name": "Pagamento no PIX",
+      "price": 0,
+      "description": "O pagamento via pix é feito pelo QR-code na entrega.",
+      "categoria": "Informações",
+      "unit": "unidade",
+      "estoque": 0,
+      "min_stock": 0,
+      "disponivel": false,
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/292.png",
+      "adicionais": [],
+      "metadata": {
+        "source": "menudireto",
+        "store_slug": "loucas-por-brigadeiro",
+        "source_product_id": "292",
+        "source_category_id": "12",
+        "source_category_slug": "informacoes",
+        "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+        "kind": "informational",
+        "homologation_stock_is_synthetic": true,
+        "sales_tags": [
+          "chocolateria",
+          "pagamento"
+        ]
+      }
+    },
+    {
+      "name": "Estamos no iFood",
+      "price": 0,
+      "description": "Horário de funcionamento do app de segunda á sábado das 12:30 ás 17:30. Faça o seu pedido!",
+      "categoria": "Informações",
+      "unit": "unidade",
+      "estoque": 0,
+      "min_stock": 0,
+      "disponivel": false,
+      "image_url": "https://menudireto.com/loucas-por-brigadeiro/images/e278.png",
+      "adicionais": [],
+      "metadata": {
+        "source": "menudireto",
+        "store_slug": "loucas-por-brigadeiro",
+        "source_product_id": "278",
+        "source_category_id": "12",
+        "source_category_slug": "informacoes",
+        "source_store_url": "https://menudireto.com/loucas-por-brigadeiro/#12",
+        "kind": "informational",
+        "homologation_stock_is_synthetic": true,
+        "sales_tags": [
+          "chocolateria"
+        ]
+      }
+    }
+  ],
+  "resumo": {
+    "categorias": 10,
+    "produtos_catalogo": 63,
+    "produtos_vendaveis": 61,
+    "itens_informativos": 2,
+    "grupos_adicionais": 28,
+    "opcoes_adicionais": 47
+  }
+}

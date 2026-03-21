@@ -61,6 +61,25 @@ export interface CatalogSalesFit {
 
 @Injectable()
 export class CatalogSalesContextService {
+  private readonly ignoredMetadataKeys = new Set([
+    'source',
+    'store_slug',
+    'source_platform',
+    'source_catalog_url',
+    'source_store_slug',
+    'source_store_url',
+    'source_image_url',
+    'source_category_name',
+    'source_product_id',
+    'source_category_id',
+    'source_category_slug',
+    'source_restaurante_n',
+    'imported_from_catalog',
+    'imported_at',
+    'kind',
+    'homologation_stock_is_synthetic',
+  ]);
+
   private readonly themeRules: CatalogThemeRule[] = [
     {
       key: 'gift',
@@ -70,7 +89,6 @@ export class CatalogSalesContextService {
       patterns: [
         'presente',
         'presentear',
-        'mimo',
         'lembranca',
         'lembrancinha',
         'caixa',
@@ -552,8 +570,16 @@ export class CatalogSalesContextService {
     }
 
     const values: string[] = [];
-    Object.values(metadata).forEach((value) => {
+    Object.entries(metadata).forEach(([key, value]) => {
+      if (this.ignoredMetadataKeys.has(key)) {
+        return;
+      }
+
       if (typeof value === 'string') {
+        if (/^https?:\/\//i.test(value)) {
+          return;
+        }
+
         values.push(value);
         return;
       }

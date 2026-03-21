@@ -1,35 +1,244 @@
-import { Controller, Post, Body, Get, BadRequestException } from '@nestjs/common';
-import { WhatsappService } from './whatsapp.service';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TenantsService } from '../tenants/tenants.service';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { WhatsappWebhookDto } from './dto/whatsapp-webhook.dto';
+import { WhatsappService } from './whatsapp.service';
+
+type RawWhatsappWebhookBody = Partial<WhatsappWebhookDto> & Record<string, any>;
+
+function normalizeDigits(value?: string | null): string {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function getPayloadRoot(body: RawWhatsappWebhookBody): Record<string, any> {
+  if (body.data && typeof body.data === 'object') {
+    return body.data;
+  }
+
+  return body;
+}
+
+function normalizeEventName(body: RawWhatsappWebhookBody): string | null {
+  const eventName = body.event || body.eventName || body.event_type;
+  if (!eventName || typeof eventName !== 'string') {
+    return null;
+  }
+
+  return eventName.replace(/[.\s-]+/g, '_').toUpperCase();
+}
+
+function extractRemoteJid(body: RawWhatsappWebhookBody): string | null {
+  const root = getPayloadRoot(body);
+  const candidate =
+    root.key?.remoteJid ||
+    body.key?.remoteJid ||
+    root.remoteJid ||
+    body.remoteJid ||
+    body.From ||
+    body.from ||
+    body.phoneNumber;
+
+  return typeof candidate === 'string' ? candidate : null;
+}
+
+function extractMessageContent(message: Record<string, any> | null | undefined): string | null {
+  if (!message || typeof message !== 'object') {
+    return null;
+  }
+
+  const directCandidates = [
+    message.conversation,
+    message.extendedTextMessage?.text,
+    message.imageMessage?.caption,
+    message.videoMessage?.caption,
+    message.documentMessage?.caption,
+    message.buttonsResponseMessage?.selectedDisplayText,
+    message.templateButtonReplyMessage?.selectedDisplayText,
+    message.listResponseMessage?.title,
+    message.listResponseMessage?.singleSelectReply?.selectedRowId,
+    message.listResponseMessage?.singleSelectReply?.title,
+  ];
+
+  for (const candidate of directCandidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return (
+    extractMessageContent(message.ephemeralMessage?.message) ||
+    extractMessageContent(message.viewOnceMessage?.message) ||
+    extractMessageContent(message.viewOnceMessageV2?.message) ||
+    null
+  );
+}
+
+function inferMessageType(body: RawWhatsappWebhookBody): 'text' | 'image' | 'document' | 'button' | 'audio' {
+  const root = getPayloadRoot(body);
+  const rawType = body.messageType || root.messageType || body.type;
+  if (rawType === 'audio' || root.message?.audioMessage || root.message?.ptvMessage) {
+    return 'audio';
+  }
+  if (rawType === 'image' || root.message?.imageMessage) {
+    return 'image';
+  }
+  if (rawType === 'document' || root.message?.documentMessage) {
+    return 'document';
+  }
+  if (
+    rawType === 'button' ||
+    root.message?.buttonsResponseMessage ||
+    root.message?.templateButtonReplyMessage ||
+    root.message?.listResponseMessage
+  ) {
+    return 'button';
+  }
+
+  return 'text';
+}
+
+function extractTimestamp(body: RawWhatsappWebhookBody): string {
+  const root = getPayloadRoot(body);
+  const rawTimestamp =
+    body.Timestamp ||
+    body.timestamp ||
+    body.date_time ||
+    root.messageTimestamp ||
+    root.timestamp;
+
+  if (typeof rawTimestamp === 'number') {
+    const milliseconds = rawTimestamp > 10_000_000_000 ? rawTimestamp : rawTimestamp * 1000;
+    return new Date(milliseconds).toISOString();
+  }
+
+  if (typeof rawTimestamp === 'string' && rawTimestamp.trim()) {
+    const asNumber = Number(rawTimestamp);
+    if (Number.isFinite(asNumber) && rawTimestamp.trim().match(/^\d+$/)) {
+      const milliseconds = asNumber > 10_000_000_000 ? asNumber : asNumber * 1000;
+      return new Date(milliseconds).toISOString();
+    }
+
+    return rawTimestamp;
+  }
+
+  return new Date().toISOString();
+}
+
+function extractMessageBody(body: RawWhatsappWebhookBody): string | null {
+  const root = getPayloadRoot(body);
+  const directCandidates = [
+    body.Body,
+    body.body,
+    typeof body.message === 'string' ? body.message : null,
+    body.text,
+    body.transcript,
+    body.transcription,
+    body.audioTranscription,
+    body.audio?.transcription,
+    body.media?.transcription,
+    root.text,
+    root.transcript,
+    root.transcription,
+  ];
+
+  for (const candidate of directCandidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return extractMessageContent(root.message);
+}
+
+function shouldIgnoreWebhook(body: RawWhatsappWebhookBody): { ignore: boolean; reason?: string } {
+  const eventName = normalizeEventName(body);
+  const root = getPayloadRoot(body);
+  const remoteJid = extractRemoteJid(body) || '';
+
+  if (eventName && eventName !== 'MESSAGES_UPSERT') {
+    return { ignore: true, reason: `evento ${eventName} ignorado` };
+  }
+
+  if (remoteJid.endsWith('@g.us') || remoteJid === 'status@broadcast') {
+    return { ignore: true, reason: 'grupo ou broadcast ignorado' };
+  }
+
+  if (root.key?.fromMe || body.key?.fromMe) {
+    return { ignore: true, reason: 'mensagem propria ignorada' };
+  }
+
+  return { ignore: false };
+}
 
 @ApiTags('WhatsApp')
 @Controller('whatsapp')
 export class WhatsappController {
   constructor(
     private readonly whatsappService: WhatsappService,
-    private readonly tenantsService: TenantsService, // Injetar TenantsService para validação
+    private readonly tenantsService: TenantsService,
   ) {}
 
   @Post('webhook')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Webhook do Twilio/Evolution API para receber mensagens',
-    description: '⚠️ SEGURANÇA: Valida que tenantId corresponde ao número de WhatsApp. Apenas números autorizados podem enviar mensagens.',
+    description:
+      'Aceita payloads de provedores diferentes e vincula a mensagem ao tenant correto.',
   })
-  async webhook(@Body() body: Partial<WhatsappWebhookDto> & Record<string, any>) {
-    // ⚠️ Suporta múltiplos formatos de webhook (Twilio, Evolution API, etc)
-    const from = body.From || body.from || body.phoneNumber;
-    const messageBody =
-      body.Body ||
-      body.body ||
-      body.message ||
-      body.text ||
-      body.transcript ||
-      body.transcription ||
-      body.audioTranscription ||
-      body.audio?.transcription ||
-      body.media?.transcription;
+  async webhook(
+    @Body() body: RawWhatsappWebhookBody,
+    @Query('tenantId') tenantIdFromQuery?: string,
+  ) {
+    const ignoreDecision = shouldIgnoreWebhook(body);
+    if (ignoreDecision.ignore) {
+      return {
+        success: true,
+        ignored: true,
+        reason: ignoreDecision.reason,
+      };
+    }
+
+    const from = normalizeDigits(extractRemoteJid(body));
+    const messageBody = extractMessageBody(body);
+    const tenantId =
+      body.tenantId || body.data?.tenantId || body.metadata?.tenantId || tenantIdFromQuery;
+
+    if (!from || !messageBody) {
+      throw new BadRequestException(
+        'Campos obrigatorios: remetente valido e texto da mensagem.',
+      );
+    }
+
+    if (!tenantId) {
+      throw new BadRequestException('tenantId e obrigatorio para processar mensagens WhatsApp');
+    }
+
+    const tenant = await this.tenantsService.findOneById(tenantId);
+    const configuredInstance =
+      tenant.settings?.whatsappInstance || tenant.settings?.whatsapp_instance || null;
+    const incomingInstance = body.instance || body.data?.instance || null;
+    const canTrustInstance =
+      Boolean(configuredInstance) &&
+      Boolean(incomingInstance) &&
+      configuredInstance === incomingInstance;
+
+    if (configuredInstance && incomingInstance && configuredInstance !== incomingInstance) {
+      throw new ForbiddenException(
+        `Instancia ${incomingInstance} nao autorizada para o tenant ${tenantId}`,
+      );
+    }
+
+    if (!canTrustInstance) {
+      await this.tenantsService.validateWhatsAppNumber(tenantId, from);
+    }
+
     const messageId =
       body.MessageSid ||
       body.messageId ||
@@ -37,48 +246,30 @@ export class WhatsappController {
       body.key?.id ||
       body.data?.key?.id ||
       body.data?.id;
-    const inferredMessageType =
-      body.messageType ||
-      body.type ||
-      (body.audio || body.voice || body.ptt || body.audioTranscription ? 'audio' : 'text');
     const mediaUrl = body.MediaUrl0 || body.mediaUrl || body.media?.url || body.audio?.url;
-    
-    if (!from || !messageBody) {
-      throw new BadRequestException('Campos obrigatórios: from/From/phoneNumber e body/Body/message/text');
-    }
-
-    // ⚠️ CRÍTICO: tenantId deve vir obrigatoriamente do webhook, nunca usar default hardcoded
-    const tenantId = body.tenantId;
-    if (!tenantId) {
-      throw new BadRequestException('tenantId é obrigatório para processar mensagens WhatsApp');
-    }
-
-    // ✅ SEGURANÇA: Validar que o tenantId corresponde ao número de WhatsApp
-    // Isso previne que webhooks maliciosos enviem qualquer tenantId
-    await this.tenantsService.validateTenantAndPhone(tenantId, from);
-
     const message = {
       from,
       body: messageBody,
-      timestamp: body.Timestamp || body.timestamp || body.timestamp || new Date().toISOString(),
+      timestamp: extractTimestamp(body),
       tenantId,
       messageId,
-      messageType: inferredMessageType,
+      messageType: inferMessageType(body),
       mediaUrl,
-      metadata: body.metadata || {
-        provider: body.provider || null,
+      metadata: {
+        ...(body.metadata || {}),
+        provider: body.provider || body.data?.provider || null,
         transcriptionSource: body.transcriptionSource || null,
+        webhookEvent: normalizeEventName(body),
+        whatsappInstance: incomingInstance,
       },
     };
 
     const response = await this.whatsappService.processIncomingMessage(message);
-    
-    // Retornar resposta para o webhook (Twilio/Evolution API)
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       response,
-      // Para Twilio, retornar formato específico
-      ...(body.From && { 
+      ...(body.From && {
         Message: response,
         To: message.from,
       }),
@@ -86,12 +277,13 @@ export class WhatsappController {
   }
 
   @Post('test')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Testar bot WhatsApp (desenvolvimento)',
-    description: 'Endpoint para testar o bot WhatsApp sem precisar de webhook real. Envie uma mensagem e receba a resposta do bot. ⚠️ Requer tenantId obrigatório. Em desenvolvimento, a validação de número é mais flexível.',
+    description:
+      'Endpoint para testar o bot sem webhook real. Requer tenantId explicito.',
   })
   @ApiResponse({ status: 200, description: 'Resposta do bot retornada com sucesso' })
-  @ApiResponse({ status: 403, description: 'Tenant ID inválido ou número não autorizado' })
+  @ApiResponse({ status: 403, description: 'Tenant ID invalido ou numero nao autorizado' })
   async test(@Body() body: {
     message: string;
     tenantId: string;
@@ -101,16 +293,11 @@ export class WhatsappController {
     mediaUrl?: string;
     metadata?: Record<string, unknown>;
   }) {
-    // ⚠️ CRÍTICO: Em desenvolvimento, tenantId deve ser fornecido explicitamente
     if (!body.tenantId) {
-      throw new BadRequestException('tenantId é obrigatório. Em desenvolvimento, use um tenant_id válido.');
+      throw new BadRequestException('tenantId e obrigatorio. Use um tenant valido.');
     }
 
-    // Usar número fornecido ou número mock padrão
     const phoneNumber = body.phoneNumber || '5511999999999';
-
-    // ✅ SEGURANÇA: Validar que o tenant existe e está ativo
-    // Em desenvolvimento, a validação de número é mais flexível (permitir se não configurado)
     await this.tenantsService.findOneById(body.tenantId);
 
     const message = {
@@ -125,8 +312,8 @@ export class WhatsappController {
     };
 
     const response = await this.whatsappService.processIncomingMessage(message);
-    return { 
-      success: true, 
+    return {
+      success: true,
       request: body.message,
       response,
     };

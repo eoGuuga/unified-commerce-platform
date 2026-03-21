@@ -208,3 +208,63 @@
     - POST /api/v1/payments/public com body vazio => 400 pedido_id e obrigatorio
   - observacao importante: o catalogo publico de producao respondeu vazio (0 produtos) no tenant atual; a infraestrutura publica ficou pronta, mas a vitrine real ainda depende de cadastro/publicacao dos produtos no tenant de producao
 
+2026-03-21
+- Ambiente: LOCAL
+- Escopo: homologacao inicial do primeiro cliente real Loucas Por Brigadeiro a partir do MenuDireto
+- Entregas:
+  - extracao estruturada do catalogo em scripts/data/site/loucas-por-brigadeiro/menudireto-catalog.json
+  - rascunho normalizado para homologacao em scripts/data/site/loucas-por-brigadeiro/ucm-homologacao.json
+  - script generico de importacao em scripts/seeds/seed-client-catalog.ts
+  - wrapper backend npm run seed:catalog
+  - teste unitario do bot com o catalogo real da Loucas Por Brigadeiro
+- Configuracao prevista no seed:
+  - tenant Loucas Por Brigadeiro
+  - phone autorizado em tenant.settings.whatsappNumbers
+  - categorias, produtos, estoque sintetico e metadata comercial do bot
+  - itens informativos do MenuDireto salvos em tenant.settings para referencia
+- Observacao:
+  - os dados reais de estoque continuam provisórios nesta fase de homologacao
+  - dry-run do seed passou com 61 produtos vendaveis, 9 categorias e 2 itens informativos
+  - execucao real do seed no banco local falhou por Postgres indisponivel (ECONNREFUSED em 127.0.0.1:5432)
+
+2026-03-21
+- Ambiente: LOCAL
+- Escopo: definicao operacional da homologacao da Loucas Por Brigadeiro
+- Decisao atual:
+  - usar numero pessoal para testes
+  - trocar para o numero oficial so na reta final
+  - usar navegador no computador da loja para PDV e estoque
+  - usar Pix e dinheiro na operacao inicial
+  - provedor WhatsApp recomendado para esta fase: Evolution API autohospedada
+- Documento criado:
+  - docs/CONSOLIDADO/11-HOMOLOGACAO-LOUCAS-POR-BRIGADEIRO.md
+
+2026-03-21
+- Ambiente: LOCAL
+- Escopo: preparacao tecnica da fase 1 da Loucas Por Brigadeiro em dev/teste
+- Entregas:
+  - deploy/docker-compose.evolution.test.yml
+  - deploy/evolution.test.env.example
+  - deploy/scripts/setup-evolution-test.sh
+  - deploy/scripts/configure-evolution-instance.sh
+  - deploy/scripts/seed-loucas-dev-test.sh
+  - deploy/scripts/apply-loucas-phase1-devtest.sh
+  - deploy/EVOLUTION-TEST-SETUP.md
+- Objetivo:
+  - subir Evolution API no VPS de dev/teste sem custo recorrente
+  - aplicar o tenant/catalogo da Loucas no ambiente de homologacao
+
+2026-03-21
+- Ambiente: LOCAL
+- Escopo: endurecimento da homologacao real com Evolution API e webhook bruto
+- Entregas:
+  - webhook do backend aceita payload bruto `messages.upsert` da Evolution
+  - tenant pode ser amarrado por `tenant.settings.whatsappInstance`
+  - eventos nao-mensagem da Evolution sao ignorados com `200`
+  - seed do tenant aceita `--whatsapp-instance`
+  - Evolution de dev/teste exposto apenas em `127.0.0.1:8081` para manager/tunel SSH
+  - script novo: `deploy/scripts/configure-evolution-instance.sh`
+- Objetivo:
+  - homologar o numero de teste no mesmo fluxo que sera usado na loja
+  - permitir troca futura para o numero oficial sem refazer a integracao do bot
+

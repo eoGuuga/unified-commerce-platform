@@ -74,8 +74,8 @@ describe('CatalogSalesContextService', () => {
 
     expect(profile.storeLabel).toBe('chocolates e doces');
     expect(profile.catalogReading).toContain('chocolates e doces');
-    expect(profile.catalogReading).toContain('presente');
-    expect(profile.qualificationQuestion).toContain('presente');
+    expect(profile.catalogReading).toContain('chocolate');
+    expect(profile.qualificationQuestion).toContain('mimo individual');
   });
 
   it('boosts products that match the configured catalog moments for gifting', () => {
