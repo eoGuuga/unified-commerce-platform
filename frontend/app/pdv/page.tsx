@@ -188,6 +188,8 @@ export default function PDVPage() {
   const router = useRouter();
   const { user, tenantId, isAuthenticated, isLoading: authLoading, login, logout } = useAuth();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const cartRef = useRef<CartItem[]>([]);
+  const tenantIdRef = useRef<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isSelling, setIsSelling] = useState(false);
@@ -209,6 +211,45 @@ export default function PDVPage() {
   const [completedSale, setCompletedSale] = useState<CompletedSaleState | null>(null);
 
   const debouncedSearch = useDebounce(searchTerm, 300);
+
+  useEffect(() => {
+    cartRef.current = cart;
+  }, [cart]);
+
+  useEffect(() => {
+    tenantIdRef.current = tenantId ?? null;
+  }, [tenantId]);
+
+  const releaseCartReservations = useCallback(
+    async (items: CartItem[], options?: { keepalive?: boolean }) => {
+      const activeTenantId = tenantIdRef.current;
+      if (!activeTenantId || items.length === 0) return;
+
+      if (options?.keepalive && typeof window !== 'undefined') {
+        const token = localStorage.getItem('token');
+
+        await Promise.allSettled(
+          items.map((item) =>
+            fetch(`${API_BASE_URL}/products/${item.id}/release?tenantId=${activeTenantId}`, {
+              method: 'POST',
+              body: JSON.stringify({ quantity: item.quantity }),
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+              keepalive: true,
+            }),
+          ),
+        );
+        return;
+      }
+
+      await Promise.allSettled(
+        items.map((item) => api.releaseStock(item.id, item.quantity, activeTenantId)),
+      );
+    },
+    [],
+  );
 
   // SWR para produtos - configurado para atualização quase em tempo real
   // ⚠️ CRÍTICO: tenantId deve vir do contexto JWT, nunca hardcoded
@@ -312,58 +353,22 @@ export default function PDVPage() {
     }
   }, [products, isLoading, error, mounted]);
 
-  // Liberar todas as reservas ao desmontar componente (fechar página)
+  // Liberar reservas apenas ao sair da página.
   useEffect(() => {
-    if (!mounted || !tenantId) return;
-
-    const releaseAllReservations = async () => {
-      if (cart.length === 0) return;
-      
-      try {
-        for (const item of cart) {
-          await api.releaseStock(item.id, item.quantity, tenantId);
-        }
-      } catch (error) {
-        console.error('Erro ao liberar reservas:', error);
-      }
-    };
+    if (!mounted) return;
 
     // Liberar ao fechar página/aba
     const handleBeforeUnload = () => {
-      if (typeof window === 'undefined' || cart.length === 0) return;
-      
-      // Usar sendBeacon para garantir que a requisição seja enviada
-      const token = localStorage.getItem('token');
-      cart.forEach(item => {
-        const url = `${API_BASE_URL}/products/${item.id}/release?tenantId=${tenantId}`;
-        const blob = new Blob([JSON.stringify({ quantity: item.quantity })], {
-          type: 'application/json',
-        });
-        
-        // Tentar usar fetch com keepalive, senão sendBeacon
-        if (navigator.sendBeacon) {
-          navigator.sendBeacon(url, blob);
-        } else {
-          fetch(url, {
-            method: 'POST',
-            body: blob,
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-            keepalive: true,
-          }).catch(() => {});
-        }
-      });
+      void releaseCartReservations(cartRef.current, { keepalive: true });
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Liberar reservas ao desmontar
-      if (cart.length > 0) {
-        releaseAllReservations();
-      }
+      void releaseCartReservations(cartRef.current);
     };
-  }, [mounted, cart, tenantId]);
+  }, [mounted, releaseCartReservations]);
 
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
@@ -749,7 +754,10 @@ export default function PDVPage() {
       toast.error('Tenant ID não disponível. Faça login novamente.');
       return;
     }
-    if (cart.length === 0) {
+    const hasExistingOrder = Boolean(orderData?.id);
+    const checkoutTotal = orderData?.total || saleSnapshot?.total || total;
+
+    if (!hasExistingOrder && cart.length === 0) {
       toast.error('Carrinho vazio!');
       return;
     }
@@ -759,7 +767,7 @@ export default function PDVPage() {
         toast.error('Informe o valor recebido.');
         return;
       }
-      if (received < total) {
+      if (received < checkoutTotal) {
         toast.error('Valor recebido menor que o total.');
         return;
       }
@@ -781,35 +789,61 @@ export default function PDVPage() {
     setIsSelling(true);
     setPaymentError(null);
     try {
-      const loadingToast = toast.loading('Criando pedido...');
-      const createdOrder = await api.createOrder(order, tenantId);
-      toast.dismiss(loadingToast);
+      let activeOrder = orderData;
+      const snapshot =
+        saleSnapshot ||
+        ({
+          items: cart.map((item) => ({ ...item })),
+          total: checkoutTotal,
+          itemsCount: cart.reduce((sum, item) => sum + item.quantity, 0),
+        } as SaleSnapshot);
 
-      const createdTotal = typeof createdOrder.total_amount === 'string'
-        ? parseFloat(createdOrder.total_amount)
-        : Number(createdOrder.total_amount);
+      if (!activeOrder) {
+        const loadingToast = toast.loading('Criando pedido...');
+        try {
+          const createdOrder = await api.createOrder(order, tenantId);
+          const createdTotal =
+            typeof createdOrder.total_amount === 'string'
+              ? parseFloat(createdOrder.total_amount)
+              : Number(createdOrder.total_amount);
 
-      setOrderData({
-        id: createdOrder.id,
-        total: Number.isFinite(createdTotal) ? createdTotal : total,
-        orderNo: createdOrder.order_no,
-      });
+          activeOrder = {
+            id: createdOrder.id,
+            total: Number.isFinite(createdTotal) ? createdTotal : checkoutTotal,
+            orderNo: createdOrder.order_no,
+          };
 
+          setOrderData(activeOrder);
+          setSaleSnapshot({
+            items: snapshot.items.map((item) => ({ ...item })),
+            total: activeOrder.total,
+            itemsCount: snapshot.itemsCount,
+          });
+          setCart([]);
+          setSearchTerm('');
+          await mutate();
+        } finally {
+          toast.dismiss(loadingToast);
+        }
+      } else if (!saleSnapshot) {
+        setSaleSnapshot({
+          items: snapshot.items.map((item) => ({ ...item })),
+          total: activeOrder.total,
+          itemsCount: snapshot.itemsCount,
+        });
+      }
+
+      setPaymentData(null);
       const paymentResult: PaymentResult = await api.createPayment(
         {
-          pedido_id: createdOrder.id,
+          pedido_id: activeOrder.id,
           method: paymentMethod,
-          amount: createdTotal || total,
+          amount: activeOrder.total,
         },
         tenantId,
       );
 
       setPaymentData(paymentResult);
-      setSaleSnapshot({
-        items: cart.map((item) => ({ ...item })),
-        total,
-        itemsCount: cart.reduce((sum, item) => sum + item.quantity, 0),
-      });
       const isDevHost =
         typeof window !== 'undefined' &&
         (['localhost', '127.0.0.1'].includes(window.location.hostname) ||
@@ -825,8 +859,6 @@ export default function PDVPage() {
           setCashReceived('');
           setCouponCode('');
           await mutate();
-          setCart([]);
-          setSearchTerm('');
           return;
         } catch (confirmError: any) {
           const message = confirmError?.message || 'Falha ao simular pagamento Pix no DEV.';
@@ -834,10 +866,11 @@ export default function PDVPage() {
           toast.error(message);
         }
       }
-      setCart([]);
-      setSearchTerm('');
-      await mutate();
-      toast.success('Pedido criado. Pagamento gerado!');
+      toast.success(
+        hasExistingOrder
+          ? 'Pagamento atualizado para o pedido em aberto!'
+          : 'Pedido criado. Pagamento gerado!',
+      );
     } catch (error: any) {
       const message = error.message || 'Não foi possível criar o pedido/pagamento';
       setPaymentError(message);
@@ -1890,9 +1923,15 @@ export default function PDVPage() {
                           <input
                             value={couponCode}
                             onChange={(e) => setCouponCode(e.target.value)}
+                            disabled={Boolean(orderData?.id)}
                             placeholder="EX: PROMO10"
-                            className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                            className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           />
+                          {orderData?.id && (
+                            <p className="mt-2 text-xs text-slate-500">
+                              O pedido ja foi criado. Agora vamos apenas regenerar o pagamento com seguranca.
+                            </p>
+                          )}
                         </div>
                         {paymentMethod === 'dinheiro' && (
                           <div>
@@ -1927,7 +1966,11 @@ export default function PDVPage() {
                         disabled={paymentLoading}
                         className="inline-flex flex-1 items-center justify-center rounded-full bg-[linear-gradient(135deg,#0891b2_0%,#0f766e_100%)] px-6 py-4 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(8,145,178,0.22)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
                       >
-                        {paymentLoading ? 'Processando...' : 'Gerar pagamento'}
+                        {paymentLoading
+                          ? 'Processando...'
+                          : orderData?.id
+                            ? 'Gerar pagamento novamente'
+                            : 'Gerar pagamento'}
                       </button>
                       {paymentData?.pagamento?.id && (
                         <button

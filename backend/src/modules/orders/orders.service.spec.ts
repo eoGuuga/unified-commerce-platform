@@ -39,8 +39,8 @@ describe('OrdersService', () => {
 
   const mockManager = {
     createQueryBuilder: jest.fn(),
-    create: jest.fn(),
-    save: jest.fn(),
+    create: jest.fn((_entity, data) => data),
+    save: jest.fn(async (data) => data),
     getRepository: jest.fn((entity) => {
       if (entity === Pedido) return mockPedidoRepository;
       if (entity === ItemPedido) return mockItensRepository;
@@ -247,6 +247,7 @@ describe('OrdersService', () => {
       const updateQueryBuilder = {
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
+        setParameters: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
@@ -298,6 +299,7 @@ describe('OrdersService', () => {
       const updateQueryBuilder = {
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
+        setParameters: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
@@ -358,6 +360,7 @@ describe('OrdersService', () => {
       const updateQueryBuilder = {
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
+        setParameters: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
@@ -368,22 +371,22 @@ describe('OrdersService', () => {
         if (entity === Produto) return produtosQueryBuilder as any;
         return updateQueryBuilder as any;
       });
-
       mockDbContextService.runInTransaction = jest.fn(async (callback) => {
         return callback(mockManager);
       });
 
       // Act & Assert
-      await expect(service.create(createOrderDto, tenantId)).rejects.toThrow(BadRequestException);
-      await expect(service.create(createOrderDto, tenantId)).rejects.toThrow('Estoque insuficiente');
+      const createPromise = service.create(createOrderDto, tenantId);
+      await expect(createPromise).rejects.toThrow(BadRequestException);
+      await expect(createPromise).rejects.toThrow('Estoque insuficiente');
     });
 
-    it('deve considerar estoque reservado ao validar disponibilidade', async () => {
+    it('deve permitir fechar pedido consumindo a reserva do proprio PDV', async () => {
       // Arrange
       const estoquesComReserva: Partial<MovimentacaoEstoque>[] = [
         {
           ...mockEstoques[0],
-          current_stock: 10,
+          current_stock: 5,
           reserved_stock: 6, // Estoque disponível = 10 - 6 = 4, mas precisa de 5
         },
         mockEstoques[1],
@@ -405,6 +408,7 @@ describe('OrdersService', () => {
       const updateQueryBuilder = {
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
+        setParameters: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
@@ -421,9 +425,58 @@ describe('OrdersService', () => {
         return callback(mockManager);
       });
 
+      jest.spyOn(service as any, 'generateOrderNumber').mockResolvedValue('PED-20260107-001');
+
+      // Act
+      const result = await service.create(createOrderDto, tenantId);
+
+      // Assert
+      expect(result).toBeDefined();
+      expect(result.status).toBe(PedidoStatus.PENDENTE_PAGAMENTO);
+      expect(updateQueryBuilder.setParameters).toHaveBeenCalled();
+    });
+
+    it('deve falhar se o abate atomico de estoque nao conseguir atualizar a linha', async () => {
+      // Arrange
+      const estoqueQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        setLock: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockEstoques),
+      };
+
+      const produtosQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockProdutos),
+      };
+
+      const updateQueryBuilder = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        setParameters: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest
+          .fn()
+          .mockResolvedValueOnce({ affected: 1 })
+          .mockResolvedValueOnce({ affected: 0 }),
+      };
+
+      mockManager.createQueryBuilder = jest.fn((entity) => {
+        if (entity === MovimentacaoEstoque) return estoqueQueryBuilder as any;
+        if (entity === Produto) return produtosQueryBuilder as any;
+        return updateQueryBuilder as any;
+      });
+
+      mockDbContextService.runInTransaction = jest.fn(async (callback) => {
+        return callback(mockManager);
+      });
+
       // Act & Assert
-      await expect(service.create(createOrderDto, tenantId)).rejects.toThrow(BadRequestException);
-      await expect(service.create(createOrderDto, tenantId)).rejects.toThrow('Estoque insuficiente');
+      const createPromise = service.create(createOrderDto, tenantId);
+      await expect(createPromise).rejects.toThrow(BadRequestException);
+      await expect(createPromise).rejects.toThrow('Estoque insuficiente');
     });
 
     it('deve calcular totais corretamente com desconto e frete', async () => {
@@ -451,6 +504,7 @@ describe('OrdersService', () => {
       const updateQueryBuilder = {
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
+        setParameters: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
@@ -519,6 +573,7 @@ describe('OrdersService', () => {
       const updateQueryBuilder = {
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
+        setParameters: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({ affected: 1 }),

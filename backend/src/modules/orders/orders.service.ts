@@ -219,30 +219,39 @@ export class OrdersService {
         }
       }
 
-      // 4. Validar estoque disponível (considerando reservas)
+      // 4. Validar estoque físico disponível.
+      // reserved_stock representa reservas soltas de carrinhos abertos e não carrega ownership.
+      // No checkout, o pedido atual pode estar consumindo parte ou toda essa reserva.
       for (const item of createOrderDto.items) {
         const estoque = produtosMap.get(item.produto_id)!;
-        const availableStock = estoque.current_stock - estoque.reserved_stock;
-        if (availableStock < item.quantity) {
+        if (estoque.current_stock < item.quantity) {
           throw new BadRequestException(
-            `Estoque insuficiente para produto ${item.produto_id}: necessário ${item.quantity}, disponível ${availableStock}`,
+            `Estoque insuficiente para produto ${item.produto_id}: necessário ${item.quantity}, disponível ${estoque.current_stock}`,
           );
         }
       }
 
       // 5. Abater estoque e liberar reserva (dentro da transação)
       for (const item of createOrderDto.items) {
-        await manager
+        const updateResult = await manager
           .createQueryBuilder()
           .update(MovimentacaoEstoque)
           .set({
-            current_stock: () => `current_stock - ${item.quantity}`,
-            reserved_stock: () => `GREATEST(0, reserved_stock - ${item.quantity})`, // Libera a reserva
+            current_stock: () => 'current_stock - :quantity',
+            reserved_stock: () => 'GREATEST(0, reserved_stock - :quantity)', // Libera a reserva
             last_updated: () => 'NOW()',
           })
+          .setParameters({ quantity: item.quantity })
           .where('tenant_id = :tenantId', { tenantId })
           .andWhere('produto_id = :produtoId', { produtoId: item.produto_id })
+          .andWhere('current_stock >= :quantity', { quantity: item.quantity })
           .execute();
+
+        if (!updateResult.affected || updateResult.affected < 1) {
+          throw new BadRequestException(
+            `Estoque insuficiente para produto ${item.produto_id}: necessário ${item.quantity}`,
+          );
+        }
       }
 
       // 6. Criar pedido
