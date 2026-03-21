@@ -65,18 +65,32 @@ fi
 
 echo ""
 echo "==> Configurando webhook da instancia ${INSTANCE_NAME}"
-curl -fsS \
-  --request POST \
-  --url "${EVOLUTION_ADMIN_URL}/webhook/set/${INSTANCE_NAME}" \
-  --header "Content-Type: application/json" \
-  --header "apikey: ${AUTHENTICATION_API_KEY}" \
-  --data "{
-    \"enabled\": true,
-    \"url\": \"${WEBHOOK_URL}\",
-    \"events\": [\"QRCODE_UPDATED\", \"MESSAGES_UPSERT\", \"CONNECTION_UPDATE\"],
-    \"webhook_by_events\": false,
-    \"webhook_base64\": false
-  }"
+WEBHOOK_SET_RESPONSE_FILE="$(mktemp)"
+WEBHOOK_SET_STATUS="$(
+  curl -sS \
+    -o "${WEBHOOK_SET_RESPONSE_FILE}" \
+    -w "%{http_code}" \
+    --request POST \
+    --url "${EVOLUTION_ADMIN_URL}/webhook/set/${INSTANCE_NAME}" \
+    --header "Content-Type: application/json" \
+    --header "apikey: ${AUTHENTICATION_API_KEY}" \
+    --data "{
+      \"enabled\": true,
+      \"url\": \"${WEBHOOK_URL}\",
+      \"events\": [\"QRCODE_UPDATED\", \"MESSAGES_UPSERT\", \"CONNECTION_UPDATE\"],
+      \"webhook_by_events\": false,
+      \"webhook_base64\": false
+    }"
+)"
+
+if [[ ! "${WEBHOOK_SET_STATUS}" =~ ^2 ]]; then
+  echo "Aviso: webhook/set retornou HTTP ${WEBHOOK_SET_STATUS}. Vou consultar a configuracao atual."
+  cat "${WEBHOOK_SET_RESPONSE_FILE}"
+else
+  cat "${WEBHOOK_SET_RESPONSE_FILE}"
+fi
+
+rm -f "${WEBHOOK_SET_RESPONSE_FILE}"
 
 echo ""
 echo "==> Webhook atual"

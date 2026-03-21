@@ -21,5 +21,15 @@ cd "$ROOT_DIR"
 docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.test.yml --project-name ucmtest up -d --build backend
 
 echo "==> Health check"
-curl -fsS "${FRONTEND_URL%/}/api/v1/health" >/dev/null
-echo "Fase 1 da Loucas aplicada em dev/teste."
+for attempt in $(seq 1 30); do
+  if curl -fsS "${FRONTEND_URL%/}/api/v1/health" >/dev/null 2>&1; then
+    echo "Health check OK na tentativa ${attempt}."
+    echo "Fase 1 da Loucas aplicada em dev/teste."
+    exit 0
+  fi
+
+  sleep 2
+done
+
+echo "Health check falhou apos 30 tentativas." >&2
+exit 1
