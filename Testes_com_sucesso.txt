@@ -156,7 +156,55 @@
   - commit ativo: d766bba
   - health: https://gtsofthub.com.br/api/v1/health => ok
   - pagina PDV: https://gtsofthub.com.br/pdv => 200
-  - observacao: nao rodei pedido sintetico em producao para nao poluir operacao real
+- observacao: nao rodei pedido sintetico em producao para nao poluir operacao real
 - Backup DEV/TESTE: /opt/ucm-test-repo/backups/pdv-flow-20260321-052749
 - Backup PRODUCAO: /home/ubuntu/ucm-backups/prod-pdv-flow-20260321-053114
+
+2026-03-21
+- Ambiente: LOCAL + DEV/TESTE (VPS) /opt/ucm-test-repo + PRODUCAO /opt/ucm
+- Commits desta rodada:
+  - 2f2499c => loja publica real com catalogo publico, checkout publico, idempotencia no pedido e retomada resiliente sem duplicar pedido
+  - 59c1a0d => primeira blindagem de payload invalido em pagamentos publicos
+  - 76fa859 => validacao final de payload invalido tambem no atalho publico de pagamentos
+- Escopo:
+  - catalogo da loja deixa de depender de autenticacao para carregar produtos
+  - checkout da loja deixa de depender de token para criar pedido ecommerce e gerar pagamento
+  - idempotencia de checkout aplicada na loja para evitar duplicidade em retry
+  - pagamento da loja reaproveita pedido ja criado em vez de abrir outro
+  - carrinho fica travado quando ja existe pedido aberto, evitando divergencia entre carrinho e pedido
+  - pagina da loja passa a reaproveitar a sessao de checkout aberta e o acompanhamento do pedido
+  - endpoints publicos novos:
+    - GET /api/v1/products/public/catalog
+    - POST /api/v1/orders/public/checkout
+    - POST /api/v1/payments/public
+- Validacao local:
+  - frontend: npm.cmd run lint => PASS
+  - frontend: npm.cmd run build => PASS
+  - backend: npm.cmd run lint => PASS
+  - backend: npm.cmd run build => PASS
+  - observacao: npm.cmd run test:integration tentou subir a suite inteira, mas o Postgres local nao estava disponivel (ECONNREFUSED 127.0.0.1:5432), entao a validacao forte desta rodada ficou concentrada em dev/teste e checks publicos reais
+- DEV/TESTE:
+  - commit ativo final: 76fa859
+  - backup: /opt/ucm-test-repo/backups/store-public-checkout-20260321-110453
+  - health: https://dev.gtsofthub.com.br/api/v1/health => ok
+  - smoke autenticado legado: bash /opt/ucm-test-repo/deploy/scripts/run-dev-smoke.sh => OK
+  - fluxo publico real sem token:
+    - catalogo publico => OK
+    - pedido publico idempotente => PED-20260321-01EA / mesmo id reaproveitado com a mesma Idempotency-Key
+    - pagamento publico reaproveitado => 7d9d33a9-1635-42f3-9a12-52580a8914ef pending / mesmo id em retry
+    - rastreio publico => PED-20260321-01EA / pendente_pagamento
+  - rerun final do fluxo publico apos blindagem de payload:
+    - PED-20260321-DD8A / pagamento bac68048-e958-443a-bc6f-2a112ee0f16d / rastreio pendente_pagamento => OK
+  - contrato defensivo:
+    - POST /api/v1/payments/public com body vazio => 400 pedido_id e obrigatorio
+- PRODUCAO:
+  - commit ativo final: 76fa859
+  - backup pos-promocao: /home/ubuntu/ucm-backups/prod-store-public-checkout-post-20260321-111013
+  - health: https://gtsofthub.com.br/api/v1/health => ok
+  - pagina loja: https://gtsofthub.com.br/loja => 200
+  - validacao segura dos endpoints publicos, sem criar pedido sintetico real:
+    - GET /api/v1/products/public/catalog => 200
+    - POST /api/v1/orders/public/checkout com body vazio => 400
+    - POST /api/v1/payments/public com body vazio => 400 pedido_id e obrigatorio
+  - observacao importante: o catalogo publico de producao respondeu vazio (0 produtos) no tenant atual; a infraestrutura publica ficou pronta, mas a vitrine real ainda depende de cadastro/publicacao dos produtos no tenant de producao
 
