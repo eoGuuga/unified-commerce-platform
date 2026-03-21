@@ -263,6 +263,7 @@
   - tenant pode ser amarrado por `tenant.settings.whatsappInstance`
   - eventos nao-mensagem da Evolution sao ignorados com `200`
   - seed do tenant aceita `--whatsapp-instance`
+  - seed de dev/teste usa container Node temporario na rede `ucmtest_ucm-test-net` quando estiver no VPS
   - Evolution de dev/teste exposto apenas em `127.0.0.1:8081` para manager/tunel SSH
   - script novo: `deploy/scripts/configure-evolution-instance.sh`
 - Objetivo:

@@ -40,6 +40,10 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep evolution
 docker logs --tail 100 ucm-evolution-test
 ```
 
+Observacao:
+- O seed da Loucas em `deploy/scripts/seed-loucas-dev-test.sh` usa um container Node temporario na rede `ucmtest_ucm-test-net` quando estiver rodando no VPS.
+- Isso permite importar no Postgres do `dev/teste` sem depender de DNS do host.
+
 ## Configuracao do backend de dev/teste
 No arquivo `/opt/ucm-test-repo/deploy/.env`, configurar:
 

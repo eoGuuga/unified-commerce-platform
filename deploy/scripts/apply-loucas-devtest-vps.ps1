@@ -1,5 +1,5 @@
 param(
-  [string]$Host = "37.59.118.210",
+  [string]$ServerHost = "37.59.118.210",
   [string]$User = "ubuntu",
   [string]$KeyPath = "$HOME\.ssh\ucm_ovh_ed25519",
   [string]$RepoPath = "/opt/ucm-test-repo",
@@ -67,7 +67,7 @@ curl -fsS "https://dev.gtsofthub.com.br/api/v1/whatsapp/health"
 
 $sshArgs = @(
   "-i", $KeyPath,
-  "$User@$Host",
+  "$User@$ServerHost",
   "bash -s -- '$RepoPath' '$EvolutionApiKey' '$EvolutionInstance'"
 )
 
