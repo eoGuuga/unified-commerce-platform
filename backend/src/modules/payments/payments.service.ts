@@ -71,6 +71,14 @@ export class PaymentsService {
     tenantId: string,
     createPaymentDto: CreatePaymentDto,
   ): Promise<PaymentResult> {
+    if (!createPaymentDto?.pedido_id) {
+      throw new BadRequestException('pedido_id e obrigatorio');
+    }
+
+    if (!createPaymentDto?.method) {
+      throw new BadRequestException('method e obrigatorio');
+    }
+
     this.logger.log(
       `Creating payment for order ${createPaymentDto.pedido_id}, method: ${createPaymentDto.method}`,
     );
