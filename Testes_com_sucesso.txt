@@ -51,3 +51,19 @@
 - Backup DEV/TESTE: /opt/ucm-test-repo/backups/whatsapp-sales-intelligence-20260321-014911
 - Backup PRODUCAO: /opt/ucm/backups/whatsapp-sales-intelligence-20260321-020540
 
+2026-03-20
+- Ambiente: LOCAL + DEV/TESTE (VPS) /opt/ucm-test-repo + PRODUCAO /opt/ucm
+- Commit final publicado: 9b2d5a0
+- Escopo: playbooks comerciais por segmento para a IA do WhatsApp (confeitaria, moda, beleza, otica, bem-estar, pet, alimentacao, eletronicos e casa)
+- Commits desta rodada: 6af865d (playbooks por segmento) + 9b2d5a0 (inferência mais conservadora para catálogos mistos)
+- Validacao local: npm.cmd run test:unit => 115/115 PASS; npm.cmd run lint => PASS; npm.cmd run build => PASS
+- Bateria real WhatsApp: powershell -ExecutionPolicy Bypass -File backend/scripts/test-whatsapp-hardening.ps1
+- Relatorio final: C:\Users\gusta\OneDrive\Desktop\sas\test-whatsapp-hardening-results-20260320-233717.json
+- Resultado bateria: 61 cenarios / 0 falhas
+- DEV/TESTE: https://dev.gtsofthub.com.br/api/v1/health => ok
+- DEV/TESTE: https://dev.gtsofthub.com.br/api/v1/whatsapp/health => ok
+- PRODUCAO: https://gtsofthub.com.br/api/v1/health => ok
+- PRODUCAO: https://gtsofthub.com.br/api/v1/whatsapp/health => ok
+- Backup DEV/TESTE: /opt/ucm-test-repo/backups/whatsapp-sales-playbooks-20260321-022123
+- Backup PRODUCAO: /opt/ucm/backups/whatsapp-sales-playbooks-20260321-023738
+
