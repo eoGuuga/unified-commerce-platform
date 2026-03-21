@@ -61,6 +61,16 @@ cd /opt/ucm-test-repo
 docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.test.yml --project-name ucmtest up -d backend
 ```
 
+## Configuracao da Evolution v2
+- A Evolution v2 precisa de banco e cache proprios configurados no `.env`.
+- O fluxo recomendado no projeto reaproveita:
+  - Postgres do `dev/teste` em `postgres:5432`
+  - Redis do `dev/teste` em `redis:6379`
+- O script `deploy/scripts/apply-loucas-devtest-vps.ps1` ja cria o banco `evolution` e preenche:
+  - `DATABASE_PROVIDER=postgresql`
+  - `DATABASE_CONNECTION_URI=postgresql://postgres:...@postgres:5432/evolution?schema=public`
+  - `CACHE_REDIS_URI=redis://:...@redis:6379/6`
+
 ## Pareamento do numero de teste
 - O script `deploy/scripts/configure-evolution-instance.sh` cria a instancia `loucas-teste` com webhook apontando para:
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/webhook?tenantId=00000000-0000-0000-0000-000000000000`
