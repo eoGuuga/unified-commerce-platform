@@ -35,3 +35,19 @@
 - Backup DEV/TESTE: /opt/ucm-test-repo/backups/whatsapp-message-intelligence-fix-20260320-200712
 - Backup PRODUCAO: /opt/ucm/backups/whatsapp-message-intelligence-20260320-201535
 
+2026-03-20
+- Ambiente: LOCAL + DEV/TESTE (VPS) /opt/ucm-test-repo + PRODUCAO /opt/ucm
+- Commit final publicado: 7bad1c3
+- Escopo: IA comercial consultiva para WhatsApp, orientada a venda profissional multi-segmento
+- Commits desta rodada: ed37812 (motor de inteligencia comercial) + 7bad1c3 (ajuste fino de copy para recomendacao de presente)
+- Validacao local: npm.cmd run test:unit => 110/110 PASS; npm.cmd run lint => PASS; npm.cmd run build => PASS
+- Bateria real WhatsApp: powershell -ExecutionPolicy Bypass -File backend/scripts/test-whatsapp-hardening.ps1
+- Relatorio final: C:\Users\gusta\OneDrive\Desktop\sas\test-whatsapp-hardening-results-20260320-230434.json
+- Resultado bateria: 61 cenarios / 0 falhas
+- DEV/TESTE: https://dev.gtsofthub.com.br/api/v1/health => ok
+- DEV/TESTE: https://dev.gtsofthub.com.br/api/v1/whatsapp/health => ok
+- PRODUCAO: https://gtsofthub.com.br/api/v1/health => ok
+- PRODUCAO: https://gtsofthub.com.br/api/v1/whatsapp/health => ok
+- Backup DEV/TESTE: /opt/ucm-test-repo/backups/whatsapp-sales-intelligence-20260321-014911
+- Backup PRODUCAO: /opt/ucm/backups/whatsapp-sales-intelligence-20260321-020540
+
