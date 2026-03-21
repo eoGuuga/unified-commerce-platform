@@ -131,3 +131,32 @@
 - Backup DEV/TESTE: /opt/ucm-test-repo/backups/whatsapp-chocolate-guidance-20260321-043739
 - Backup PRODUCAO: /opt/ucm/backups/whatsapp-chocolate-guidance-20260321-044536
 
+2026-03-21
+- Ambiente: LOCAL + DEV/TESTE (VPS) /opt/ucm-test-repo + PRODUCAO /opt/ucm
+- Commit funcional publicado: d766bba
+- Escopo: hardening real da integracao PDV + estoque + pedidos + pagamentos
+- Ajustes principais:
+  - PDV nao libera mais reserva de estoque a cada mudanca de carrinho; agora libera apenas ao sair da pagina
+  - PDV passa a reaproveitar pedido ja criado quando a geracao do pagamento falha, evitando pedido/baixa duplicados
+  - OrdersService passa a fechar pedido com base no estoque fisico e a proteger o abate atomico de estoque no update final
+- Validacao local:
+  - backend: npm.cmd run lint => PASS
+  - backend: npm.cmd run build => PASS
+  - backend: npm.cmd run test:unit -- --runInBand backend/src/modules/orders/orders.service.spec.ts => 7/7 PASS
+  - frontend: npm.cmd run lint => PASS
+  - frontend: npm.cmd run build => PASS
+- DEV/TESTE:
+  - commit ativo: d766bba
+  - smoke basico: bash ./deploy/scripts/run-dev-smoke.sh => OK
+  - health: https://dev.gtsofthub.com.br/api/v1/health => ok
+  - pagina PDV: https://dev.gtsofthub.com.br/pdv => 200
+  - smoke sintetico pedido+pagamento: produto de teste => pedido PED-20260321-73CE / pagamento pix pendente => OK
+  - caso critico reserva->pedido: reserva OK + pedido PED-20260321-B911 criado apos reserva => OK
+- PRODUCAO:
+  - commit ativo: d766bba
+  - health: https://gtsofthub.com.br/api/v1/health => ok
+  - pagina PDV: https://gtsofthub.com.br/pdv => 200
+  - observacao: nao rodei pedido sintetico em producao para nao poluir operacao real
+- Backup DEV/TESTE: /opt/ucm-test-repo/backups/pdv-flow-20260321-052749
+- Backup PRODUCAO: /home/ubuntu/ucm-backups/prod-pdv-flow-20260321-053114
+
