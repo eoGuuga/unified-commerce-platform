@@ -2,6 +2,18 @@
 
 Ultima atualizacao: 2026-03-21
 
+## Status atual da fase 1
+- Instancia `loucas-teste` pareada com sucesso no Evolution em `dev/teste`.
+- Numero pessoal de teste conectado e pronto para homologacao controlada.
+- Catalogo Loucas carregado no tenant `00000000-0000-0000-0000-000000000000`.
+- Validacoes concluidas em `dev/teste`:
+  - bot WhatsApp criando pedido com Pix
+  - checkout publico da loja criando pedido com Pix
+  - rastreio publico funcionando
+  - estoque refletindo pedidos de WhatsApp e da loja
+- Ajuste importante feito durante a homologacao:
+  - selecao numerica de recomendacao (`1`, `2`, `3`) agora assume `1 unidade` quando a recomendacao escolhida nao tinha quantidade previa, evitando erro com produtos que tem numero no nome
+
 ## Decisao operacional atual
 - Primeiro cliente real: Loucas Por Brigadeiro.
 - Fase atual: homologacao com numero pessoal de teste.

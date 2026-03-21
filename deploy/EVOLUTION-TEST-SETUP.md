@@ -63,6 +63,9 @@ docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.test.yml --pr
 
 ## Configuracao da Evolution v2
 - A Evolution v2 precisa de banco e cache proprios configurados no `.env`.
+- Para a homologacao da Loucas, a combinacao validada foi:
+  - imagem `evoapicloud/evolution-api:v2.3.7`
+  - `CONFIG_SESSION_PHONE_VERSION=2.3000.1020885143`
 - O fluxo recomendado no projeto reaproveita:
   - Postgres do `dev/teste` em `postgres:5432`
   - Redis do `dev/teste` em `redis:6379`

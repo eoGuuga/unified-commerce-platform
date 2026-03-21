@@ -270,3 +270,30 @@
   - homologar o numero de teste no mesmo fluxo que sera usado na loja
   - permitir troca futura para o numero oficial sem refazer a integracao do bot
 
+2026-03-21
+- Ambiente: LOCAL / DEV-TESTE
+- Escopo: pareamento do numero de teste da Loucas Por Brigadeiro e smoke completo de homologacao
+- Evolution API:
+  - imagem de dev/teste ajustada para `evoapicloud/evolution-api:v2.3.7`
+  - `CONFIG_SESSION_PHONE_VERSION=2.3000.1020885143` registrada no exemplo de ambiente
+  - instancia `loucas-teste` pareada com sucesso
+  - estado confirmado: `open`
+- Homologacao validada em dev/teste:
+  - `GET /api/v1/products/public/catalog` com tenant `00000000-0000-0000-0000-000000000000` => catalogo Loucas carregado
+  - `POST /api/v1/whatsapp/test` => fluxo real de pedido WhatsApp criado ate Pix
+  - pedido WhatsApp homologado: `PED-20260321-A484`
+  - `POST /api/v1/orders/public/track` => rastreio publico validado para `PED-20260321-A484`
+  - `POST /api/v1/orders/public/checkout` => pedido publico homologado: `PED-20260321-2549`
+  - `POST /api/v1/payments/public` => Pix publico homologado para `PED-20260321-2549`
+  - estoque refletido no catalogo publico:
+    - `10 Brigadeiros tradicionais` caiu de `40` para `35` apos pedido WhatsApp
+    - `3 Beijinhos de coco` caiu de `40` para `39` apos checkout publico
+  - paginas operacionais:
+    - `https://dev.gtsofthub.com.br/loja` => `200`
+    - `https://dev.gtsofthub.com.br/pdv` => `200`
+    - `https://dev.gtsofthub.com.br/admin/estoque` => `200`
+- Correcao funcional descoberta na homologacao:
+  - selecao numerica de recomendacao (`1`, `2`, `3`) com produto contendo numero no nome podia capturar quantidade errada
+  - ajuste aplicado no fluxo contextual do WhatsApp para assumir `1 unidade` quando a selecao numerica escolhe uma sugestao sem quantidade previa
+  - teste novo cobrindo `Caixa presenteavel com 6 brigadeiros tradicionais`
+

@@ -839,6 +839,57 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('PEDIDO PREPARADO');
   });
 
+  it('defaults numeric recommendation selection to one unit when the suggested product name contains numbers', async () => {
+    const recommendationCatalog = [
+      {
+        id: 'gift1',
+        name: 'Caixa presenteavel 12 brigadeiros tradicionais',
+        price: 48,
+        available_stock: 10,
+        created_at: '2026-03-21T00:00:00.000Z',
+        categoria: { name: 'Presentear' },
+      },
+      {
+        id: 'gift2',
+        name: 'Caixa presenteavel com 6 brigadeiros tradicionais',
+        price: 26,
+        available_stock: 12,
+        created_at: '2026-03-21T00:00:00.000Z',
+        categoria: { name: 'Presentear' },
+      },
+    ];
+
+    const { service, conversationService } = createFixture(recommendationCatalog);
+
+    const response = await service.generateResponse(
+      '2',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_names: recommendationCatalog.map((product) => product.name),
+            last_query: 'algo para presente',
+          },
+        },
+      }),
+    );
+
+    expect(conversationService.savePendingOrder).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            produto_name: 'Caixa presenteavel com 6 brigadeiros tradicionais',
+            quantity: 1,
+          }),
+        ]),
+      }),
+    );
+    expect(response).toContain('PEDIDO PREPARADO');
+  });
+
   it('keeps consultation mode when selecting a remembered price suggestion by number', async () => {
     const { service } = createFixture(catalog);
 

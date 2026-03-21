@@ -4741,8 +4741,11 @@ export class WhatsappService {
       return null;
     }
 
-    const syntheticMessage = contextualAnalysis.contextualQuantity
-      ? `quero ${contextualAnalysis.contextualQuantity} ${contextualAnalysis.contextualProductCandidate}`
+    const fallbackQuantity =
+      contextualAnalysis.references.selectedSuggestionIndex !== null ? 1 : null;
+    const syntheticQuantity = contextualAnalysis.contextualQuantity ?? fallbackQuantity;
+    const syntheticMessage = syntheticQuantity
+      ? `quero ${syntheticQuantity} ${contextualAnalysis.contextualProductCandidate}`
       : `quero ${contextualAnalysis.contextualProductCandidate}`;
 
     return await this.processOrder(syntheticMessage, tenantId, conversation);

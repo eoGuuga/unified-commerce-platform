@@ -1,8 +1,6 @@
-version: '3.9'
-
 services:
   evolution-api:
-    image: atendai/evolution-api:v2.1.1
+    image: evoapicloud/evolution-api:v2.3.7
     container_name: ucm-evolution-test
     restart: unless-stopped
     env_file:
