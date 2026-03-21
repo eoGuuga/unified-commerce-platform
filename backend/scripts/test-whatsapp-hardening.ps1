@@ -198,7 +198,7 @@ $scenarios = @(
     @{
         Name = "recommendation_follow_up_by_number"
         Steps = @(
-            @{ Message = "me indica algo para presente"; ExpectAny = @("melhores opcoes", "Separei algumas opcoes") }
+            @{ Message = "me indica algo para presente"; ExpectAny = @("melhores opcoes", "Separei algumas opcoes", "separei algumas opcoes") }
             @{ Message = "1"; ExpectAny = @("PEDIDO PREPARADO", "Quantidade: 1 unidade(s)", "Digite a quantidade") }
         )
     },

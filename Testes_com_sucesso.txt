@@ -312,10 +312,12 @@
   - `backend/src/modules/whatsapp/services/sales-intelligence.service.spec.ts`
   - `backend/src/modules/whatsapp/services/catalog-sales-context.service.spec.ts`
   - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
-- Validacao local:
- - `npm.cmd run lint` => ok
+ - Validacao local:
+  - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
   - `npm.cmd run test:unit` => `149/149` testes ok
+  - `powershell -ExecutionPolicy Bypass -File backend/scripts/test-whatsapp-hardening.ps1` => bateria real em `dev/teste` aprovada
+  - relatorio final: `test-whatsapp-hardening-results-20260321-142821.json`
 
 2026-03-21
 - Ambiente: LOCAL
