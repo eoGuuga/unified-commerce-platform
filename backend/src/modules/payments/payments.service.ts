@@ -186,6 +186,14 @@ export class PaymentsService {
     tenantId: string,
     createPaymentDto: CreatePaymentDto,
   ): Promise<PaymentResult> {
+    if (!createPaymentDto?.pedido_id) {
+      throw new BadRequestException('pedido_id e obrigatorio');
+    }
+
+    if (!createPaymentDto?.method) {
+      throw new BadRequestException('method e obrigatorio');
+    }
+
     const pedido = await this.db.getRepository(Pedido).findOne({
       where: { id: createPaymentDto.pedido_id, tenant_id: tenantId },
     });
