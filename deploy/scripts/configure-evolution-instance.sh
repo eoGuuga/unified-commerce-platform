@@ -38,13 +38,16 @@ CREATE_PAYLOAD=$(cat <<JSON
   "instanceName": "${INSTANCE_NAME}",
   "integration": "WHATSAPP-BAILEYS",
   "qrcode": true,
-  "webhook": "${WEBHOOK_URL}",
-  "webhook_by_events": false,
-  "events": [
-    "QRCODE_UPDATED",
-    "MESSAGES_UPSERT",
-    "CONNECTION_UPDATE"
-  ]$(if [[ -n "$TEST_NUMBER" ]]; then printf ',\n  "number": "%s"' "$TEST_NUMBER"; fi)
+  "webhook": {
+    "url": "${WEBHOOK_URL}",
+    "byEvents": false,
+    "base64": false,
+    "events": [
+      "QRCODE_UPDATED",
+      "MESSAGES_UPSERT",
+      "CONNECTION_UPDATE"
+    ]
+  }$(if [[ -n "$TEST_NUMBER" ]]; then printf ',\n  "number": "%s"' "$TEST_NUMBER"; fi)
 }
 JSON
 )
