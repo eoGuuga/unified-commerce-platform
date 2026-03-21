@@ -205,13 +205,13 @@ $scenarios = @(
     @{
         Name = "sales_strategy_context"
         Steps = @(
-            @{ Message = "me indica algo para presente"; ExpectAny = @("Estrategia da", "presentear", "Aqui eu priorizei") }
+            @{ Message = "me indica algo para presente"; ExpectAny = @("Estrategia da", "presentear", "Aqui eu priorizei", "Leitura do catalogo atual") }
         )
     },
     @{
         Name = "sales_vertical_pack_context"
         Steps = @(
-            @{ Message = "me indica algo para presente"; ExpectAny = @("Leitura da vertical", "Voce quer isso mais para presente", "fazer sentido, eu fecho isso") }
+            @{ Message = "me indica algo para presente"; ExpectAny = @("Leitura da vertical", "Leitura do catalogo atual", "Voce quer isso mais para presente", "fazer sentido, eu fecho isso") }
         )
     },
     @{

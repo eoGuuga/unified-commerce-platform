@@ -19,6 +19,10 @@ import {
   SalesVerticalPackProfile,
   SalesVerticalPackService,
 } from './services/sales-vertical-pack.service';
+import {
+  CatalogSalesContextService,
+  CatalogSalesProfile,
+} from './services/catalog-sales-context.service';
 import { ConversationService } from './services/conversation.service';
 import { ProductsService } from '../products/products.service';
 import { OrdersService } from '../orders/orders.service';
@@ -117,6 +121,7 @@ export class WhatsappService {
     private salesPlaybookService: SalesPlaybookService,
     private salesSegmentStrategyService: SalesSegmentStrategyService,
     private salesVerticalPackService: SalesVerticalPackService,
+    private catalogSalesContextService: CatalogSalesContextService,
     private conversationService: ConversationService,
     private productsService: ProductsService,
     private ordersService: OrdersService,
@@ -1965,11 +1970,7 @@ export class WhatsappService {
   }
 
   private buildProductSalesDocument(product: ProductWithStock): string {
-    return this.normalizeForSearch(
-      [product.name, product.categoria?.name || '', product.description || '']
-        .filter(Boolean)
-        .join(' '),
-    );
+    return this.catalogSalesContextService.buildProductSearchDocument(product);
   }
 
   private getSalesQueryWords(query?: string | null): string[] {
@@ -2055,6 +2056,7 @@ export class WhatsappService {
     analysis: SalesConversationAnalysis,
     playbook: SalesPlaybookProfile,
     strategy: SalesConversationStrategy,
+    catalogProfile: CatalogSalesProfile,
     referenceProduct?: ProductWithStock | null,
   ): RankedSalesProduct[] {
     const saleableProducts = products.filter((product) => product.is_active !== false);
@@ -2085,6 +2087,14 @@ export class WhatsappService {
         if (available > 0) {
           addReason('pronto para venda agora');
         }
+
+        const catalogFit = this.catalogSalesContextService.scoreProduct(
+          product,
+          analysis,
+          catalogProfile,
+        );
+        score += catalogFit.score;
+        catalogFit.reasons.forEach(addReason);
 
         const playbookFit = this.salesPlaybookService.describeProductFit(playbook, product, analysis);
         score += playbookFit.score;
@@ -2168,6 +2178,7 @@ export class WhatsappService {
     rankedProducts: RankedSalesProduct[],
     playbook: SalesPlaybookProfile,
     strategy: SalesConversationStrategy,
+    catalogProfile: CatalogSalesProfile,
     verticalPack: SalesVerticalPackProfile,
     crossSellSuggestion: SalesVerticalCrossSellSuggestion | null,
     referenceProduct?: ProductWithStock | null,
@@ -2183,6 +2194,7 @@ export class WhatsappService {
       intro,
       '',
       this.salesSegmentStrategyService.buildStrategyContext(playbook, strategy),
+      this.catalogSalesContextService.buildCatalogContext(catalogProfile),
       `Leitura da vertical ${verticalPack.label}: ${verticalPack.salesFrame}`,
       analysis.intent === 'objection'
         ? `Abordagem da objecao: ${strategy.objectionBridge}`
@@ -2197,6 +2209,7 @@ export class WhatsappService {
       '',
       close,
       this.salesVerticalPackService.buildClosingMove(verticalPack, analysis),
+      catalogProfile.qualificationQuestion,
       this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
       this.salesSegmentStrategyService.buildRecommendationRefinement(strategy),
       `Exemplo: "quero 1 ${rankedProducts[0].product.name}" ou "compara ${rankedProducts[0].product.name} com outra opcao".`,
@@ -2210,6 +2223,7 @@ export class WhatsappService {
     analysis: SalesConversationAnalysis,
     playbook: SalesPlaybookProfile,
     strategy: SalesConversationStrategy,
+    catalogProfile: CatalogSalesProfile,
     verticalPack: SalesVerticalPackProfile,
   ): string {
     const [left, right] = comparedProducts;
@@ -2239,6 +2253,7 @@ export class WhatsappService {
       '',
       `Leitura comercial da ${playbook.label}: ${playbook.salesLens}`,
       this.salesSegmentStrategyService.buildComparisonContext(strategy),
+      this.catalogSalesContextService.buildCatalogContext(catalogProfile),
       `Regra de fechamento da vertical ${verticalPack.label}: ${verticalPack.comparisonFrame}`,
       '',
       'Leitura comercial:',
@@ -2256,12 +2271,14 @@ export class WhatsappService {
     analysis: SalesConversationAnalysis,
     playbook: SalesPlaybookProfile,
     strategy: SalesConversationStrategy,
+    catalogProfile: CatalogSalesProfile,
     verticalPack: SalesVerticalPackProfile,
     closestProducts: RankedSalesProduct[],
   ): string {
     return [
       `Com esse teto de ate R$ ${this.formatCurrency(analysis.budgetCeiling || 0)}, eu nao encontrei algo realmente forte disponivel agora.`,
       this.salesSegmentStrategyService.buildBudgetBridge(strategy),
+      this.catalogSalesContextService.buildCatalogContext(catalogProfile),
       `Leitura da vertical ${verticalPack.label}: ${verticalPack.budgetFrame}`,
       '',
       'As opcoes mais proximas que ainda fazem sentido comercialmente sao:',
@@ -2269,6 +2286,7 @@ export class WhatsappService {
       '',
       this.salesPlaybookService.buildBudgetMissClose(playbook),
       this.salesVerticalPackService.buildClosingMove(verticalPack, analysis),
+      catalogProfile.qualificationQuestion,
       this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
       this.salesSegmentStrategyService.buildRecommendationRefinement(strategy),
     ].join('\n');
@@ -2532,6 +2550,7 @@ export class WhatsappService {
     }
     const playbook = this.salesPlaybookService.inferPlaybook(products);
     const strategy = this.salesSegmentStrategyService.buildStrategy(playbook, analysis);
+    const catalogProfile = this.catalogSalesContextService.buildProfile(products, playbook);
     const verticalPack = this.salesVerticalPackService.buildPack(playbook, products);
 
     const referencedProducts = this.findMentionedSalesProducts(products, message);
@@ -2540,7 +2559,13 @@ export class WhatsappService {
       const comparisonProducts =
         referencedProducts.length >= 2
           ? referencedProducts.slice(0, 2)
-          : this.rankProductsForSalesConversation(products, analysis, playbook, strategy)
+          : this.rankProductsForSalesConversation(
+              products,
+              analysis,
+              playbook,
+              strategy,
+              catalogProfile,
+            )
               .slice(0, 2)
               .map((item) => item.product);
 
@@ -2558,6 +2583,7 @@ export class WhatsappService {
           analysis,
           playbook,
           strategy,
+          catalogProfile,
           verticalPack,
         );
       }
@@ -2569,6 +2595,7 @@ export class WhatsappService {
       analysis,
       playbook,
       strategy,
+      catalogProfile,
       referenceProduct,
     );
 
@@ -2586,6 +2613,7 @@ export class WhatsappService {
         analysis,
         playbook,
         strategy,
+        catalogProfile,
         verticalPack,
         rankedProducts,
       );
@@ -2619,6 +2647,7 @@ export class WhatsappService {
       rankedProducts,
       playbook,
       strategy,
+      catalogProfile,
       verticalPack,
       crossSellSuggestion,
       referenceProduct,

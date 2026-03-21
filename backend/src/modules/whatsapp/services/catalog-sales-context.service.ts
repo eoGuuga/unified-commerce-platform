@@ -1,0 +1,411 @@
+import { Injectable } from '@nestjs/common';
+import { ProductWithStock } from '../../products/types/product.types';
+import { SalesConversationAnalysis } from './sales-intelligence.service';
+import { MessageIntelligenceService } from './message-intelligence.service';
+import { SalesPlaybookProfile, SalesPlaybookSegment } from './sales-playbook.service';
+
+type CatalogThemeKey =
+  | 'gift'
+  | 'sharing'
+  | 'self_treat'
+  | 'premium'
+  | 'chocolate'
+  | 'celebration';
+
+type CatalogThemeRule = {
+  key: CatalogThemeKey;
+  label: string;
+  questionLabel: string;
+  recommendationReason: string;
+  patterns: string[];
+};
+
+type CatalogThemeSummary = {
+  key: CatalogThemeKey;
+  label: string;
+  questionLabel: string;
+  recommendationReason: string;
+  patterns: string[];
+  count: number;
+};
+
+export interface CatalogSalesProfile {
+  segment: SalesPlaybookSegment;
+  storeLabel: string;
+  dominantCategory: string | null;
+  catalogReading: string;
+  focusThemes: CatalogThemeSummary[];
+  qualificationQuestion: string;
+}
+
+export interface CatalogSalesFit {
+  score: number;
+  reasons: string[];
+}
+
+@Injectable()
+export class CatalogSalesContextService {
+  private readonly themeRules: CatalogThemeRule[] = [
+    {
+      key: 'gift',
+      label: 'presente',
+      questionLabel: 'presente',
+      recommendationReason: 'boa leitura para presente',
+      patterns: [
+        'presente',
+        'presentear',
+        'mimo',
+        'lembranca',
+        'lembrancinha',
+        'caixa',
+        'box',
+        'kit',
+      ],
+    },
+    {
+      key: 'sharing',
+      label: 'compartilhar',
+      questionLabel: 'compartilhar',
+      recommendationReason: 'funciona bem para compartilhar',
+      patterns: [
+        'compartilhar',
+        'dividir',
+        'duzia',
+        'combo',
+        'caixa',
+        'box',
+        'kit',
+        'mesa',
+        'bandeja',
+      ],
+    },
+    {
+      key: 'self_treat',
+      label: 'mimo individual',
+      questionLabel: 'mimo individual',
+      recommendationReason: 'tem boa saida como mimo individual',
+      patterns: [
+        'individual',
+        'unidade',
+        'docinho',
+        'sobremesa',
+        'vontade',
+        'brigadeiro',
+        'brownie',
+        'trufa',
+        'cookie',
+      ],
+    },
+    {
+      key: 'premium',
+      label: 'premium',
+      questionLabel: 'algo mais marcante',
+      recommendationReason: 'eleva percepcao premium',
+      patterns: ['premium', 'gourmet', 'artesanal', 'fino', 'especial', 'sofisticado'],
+    },
+    {
+      key: 'chocolate',
+      label: 'chocolate',
+      questionLabel: 'algo mais intenso no chocolate',
+      recommendationReason: 'tem apelo forte de chocolate',
+      patterns: ['chocolate', 'cacau', 'ganache', 'trufa', 'brigadeiro', 'brownie'],
+    },
+    {
+      key: 'celebration',
+      label: 'evento',
+      questionLabel: 'evento ou mesa',
+      recommendationReason: 'resolve melhor uma compra de evento',
+      patterns: ['festa', 'aniversario', 'evento', 'comemoracao', 'bolo', 'torta'],
+    },
+  ];
+
+  constructor(private readonly messageIntelligenceService: MessageIntelligenceService) {}
+
+  buildProfile(
+    products: ProductWithStock[],
+    playbook: SalesPlaybookProfile,
+  ): CatalogSalesProfile {
+    const allThemes = this.themeRules
+      .map((rule) => ({
+        ...rule,
+        count: products.reduce(
+          (total, product) => total + (this.matchesTheme(product, rule) ? 1 : 0),
+          0,
+        ),
+      }))
+      .filter((theme) => theme.count > 0)
+      .sort((left, right) => right.count - left.count);
+
+    const focusThemes = allThemes
+      .slice(0, 3);
+
+    const dominantCategory = this.getDominantCategory(products);
+    const storeLabel = this.buildStoreLabel(playbook, allThemes, dominantCategory);
+
+    return {
+      segment: playbook.segment,
+      storeLabel,
+      dominantCategory,
+      focusThemes,
+      catalogReading: this.buildCatalogReading(playbook, storeLabel, focusThemes),
+      qualificationQuestion: this.buildQualificationQuestion(playbook, focusThemes),
+    };
+  }
+
+  buildProductSearchDocument(product: ProductWithStock): string {
+    const metadataStrings = this.collectMetadataStrings(product.metadata);
+    return this.messageIntelligenceService.normalizeText(
+      [
+        product.name,
+        product.description || '',
+        product.categoria?.name || '',
+        ...metadataStrings,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    );
+  }
+
+  scoreProduct(
+    product: ProductWithStock,
+    analysis: SalesConversationAnalysis,
+    profile: CatalogSalesProfile,
+  ): CatalogSalesFit {
+    const matchedThemes = this.getMatchedThemes(product, profile.focusThemes);
+    const reasons: string[] = [];
+    const addReason = (reason: string) => {
+      if (reason && !reasons.includes(reason)) {
+        reasons.push(reason);
+      }
+    };
+
+    let score = 0;
+
+    if (
+      analysis.normalizedText.includes('chocolate') &&
+      this.hasTheme(matchedThemes, 'chocolate')
+    ) {
+      score += 12;
+      addReason('apelo forte de chocolate');
+    }
+
+    matchedThemes.slice(0, 2).forEach((theme) => {
+      score += 5;
+      addReason(theme.recommendationReason);
+    });
+
+    if (analysis.useCaseTags.includes('gift') && this.hasTheme(matchedThemes, 'gift')) {
+      score += 14;
+      addReason('combina bem com contexto de presente');
+    }
+
+    if (
+      analysis.useCaseTags.includes('party') &&
+      (this.hasTheme(matchedThemes, 'sharing') || this.hasTheme(matchedThemes, 'celebration'))
+    ) {
+      score += 14;
+      addReason('fecha melhor para compartilhar');
+    }
+
+    if (analysis.pricePreference === 'premium' && this.hasTheme(matchedThemes, 'premium')) {
+      score += 10;
+      addReason('segura melhor uma escolha mais premium');
+    }
+
+    if (
+      profile.segment === 'confectionery' &&
+      (this.hasTheme(matchedThemes, 'chocolate') || this.hasTheme(profile.focusThemes, 'chocolate'))
+    ) {
+      score += 8;
+      addReason('tem boa leitura dentro da loja de chocolate');
+    }
+
+    const metadataHint = this.extractMetadataHint(product);
+    if (metadataHint) {
+      score += 6;
+      addReason(metadataHint);
+    }
+
+    return { score, reasons: reasons.slice(0, 3) };
+  }
+
+  buildCatalogContext(profile: CatalogSalesProfile): string {
+    return `Leitura do catalogo atual: ${profile.catalogReading}`;
+  }
+
+  buildQualificationQuestion(
+    playbook: SalesPlaybookProfile,
+    focusThemes: CatalogThemeSummary[],
+  ): string {
+    const questionLabels = focusThemes.map((theme) => theme.questionLabel);
+
+    if (playbook.segment === 'confectionery') {
+      const ordered = this.pickQuestionLabels(questionLabels, [
+        'presente',
+        'mimo individual',
+        'compartilhar',
+        'evento ou mesa',
+        'algo mais intenso no chocolate',
+      ]);
+
+      if (ordered.length >= 3) {
+        return `Voce quer algo mais para ${ordered[0]}, ${ordered[1]} ou ${ordered[2]}?`;
+      }
+
+      if (ordered.length === 2) {
+        return `Voce quer algo mais para ${ordered[0]} ou ${ordered[1]}?`;
+      }
+
+      return 'Voce quer algo mais para presente, mimo individual ou compartilhar?';
+    }
+
+    if (questionLabels.length >= 2) {
+      return `Se eu afinar a recomendacao, isso faz mais sentido para ${questionLabels[0]} ou ${questionLabels[1]}?`;
+    }
+
+    return `Se eu afinar a recomendacao, isso faz mais sentido dentro de ${playbook.label} para qual contexto?`;
+  }
+
+  private buildCatalogReading(
+    playbook: SalesPlaybookProfile,
+    storeLabel: string,
+    focusThemes: CatalogThemeSummary[],
+  ): string {
+    const themeLabels = focusThemes.map((theme) => theme.label);
+
+    if (playbook.segment === 'confectionery') {
+      if (themeLabels.length >= 3) {
+        return `hoje a loja gira em ${storeLabel}, com saida forte para ${themeLabels[0]}, ${themeLabels[1]} e ${themeLabels[2]}.`;
+      }
+
+      if (themeLabels.length === 2) {
+        return `hoje a loja gira em ${storeLabel}, com boa leitura para ${themeLabels[0]} e ${themeLabels[1]}.`;
+      }
+
+      return `hoje a loja gira em ${storeLabel}, com foco em vender o que esta configurado no catalogo sem chute.`;
+    }
+
+    if (themeLabels.length >= 2) {
+      return `o catalogo atual esta puxando melhor para ${themeLabels[0]} e ${themeLabels[1]}.`;
+    }
+
+    return `o catalogo atual esta sendo lido a partir do que foi configurado nos produtos e categorias.`;
+  }
+
+  private buildStoreLabel(
+    playbook: SalesPlaybookProfile,
+    focusThemes: CatalogThemeSummary[],
+    dominantCategory: string | null,
+  ): string {
+    if (
+      playbook.segment === 'confectionery' &&
+      focusThemes.some((theme) => theme.key === 'chocolate')
+    ) {
+      return 'chocolates e doces';
+    }
+
+    if (dominantCategory) {
+      return dominantCategory.toLowerCase();
+    }
+
+    return playbook.label;
+  }
+
+  private getDominantCategory(products: ProductWithStock[]): string | null {
+    const categoryCounter = new Map<string, number>();
+    products.forEach((product) => {
+      const category = String(product.categoria?.name || '').trim();
+      if (!category) {
+        return;
+      }
+
+      categoryCounter.set(category, (categoryCounter.get(category) || 0) + 1);
+    });
+
+    return Array.from(categoryCounter.entries()).sort((left, right) => right[1] - left[1])[0]?.[0] || null;
+  }
+
+  private matchesTheme(
+    product: ProductWithStock,
+    theme: Pick<CatalogThemeRule, 'patterns'>,
+  ): boolean {
+    const document = this.buildProductSearchDocument(product);
+    return theme.patterns.some((pattern) => document.includes(pattern));
+  }
+
+  private getMatchedThemes(
+    product: ProductWithStock,
+    themes: Array<Pick<CatalogThemeSummary, 'key' | 'patterns' | 'recommendationReason'>>,
+  ): Array<Pick<CatalogThemeSummary, 'key' | 'recommendationReason'>> {
+    const document = this.buildProductSearchDocument(product);
+    return themes.filter((theme) => theme.patterns.some((pattern) => document.includes(pattern)));
+  }
+
+  private hasTheme(
+    themes: Array<Pick<CatalogThemeSummary, 'key'>>,
+    key: CatalogThemeKey,
+  ): boolean {
+    return themes.some((theme) => theme.key === key);
+  }
+
+  private pickQuestionLabels(available: string[], preferred: string[]): string[] {
+    const ordered = preferred.filter((label) => available.includes(label));
+    const leftovers = available.filter((label) => !ordered.includes(label));
+    return [...ordered, ...leftovers].slice(0, 3);
+  }
+
+  private collectMetadataStrings(
+    metadata: Record<string, unknown> | undefined,
+    depth = 0,
+  ): string[] {
+    if (!metadata || depth > 2) {
+      return [];
+    }
+
+    const values: string[] = [];
+    Object.values(metadata).forEach((value) => {
+      if (typeof value === 'string') {
+        values.push(value);
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (typeof item === 'string') {
+            values.push(item);
+          } else if (item && typeof item === 'object') {
+            values.push(...this.collectMetadataStrings(item as Record<string, unknown>, depth + 1));
+          }
+        });
+        return;
+      }
+
+      if (value && typeof value === 'object') {
+        values.push(...this.collectMetadataStrings(value as Record<string, unknown>, depth + 1));
+      }
+    });
+
+    return values;
+  }
+
+  private extractMetadataHint(product: ProductWithStock): string | null {
+    const metadata = product.metadata || {};
+    const hintKeys = ['whatsapp_hint', 'sales_pitch', 'positioning', 'flavor_profile'];
+
+    for (const key of hintKeys) {
+      const value = metadata[key];
+      if (typeof value !== 'string') {
+        continue;
+      }
+
+      const cleaned = value.trim();
+      if (!cleaned) {
+        continue;
+      }
+
+      return cleaned.length > 72 ? `${cleaned.slice(0, 69).trim()}...` : cleaned;
+    }
+
+    return null;
+  }
+}

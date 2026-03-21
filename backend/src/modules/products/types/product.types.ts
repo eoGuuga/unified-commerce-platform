@@ -12,6 +12,7 @@ export interface ProductWithStock {
   sku?: string;
   name: string;
   description?: string;
+  metadata?: Record<string, unknown>;
   price: string | number;
   cost_price?: number;
   unit?: string;

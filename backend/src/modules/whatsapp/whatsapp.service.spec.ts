@@ -5,6 +5,7 @@ import { SalesIntelligenceService } from './services/sales-intelligence.service'
 import { SalesPlaybookService } from './services/sales-playbook.service';
 import { SalesSegmentStrategyService } from './services/sales-segment-strategy.service';
 import { SalesVerticalPackService } from './services/sales-vertical-pack.service';
+import { CatalogSalesContextService } from './services/catalog-sales-context.service';
 
 describe('WhatsappService defensive WhatsApp flow', () => {
   const catalog = [
@@ -12,6 +13,10 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       id: 'p1',
       name: 'Brigadeiro Gourmet',
       description: 'Doce gourmet individual para presente e venda rapida.',
+      metadata: {
+        sales_pitch: 'chocolate artesanal com boa leitura para mimo individual',
+        sales_tags: ['chocolate', 'presente', 'mimo'],
+      },
       price: 10.5,
       available_stock: 10,
       created_at: '2026-03-15T00:00:00.000Z',
@@ -21,6 +26,10 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       id: 'p2',
       name: 'Brownie Premium',
       description: 'Brownie mais intenso, com leitura premium e otimo para presente.',
+      metadata: {
+        sales_pitch: 'brownie de chocolate mais intenso para presente e ticket premium',
+        sales_tags: ['brownie', 'chocolate', 'premium', 'presente'],
+      },
       price: 15,
       available_stock: 8,
       created_at: '2026-03-15T00:00:00.000Z',
@@ -30,6 +39,9 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       id: 'p3',
       name: 'Bolo de Cenoura',
       description: 'Opcao forte para festa e comemoracao.',
+      metadata: {
+        sales_tags: ['bolo', 'festa', 'compartilhar'],
+      },
       price: 40,
       available_stock: 3,
       created_at: '2026-03-15T00:00:00.000Z',
@@ -229,6 +241,9 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     const salesVerticalPackService = new SalesVerticalPackService(
       messageIntelligenceService,
     );
+    const catalogSalesContextService = new CatalogSalesContextService(
+      messageIntelligenceService,
+    );
 
     const service = new WhatsappService(
       config as any,
@@ -238,6 +253,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       salesPlaybookService as any,
       salesSegmentStrategyService as any,
       salesVerticalPackService as any,
+      catalogSalesContextService as any,
       conversationService as any,
       productsService as any,
       ordersService as any,
@@ -923,6 +939,33 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     expect(response).toContain('presentear bem');
     expect(response).toContain('Brownie Premium');
+  });
+
+  it('reads the configured chocolate catalog before recommending', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'me indica algo para presente',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Leitura do catalogo atual');
+    expect(response).toContain('chocolates e doces');
+    expect(response).toContain('presente');
+  });
+
+  it('uses configured product descriptions and metadata to qualify the chocolate sale', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'quero algo mais premium de chocolate para presente',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Brownie Premium');
+    expect(response).toContain('Leitura do catalogo atual: hoje a loja gira em chocolates e doces');
+    expect(response).toContain('boa leitura para presente');
+    expect(response).toContain('Voce quer algo mais para presente');
   });
 
   it('adapts recommendation language to fashion catalogs', async () => {
