@@ -30,8 +30,28 @@ function Invoke-WhatsappTest {
     }
 
     $body = $body | ConvertTo-Json -Compress
+    $maxAttempts = 4
 
-    return Invoke-RestMethod -Uri $BaseUrl -Method Post -ContentType "application/json" -Body $body
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        try {
+            return Invoke-RestMethod -Uri $BaseUrl -Method Post -ContentType "application/json" -Body $body
+        } catch {
+            $response = $_.Exception.Response
+            $statusCode = $null
+            $errorText = ($_ | Out-String)
+
+            if ($response -and $response.StatusCode) {
+                $statusCode = [int]$response.StatusCode
+            }
+
+            if (($statusCode -eq 429 -or $errorText -match '429' -or $errorText -match 'Too Many Requests') -and $attempt -lt $maxAttempts) {
+                Start-Sleep -Seconds (5 * $attempt)
+                continue
+            }
+
+            throw
+        }
+    }
 }
 
 $catalogResponse = Invoke-WhatsappTest -Phone "+5511998899900" -Message "cardapio"

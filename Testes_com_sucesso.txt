@@ -67,3 +67,19 @@
 - Backup DEV/TESTE: /opt/ucm-test-repo/backups/whatsapp-sales-playbooks-20260321-022123
 - Backup PRODUCAO: /opt/ucm/backups/whatsapp-sales-playbooks-20260321-023738
 
+2026-03-21
+- Ambiente: LOCAL + DEV/TESTE (VPS) /opt/ucm-test-repo + PRODUCAO /opt/ucm
+- Commit funcional publicado: a30ebc9
+- Escopo: estrategia comercial por nicho para a IA do WhatsApp, com logica de venda por segmento alem do playbook de copy
+- Commits desta rodada: a30ebc9 (motor de estrategia comercial por nicho) + apoio operacional no script de hardening para retry/backoff em 429
+- Validacao local: npm.cmd run test:unit => 121/121 PASS; npm.cmd run lint => PASS; npm.cmd run build => PASS
+- Bateria real WhatsApp: powershell -ExecutionPolicy Bypass -File backend/scripts/test-whatsapp-hardening.ps1
+- Relatorio final: C:\Users\gusta\OneDrive\Desktop\sas\test-whatsapp-hardening-results-20260321-001031.json
+- Resultado bateria: 64 cenarios / 0 falhas
+- DEV/TESTE: https://dev.gtsofthub.com.br/api/v1/health => ok
+- DEV/TESTE: https://dev.gtsofthub.com.br/api/v1/whatsapp/health => ok
+- PRODUCAO: https://gtsofthub.com.br/api/v1/health => ok
+- PRODUCAO: https://gtsofthub.com.br/api/v1/whatsapp/health => ok
+- Backup DEV/TESTE: /opt/ucm-test-repo/backups/whatsapp-sales-strategy-20260321-025351
+- Backup PRODUCAO: /opt/ucm/backups/whatsapp-sales-strategy-20260321-031108
+
