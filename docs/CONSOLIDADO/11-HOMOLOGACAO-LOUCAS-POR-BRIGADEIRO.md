@@ -83,6 +83,7 @@ Ultima atualizacao: 2026-03-21
 - Env exemplo em `deploy/evolution.test.env.example`
 - Setup do Evolution em `deploy/scripts/setup-evolution-test.sh`
 - Configuracao automatica da instancia em `deploy/scripts/configure-evolution-instance.sh`
+- Aplicacao remota em lote pelo Windows em `deploy/scripts/apply-loucas-devtest-vps.ps1`
 - Seed da Loucas em `deploy/scripts/seed-loucas-dev-test.sh`
 - Aplicacao rapida da fase 1 em `deploy/scripts/apply-loucas-phase1-devtest.sh`
 - Guia operacional do Evolution em `deploy/EVOLUTION-TEST-SETUP.md`

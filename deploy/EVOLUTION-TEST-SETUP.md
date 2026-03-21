@@ -12,6 +12,7 @@ Ultima atualizacao: 2026-03-21
 - `deploy/evolution.test.env.example`
 - `deploy/scripts/setup-evolution-test.sh`
 - `deploy/scripts/configure-evolution-instance.sh`
+- `deploy/scripts/apply-loucas-devtest-vps.ps1`
 
 ## Passo a passo no VPS
 1. No repo de dev/teste:

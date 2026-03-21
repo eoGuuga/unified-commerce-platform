@@ -247,6 +247,7 @@
   - deploy/evolution.test.env.example
   - deploy/scripts/setup-evolution-test.sh
   - deploy/scripts/configure-evolution-instance.sh
+  - deploy/scripts/apply-loucas-devtest-vps.ps1
   - deploy/scripts/seed-loucas-dev-test.sh
   - deploy/scripts/apply-loucas-phase1-devtest.sh
   - deploy/EVOLUTION-TEST-SETUP.md
