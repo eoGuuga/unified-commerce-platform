@@ -4,6 +4,7 @@ import { MessageIntelligenceService } from './services/message-intelligence.serv
 import { SalesIntelligenceService } from './services/sales-intelligence.service';
 import { SalesPlaybookService } from './services/sales-playbook.service';
 import { SalesSegmentStrategyService } from './services/sales-segment-strategy.service';
+import { SalesVerticalPackService } from './services/sales-vertical-pack.service';
 
 describe('WhatsappService defensive WhatsApp flow', () => {
   const catalog = [
@@ -109,6 +110,15 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       created_at: '2026-03-20T00:00:00.000Z',
       categoria: { name: 'Lanches' },
     },
+    {
+      id: 'r3',
+      name: 'Suco Natural',
+      description: 'Bebida leve para acompanhar refeicao completa.',
+      price: 9.9,
+      available_stock: 15,
+      created_at: '2026-03-20T00:00:00.000Z',
+      categoria: { name: 'Bebidas' },
+    },
   ];
 
   const electronicsCatalog = [
@@ -129,6 +139,27 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       available_stock: 11,
       created_at: '2026-03-20T00:00:00.000Z',
       categoria: { name: 'Carregadores' },
+    },
+  ];
+
+  const servicesCatalog = [
+    {
+      id: 's1',
+      name: 'Pacote de Manutencao Mensal',
+      description: 'Servico com assistencia, revisao e agendamento.',
+      price: 199.9,
+      available_stock: 10,
+      created_at: '2026-03-20T00:00:00.000Z',
+      categoria: { name: 'Servicos' },
+    },
+    {
+      id: 's2',
+      name: 'Visita Tecnica de Avaliacao',
+      description: 'Avaliacao inicial para fechar o melhor escopo.',
+      price: 79.9,
+      available_stock: 10,
+      created_at: '2026-03-20T00:00:00.000Z',
+      categoria: { name: 'Atendimento' },
     },
   ];
 
@@ -195,6 +226,9 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     const salesSegmentStrategyService = new SalesSegmentStrategyService(
       messageIntelligenceService,
     );
+    const salesVerticalPackService = new SalesVerticalPackService(
+      messageIntelligenceService,
+    );
 
     const service = new WhatsappService(
       config as any,
@@ -203,6 +237,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       salesIntelligenceService as any,
       salesPlaybookService as any,
       salesSegmentStrategyService as any,
+      salesVerticalPackService as any,
       conversationService as any,
       productsService as any,
       ordersService as any,
@@ -941,6 +976,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Estrategia da alimentacao');
     expect(response).toContain('almoco ou refeicao principal');
     expect(response).toContain('Combo Executivo');
+    expect(response).toContain('Leitura da vertical alimentacao');
   });
 
   it('uses electronics strategy to compare products by compatibility', async () => {
@@ -954,6 +990,33 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('COMPARATIVO OBJETIVO');
     expect(response).toContain('compatibilidade');
     expect(response).toContain('iphone');
+    expect(response).toContain('Regra de fechamento da vertical eletronicos');
+  });
+
+  it('suggests a restaurant complement when the catalog supports it', async () => {
+    const { service } = createFixture(restaurantCatalog);
+
+    const response = await service.generateResponse(
+      'me indica algo para almoco',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Leitura da vertical alimentacao');
+    expect(response).toContain('Suco Natural');
+    expect(response).toContain('Para esse almoco');
+  });
+
+  it('uses services packs to sell by scope and scheduling', async () => {
+    const { service } = createFixture(servicesCatalog);
+
+    const response = await service.generateResponse(
+      'me indica a melhor opcao para manutencao recorrente',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Leitura da vertical servicos');
+    expect(response).toContain('agendar uma avaliacao');
+    expect(response).toContain('Pacote de Manutencao Mensal');
   });
 
   it('accepts noisy payment keywords after normalization', () => {

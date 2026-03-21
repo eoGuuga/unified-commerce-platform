@@ -14,6 +14,11 @@ import {
   SalesConversationStrategy,
   SalesSegmentStrategyService,
 } from './services/sales-segment-strategy.service';
+import {
+  SalesVerticalCrossSellSuggestion,
+  SalesVerticalPackProfile,
+  SalesVerticalPackService,
+} from './services/sales-vertical-pack.service';
 import { ConversationService } from './services/conversation.service';
 import { ProductsService } from '../products/products.service';
 import { OrdersService } from '../orders/orders.service';
@@ -111,6 +116,7 @@ export class WhatsappService {
     private salesIntelligenceService: SalesIntelligenceService,
     private salesPlaybookService: SalesPlaybookService,
     private salesSegmentStrategyService: SalesSegmentStrategyService,
+    private salesVerticalPackService: SalesVerticalPackService,
     private conversationService: ConversationService,
     private productsService: ProductsService,
     private ordersService: OrdersService,
@@ -2162,6 +2168,8 @@ export class WhatsappService {
     rankedProducts: RankedSalesProduct[],
     playbook: SalesPlaybookProfile,
     strategy: SalesConversationStrategy,
+    verticalPack: SalesVerticalPackProfile,
+    crossSellSuggestion: SalesVerticalCrossSellSuggestion | null,
     referenceProduct?: ProductWithStock | null,
   ): string {
     const intro = this.salesPlaybookService.buildRecommendationIntro(playbook, analysis);
@@ -2175,6 +2183,7 @@ export class WhatsappService {
       intro,
       '',
       this.salesSegmentStrategyService.buildStrategyContext(playbook, strategy),
+      `Leitura da vertical ${verticalPack.label}: ${verticalPack.salesFrame}`,
       analysis.intent === 'objection'
         ? `Abordagem da objecao: ${strategy.objectionBridge}`
         : analysis.intent === 'budget'
@@ -2182,8 +2191,13 @@ export class WhatsappService {
           : '',
       '',
       ...rankedProducts.slice(0, 3).map((item) => this.formatSalesRecommendationLine(item)),
+      crossSellSuggestion
+        ? `${crossSellSuggestion.prompt} ${crossSellSuggestion.product.name}, porque ${crossSellSuggestion.reason}.`
+        : '',
       '',
       close,
+      this.salesVerticalPackService.buildClosingMove(verticalPack, analysis),
+      this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
       this.salesSegmentStrategyService.buildRecommendationRefinement(strategy),
       `Exemplo: "quero 1 ${rankedProducts[0].product.name}" ou "compara ${rankedProducts[0].product.name} com outra opcao".`,
     ]
@@ -2196,6 +2210,7 @@ export class WhatsappService {
     analysis: SalesConversationAnalysis,
     playbook: SalesPlaybookProfile,
     strategy: SalesConversationStrategy,
+    verticalPack: SalesVerticalPackProfile,
   ): string {
     const [left, right] = comparedProducts;
     const leftPrice = Number(left.price || 0);
@@ -2224,6 +2239,7 @@ export class WhatsappService {
       '',
       `Leitura comercial da ${playbook.label}: ${playbook.salesLens}`,
       this.salesSegmentStrategyService.buildComparisonContext(strategy),
+      `Regra de fechamento da vertical ${verticalPack.label}: ${verticalPack.comparisonFrame}`,
       '',
       'Leitura comercial:',
       `- ${labels.cheaper}: ${cheaper.name}.`,
@@ -2231,6 +2247,7 @@ export class WhatsappService {
       `- ${labels.betterValue}: ${betterValue.name}.`,
       '',
       `${labels.recommendationLead} ${recommended.name}.`,
+      this.salesVerticalPackService.buildClosingMove(verticalPack, analysis),
       `Se quiser seguir, envie: "quero 1 ${recommended.name}".`,
     ].join('\n');
   }
@@ -2239,16 +2256,20 @@ export class WhatsappService {
     analysis: SalesConversationAnalysis,
     playbook: SalesPlaybookProfile,
     strategy: SalesConversationStrategy,
+    verticalPack: SalesVerticalPackProfile,
     closestProducts: RankedSalesProduct[],
   ): string {
     return [
       `Com esse teto de ate R$ ${this.formatCurrency(analysis.budgetCeiling || 0)}, eu nao encontrei algo realmente forte disponivel agora.`,
       this.salesSegmentStrategyService.buildBudgetBridge(strategy),
+      `Leitura da vertical ${verticalPack.label}: ${verticalPack.budgetFrame}`,
       '',
       'As opcoes mais proximas que ainda fazem sentido comercialmente sao:',
       ...closestProducts.slice(0, 2).map((item) => this.formatSalesRecommendationLine(item)),
       '',
       this.salesPlaybookService.buildBudgetMissClose(playbook),
+      this.salesVerticalPackService.buildClosingMove(verticalPack, analysis),
+      this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
       this.salesSegmentStrategyService.buildRecommendationRefinement(strategy),
     ].join('\n');
   }
@@ -2511,6 +2532,7 @@ export class WhatsappService {
     }
     const playbook = this.salesPlaybookService.inferPlaybook(products);
     const strategy = this.salesSegmentStrategyService.buildStrategy(playbook, analysis);
+    const verticalPack = this.salesVerticalPackService.buildPack(playbook, products);
 
     const referencedProducts = this.findMentionedSalesProducts(products, message);
 
@@ -2531,7 +2553,13 @@ export class WhatsappService {
           last_query: analysis.commercialQuery || null,
         });
 
-        return this.buildSalesComparisonResponse(comparisonProducts, analysis, playbook, strategy);
+        return this.buildSalesComparisonResponse(
+          comparisonProducts,
+          analysis,
+          playbook,
+          strategy,
+          verticalPack,
+        );
       }
     }
 
@@ -2554,7 +2582,13 @@ export class WhatsappService {
         return 'Nao encontrei uma opcao segura dentro desse orcamento agora. Se quiser, me diga outra faixa de valor e eu recalculo com voce.';
       }
 
-      return this.buildSalesBudgetMissResponse(analysis, playbook, strategy, rankedProducts);
+      return this.buildSalesBudgetMissResponse(
+        analysis,
+        playbook,
+        strategy,
+        verticalPack,
+        rankedProducts,
+      );
     }
 
     if (!rankedProducts.length) {
@@ -2574,11 +2608,19 @@ export class WhatsappService {
       last_query: analysis.commercialQuery || null,
     });
 
+    const crossSellSuggestion = this.salesVerticalPackService.findCrossSellSuggestion(
+      verticalPack,
+      products,
+      rankedProducts.map((item) => item.product),
+    );
+
     return this.buildSalesRecommendationResponse(
       analysis,
       rankedProducts,
       playbook,
       strategy,
+      verticalPack,
+      crossSellSuggestion,
       referenceProduct,
     );
   }

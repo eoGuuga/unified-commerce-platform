@@ -209,6 +209,12 @@ $scenarios = @(
         )
     },
     @{
+        Name = "sales_vertical_pack_context"
+        Steps = @(
+            @{ Message = "me indica algo para presente"; ExpectAny = @("Leitura da vertical", "Voce quer isso mais para presente", "fazer sentido, eu fecho isso") }
+        )
+    },
+    @{
         Name = "sales_budget_guidance"
         Steps = @(
             @{ Message = "quero algo ate 20 reais"; ExpectAny = @("teto de ate", "opcoes mais inteligentes", "rotas que achei") }
