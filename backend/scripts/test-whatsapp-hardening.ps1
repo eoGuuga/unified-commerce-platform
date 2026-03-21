@@ -183,9 +183,21 @@ $scenarios = @(
         )
     },
     @{
+        Name = "sales_strategy_context"
+        Steps = @(
+            @{ Message = "me indica algo para presente"; ExpectAny = @("Estrategia da", "presentear", "Aqui eu priorizei") }
+        )
+    },
+    @{
         Name = "sales_budget_guidance"
         Steps = @(
             @{ Message = "quero algo ate 20 reais"; ExpectAny = @("teto de ate", "opcoes mais inteligentes", "rotas que achei") }
+        )
+    },
+    @{
+        Name = "sales_budget_strategy_guardrail"
+        Steps = @(
+            @{ Message = "quero algo ate 20 reais"; ExpectAny = @("Protegendo no ticket", "Mesmo ajustando o ticket", "opcoes mais inteligentes") }
         )
     },
     @{

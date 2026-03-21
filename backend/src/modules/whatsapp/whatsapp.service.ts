@@ -10,6 +10,10 @@ import {
   SalesPlaybookProfile,
   SalesPlaybookService,
 } from './services/sales-playbook.service';
+import {
+  SalesConversationStrategy,
+  SalesSegmentStrategyService,
+} from './services/sales-segment-strategy.service';
 import { ConversationService } from './services/conversation.service';
 import { ProductsService } from '../products/products.service';
 import { OrdersService } from '../orders/orders.service';
@@ -106,6 +110,7 @@ export class WhatsappService {
     private messageIntelligenceService: MessageIntelligenceService,
     private salesIntelligenceService: SalesIntelligenceService,
     private salesPlaybookService: SalesPlaybookService,
+    private salesSegmentStrategyService: SalesSegmentStrategyService,
     private conversationService: ConversationService,
     private productsService: ProductsService,
     private ordersService: OrdersService,
@@ -2043,6 +2048,7 @@ export class WhatsappService {
     products: ProductWithStock[],
     analysis: SalesConversationAnalysis,
     playbook: SalesPlaybookProfile,
+    strategy: SalesConversationStrategy,
     referenceProduct?: ProductWithStock | null,
   ): RankedSalesProduct[] {
     const saleableProducts = products.filter((product) => product.is_active !== false);
@@ -2077,6 +2083,13 @@ export class WhatsappService {
         const playbookFit = this.salesPlaybookService.describeProductFit(playbook, product, analysis);
         score += playbookFit.score;
         playbookFit.reasons.forEach(addReason);
+
+        const strategyFit = this.salesSegmentStrategyService.scoreProductForStrategy(
+          product,
+          strategy,
+        );
+        score += strategyFit.score;
+        strategyFit.reasons.forEach(addReason);
 
         queryWords.forEach((word) => {
           if (normalizedName.includes(word)) {
@@ -2148,6 +2161,7 @@ export class WhatsappService {
     analysis: SalesConversationAnalysis,
     rankedProducts: RankedSalesProduct[],
     playbook: SalesPlaybookProfile,
+    strategy: SalesConversationStrategy,
     referenceProduct?: ProductWithStock | null,
   ): string {
     const intro = this.salesPlaybookService.buildRecommendationIntro(playbook, analysis);
@@ -2160,17 +2174,28 @@ export class WhatsappService {
     return [
       intro,
       '',
+      this.salesSegmentStrategyService.buildStrategyContext(playbook, strategy),
+      analysis.intent === 'objection'
+        ? `Abordagem da objecao: ${strategy.objectionBridge}`
+        : analysis.intent === 'budget'
+          ? `Protegendo no ticket: ${strategy.budgetProtection}.`
+          : '',
+      '',
       ...rankedProducts.slice(0, 3).map((item) => this.formatSalesRecommendationLine(item)),
       '',
       close,
+      this.salesSegmentStrategyService.buildRecommendationRefinement(strategy),
       `Exemplo: "quero 1 ${rankedProducts[0].product.name}" ou "compara ${rankedProducts[0].product.name} com outra opcao".`,
-    ].join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
   private buildSalesComparisonResponse(
     comparedProducts: ProductWithStock[],
     analysis: SalesConversationAnalysis,
     playbook: SalesPlaybookProfile,
+    strategy: SalesConversationStrategy,
   ): string {
     const [left, right] = comparedProducts;
     const leftPrice = Number(left.price || 0);
@@ -2198,6 +2223,7 @@ export class WhatsappService {
       `2. ${this.formatProductHeadline(right)} | Estoque: ${right.available_stock} unidade(s)`,
       '',
       `Leitura comercial da ${playbook.label}: ${playbook.salesLens}`,
+      this.salesSegmentStrategyService.buildComparisonContext(strategy),
       '',
       'Leitura comercial:',
       `- ${labels.cheaper}: ${cheaper.name}.`,
@@ -2212,15 +2238,18 @@ export class WhatsappService {
   private buildSalesBudgetMissResponse(
     analysis: SalesConversationAnalysis,
     playbook: SalesPlaybookProfile,
+    strategy: SalesConversationStrategy,
     closestProducts: RankedSalesProduct[],
   ): string {
     return [
       `Com esse teto de ate R$ ${this.formatCurrency(analysis.budgetCeiling || 0)}, eu nao encontrei algo realmente forte disponivel agora.`,
+      this.salesSegmentStrategyService.buildBudgetBridge(strategy),
       '',
       'As opcoes mais proximas que ainda fazem sentido comercialmente sao:',
       ...closestProducts.slice(0, 2).map((item) => this.formatSalesRecommendationLine(item)),
       '',
       this.salesPlaybookService.buildBudgetMissClose(playbook),
+      this.salesSegmentStrategyService.buildRecommendationRefinement(strategy),
     ].join('\n');
   }
 
@@ -2481,6 +2510,7 @@ export class WhatsappService {
       return 'Ainda nao ha produtos publicados para eu recomendar agora.';
     }
     const playbook = this.salesPlaybookService.inferPlaybook(products);
+    const strategy = this.salesSegmentStrategyService.buildStrategy(playbook, analysis);
 
     const referencedProducts = this.findMentionedSalesProducts(products, message);
 
@@ -2488,7 +2518,7 @@ export class WhatsappService {
       const comparisonProducts =
         referencedProducts.length >= 2
           ? referencedProducts.slice(0, 2)
-          : this.rankProductsForSalesConversation(products, analysis, playbook)
+          : this.rankProductsForSalesConversation(products, analysis, playbook, strategy)
               .slice(0, 2)
               .map((item) => item.product);
 
@@ -2501,7 +2531,7 @@ export class WhatsappService {
           last_query: analysis.commercialQuery || null,
         });
 
-        return this.buildSalesComparisonResponse(comparisonProducts, analysis, playbook);
+        return this.buildSalesComparisonResponse(comparisonProducts, analysis, playbook, strategy);
       }
     }
 
@@ -2510,6 +2540,7 @@ export class WhatsappService {
       products,
       analysis,
       playbook,
+      strategy,
       referenceProduct,
     );
 
@@ -2523,7 +2554,7 @@ export class WhatsappService {
         return 'Nao encontrei uma opcao segura dentro desse orcamento agora. Se quiser, me diga outra faixa de valor e eu recalculo com voce.';
       }
 
-      return this.buildSalesBudgetMissResponse(analysis, playbook, rankedProducts);
+      return this.buildSalesBudgetMissResponse(analysis, playbook, strategy, rankedProducts);
     }
 
     if (!rankedProducts.length) {
@@ -2547,6 +2578,7 @@ export class WhatsappService {
       analysis,
       rankedProducts,
       playbook,
+      strategy,
       referenceProduct,
     );
   }

@@ -6,6 +6,7 @@ import { OpenAIService } from './services/openai.service';
 import { MessageIntelligenceService } from './services/message-intelligence.service';
 import { SalesIntelligenceService } from './services/sales-intelligence.service';
 import { SalesPlaybookService } from './services/sales-playbook.service';
+import { SalesSegmentStrategyService } from './services/sales-segment-strategy.service';
 import { ConversationService } from './services/conversation.service';
 import { ProductsModule } from '../products/products.module';
 import { OrdersModule } from '../orders/orders.module';
@@ -33,6 +34,7 @@ import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity'
     MessageIntelligenceService,
     SalesIntelligenceService,
     SalesPlaybookService,
+    SalesSegmentStrategyService,
     ConversationService,
   ],
   exports: [WhatsappService, ConversationService],

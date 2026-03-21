@@ -3,6 +3,7 @@ import { WhatsappService } from './whatsapp.service';
 import { MessageIntelligenceService } from './services/message-intelligence.service';
 import { SalesIntelligenceService } from './services/sales-intelligence.service';
 import { SalesPlaybookService } from './services/sales-playbook.service';
+import { SalesSegmentStrategyService } from './services/sales-segment-strategy.service';
 
 describe('WhatsappService defensive WhatsApp flow', () => {
   const catalog = [
@@ -89,6 +90,48 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     },
   ];
 
+  const restaurantCatalog = [
+    {
+      id: 'r1',
+      name: 'Combo Executivo',
+      description: 'Refeicao completa para almoco com mais sustancia.',
+      price: 34.9,
+      available_stock: 10,
+      created_at: '2026-03-20T00:00:00.000Z',
+      categoria: { name: 'Executivo' },
+    },
+    {
+      id: 'r2',
+      name: 'Lanche Rapido Artesanal',
+      description: 'Opcao pratica para correria sem perder sabor.',
+      price: 24.9,
+      available_stock: 12,
+      created_at: '2026-03-20T00:00:00.000Z',
+      categoria: { name: 'Lanches' },
+    },
+  ];
+
+  const electronicsCatalog = [
+    {
+      id: 'e1',
+      name: 'Cabo Lightning Turbo',
+      description: 'Compatibilidade segura com iPhone e celular, com carga rapida.',
+      price: 59.9,
+      available_stock: 15,
+      created_at: '2026-03-20T00:00:00.000Z',
+      categoria: { name: 'Cabos' },
+    },
+    {
+      id: 'e2',
+      name: 'Carregador USB-C Turbo',
+      description: 'Carregador de celular Android e USB-C com mais potencia.',
+      price: 79.9,
+      available_stock: 11,
+      created_at: '2026-03-20T00:00:00.000Z',
+      categoria: { name: 'Carregadores' },
+    },
+  ];
+
   const createFixture = (
     products: Array<Record<string, unknown>> = [],
     overrides?: {
@@ -149,6 +192,9 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     const messageIntelligenceService = new MessageIntelligenceService();
     const salesIntelligenceService = new SalesIntelligenceService(messageIntelligenceService);
     const salesPlaybookService = new SalesPlaybookService(messageIntelligenceService);
+    const salesSegmentStrategyService = new SalesSegmentStrategyService(
+      messageIntelligenceService,
+    );
 
     const service = new WhatsappService(
       config as any,
@@ -156,6 +202,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       messageIntelligenceService as any,
       salesIntelligenceService as any,
       salesPlaybookService as any,
+      salesSegmentStrategyService as any,
       conversationService as any,
       productsService as any,
       ordersService as any,
@@ -856,6 +903,19 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Camiseta Basica Versatil');
   });
 
+  it('uses fashion strategy to prioritize workwear selling', async () => {
+    const { service } = createFixture(fashionCatalog);
+
+    const response = await service.generateResponse(
+      'me indica algo profissional para trabalho',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Estrategia da moda');
+    expect(response).toContain('uso de trabalho');
+    expect(response).toContain('Blazer Premium');
+  });
+
   it('adapts comparison language to pet catalogs', async () => {
     const { service } = createFixture(petCatalog);
 
@@ -868,6 +928,32 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Melhor rotina do pet');
     expect(response).toContain('Racao Premium Porte Medio');
     expect(response).toContain('Petisco Natural Filhote');
+  });
+
+  it('uses restaurant strategy to protect meal value under budget pressure', async () => {
+    const { service } = createFixture(restaurantCatalog);
+
+    const response = await service.generateResponse(
+      'quero algo ate 30 reais para almoco',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Estrategia da alimentacao');
+    expect(response).toContain('almoco ou refeicao principal');
+    expect(response).toContain('Combo Executivo');
+  });
+
+  it('uses electronics strategy to compare products by compatibility', async () => {
+    const { service } = createFixture(electronicsCatalog);
+
+    const response = await service.generateResponse(
+      'qual vale mais a pena cabo lightning turbo ou carregador usb-c turbo para iphone',
+      'tenant-id',
+    );
+
+    expect(response).toContain('COMPARATIVO OBJETIVO');
+    expect(response).toContain('compatibilidade');
+    expect(response).toContain('iphone');
   });
 
   it('accepts noisy payment keywords after normalization', () => {
