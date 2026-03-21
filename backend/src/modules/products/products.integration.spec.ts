@@ -118,6 +118,20 @@ describe('Products Integration Tests (e2e)', () => {
         expect(response.body).toHaveProperty('data');
       }
     });
+
+    it('deve listar o catalogo publico sem autenticacao', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste - app não inicializado');
+        return;
+      }
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/products/public/catalog`)
+        .set('x-tenant-id', tenantId)
+        .expect(200);
+
+      expect(Array.isArray(response.body)).toBe(true);
+    });
   });
 
   describe('POST /products - Criar Produto', () => {

@@ -17,7 +17,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Pagamento, PagamentoStatus, MetodoPagamento } from '../../database/entities/Pagamento.entity';
-import { Pedido, PedidoStatus } from '../../database/entities/Pedido.entity';
+import { CanalVenda, Pedido, PedidoStatus } from '../../database/entities/Pedido.entity';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as QRCode from 'qrcode';
@@ -172,6 +172,25 @@ export class PaymentsService {
     }
 
     return result;
+  }
+
+  async createPublicPayment(
+    tenantId: string,
+    createPaymentDto: CreatePaymentDto,
+  ): Promise<PaymentResult> {
+    const pedido = await this.db.getRepository(Pedido).findOne({
+      where: { id: createPaymentDto.pedido_id, tenant_id: tenantId },
+    });
+
+    if (!pedido) {
+      throw new NotFoundException('Pedido nao encontrado');
+    }
+
+    if (pedido.channel !== CanalVenda.ECOMMERCE) {
+      throw new BadRequestException('Pagamento publico restrito a pedidos da loja');
+    }
+
+    return this.createPayment(tenantId, createPaymentDto);
   }
 
   private getPaymentProvider(): string {

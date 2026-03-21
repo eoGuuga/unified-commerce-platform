@@ -92,6 +92,12 @@ class ApiClient {
     return this.request('/products');
   }
 
+  async getPublicStoreProducts(tenantId: string) {
+    return this.request('/products/public/catalog', {
+      headers: tenantId ? { 'x-tenant-id': tenantId } : undefined,
+    });
+  }
+
   async getProduct(id: string, _tenantId: string) {
     return this.request(`/products/${id}`);
   }
@@ -115,10 +121,22 @@ class ApiClient {
   }
 
   // Orders endpoints
-  async createOrder(order: any, _tenantId: string) {
+  async createOrder(order: any, _tenantId: string, idempotencyKey?: string) {
     return this.request('/orders', {
       method: 'POST',
       body: JSON.stringify(order),
+      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+    });
+  }
+
+  async createPublicOrder(order: any, tenantId: string, idempotencyKey?: string) {
+    return this.request('/orders/public/checkout', {
+      method: 'POST',
+      body: JSON.stringify(order),
+      headers: {
+        ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
+        ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      },
     });
   }
 
@@ -167,6 +185,25 @@ class ApiClient {
     return this.request('/payments', {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  }
+
+  async createPublicPayment(
+    payload: {
+      pedido_id: string;
+      method: string;
+      amount?: number;
+      payerEmail?: string;
+      cardToken?: string;
+      installments?: number;
+      metadata?: Record<string, unknown>;
+    },
+    tenantId: string,
+  ) {
+    return this.request('/payments/public', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: tenantId ? { 'x-tenant-id': tenantId } : undefined,
     });
   }
 

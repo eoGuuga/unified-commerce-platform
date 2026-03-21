@@ -23,6 +23,16 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
+  @Public()
+  @Post('public')
+  @ApiOperation({ summary: 'Criar pagamento publico para pedido da loja' })
+  async createPublicPayment(
+    @Headers('x-tenant-id') tenantId: string,
+    @Body() createPaymentDto: CreatePaymentDto,
+  ) {
+    return await this.paymentsService.createPublicPayment(tenantId, createPaymentDto);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Criar pagamento para um pedido' })
   async createPayment(

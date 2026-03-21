@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   Request,
+  Headers,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -18,6 +19,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagg
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../common/decorators/tenant.decorator';
 import { CurrentUser } from '../auth/decorators/user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { Usuario } from '../../database/entities/Usuario.entity';
 import { TypedRequest, getClientIp, getUserAgent } from '../../common/types/request.types';
 
@@ -26,6 +28,13 @@ import { TypedRequest, getClientIp, getUserAgent } from '../../common/types/requ
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
+
+  @Public()
+  @Get('public/catalog')
+  @ApiOperation({ summary: 'Catalogo publico da loja' })
+  getPublicCatalog(@Headers('x-tenant-id') tenantId: string) {
+    return this.productsService.findAll(tenantId);
+  }
 
   @Get()
   @UseGuards(JwtAuthGuard)

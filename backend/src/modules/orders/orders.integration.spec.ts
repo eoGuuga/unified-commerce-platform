@@ -165,6 +165,70 @@ describe('Orders Integration Tests (e2e)', () => {
       expect(orderResponse.body.total_amount).toBe(52.5); // 5 * 10.5
     });
 
+    it('deve criar checkout publico do ecommerce sem autenticacao', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste - app não inicializado');
+        return;
+      }
+
+      const publicProductName = `${productName} Publico`;
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      await queryRunner.query(
+        'UPDATE produtos SET is_active = false WHERE tenant_id = $1 AND name = $2',
+        [tenantId, publicProductName],
+      );
+      await queryRunner.release();
+
+      const productResponse = await request(app.getHttpServer())
+        .post(`/api/v1/products`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({
+          name: publicProductName,
+          price: 12.75,
+          description: 'Produto para checkout publico',
+          unit: 'unidade',
+        })
+        .expect(201);
+
+      const productId = productResponse.body.id;
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/products/${productId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ quantity: 8, reason: 'Teste de checkout publico' })
+        .expect(201);
+
+      const orderResponse = await request(app.getHttpServer())
+        .post(`/api/v1/orders/public/checkout`)
+        .set('x-tenant-id', tenantId)
+        .set('Idempotency-Key', 'orders-public-checkout-e2e')
+        .send({
+          channel: 'ecommerce',
+          customer_name: 'Cliente Publico',
+          customer_email: 'cliente.publico@test.com',
+          customer_phone: '11999999999',
+          delivery_type: 'pickup',
+          items: [
+            {
+              produto_id: productId,
+              quantity: 2,
+              unit_price: 12.75,
+            },
+          ],
+          discount_amount: 0,
+          shipping_amount: 0,
+        })
+        .expect(201);
+
+      expect(orderResponse.body).toHaveProperty('id');
+      expect(orderResponse.body).toHaveProperty('order_no');
+      expect(orderResponse.body.channel).toBe('ecommerce');
+      expect(orderResponse.body.status).toBe('pendente_pagamento');
+      expect(orderResponse.body.total_amount).toBe(25.5);
+    });
+
     it('deve retornar erro 400 quando estoque insuficiente', async () => {
       if (!app) {
         console.log('⏭️ Pulando teste - app não inicializado');

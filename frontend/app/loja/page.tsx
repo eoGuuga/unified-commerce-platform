@@ -305,6 +305,7 @@ export default function LojaPage() {
   const { tenantId, isLoading: authLoading, login } = useAuth();
   const fallbackTenantId = TENANT_ID !== EMPTY_TENANT_ID ? TENANT_ID : null;
   const activeTenantId = tenantId || fallbackTenantId;
+  const isOperatorPreview = Boolean(tenantId);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -326,6 +327,7 @@ export default function LojaPage() {
   const [paymentData, setPaymentData] = useState<PaymentResult | null>(null);
   const [checkoutSnapshot, setCheckoutSnapshot] = useState<CheckoutSnapshot | null>(null);
   const [checkoutSuccess, setCheckoutSuccess] = useState<CheckoutSuccessState | null>(null);
+  const [checkoutIdempotencyKey, setCheckoutIdempotencyKey] = useState<string | null>(null);
 
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
@@ -363,7 +365,9 @@ export default function LojaPage() {
 
     (async () => {
       try {
-        const data = await api.getProducts(activeTenantId);
+        const data = isOperatorPreview
+          ? await api.getProducts(activeTenantId)
+          : await api.getPublicStoreProducts(activeTenantId);
         if (!cancelled) {
           setProducts(Array.isArray(data) ? data : []);
         }
@@ -382,7 +386,7 @@ export default function LojaPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTenantId, authLoading]);
+  }, [activeTenantId, authLoading, isOperatorPreview]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -506,6 +510,8 @@ export default function LojaPage() {
   const summarySubtotal = paymentData ? checkoutSnapshot?.subtotal || 0 : subtotal;
   const summaryDeliveryFee = paymentData ? checkoutSnapshot?.deliveryFee || 0 : deliveryFee;
   const summaryTotal = paymentData ? checkoutSnapshot?.total || payableTotal : checkoutTotal;
+  const hasLockedCheckout = Boolean(createdOrder) && !checkoutSuccess;
+  const hasActiveCheckoutSession = hasLockedCheckout || Boolean(paymentData);
   const storefrontJourney = [
     {
       key: 'catalog',
@@ -555,9 +561,32 @@ export default function LojaPage() {
     setPaymentData(null);
     setCheckoutSnapshot(null);
     setCheckoutSuccess(null);
+    setCheckoutIdempotencyKey(null);
+  };
+
+  const getCheckoutIdempotencyKey = () => {
+    if (checkoutIdempotencyKey) {
+      return checkoutIdempotencyKey;
+    }
+
+    const nextKey =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `loja-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+    setCheckoutIdempotencyKey(nextKey);
+    return nextKey;
   };
 
   const handleAddToCart = (product: Product) => {
+    if (hasLockedCheckout) {
+      toast.error(
+        'Este pedido ja foi criado. Retome o checkout atual para concluir o pagamento antes de alterar o carrinho.',
+      );
+      setShowCheckout(true);
+      return;
+    }
+
     const availableStock = getAvailableUnits(product);
     if (availableStock <= 0) {
       toast.error('Produto sem estoque disponivel.');
@@ -595,6 +624,14 @@ export default function LojaPage() {
   };
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
+    if (hasLockedCheckout) {
+      toast.error(
+        'O carrinho fica travado enquanto existe um pedido aberto. Retome o checkout atual para concluir o pagamento.',
+      );
+      setShowCheckout(true);
+      return;
+    }
+
     if (quantity <= 0) {
       setCart(cart.filter((item) => item.id !== id));
       return;
@@ -610,6 +647,15 @@ export default function LojaPage() {
   };
 
   const handleClearCart = () => {
+    if (hasLockedCheckout) {
+      toast.error(
+        'Este pedido ja existe. Retome o checkout atual ou acompanhe o pedido em vez de limpar o carrinho.',
+      );
+      setShowCheckout(true);
+      setShowCart(false);
+      return;
+    }
+
     setCart([]);
     setShowCart(false);
     setShowCheckout(false);
@@ -669,14 +715,23 @@ export default function LojaPage() {
   };
 
   const handleCopyCheckoutReceipt = async () => {
-    if (!checkoutSuccess) return;
+    if (!checkoutSuccess && !createdOrder) {
+      toast.error('Ainda nao existe um pedido para gerar comprovante.');
+      return;
+    }
+
+    const receiptOrderNo = checkoutSuccess?.orderNo || createdOrder?.orderNo || 'Pedido criado';
+    const receiptCustomerName = checkoutSuccess?.customerName || customerInfo.name || 'Cliente';
+    const receiptPaymentMethod = checkoutSuccess?.paymentMethod || paymentMethod;
+    const receiptDeliveryType = checkoutSuccess?.deliveryType || customerInfo.deliveryType;
+    const receiptTotal = checkoutSuccess?.total ?? payableTotal;
 
     const receiptLines = [
       'GTSoftHub | comprovante da compra',
-      `Pedido: ${checkoutSuccess.orderNo || 'Pedido confirmado'}`,
-      `Cliente: ${checkoutSuccess.customerName}`,
-      `Pagamento: ${getPaymentMethodLabel(checkoutSuccess.paymentMethod)}`,
-      `Recebimento: ${getDeliveryTypeLabel(checkoutSuccess.deliveryType)}`,
+      `Pedido: ${receiptOrderNo}`,
+      `Cliente: ${receiptCustomerName}`,
+      `Pagamento: ${getPaymentMethodLabel(receiptPaymentMethod)}`,
+      `Recebimento: ${getDeliveryTypeLabel(receiptDeliveryType)}`,
       '',
       'Itens:',
       ...(checkoutSnapshot?.items || []).map(
@@ -684,7 +739,7 @@ export default function LojaPage() {
           `- ${item.name} | ${item.quantity} x ${formatCurrency(item.price)} = ${formatCurrency(item.price * item.quantity)}`,
       ),
       '',
-      `Total: ${formatCurrency(checkoutSuccess.total)}`,
+      `Total: ${formatCurrency(receiptTotal)}`,
     ];
 
     try {
@@ -696,18 +751,19 @@ export default function LojaPage() {
   };
 
   const handleOpenOrderTracking = () => {
-    if (!checkoutSuccess?.orderNo) {
+    const orderNo = checkoutSuccess?.orderNo || createdOrder?.orderNo;
+    if (!orderNo) {
       toast.error('Codigo do pedido indisponivel para acompanhamento.');
       return;
     }
 
     saveOrderTrackingContext({
-      orderNo: checkoutSuccess.orderNo,
-      customerEmail: checkoutSuccess.customerEmail,
-      customerPhone: checkoutSuccess.customerPhone,
-      customerName: checkoutSuccess.customerName,
+      orderNo,
+      customerEmail: checkoutSuccess?.customerEmail || customerInfo.email,
+      customerPhone: checkoutSuccess?.customerPhone || customerInfo.phone,
+      customerName: checkoutSuccess?.customerName || customerInfo.name,
     });
-    router.push(`/pedido?order=${encodeURIComponent(checkoutSuccess.orderNo)}`);
+    router.push(`/pedido?order=${encodeURIComponent(orderNo)}`);
   };
 
   const handleCreateOrderAndPayment = async () => {
@@ -741,6 +797,7 @@ export default function LojaPage() {
 
     try {
       const phoneDigits = customerInfo.phone.replace(/\D/g, '');
+      const snapshotItems = cart.map((item) => ({ ...item }));
       const orderPayload = {
         channel: 'ecommerce',
         customer_name: customerInfo.name,
@@ -770,22 +827,47 @@ export default function LojaPage() {
         coupon_code: couponCode ? couponCode.trim().toUpperCase() : undefined,
       };
 
-      const created = await api.createOrder(orderPayload, activeTenantId);
-      const totalAmount = Number(created.total_amount);
-      const orderTotal = Number.isFinite(totalAmount) ? totalAmount : checkoutTotal;
+      let orderContext = createdOrder;
+      let orderTotal = createdOrder?.total ?? checkoutTotal;
 
-      setCreatedOrder({
-        id: created.id,
-        total: orderTotal,
-        orderNo: created.order_no || created.orderNo,
-      });
+      if (!orderContext) {
+        const idempotencyKey = getCheckoutIdempotencyKey();
+        const created = isOperatorPreview
+          ? await api.createOrder(orderPayload, activeTenantId, idempotencyKey)
+          : await api.createPublicOrder(orderPayload, activeTenantId, idempotencyKey);
+        const totalAmount = Number(created.total_amount);
+        orderTotal = Number.isFinite(totalAmount) ? totalAmount : checkoutTotal;
 
-      setCheckoutSnapshot({
-        items: cart.map((item) => ({ ...item })),
-        subtotal,
-        deliveryFee,
-        total: orderTotal,
-      });
+        orderContext = {
+          id: created.id,
+          total: orderTotal,
+          orderNo: created.order_no || created.orderNo,
+        };
+
+        setCreatedOrder(orderContext);
+        setCheckoutSnapshot({
+          items: snapshotItems,
+          subtotal,
+          deliveryFee,
+          total: orderTotal,
+        });
+
+        if (orderContext.orderNo) {
+          saveOrderTrackingContext({
+            orderNo: orderContext.orderNo,
+            customerEmail: customerInfo.email,
+            customerPhone: customerInfo.phone,
+            customerName: customerInfo.name,
+          });
+        }
+      } else if (!checkoutSnapshot) {
+        setCheckoutSnapshot({
+          items: snapshotItems,
+          subtotal,
+          deliveryFee,
+          total: orderContext.total,
+        });
+      }
 
       const paymentPayload: {
         pedido_id: string;
@@ -793,23 +875,27 @@ export default function LojaPage() {
         amount: number;
         metadata?: Record<string, unknown>;
       } = {
-        pedido_id: created.id,
+        pedido_id: orderContext.id,
         method: paymentMethod,
-        amount: orderTotal,
+        amount: orderContext.total,
       };
 
       if (paymentMethod === 'dinheiro' && Number.isFinite(cashReceivedNumber)) {
         paymentPayload.metadata = {
           cash_change_for: cashReceivedNumber,
-          cash_change_amount: Math.max(0, cashReceivedNumber - orderTotal),
+          cash_change_amount: Math.max(0, cashReceivedNumber - orderContext.total),
         };
       }
 
-      const paymentResult = await api.createPayment(paymentPayload, activeTenantId);
+      const paymentResult = isOperatorPreview
+        ? await api.createPayment(paymentPayload, activeTenantId)
+        : await api.createPublicPayment(paymentPayload, activeTenantId);
       setPaymentData(paymentResult);
       setCart([]);
       setShowCart(false);
-      toast.success('Pedido criado e pagamento gerado.');
+      toast.success(
+        createdOrder ? 'Pagamento gerado novamente para o pedido existente.' : 'Pedido criado e pagamento gerado.',
+      );
     } catch (error: any) {
       const message = error?.message || 'Nao foi possivel criar pedido e pagamento';
       setPaymentError(message);
@@ -821,6 +907,12 @@ export default function LojaPage() {
 
   const handleConfirmPayment = async () => {
     if (!activeTenantId || !paymentData?.pagamento?.id) return;
+    if (!isOperatorPreview) {
+      toast.error(
+        'A confirmacao do pagamento nao acontece no navegador do cliente. Use o acompanhamento do pedido enquanto aguardamos a confirmacao automatica.',
+      );
+      return;
+    }
 
     setPaymentLoading(true);
     setPaymentError(null);
@@ -873,17 +965,28 @@ export default function LojaPage() {
   const openCheckout = () => {
     if (cart.length === 0) return;
     setShowCart(false);
-    resetPaymentState();
+    if (!hasActiveCheckoutSession) {
+      resetPaymentState();
+    }
     setShowCheckout(true);
   };
 
   const closeCheckout = () => {
     if (paymentLoading) return;
+    if (createdOrder?.orderNo) {
+      saveOrderTrackingContext({
+        orderNo: createdOrder.orderNo,
+        customerEmail: checkoutSuccess?.customerEmail || customerInfo.email,
+        customerPhone: checkoutSuccess?.customerPhone || customerInfo.phone,
+        customerName: checkoutSuccess?.customerName || customerInfo.name,
+      });
+    }
     setShowCheckout(false);
-    resetPaymentState();
+    if (!hasActiveCheckoutSession || checkoutSuccess) {
+      resetPaymentState();
+    }
   };
 
-  const isOperatorPreview = Boolean(tenantId);
   const hasTenantConfiguration = !authLoading && !!activeTenantId;
 
   return (
@@ -933,7 +1036,15 @@ export default function LojaPage() {
             </a>
             <button
               type="button"
-              onClick={() => setShowCart(true)}
+              onClick={() => {
+                if (hasActiveCheckoutSession) {
+                  setShowCart(false);
+                  setShowCheckout(true);
+                  return;
+                }
+
+                setShowCart(true);
+              }}
               className="relative inline-flex items-center gap-2 rounded-2xl bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition hover:opacity-90"
             >
               <ShoppingBag className="size-4" />
@@ -2212,8 +2323,14 @@ export default function LojaPage() {
                         value={couponCode}
                         onChange={(event) => setCouponCode(event.target.value)}
                         placeholder="PROMO10"
+                        disabled={Boolean(createdOrder)}
                         className={controlClassName}
                       />
+                      {createdOrder && (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          O cupom fica travado depois que o pedido ja foi criado para evitar divergencia no pagamento.
+                        </p>
+                      )}
                     </div>
 
                     {paymentMethod === 'dinheiro' && (
@@ -2310,7 +2427,11 @@ export default function LojaPage() {
                       disabled={paymentLoading || summaryItems.length === 0}
                       className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-4 py-3 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {paymentLoading ? 'Processando...' : 'Criar pedido e gerar pagamento'}
+                      {paymentLoading
+                        ? 'Processando...'
+                        : createdOrder
+                          ? 'Gerar pagamento novamente'
+                          : 'Criar pedido e gerar pagamento'}
                       <ArrowRight className="size-4" />
                     </button>
                   ) : (
@@ -2326,6 +2447,18 @@ export default function LojaPage() {
                           </p>
                         )}
                       </div>
+
+                      {createdOrder?.orderNo && (
+                        <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+                          <p className="text-sm text-muted-foreground">Codigo do pedido</p>
+                          <p className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+                            {createdOrder.orderNo}
+                          </p>
+                          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                            O acompanhamento do pedido ja esta pronto mesmo antes da confirmacao final do pagamento.
+                          </p>
+                        </div>
+                      )}
 
                       {paymentMethod === 'pix' &&
                         (paymentData.qr_code || paymentData.qr_code_url) && (
@@ -2365,15 +2498,43 @@ export default function LojaPage() {
                           </div>
                         )}
 
-                      <button
-                        type="button"
-                        onClick={handleConfirmPayment}
-                        disabled={paymentLoading}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {paymentLoading ? 'Confirmando...' : 'Confirmar pagamento'}
-                        <BadgeCheck className="size-4" />
-                      </button>
+                      <div className="space-y-3">
+                        {createdOrder?.orderNo && (
+                          <button
+                            type="button"
+                            onClick={handleOpenOrderTracking}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-foreground transition hover:border-accent/30 hover:bg-white/[0.08]"
+                          >
+                            Acompanhar pedido
+                            <ArrowRight className="size-4" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => void handleCopyCheckoutReceipt()}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-foreground transition hover:border-accent/30 hover:bg-white/[0.08]"
+                        >
+                          <Copy className="size-4" />
+                          Copiar comprovante
+                        </button>
+                        {isOperatorPreview ? (
+                          <button
+                            type="button"
+                            onClick={handleConfirmPayment}
+                            disabled={paymentLoading}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {paymentLoading ? 'Confirmando...' : 'Confirmar pagamento'}
+                            <BadgeCheck className="size-4" />
+                          </button>
+                        ) : (
+                          <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-4 text-sm leading-relaxed text-emerald-50">
+                            {paymentMethod === 'pix'
+                              ? 'Assim que o Pix for pago, a confirmacao aparecera automaticamente no acompanhamento do pedido.'
+                              : 'Seu pedido foi enviado para a loja. A confirmacao do dinheiro acontece na retirada ou na entrega.'}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

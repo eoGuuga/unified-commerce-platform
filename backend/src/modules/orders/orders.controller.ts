@@ -9,12 +9,13 @@ import {
   UseGuards,
   Request,
   Headers,
+  BadRequestException,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { TrackPublicOrderDto } from './dto/track-public-order.dto';
-import { PedidoStatus } from '../../database/entities/Pedido.entity';
+import { CanalVenda, PedidoStatus } from '../../database/entities/Pedido.entity';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/user.decorator';
@@ -28,6 +29,37 @@ import { TypedRequest, getClientIp, getUserAgent } from '../../common/types/requ
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
+
+  @Public()
+  @Post('public/checkout')
+  @ApiOperation({ summary: 'Criar pedido publico da loja' })
+  @ApiResponse({
+    status: 201,
+    description: 'Pedido publico criado com sucesso',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Checkout publico restrito ao ecommerce ou dados invalidos',
+  })
+  createPublicCheckout(
+    @Body() createOrderDto: CreateOrderDto,
+    @Headers('x-tenant-id') tenantId: string,
+    @Request() req: TypedRequest,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    if (createOrderDto.channel !== CanalVenda.ECOMMERCE) {
+      throw new BadRequestException('Checkout publico restrito ao canal ecommerce');
+    }
+
+    return this.ordersService.create(
+      createOrderDto,
+      tenantId,
+      undefined,
+      idempotencyKey,
+      getClientIp(req),
+      getUserAgent(req),
+    );
+  }
 
   @Post()
   @UseGuards(JwtAuthGuard)
