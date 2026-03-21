@@ -19,10 +19,13 @@ set -a
 source "$ENV_FILE"
 set +a
 
+SEED_DATABASE_URL="postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/ucm"
+
 if docker network inspect ucmtest_ucm-test-net >/dev/null 2>&1; then
   docker run --rm \
     --network ucmtest_ucm-test-net \
     --env-file "$ENV_FILE" \
+    -e "DATABASE_URL=${SEED_DATABASE_URL}" \
     -v "${ROOT_DIR}:/workspace" \
     -w /workspace/backend \
     node:20-alpine \
@@ -31,4 +34,5 @@ if docker network inspect ucmtest_ucm-test-net >/dev/null 2>&1; then
 fi
 
 cd "${ROOT_DIR}/backend"
+export DATABASE_URL="${SEED_DATABASE_URL}"
 npm run seed:catalog -- --input "$CATALOG_FILE" --whatsapp-instance "${EVOLUTION_INSTANCE:-loucas-teste}"
