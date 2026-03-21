@@ -544,14 +544,19 @@ export class SalesPlaybookService {
     const scored = this.playbooks
       .map((playbook) => ({
         playbook,
-        score: this.scoreCatalogForPlaybook(playbook, normalizedProducts),
+        ...this.scoreCatalogForPlaybook(playbook, normalizedProducts),
       }))
       .sort((left, right) => right.score - left.score);
 
     const best = scored[0];
     const runnerUp = scored[1];
 
-    if (!best || best.score < 6) {
+    if (
+      !best ||
+      best.score < 6 ||
+      (best.uniqueHits < 2 && best.matchedProducts < 2) ||
+      best.score <= (runnerUp?.score || 0) + 2
+    ) {
       return { ...this.getGeneralPlaybook(), confidence: 0.45 };
     }
 
@@ -626,15 +631,23 @@ export class SalesPlaybookService {
     }
 
     if (analysis.intent === 'objection') {
-      return playbook.recommendationIntro.objection;
+      return playbook.recommendationIntro.objection.includes('preocupacao com custo')
+        ? playbook.recommendationIntro.objection
+        : `Entendi a preocupacao com custo. ${playbook.recommendationIntro.objection}`;
     }
 
-    if (analysis.useCaseTags.includes('gift') && playbook.recommendationIntro.gift) {
-      return playbook.recommendationIntro.gift;
+    if (analysis.useCaseTags.includes('gift')) {
+      return (
+        playbook.recommendationIntro.gift ||
+        'Separei algumas opcoes que fazem sentido para esse contexto de presente:'
+      );
     }
 
-    if (analysis.useCaseTags.includes('party') && playbook.recommendationIntro.party) {
-      return playbook.recommendationIntro.party;
+    if (analysis.useCaseTags.includes('party')) {
+      return (
+        playbook.recommendationIntro.party ||
+        'Estas sao as opcoes que fazem mais sentido para esse contexto:'
+      );
     }
 
     if (analysis.commercialQuery && playbook.recommendationIntro.queryPrefix) {
@@ -668,13 +681,20 @@ export class SalesPlaybookService {
     return this.playbooks.find((playbook) => playbook.segment === 'general') as SalesPlaybookDefinition;
   }
 
-  private scoreCatalogForPlaybook(playbook: SalesPlaybookDefinition, normalizedProducts: string[]): number {
+  private scoreCatalogForPlaybook(
+    playbook: SalesPlaybookDefinition,
+    normalizedProducts: string[],
+  ): { score: number; uniqueHits: number; matchedProducts: number } {
     if (playbook.segment === 'general') {
-      return 0;
+      return { score: 0, uniqueHits: 0, matchedProducts: 0 };
     }
 
     let score = 0;
+    const matchedKeywords = new Set<string>();
+    let matchedProducts = 0;
+
     for (const productDocument of normalizedProducts) {
+      let productMatched = false;
       for (const keyword of playbook.keywords) {
         const normalizedKeyword = this.normalize(keyword);
         if (!normalizedKeyword) {
@@ -683,11 +703,21 @@ export class SalesPlaybookService {
 
         if (productDocument.includes(normalizedKeyword)) {
           score += normalizedKeyword.length >= 6 ? 3 : 2;
+          matchedKeywords.add(normalizedKeyword);
+          productMatched = true;
         }
+      }
+
+      if (productMatched) {
+        matchedProducts += 1;
       }
     }
 
-    return score;
+    return {
+      score,
+      uniqueHits: matchedKeywords.size,
+      matchedProducts,
+    };
   }
 
   private buildProductDocument(product: ProductWithStock): string {
