@@ -2155,7 +2155,7 @@ export class WhatsappService {
         : analysis.intent === 'objection'
           ? 'Entendi a preocupacao com custo. Para manter a venda forte sem forcar a barra, eu seguiria por aqui:'
           : analysis.useCaseTags.includes('gift')
-            ? 'Pensando em presentear bem, eu separaria estas opcoes:'
+            ? 'Separei algumas opcoes que costumam funcionar muito bem para presente:'
             : analysis.useCaseTags.includes('party')
               ? 'Para esse contexto de evento, estas sao as opcoes que fazem mais sentido agora:'
               : analysis.commercialQuery
