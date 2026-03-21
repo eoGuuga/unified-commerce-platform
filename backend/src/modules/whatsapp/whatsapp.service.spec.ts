@@ -2,6 +2,7 @@ import { PedidoStatus } from '../../database/entities/Pedido.entity';
 import { WhatsappService } from './whatsapp.service';
 import { MessageIntelligenceService } from './services/message-intelligence.service';
 import { SalesIntelligenceService } from './services/sales-intelligence.service';
+import { SalesPlaybookService } from './services/sales-playbook.service';
 
 describe('WhatsappService defensive WhatsApp flow', () => {
   const catalog = [
@@ -43,6 +44,48 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       available_stock: 9,
       created_at: '2026-03-15T00:00:00.000Z',
       categoria: { name: 'Doces' },
+    },
+  ];
+
+  const fashionCatalog = [
+    {
+      id: 'f1',
+      name: 'Blazer Premium',
+      description: 'Peca marcante para noite e ocasiões especiais.',
+      price: 189.9,
+      available_stock: 6,
+      created_at: '2026-03-20T00:00:00.000Z',
+      categoria: { name: 'Moda Feminina' },
+    },
+    {
+      id: 'f2',
+      name: 'Camiseta Basica Versatil',
+      description: 'Malha leve para uso do dia a dia com encaixe facil.',
+      price: 69.9,
+      available_stock: 12,
+      created_at: '2026-03-20T00:00:00.000Z',
+      categoria: { name: 'Roupas' },
+    },
+  ];
+
+  const petCatalog = [
+    {
+      id: 'pet1',
+      name: 'Racao Premium Porte Medio',
+      description: 'Nutricao equilibrada para rotina do pet adulto.',
+      price: 129.9,
+      available_stock: 7,
+      created_at: '2026-03-20T00:00:00.000Z',
+      categoria: { name: 'Pet' },
+    },
+    {
+      id: 'pet2',
+      name: 'Petisco Natural Filhote',
+      description: 'Snack pratico para reforco e recompensa.',
+      price: 34.9,
+      available_stock: 15,
+      created_at: '2026-03-20T00:00:00.000Z',
+      categoria: { name: 'Petiscos' },
     },
   ];
 
@@ -105,12 +148,14 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     const messageIntelligenceService = new MessageIntelligenceService();
     const salesIntelligenceService = new SalesIntelligenceService(messageIntelligenceService);
+    const salesPlaybookService = new SalesPlaybookService(messageIntelligenceService);
 
     const service = new WhatsappService(
       config as any,
       openAIService as any,
       messageIntelligenceService as any,
       salesIntelligenceService as any,
+      salesPlaybookService as any,
       conversationService as any,
       productsService as any,
       ordersService as any,
@@ -796,6 +841,33 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     expect(response).toContain('presentear bem');
     expect(response).toContain('Brownie Premium');
+  });
+
+  it('adapts recommendation language to fashion catalogs', async () => {
+    const { service } = createFixture(fashionCatalog);
+
+    const response = await service.generateResponse(
+      'me indica algo versatil para usar todo dia',
+      'tenant-id',
+    );
+
+    expect(response).toContain('consultora de moda');
+    expect(response).toContain('dia a dia');
+    expect(response).toContain('Camiseta Basica Versatil');
+  });
+
+  it('adapts comparison language to pet catalogs', async () => {
+    const { service } = createFixture(petCatalog);
+
+    const response = await service.generateResponse(
+      'qual vale mais a pena racao premium porte medio ou petisco natural filhote',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Leitura comercial da pet');
+    expect(response).toContain('Melhor rotina do pet');
+    expect(response).toContain('Racao Premium Porte Medio');
+    expect(response).toContain('Petisco Natural Filhote');
   });
 
   it('accepts noisy payment keywords after normalization', () => {

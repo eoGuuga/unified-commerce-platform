@@ -6,6 +6,10 @@ import {
   SalesConversationAnalysis,
   SalesIntelligenceService,
 } from './services/sales-intelligence.service';
+import {
+  SalesPlaybookProfile,
+  SalesPlaybookService,
+} from './services/sales-playbook.service';
 import { ConversationService } from './services/conversation.service';
 import { ProductsService } from '../products/products.service';
 import { OrdersService } from '../orders/orders.service';
@@ -101,6 +105,7 @@ export class WhatsappService {
     private openAIService: OpenAIService,
     private messageIntelligenceService: MessageIntelligenceService,
     private salesIntelligenceService: SalesIntelligenceService,
+    private salesPlaybookService: SalesPlaybookService,
     private conversationService: ConversationService,
     private productsService: ProductsService,
     private ordersService: OrdersService,
@@ -2037,6 +2042,7 @@ export class WhatsappService {
   private rankProductsForSalesConversation(
     products: ProductWithStock[],
     analysis: SalesConversationAnalysis,
+    playbook: SalesPlaybookProfile,
     referenceProduct?: ProductWithStock | null,
   ): RankedSalesProduct[] {
     const saleableProducts = products.filter((product) => product.is_active !== false);
@@ -2068,6 +2074,10 @@ export class WhatsappService {
           addReason('pronto para venda agora');
         }
 
+        const playbookFit = this.salesPlaybookService.describeProductFit(playbook, product, analysis);
+        score += playbookFit.score;
+        playbookFit.reasons.forEach(addReason);
+
         queryWords.forEach((word) => {
           if (normalizedName.includes(word)) {
             score += 14;
@@ -2077,16 +2087,6 @@ export class WhatsappService {
             addReason('faz sentido para esse contexto');
           }
         });
-
-        if (analysis.useCaseTags.includes('gift') && /(kit|caixa|combo|box|presente|premium|gourmet)/.test(searchDocument)) {
-          score += 12;
-          addReason('tem perfil forte para presente');
-        }
-
-        if (analysis.useCaseTags.includes('party') && /(bolo|torta|kit|combo|festa|anivers)/.test(searchDocument)) {
-          score += 12;
-          addReason('encaixa melhor em evento ou comemoracao');
-        }
 
         const priceRatio = (price - minPrice) / priceSpan;
         if (analysis.pricePreference === 'budget') {
@@ -2147,25 +2147,15 @@ export class WhatsappService {
   private buildSalesRecommendationResponse(
     analysis: SalesConversationAnalysis,
     rankedProducts: RankedSalesProduct[],
+    playbook: SalesPlaybookProfile,
     referenceProduct?: ProductWithStock | null,
   ): string {
-    const intro =
-      analysis.intent === 'budget' && analysis.budgetCeiling !== null
-        ? `Pensando no seu teto de ate R$ ${this.formatCurrency(analysis.budgetCeiling)}, estas sao as opcoes mais inteligentes agora:`
-        : analysis.intent === 'objection'
-          ? 'Entendi a preocupacao com custo. Para manter a venda forte sem forcar a barra, eu seguiria por aqui:'
-          : analysis.useCaseTags.includes('gift')
-            ? 'Separei algumas opcoes que costumam funcionar muito bem para presente:'
-            : analysis.useCaseTags.includes('party')
-              ? 'Para esse contexto de evento, estas sao as opcoes que fazem mais sentido agora:'
-              : analysis.commercialQuery
-                ? `Pelo que voce descreveu sobre "${analysis.commercialQuery}", estas sao as melhores rotas que achei:`
-                : 'Pensando como uma vendedora consultiva, eu separaria estas opcoes para voce:';
-
-    const close =
-      analysis.intent === 'objection' && referenceProduct
-        ? `Se quiser, eu tambem comparo com ${referenceProduct.name} para te mostrar a diferenca com clareza.`
-        : 'Se quiser, eu comparo duas opcoes, ajusto por orcamento ou ja monto o pedido por aqui.';
+    const intro = this.salesPlaybookService.buildRecommendationIntro(playbook, analysis);
+    const close = this.salesPlaybookService.buildRecommendationClose(
+      playbook,
+      analysis,
+      referenceProduct,
+    );
 
     return [
       intro,
@@ -2180,6 +2170,7 @@ export class WhatsappService {
   private buildSalesComparisonResponse(
     comparedProducts: ProductWithStock[],
     analysis: SalesConversationAnalysis,
+    playbook: SalesPlaybookProfile,
   ): string {
     const [left, right] = comparedProducts;
     const leftPrice = Number(left.price || 0);
@@ -2198,6 +2189,7 @@ export class WhatsappService {
         : analysis.pricePreference === 'premium'
           ? premium
           : betterValue;
+    const labels = this.salesPlaybookService.getComparisonLabels(playbook);
 
     return [
       'COMPARATIVO OBJETIVO',
@@ -2205,18 +2197,21 @@ export class WhatsappService {
       `1. ${this.formatProductHeadline(left)} | Estoque: ${left.available_stock} unidade(s)`,
       `2. ${this.formatProductHeadline(right)} | Estoque: ${right.available_stock} unidade(s)`,
       '',
-      'Leitura comercial:',
-      `- Mais acessivel: ${cheaper.name}.`,
-      `- Mais premium: ${premium.name}.`,
-      `- Melhor equilibrio agora: ${betterValue.name}.`,
+      `Leitura comercial da ${playbook.label}: ${playbook.salesLens}`,
       '',
-      `Se eu fosse te orientar para fechar bem essa venda, eu iria de ${recommended.name}.`,
+      'Leitura comercial:',
+      `- ${labels.cheaper}: ${cheaper.name}.`,
+      `- ${labels.premium}: ${premium.name}.`,
+      `- ${labels.betterValue}: ${betterValue.name}.`,
+      '',
+      `${labels.recommendationLead} ${recommended.name}.`,
       `Se quiser seguir, envie: "quero 1 ${recommended.name}".`,
     ].join('\n');
   }
 
   private buildSalesBudgetMissResponse(
     analysis: SalesConversationAnalysis,
+    playbook: SalesPlaybookProfile,
     closestProducts: RankedSalesProduct[],
   ): string {
     return [
@@ -2225,7 +2220,7 @@ export class WhatsappService {
       'As opcoes mais proximas que ainda fazem sentido comercialmente sao:',
       ...closestProducts.slice(0, 2).map((item) => this.formatSalesRecommendationLine(item)),
       '',
-      'Se quiser, eu tento abrir outra faixa de valor ou comparo essas opcoes com voce.',
+      this.salesPlaybookService.buildBudgetMissClose(playbook),
     ].join('\n');
   }
 
@@ -2485,6 +2480,7 @@ export class WhatsappService {
     if (!products.length) {
       return 'Ainda nao ha produtos publicados para eu recomendar agora.';
     }
+    const playbook = this.salesPlaybookService.inferPlaybook(products);
 
     const referencedProducts = this.findMentionedSalesProducts(products, message);
 
@@ -2492,7 +2488,7 @@ export class WhatsappService {
       const comparisonProducts =
         referencedProducts.length >= 2
           ? referencedProducts.slice(0, 2)
-          : this.rankProductsForSalesConversation(products, analysis)
+          : this.rankProductsForSalesConversation(products, analysis, playbook)
               .slice(0, 2)
               .map((item) => item.product);
 
@@ -2505,12 +2501,17 @@ export class WhatsappService {
           last_query: analysis.commercialQuery || null,
         });
 
-        return this.buildSalesComparisonResponse(comparisonProducts, analysis);
+        return this.buildSalesComparisonResponse(comparisonProducts, analysis, playbook);
       }
     }
 
     const referenceProduct = referencedProducts[0] || null;
-    const rankedProducts = this.rankProductsForSalesConversation(products, analysis, referenceProduct);
+    const rankedProducts = this.rankProductsForSalesConversation(
+      products,
+      analysis,
+      playbook,
+      referenceProduct,
+    );
 
     const budgetCeiling = analysis.budgetCeiling;
     if (
@@ -2522,7 +2523,7 @@ export class WhatsappService {
         return 'Nao encontrei uma opcao segura dentro desse orcamento agora. Se quiser, me diga outra faixa de valor e eu recalculo com voce.';
       }
 
-      return this.buildSalesBudgetMissResponse(analysis, rankedProducts);
+      return this.buildSalesBudgetMissResponse(analysis, playbook, rankedProducts);
     }
 
     if (!rankedProducts.length) {
@@ -2542,7 +2543,12 @@ export class WhatsappService {
       last_query: analysis.commercialQuery || null,
     });
 
-    return this.buildSalesRecommendationResponse(analysis, rankedProducts, referenceProduct);
+    return this.buildSalesRecommendationResponse(
+      analysis,
+      rankedProducts,
+      playbook,
+      referenceProduct,
+    );
   }
 
   private async applyPendingOrderAndProceedPremium(
