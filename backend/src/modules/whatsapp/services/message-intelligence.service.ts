@@ -85,7 +85,6 @@ export class MessageIntelligenceService {
   ];
 
   private readonly additiveReferencePhrases = [
-    'mais',
     'quero mais',
     'manda mais',
     'adiciona',
@@ -403,7 +402,15 @@ export class MessageIntelligenceService {
       this.hasAnyPhrase(normalizedText, this.additiveReferencePhrases) ||
       /^(mais|quero mais)\b/.test(normalizedText);
     const selectedSuggestionIndex = this.findSelectedSuggestionIndex(normalizedText);
-    const supportsOrdinalSelection = ['suggestion', 'recommendation', 'price', 'stock'].includes(
+    const supportsOrdinalSelection = [
+      'suggestion',
+      'recommendation',
+      'comparison',
+      'budget',
+      'objection',
+      'price',
+      'stock',
+    ].includes(
       context?.lastIntent || '',
     );
     const hasSelectedSuggestion =

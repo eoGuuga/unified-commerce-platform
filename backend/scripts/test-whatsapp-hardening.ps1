@@ -183,6 +183,25 @@ $scenarios = @(
         )
     },
     @{
+        Name = "sales_budget_guidance"
+        Steps = @(
+            @{ Message = "quero algo ate 20 reais"; ExpectAny = @("teto de ate", "opcoes mais inteligentes", "rotas que achei") }
+        )
+    },
+    @{
+        Name = "sales_comparison_guidance"
+        Steps = @(
+            @{ Message = "qual vale mais a pena $primaryProduct ou $secondaryProduct"; ExpectAny = @("COMPARATIVO OBJETIVO", "Leitura comercial", "Mais acessivel") }
+        )
+    },
+    @{
+        Name = "sales_price_objection_guidance"
+        Steps = @(
+            @{ Message = "preco de $secondaryProduct"; ExpectAny = @("Aqui esta a leitura mais clara deste item.", "Aqui esta a leitura mais util deste item agora.") }
+            @{ Message = "ta caro tem algo mais em conta?"; ExpectAny = @("preocupacao com custo", "opcoes mais inteligentes", "manter a venda forte") }
+        )
+    },
+    @{
         Name = "repeat_same_item_after_cancelled_draft"
         Steps = @(
             @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "No momento esse item ficou sem estoque") }

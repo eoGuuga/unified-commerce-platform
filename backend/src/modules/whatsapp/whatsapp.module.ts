@@ -4,6 +4,7 @@ import { WhatsappController } from './whatsapp.controller';
 import { WhatsappService } from './whatsapp.service';
 import { OpenAIService } from './services/openai.service';
 import { MessageIntelligenceService } from './services/message-intelligence.service';
+import { SalesIntelligenceService } from './services/sales-intelligence.service';
 import { ConversationService } from './services/conversation.service';
 import { ProductsModule } from '../products/products.module';
 import { OrdersModule } from '../orders/orders.module';
@@ -25,7 +26,13 @@ import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity'
     CouponsModule,
   ],
   controllers: [WhatsappController],
-  providers: [WhatsappService, OpenAIService, MessageIntelligenceService, ConversationService],
+  providers: [
+    WhatsappService,
+    OpenAIService,
+    MessageIntelligenceService,
+    SalesIntelligenceService,
+    ConversationService,
+  ],
   exports: [WhatsappService, ConversationService],
 })
 export class WhatsappModule {}

@@ -83,6 +83,9 @@ export type ConversationIntelligenceIntent =
   | 'price'
   | 'stock'
   | 'recommendation'
+  | 'comparison'
+  | 'budget'
+  | 'objection'
   | 'suggestion'
   | 'other';
 

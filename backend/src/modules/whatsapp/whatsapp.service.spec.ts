@@ -1,12 +1,14 @@
 import { PedidoStatus } from '../../database/entities/Pedido.entity';
 import { WhatsappService } from './whatsapp.service';
 import { MessageIntelligenceService } from './services/message-intelligence.service';
+import { SalesIntelligenceService } from './services/sales-intelligence.service';
 
 describe('WhatsappService defensive WhatsApp flow', () => {
   const catalog = [
     {
       id: 'p1',
       name: 'Brigadeiro Gourmet',
+      description: 'Doce gourmet individual para presente e venda rapida.',
       price: 10.5,
       available_stock: 10,
       created_at: '2026-03-15T00:00:00.000Z',
@@ -15,6 +17,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     {
       id: 'p2',
       name: 'Brownie Premium',
+      description: 'Brownie mais intenso, com leitura premium e otimo para presente.',
       price: 15,
       available_stock: 8,
       created_at: '2026-03-15T00:00:00.000Z',
@@ -23,6 +26,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     {
       id: 'p3',
       name: 'Bolo de Cenoura',
+      description: 'Opcao forte para festa e comemoracao.',
       price: 40,
       available_stock: 3,
       created_at: '2026-03-15T00:00:00.000Z',
@@ -100,11 +104,13 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     };
 
     const messageIntelligenceService = new MessageIntelligenceService();
+    const salesIntelligenceService = new SalesIntelligenceService(messageIntelligenceService);
 
     const service = new WhatsappService(
       config as any,
       openAIService as any,
       messageIntelligenceService as any,
+      salesIntelligenceService as any,
       conversationService as any,
       productsService as any,
       ordersService as any,
@@ -731,6 +737,65 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     );
 
     expect(response.toLowerCase()).toContain('quantos *brownie premium*');
+  });
+
+  it('treats budget-led messages as consultative selling instead of direct order capture', async () => {
+    const { service, conversationService } = createFixture(catalog);
+
+    const response = await service.generateResponse('quero algo ate 12 reais', 'tenant-id');
+
+    expect(conversationService.savePendingOrder).not.toHaveBeenCalled();
+    expect(response).toContain('teto de ate R$ 12,00');
+    expect(response).toContain('Brigadeiro Gourmet');
+  });
+
+  it('compares products with a commercial recommendation', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'qual vale mais a pena brigadeiro gourmet ou brownie premium',
+      'tenant-id',
+    );
+
+    expect(response).toContain('COMPARATIVO OBJETIVO');
+    expect(response).toContain('Brigadeiro Gourmet');
+    expect(response).toContain('Brownie Premium');
+    expect(response).toContain('Leitura comercial');
+  });
+
+  it('answers price objections with safer alternatives from the catalog', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'ta caro, tem algo mais em conta?',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'price',
+            last_product_name: 'Brownie Premium',
+            last_product_names: ['Brownie Premium'],
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('preocupacao com custo');
+    expect(response).toContain('Brigadeiro Gourmet');
+    expect(response).toContain('Brownie Premium');
+  });
+
+  it('handles recommendation requests as guided selling instead of greeting fallback', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'oi, nao sei qual escolher para presente',
+      'tenant-id',
+    );
+
+    expect(response).toContain('presentear bem');
+    expect(response).toContain('Brownie Premium');
   });
 
   it('accepts noisy payment keywords after normalization', () => {

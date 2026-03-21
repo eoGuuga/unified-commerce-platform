@@ -2,6 +2,10 @@ import { Injectable, Logger, BadRequestException, NotFoundException } from '@nes
 import { ConfigService } from '@nestjs/config';
 import { OpenAIService } from './services/openai.service';
 import { MessageIntelligenceService } from './services/message-intelligence.service';
+import {
+  SalesConversationAnalysis,
+  SalesIntelligenceService,
+} from './services/sales-intelligence.service';
 import { ConversationService } from './services/conversation.service';
 import { ProductsService } from '../products/products.service';
 import { OrdersService } from '../orders/orders.service';
@@ -38,6 +42,12 @@ type StageRecoveryKind =
   | 'confirmation'
   | 'notes'
   | 'name';
+
+type RankedSalesProduct = {
+  product: ProductWithStock;
+  score: number;
+  reasons: string[];
+};
 
 @Injectable()
 export class WhatsappService {
@@ -90,6 +100,7 @@ export class WhatsappService {
     private config: ConfigService,
     private openAIService: OpenAIService,
     private messageIntelligenceService: MessageIntelligenceService,
+    private salesIntelligenceService: SalesIntelligenceService,
     private conversationService: ConversationService,
     private productsService: ProductsService,
     private ordersService: OrdersService,
@@ -1937,6 +1948,287 @@ export class WhatsappService {
     ].join('\n');
   }
 
+  private buildProductSalesDocument(product: ProductWithStock): string {
+    return this.normalizeForSearch(
+      [product.name, product.categoria?.name || '', product.description || '']
+        .filter(Boolean)
+        .join(' '),
+    );
+  }
+
+  private getSalesQueryWords(query?: string | null): string[] {
+    if (!query) {
+      return [];
+    }
+
+    const stopWords = new Set([
+      'de',
+      'do',
+      'da',
+      'dos',
+      'das',
+      'com',
+      'sem',
+      'para',
+      'pra',
+      'pro',
+      'um',
+      'uma',
+      'uns',
+      'umas',
+      'o',
+      'a',
+      'os',
+      'as',
+      'algo',
+      'opcao',
+      'opcoes',
+      'melhor',
+    ]);
+
+    return this.normalizeForSearch(query)
+      .split(/\s+/)
+      .filter((word) => word.length >= 2 && !stopWords.has(word));
+  }
+
+  private dedupeProducts(products: ProductWithStock[]): ProductWithStock[] {
+    const seen = new Set<string>();
+
+    return products.filter((product) => {
+      if (seen.has(product.id)) {
+        return false;
+      }
+
+      seen.add(product.id);
+      return true;
+    });
+  }
+
+  private findMentionedSalesProducts(
+    products: ProductWithStock[],
+    message: string,
+  ): ProductWithStock[] {
+    const normalizedMessage = this.normalizeForSearch(message);
+    const exactIncludes = products
+      .map((product) => ({
+        product,
+        position: normalizedMessage.indexOf(this.normalizeForSearch(product.name)),
+      }))
+      .filter((item) => item.position >= 0)
+      .sort((left, right) => left.position - right.position)
+      .map((item) => item.product);
+
+    if (exactIncludes.length >= 2) {
+      return this.dedupeProducts(exactIncludes).slice(0, 3);
+    }
+
+    const segments = normalizedMessage
+      .split(/\b(?:ou|vs|versus)\b|,/g)
+      .map((segment) => segment.trim())
+      .filter((segment) => segment.length >= 3);
+
+    const resolved = segments
+      .map((segment) => this.findProductByName(products, segment).produto)
+      .filter((product): product is ProductWithStock => Boolean(product));
+
+    return this.dedupeProducts([...exactIncludes, ...resolved]).slice(0, 3);
+  }
+
+  private rankProductsForSalesConversation(
+    products: ProductWithStock[],
+    analysis: SalesConversationAnalysis,
+    referenceProduct?: ProductWithStock | null,
+  ): RankedSalesProduct[] {
+    const saleableProducts = products.filter((product) => product.is_active !== false);
+    const inStockProducts = saleableProducts.filter((product) => Number(product.available_stock || 0) > 0);
+    const priceBase = (inStockProducts.length ? inStockProducts : saleableProducts).map((product) =>
+      Number(product.price || 0),
+    );
+    const minPrice = priceBase.length ? Math.min(...priceBase) : 0;
+    const maxPrice = priceBase.length ? Math.max(...priceBase) : minPrice;
+    const priceSpan = Math.max(1, maxPrice - minPrice);
+    const queryWords = this.getSalesQueryWords(analysis.commercialQuery);
+
+    return saleableProducts
+      .map((product) => {
+        const available = Number(product.available_stock || 0);
+        const price = Number(product.price || 0);
+        const normalizedName = this.normalizeForSearch(product.name);
+        const searchDocument = this.buildProductSalesDocument(product);
+        const reasons: string[] = [];
+        const addReason = (reason: string) => {
+          if (reason && !reasons.includes(reason)) {
+            reasons.push(reason);
+          }
+        };
+
+        let score = available > 0 ? 20 : -30;
+
+        if (available > 0) {
+          addReason('pronto para venda agora');
+        }
+
+        queryWords.forEach((word) => {
+          if (normalizedName.includes(word)) {
+            score += 14;
+            addReason('combina com o que voce descreveu');
+          } else if (searchDocument.includes(word)) {
+            score += 7;
+            addReason('faz sentido para esse contexto');
+          }
+        });
+
+        if (analysis.useCaseTags.includes('gift') && /(kit|caixa|combo|box|presente|premium|gourmet)/.test(searchDocument)) {
+          score += 12;
+          addReason('tem perfil forte para presente');
+        }
+
+        if (analysis.useCaseTags.includes('party') && /(bolo|torta|kit|combo|festa|anivers)/.test(searchDocument)) {
+          score += 12;
+          addReason('encaixa melhor em evento ou comemoracao');
+        }
+
+        const priceRatio = (price - minPrice) / priceSpan;
+        if (analysis.pricePreference === 'budget') {
+          score += Math.round((1 - priceRatio) * 16);
+          addReason('segura melhor o orcamento');
+        } else if (analysis.pricePreference === 'value') {
+          score += Math.round((1 - priceRatio) * 10) + Math.min(available, 8);
+          addReason('equilibra custo e disponibilidade');
+        } else if (analysis.pricePreference === 'premium') {
+          score += Math.round(priceRatio * 12);
+          addReason('tem leitura mais premium');
+        }
+
+        if (analysis.budgetCeiling !== null) {
+          if (price <= analysis.budgetCeiling) {
+            score += 12;
+            addReason(`fica dentro do teto de R$ ${this.formatCurrency(analysis.budgetCeiling)}`);
+          } else {
+            score -= Math.min(18, Math.round((price - analysis.budgetCeiling) * 2));
+          }
+        }
+
+        if (referenceProduct) {
+          if (
+            referenceProduct.categoria?.name &&
+            product.categoria?.name &&
+            referenceProduct.categoria.name === product.categoria.name
+          ) {
+            score += 6;
+          }
+
+          if (analysis.intent === 'objection' && product.id === referenceProduct.id) {
+            score -= 8;
+          }
+
+          if (
+            (analysis.intent === 'objection' || analysis.intent === 'budget') &&
+            price < Number(referenceProduct.price || 0)
+          ) {
+            score += 10;
+            addReason(`entra abaixo do valor de ${referenceProduct.name}`);
+          }
+        }
+
+        score += Math.min(available, 10);
+        return { product, score, reasons };
+      })
+      .sort((left, right) => right.score - left.score)
+      .filter((item) => item.score > 0)
+      .slice(0, 4);
+  }
+
+  private formatSalesRecommendationLine(item: RankedSalesProduct): string {
+    const reasons = item.reasons.slice(0, 2).join(' e ');
+    return `- ${this.formatProductHeadline(item.product)}${reasons ? ` | ${reasons}` : ''}`;
+  }
+
+  private buildSalesRecommendationResponse(
+    analysis: SalesConversationAnalysis,
+    rankedProducts: RankedSalesProduct[],
+    referenceProduct?: ProductWithStock | null,
+  ): string {
+    const intro =
+      analysis.intent === 'budget' && analysis.budgetCeiling !== null
+        ? `Pensando no seu teto de ate R$ ${this.formatCurrency(analysis.budgetCeiling)}, estas sao as opcoes mais inteligentes agora:`
+        : analysis.intent === 'objection'
+          ? 'Entendi a preocupacao com custo. Para manter a venda forte sem forcar a barra, eu seguiria por aqui:'
+          : analysis.useCaseTags.includes('gift')
+            ? 'Pensando em presentear bem, eu separaria estas opcoes:'
+            : analysis.useCaseTags.includes('party')
+              ? 'Para esse contexto de evento, estas sao as opcoes que fazem mais sentido agora:'
+              : analysis.commercialQuery
+                ? `Pelo que voce descreveu sobre "${analysis.commercialQuery}", estas sao as melhores rotas que achei:`
+                : 'Pensando como uma vendedora consultiva, eu separaria estas opcoes para voce:';
+
+    const close =
+      analysis.intent === 'objection' && referenceProduct
+        ? `Se quiser, eu tambem comparo com ${referenceProduct.name} para te mostrar a diferenca com clareza.`
+        : 'Se quiser, eu comparo duas opcoes, ajusto por orcamento ou ja monto o pedido por aqui.';
+
+    return [
+      intro,
+      '',
+      ...rankedProducts.slice(0, 3).map((item) => this.formatSalesRecommendationLine(item)),
+      '',
+      close,
+      `Exemplo: "quero 1 ${rankedProducts[0].product.name}" ou "compara ${rankedProducts[0].product.name} com outra opcao".`,
+    ].join('\n');
+  }
+
+  private buildSalesComparisonResponse(
+    comparedProducts: ProductWithStock[],
+    analysis: SalesConversationAnalysis,
+  ): string {
+    const [left, right] = comparedProducts;
+    const leftPrice = Number(left.price || 0);
+    const rightPrice = Number(right.price || 0);
+    const cheaper = leftPrice <= rightPrice ? left : right;
+    const premium = leftPrice >= rightPrice ? left : right;
+    const betterValue =
+      leftPrice === rightPrice
+        ? Number(left.available_stock || 0) >= Number(right.available_stock || 0)
+          ? left
+          : right
+        : cheaper;
+    const recommended =
+      analysis.pricePreference === 'budget'
+        ? cheaper
+        : analysis.pricePreference === 'premium'
+          ? premium
+          : betterValue;
+
+    return [
+      'COMPARATIVO OBJETIVO',
+      '',
+      `1. ${this.formatProductHeadline(left)} | Estoque: ${left.available_stock} unidade(s)`,
+      `2. ${this.formatProductHeadline(right)} | Estoque: ${right.available_stock} unidade(s)`,
+      '',
+      'Leitura comercial:',
+      `- Mais acessivel: ${cheaper.name}.`,
+      `- Mais premium: ${premium.name}.`,
+      `- Melhor equilibrio agora: ${betterValue.name}.`,
+      '',
+      `Se eu fosse te orientar para fechar bem essa venda, eu iria de ${recommended.name}.`,
+      `Se quiser seguir, envie: "quero 1 ${recommended.name}".`,
+    ].join('\n');
+  }
+
+  private buildSalesBudgetMissResponse(
+    analysis: SalesConversationAnalysis,
+    closestProducts: RankedSalesProduct[],
+  ): string {
+    return [
+      `Com esse teto de ate R$ ${this.formatCurrency(analysis.budgetCeiling || 0)}, eu nao encontrei algo realmente forte disponivel agora.`,
+      '',
+      'As opcoes mais proximas que ainda fazem sentido comercialmente sao:',
+      ...closestProducts.slice(0, 2).map((item) => this.formatSalesRecommendationLine(item)),
+      '',
+      'Se quiser, eu tento abrir outra faixa de valor ou comparo essas opcoes com voce.',
+    ].join('\n');
+  }
+
   private pickRecommendationProducts(
     products: ProductWithStock[],
     query: string,
@@ -2184,23 +2476,8 @@ export class WhatsappService {
     tenantId: string,
     conversation?: TypedConversation,
   ): Promise<string | null> {
-    const normalized = this.normalizeForSearch(message);
-    const recommendationKeywords = [
-      'recomenda',
-      'indica',
-      'sugere',
-      'melhor',
-      'mais vendido',
-      'algo para',
-      'opcao',
-      'opcoes',
-      'presente',
-      'festa',
-      'anivers',
-      'chocolate',
-    ];
-
-    if (!recommendationKeywords.some((keyword) => normalized.includes(keyword))) {
+    const analysis = this.salesIntelligenceService.analyze(message);
+    if (analysis.intent === 'other') {
       return null;
     }
 
@@ -2209,32 +2486,63 @@ export class WhatsappService {
       return 'Ainda nao ha produtos publicados para eu recomendar agora.';
     }
 
-    const query = this.extractCatalogQuery(message);
-    const recommendations = this.pickRecommendationProducts(products, query);
+    const referencedProducts = this.findMentionedSalesProducts(products, message);
 
-    if (!recommendations.length) {
+    if (analysis.intent === 'comparison') {
+      const comparisonProducts =
+        referencedProducts.length >= 2
+          ? referencedProducts.slice(0, 2)
+          : this.rankProductsForSalesConversation(products, analysis)
+              .slice(0, 2)
+              .map((item) => item.product);
+
+      if (comparisonProducts.length >= 2) {
+        await this.rememberConversationIntelligence(conversation, {
+          last_intent: 'comparison',
+          last_product_name: null,
+          last_product_names: comparisonProducts.map((product) => product.name),
+          last_quantity: null,
+          last_query: analysis.commercialQuery || null,
+        });
+
+        return this.buildSalesComparisonResponse(comparisonProducts, analysis);
+      }
+    }
+
+    const referenceProduct = referencedProducts[0] || null;
+    const rankedProducts = this.rankProductsForSalesConversation(products, analysis, referenceProduct);
+
+    const budgetCeiling = analysis.budgetCeiling;
+    if (
+      analysis.intent === 'budget' &&
+      budgetCeiling !== null &&
+      !rankedProducts.some((item) => Number(item.product.price || 0) <= budgetCeiling)
+    ) {
+      if (!rankedProducts.length) {
+        return 'Nao encontrei uma opcao segura dentro desse orcamento agora. Se quiser, me diga outra faixa de valor e eu recalculo com voce.';
+      }
+
+      return this.buildSalesBudgetMissResponse(analysis, rankedProducts);
+    }
+
+    if (!rankedProducts.length) {
       return 'Nao encontrei uma recomendacao forte com esse contexto, mas posso te mostrar o catalogo se voce enviar "cardapio".';
     }
 
     await this.rememberConversationIntelligence(conversation, {
-      last_intent: 'recommendation',
-      last_product_name: recommendations.length === 1 ? recommendations[0].name : null,
-      last_product_names: recommendations.map((product) => product.name),
+      last_intent:
+        analysis.intent === 'budget'
+          ? 'budget'
+          : analysis.intent === 'objection'
+            ? 'objection'
+            : 'recommendation',
+      last_product_name: rankedProducts.length === 1 ? rankedProducts[0].product.name : null,
+      last_product_names: rankedProducts.map((item) => item.product.name),
       last_quantity: null,
-      last_query: query || null,
+      last_query: analysis.commercialQuery || null,
     });
 
-    const intro = query
-      ? `Pelo que voce descreveu sobre "${query}", estas sao as melhores opcoes que achei agora:`
-      : 'Separei algumas opcoes fortes para voce:';
-
-    return [
-      intro,
-      '',
-      ...recommendations.map((product) => `- ${this.formatProductHeadline(product)}`),
-      '',
-      `Se quiser, eu ja monto o pedido por aqui. Exemplo: "quero 1 ${recommendations[0].name}".`,
-    ].join('\n');
+    return this.buildSalesRecommendationResponse(analysis, rankedProducts, referenceProduct);
   }
 
   private async applyPendingOrderAndProceedPremium(
@@ -4191,33 +4499,32 @@ export class WhatsappService {
     }
 
     // Comando: Cardápio / Menu
-    if (lowerMessage.includes('cardapio') || lowerMessage.includes('menu') || lowerMessage.includes('produtos')) {
+    if (this.isDirectCatalogRequest(message)) {
       return await this.getPremiumCardapio(tenantId);
     }
 
     // Comando: Preço de [produto]
-    if (lowerMessage.includes('preco') || lowerMessage.includes('valor') || lowerMessage.includes('quanto custa')) {
+    if (this.isDirectPriceQuestion(message)) {
       return await this.getPremiumPriceResponse(message, tenantId, conversation);
     }
 
     // Comando: Estoque de [produto]
-    if (lowerMessage.includes('estoque') || lowerMessage.includes('tem') || lowerMessage.includes('disponivel')) {
+    if (this.isDirectStockQuestion(message)) {
       return await this.getPremiumStockResponse(message, tenantId, conversation);
     }
 
     // Comando: Horário
-    if (lowerMessage.includes('horario') || lowerMessage.includes('funciona') || lowerMessage.includes('aberto')) {
+    if (this.isDirectScheduleQuestion(message)) {
       return this.getPremiumScheduleMessage();
     }
 
     // Comando: Ajuda
-    if (lowerMessage.includes('ajuda') || lowerMessage.includes('help') || lowerMessage.includes('comandos')) {
+    if (this.isDirectHelpRequest(message)) {
       return this.getPremiumHelpMessage();
     }
 
     // Saudação
-    if (lowerMessage.includes('ola') || lowerMessage.includes('oi') || lowerMessage.includes('bom dia') || 
-        lowerMessage.includes('boa tarde') || lowerMessage.includes('boa noite')) {
+    if (this.isDirectGreeting(message)) {
       return this.getPremiumGreetingMessage();
     }
 
@@ -4460,6 +4767,7 @@ export class WhatsappService {
 
   private isOrderIntent(lowerMessage: string): boolean {
     const analysis = this.messageIntelligenceService.analyze(lowerMessage);
+    const salesAnalysis = this.salesIntelligenceService.analyze(lowerMessage);
     const normalized = this.normalizeForSearch(lowerMessage);
 
     if (this.isBareOrderIntent(normalized)) {
@@ -4467,6 +4775,10 @@ export class WhatsappService {
     }
 
     if (analysis.flags.negativeOrder) {
+      return false;
+    }
+
+    if (salesAnalysis.intent !== 'other') {
       return false;
     }
 
@@ -4498,7 +4810,59 @@ export class WhatsappService {
       'quero fazer encomenda', 'preciso fazer encomenda', 'quero fazer', 'preciso fazer',
     ];
 
-    return palavrasPedido.some((palavra) => normalized.includes(this.normalizeForSearch(palavra)));
+    return (
+      palavrasPedido.some((palavra) => normalized.includes(this.normalizeForSearch(palavra))) &&
+      Boolean(analysis.productCandidate)
+    );
+  }
+
+  private isDirectCatalogRequest(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    return /\b(cardapio|catalogo|catalogue|menu)\b/.test(normalized);
+  }
+
+  private isDirectPriceQuestion(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    return /\b(preco|valor|quanto custa|qual o valor|quanto sai|quanto fica)\b/.test(normalized);
+  }
+
+  private isDirectStockQuestion(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    return (
+      /\b(estoque|disponivel|disponibilidade)\b/.test(normalized) ||
+      /\b(tem|ainda tem|restou|sobrou)\b.*\b(estoque|disponivel)\b/.test(normalized)
+    );
+  }
+
+  private isDirectScheduleQuestion(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    return /\b(horario|funciona|aberto|fecha|abre)\b/.test(normalized);
+  }
+
+  private isDirectHelpRequest(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return false;
+    }
+
+    return /^(ajuda|help|comandos)$/.test(normalized);
+  }
+
+  private isDirectGreeting(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return false;
+    }
+
+    if (
+      /\b(quero|preciso|preco|valor|estoque|pedido|indica|recomenda|sugere|compar|barato|caro|produto|item)\b/.test(
+        normalized,
+      )
+    ) {
+      return false;
+    }
+
+    return /^(oi|ola|bom dia|boa tarde|boa noite)(?:\s+tudo bem)?$/.test(normalized);
   }
 
   private extractMultipleOrderInfos(

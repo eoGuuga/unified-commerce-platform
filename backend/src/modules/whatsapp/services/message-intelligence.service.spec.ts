@@ -83,4 +83,14 @@ describe('MessageIntelligenceService', () => {
     expect(analysis.contextualIntent).toBe('consultar');
     expect(analysis.contextualProductCandidate).toBe('Brigadeiro Gourmet');
   });
+
+  it('supports contextual numeric selection after a budget recommendation', () => {
+    const analysis = service.analyzeWithContext('2', {
+      lastIntent: 'budget',
+      lastProductNames: ['Brigadeiro Gourmet', 'Brownie Premium'],
+    });
+
+    expect(analysis.contextualIntent).toBe('fazer_pedido');
+    expect(analysis.contextualProductCandidate).toBe('Brownie Premium');
+  });
 });
