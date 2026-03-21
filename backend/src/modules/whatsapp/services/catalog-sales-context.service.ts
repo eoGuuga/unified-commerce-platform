@@ -234,6 +234,11 @@ export class CatalogSalesContextService {
       addReason('combina bem com contexto de presente');
     }
 
+    if (analysis.useCaseTags.includes('sharing') && this.hasTheme(matchedThemes, 'sharing')) {
+      score += 13;
+      addReason('fecha melhor para dividir sem perder impacto');
+    }
+
     if (
       analysis.useCaseTags.includes('party') &&
       (this.hasTheme(matchedThemes, 'sharing') || this.hasTheme(matchedThemes, 'celebration'))
@@ -242,9 +247,24 @@ export class CatalogSalesContextService {
       addReason('fecha melhor para compartilhar');
     }
 
+    if (analysis.useCaseTags.includes('self_treat') && this.hasTheme(matchedThemes, 'self_treat')) {
+      score += 12;
+      addReason('funciona melhor para vontade do dia');
+    }
+
+    if (analysis.useCaseTags.includes('chocolate_focus') && this.hasTheme(matchedThemes, 'chocolate')) {
+      score += 14;
+      addReason('entrega a leitura mais chocolatuda');
+    }
+
     if (analysis.pricePreference === 'premium' && this.hasTheme(matchedThemes, 'premium')) {
       score += 10;
       addReason('segura melhor uma escolha mais premium');
+    }
+
+    if (analysis.useCaseTags.includes('premium') && this.hasTheme(matchedThemes, 'premium')) {
+      score += 9;
+      addReason('sustenta melhor uma percepcao premium');
     }
 
     confectioneryCues.forEach((cue) => {
@@ -464,6 +484,7 @@ export class CatalogSalesContextService {
 
     if (
       analysis.useCaseTags.includes('party') ||
+      analysis.useCaseTags.includes('sharing') ||
       hasPattern([
         'duzia',
         'meia duzia',
@@ -488,6 +509,7 @@ export class CatalogSalesContextService {
     }
 
     if (
+      analysis.useCaseTags.includes('chocolate_focus') ||
       hasPattern([
         'chocolate',
         'chocolatudo',
@@ -513,6 +535,7 @@ export class CatalogSalesContextService {
     }
 
     if (
+      analysis.useCaseTags.includes('self_treat') ||
       hasPattern([
         'docinho',
         'mimo',
@@ -537,6 +560,7 @@ export class CatalogSalesContextService {
 
     if (
       analysis.pricePreference === 'premium' ||
+      analysis.useCaseTags.includes('premium') ||
       hasPattern([
         'premium',
         'marcante',

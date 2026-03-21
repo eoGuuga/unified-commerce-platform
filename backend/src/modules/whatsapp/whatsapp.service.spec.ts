@@ -1044,6 +1044,32 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Brownie Premium');
   });
 
+  it('guides sharing conversations with a divide-or-table qualifier', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'me indica algo pra dividir com mais gente',
+      'tenant-id',
+    );
+
+    expect(response).toContain('compartilhamento');
+    expect(response).toContain('dividir facil');
+    expect(response).toContain('Bolo de Cenoura');
+  });
+
+  it('guides self-treat conversations with a desire-first qualifier', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'quero um mimo pra mim, mais chocolatudo',
+      'tenant-id',
+    );
+
+    expect(response).toContain('mimo individual');
+    expect(response).toContain('mais intenso');
+    expect(response).toContain('Brownie Premium');
+  });
+
   it('adapts recommendation language to fashion catalogs', async () => {
     const { service } = createFixture(fashionCatalog);
 

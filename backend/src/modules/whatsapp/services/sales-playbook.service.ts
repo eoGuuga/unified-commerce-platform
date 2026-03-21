@@ -643,7 +643,7 @@ export class SalesPlaybookService {
       );
     }
 
-    if (analysis.useCaseTags.includes('party')) {
+    if (analysis.useCaseTags.includes('party') || analysis.useCaseTags.includes('sharing')) {
       return (
         playbook.recommendationIntro.party ||
         'Estas sao as opcoes que fazem mais sentido para esse contexto:'

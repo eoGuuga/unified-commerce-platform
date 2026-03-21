@@ -33,4 +33,15 @@ describe('SalesIntelligenceService', () => {
     expect(analysis.intent).toBe('recommendation');
     expect(analysis.useCaseTags).toContain('gift');
   });
+
+  it('detects richer confectionery occasions beyond generic recommendation intent', () => {
+    const analysis = service.analyze(
+      'quero algo mais premium e chocolatudo pra mim, mas que eu consiga dividir depois',
+    );
+
+    expect(analysis.intent).toBe('recommendation');
+    expect(analysis.useCaseTags).toEqual(
+      expect.arrayContaining(['premium', 'chocolate_focus', 'self_treat', 'sharing']),
+    );
+  });
 });

@@ -110,17 +110,55 @@ export class SalesIntelligenceService {
   ];
 
   private readonly premiumPhrases = [
-    'premium',
     'mais premium',
     'mais especial',
     'mais completo',
     'mais caprichado',
-    'melhor',
-    'top',
+    'mais sofisticado',
+    'mais bonito',
+    'mais marcante',
+    'pra impressionar',
+    'para impressionar',
   ];
 
   private readonly giftPhrases = ['presente', 'presentear', 'lembranca', 'lembrancinha'];
   private readonly partyPhrases = ['festa', 'aniversario', 'anivers', 'evento', 'comemoracao'];
+  private readonly sharingPhrases = [
+    'compartilhar',
+    'dividir',
+    'pra dividir',
+    'para dividir',
+    'pra galera',
+    'pro pessoal',
+    'familia',
+    'mesa',
+    'todo mundo',
+    'com o pessoal',
+    'pra geral',
+    'para geral',
+  ];
+  private readonly selfTreatPhrases = [
+    'mimo',
+    'mimo individual',
+    'vontade',
+    'matar a vontade',
+    'docinho pra mim',
+    'sobremesa pra mim',
+    'so pra mim',
+    'só pra mim',
+    'pra mim mesmo',
+    'para mim mesmo',
+  ];
+  private readonly chocolateFocusPhrases = [
+    'chocolatudo',
+    'mais chocolatudo',
+    'mais chocolate',
+    'mais intenso',
+    'mais intenso no chocolate',
+    'forte em chocolate',
+    'bem chocolatudo',
+    'intenso no chocolate',
+  ];
   private readonly quickChoicePhrases = ['sem enrolacao', 'um so', 'uma so', 'o melhor pra fechar'];
 
   constructor(private readonly messageIntelligenceService: MessageIntelligenceService) {}
@@ -271,6 +309,22 @@ export class SalesIntelligenceService {
       tags.add('party');
     }
 
+    if (this.hasAny(normalizedText, this.sharingPhrases)) {
+      tags.add('sharing');
+    }
+
+    if (this.hasSelfTreatSignal(normalizedText)) {
+      tags.add('self_treat');
+    }
+
+    if (this.hasAny(normalizedText, this.chocolateFocusPhrases)) {
+      tags.add('chocolate_focus');
+    }
+
+    if (this.hasAny(normalizedText, this.premiumPhrases)) {
+      tags.add('premium');
+    }
+
     return Array.from(tags);
   }
 
@@ -278,6 +332,27 @@ export class SalesIntelligenceService {
     return phrases.some((phrase) =>
       normalizedText.includes(this.messageIntelligenceService.normalizeText(phrase)),
     );
+  }
+
+  private hasSelfTreatSignal(normalizedText: string): boolean {
+    if (this.hasAny(normalizedText, this.selfTreatPhrases)) {
+      return true;
+    }
+
+    const containsForMe =
+      normalizedText.includes('pra mim') || normalizedText.includes('para mim');
+    if (!containsForMe) {
+      return false;
+    }
+
+    const consultativeMarkers = /\b(algo|mimo|docinho|sobremesa|vontade|mais)\b/.test(
+      normalizedText,
+    );
+    const directOrderMarkers =
+      /\b(me ve|separa|arruma|manda|traz)\b/.test(normalizedText) ||
+      /\b(quero|preciso)\s+\d+\b/.test(normalizedText);
+
+    return consultativeMarkers && !directOrderMarkers;
   }
 
   private clampScore(value: number): number {

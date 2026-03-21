@@ -116,6 +116,30 @@ describe('CatalogSalesContextService', () => {
     );
   });
 
+  it('boosts sharing items when the customer wants something to divide', () => {
+    const playbook = salesPlaybookService.inferPlaybook(chocolateCatalog);
+    const profile = service.buildProfile(chocolateCatalog, playbook);
+    const analysis = salesIntelligenceService.analyze('quero algo pra dividir com mais gente');
+
+    const sharingFit = service.scoreProduct(chocolateCatalog[2], analysis, profile);
+    const singleFit = service.scoreProduct(chocolateCatalog[1], analysis, profile);
+
+    expect(sharingFit.score).toBeGreaterThan(singleFit.score);
+    expect(sharingFit.reasons.join(' ')).toContain('dividir');
+  });
+
+  it('boosts self-treat items when the customer wants something for themselves', () => {
+    const playbook = salesPlaybookService.inferPlaybook(chocolateCatalog);
+    const profile = service.buildProfile(chocolateCatalog, playbook);
+    const analysis = salesIntelligenceService.analyze('quero um mimo pra mim, mais chocolatudo');
+
+    const selfTreatFit = service.scoreProduct(chocolateCatalog[1], analysis, profile);
+    const sharingFit = service.scoreProduct(chocolateCatalog[2], analysis, profile);
+
+    expect(selfTreatFit.score).toBeGreaterThan(sharingFit.score);
+    expect(selfTreatFit.reasons.join(' ')).toContain('vontade');
+  });
+
   it('includes product metadata in the catalog search document', () => {
     const searchDocument = service.buildProductSearchDocument(chocolateCatalog[0]);
 

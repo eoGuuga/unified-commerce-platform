@@ -292,8 +292,28 @@
     - `https://dev.gtsofthub.com.br/loja` => `200`
     - `https://dev.gtsofthub.com.br/pdv` => `200`
     - `https://dev.gtsofthub.com.br/admin/estoque` => `200`
-- Correcao funcional descoberta na homologacao:
+ - Correcao funcional descoberta na homologacao:
   - selecao numerica de recomendacao (`1`, `2`, `3`) com produto contendo numero no nome podia capturar quantidade errada
   - ajuste aplicado no fluxo contextual do WhatsApp para assumir `1 unidade` quando a selecao numerica escolhe uma sugestao sem quantidade previa
   - teste novo cobrindo `Caixa presenteavel com 6 brigadeiros tradicionais`
+
+2026-03-21
+- Ambiente: LOCAL
+- Escopo: evolucao da IA comercial do WhatsApp para ocasioes de venda mais humanas
+- Entregas:
+  - leitura de ocasiao mais robusta para `presente`, `compartilhar`, `mimo individual`, `premium` e busca mais chocolatuda
+  - calibracao dos sinais para nao roubar fluxo de pedido direto, comparacao ou audio transcrito caotico
+  - contexto da confeitaria agora usa melhor a diferenca entre vender para dividir e vender para vontade individual
+  - intro comercial de recomendacao passou a tratar `sharing` como contexto proprio, sem depender so de `party`
+- Arquivos principais:
+  - `backend/src/modules/whatsapp/services/sales-intelligence.service.ts`
+  - `backend/src/modules/whatsapp/services/catalog-sales-context.service.ts`
+  - `backend/src/modules/whatsapp/services/sales-playbook.service.ts`
+  - `backend/src/modules/whatsapp/services/sales-intelligence.service.spec.ts`
+  - `backend/src/modules/whatsapp/services/catalog-sales-context.service.spec.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+- Validacao local:
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run test:unit` => `149/149` testes ok
 
