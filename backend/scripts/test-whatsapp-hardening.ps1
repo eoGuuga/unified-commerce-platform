@@ -199,7 +199,7 @@ $scenarios = @(
         Name = "recommendation_follow_up_by_number"
         Steps = @(
             @{ Message = "me indica algo para presente"; ExpectAny = @("melhores opcoes", "Separei algumas opcoes") }
-            @{ Message = "1"; ExpectAny = @("Quantos", "gostaria", "Digite a quantidade") }
+            @{ Message = "1"; ExpectAny = @("PEDIDO PREPARADO", "Quantidade: 1 unidade(s)", "Digite a quantidade") }
         )
     },
     @{
@@ -460,7 +460,7 @@ $scenarios = @(
         Name = "post_payment_address_change"
         Steps = @(
             @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo") }
-            @{ Message = "Cliente Endereco 2"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "Cliente Endereco Dois"; Expect = "Como voce prefere receber esse pedido?" }
             @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
             @{ Message = "11966443321"; Expect = "OBSERVACOES DO PEDIDO" }
             @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }
@@ -472,7 +472,7 @@ $scenarios = @(
         Name = "post_payment_item_change"
         Steps = @(
             @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo") }
-            @{ Message = "Cliente Item 2"; Expect = "Como voce prefere receber esse pedido?" }
+            @{ Message = "Cliente Item Dois"; Expect = "Como voce prefere receber esse pedido?" }
             @{ Message = "retirada"; Expect = "TELEFONE DE CONTATO" }
             @{ Message = "11966443320"; Expect = "OBSERVACOES DO PEDIDO" }
             @{ Message = "sem"; ExpectAny = @("REVISAO FINAL DO PEDIDO", "Confirma o pedido") }

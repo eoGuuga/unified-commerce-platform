@@ -313,6 +313,22 @@
   - `backend/src/modules/whatsapp/services/catalog-sales-context.service.spec.ts`
   - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
 - Validacao local:
+ - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run test:unit` => `149/149` testes ok
+
+2026-03-21
+- Ambiente: LOCAL
+- Escopo: fechamento dos achados da bateria real da Loucas em dev/teste
+- Correcao aplicada:
+  - retomada de pedido agora tem prioridade sobre leitura de status quando a frase fala em continuar de onde parou
+  - perguntas de preco, estoque e horario nao entram mais na rota de pedido por causa de numeros no nome do produto
+  - comparacao comercial com `ou` nao cai mais no bloqueio de pedido ambiguo
+  - fallback de retomada sem pedido pendente ficou mais humano e mais claro sobre montar um novo pedido
+  - script `backend/scripts/test-whatsapp-hardening.ps1` ajustado para:
+    - refletir a regra atual de selecao numerica de recomendacao (`1` => `1 unidade`)
+    - usar nomes sinteticos validos nos cenarios de mutacao pos-pagamento
+- Validacao local:
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
   - `npm.cmd run test:unit` => `149/149` testes ok

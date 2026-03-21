@@ -1370,6 +1370,11 @@ export class WhatsappService {
       return false;
     }
 
+    const salesAnalysis = this.salesIntelligenceService.analyze(normalized);
+    if (salesAnalysis.intent === 'comparison' || this.isDirectPriceQuestion(normalized)) {
+      return false;
+    }
+
     const orderInfo = this.extractOrderInfo(normalized);
     const hasOrderShape =
       this.looksLikeMultiItemOrder(normalized) ||
@@ -3769,7 +3774,12 @@ export class WhatsappService {
 
       await this.conversationService.clearPedido(conversation.id);
       await this.conversationService.updateState(conversation.id, 'idle');
-      return 'Nao encontrei um pedido pendente para retomar.\n\nSe quiser, faca um novo pedido digitando: "Quero X [produto]".';
+      return [
+        'Nao encontrei um pedido pendente para retomar.',
+        '',
+        'Se quiser, eu monto um novo pedido por aqui sem reaproveitar nada por engano.',
+        'Exemplo: "Quero X [produto]".',
+      ].join('\n');
     }
 
     await this.conversationService.setPedidoId(conversation.id, pedido.id);
@@ -4441,16 +4451,16 @@ export class WhatsappService {
       return this.getPremiumOrderChoiceClarificationMessage();
     }
 
+    if (this.isReopenIntent(lowerMessage)) {
+      return await this.handlePremiumReopenIntent(tenantId, conversation);
+    }
+
     if (this.looksLikeOrderStatusQuery(lowerMessage, conversation)) {
       return await this.handlePremiumOrderStatusQuery(tenantId, conversation, orderNo);
     }
 
     if (this.isCancelIntent(lowerMessage, conversation, currentState)) {
       return await this.handlePremiumCancelIntent(tenantId, conversation, currentState, orderNo);
-    }
-
-    if (this.isReopenIntent(lowerMessage)) {
-      return await this.handlePremiumReopenIntent(tenantId, conversation);
     }
 
     if (this.isRepeatOrderIntent(lowerMessage)) {
@@ -4923,6 +4933,14 @@ export class WhatsappService {
     }
 
     if (analysis.flags.negativeOrder) {
+      return false;
+    }
+
+    if (
+      this.isDirectPriceQuestion(normalized) ||
+      this.isDirectStockQuestion(normalized) ||
+      this.isDirectScheduleQuestion(normalized)
+    ) {
       return false;
     }
 
