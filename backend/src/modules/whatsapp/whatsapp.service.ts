@@ -9,7 +9,7 @@ import { PaymentsService, CreatePaymentDto } from '../payments/payments.service'
 import { NotificationsService } from '../notifications/notifications.service';
 import { CanalVenda, PedidoStatus, Pedido } from '../../database/entities/Pedido.entity';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
-import { TypedConversation, ProductSearchResult, toTypedConversation, ConversationState, CustomerData, PendingOrder, PendingOrderItem, StockAdjustmentContext } from './types/whatsapp.types';
+import { TypedConversation, ProductSearchResult, toTypedConversation, ConversationState, CustomerData, PendingOrder, PendingOrderItem, StockAdjustmentContext, ConversationIntelligenceMemory } from './types/whatsapp.types';
 import { ProductWithStock } from '../products/types/product.types';
 import * as crypto from 'crypto';
 import { CouponsService } from '../coupons/coupons.service';
@@ -179,6 +179,85 @@ export class WhatsappService {
 
   private formatCurrency(value: number): string {
     return Number(value || 0).toFixed(2).replace('.', ',');
+  }
+
+  private getConversationIntelligenceMemory(
+    conversation?: TypedConversation,
+  ): ConversationIntelligenceMemory {
+    return (conversation?.context?.intelligence_memory || {}) as ConversationIntelligenceMemory;
+  }
+
+  private buildMessageContextSnapshot(conversation?: TypedConversation) {
+    const memory = this.getConversationIntelligenceMemory(conversation);
+    return {
+      lastIntent: memory.last_intent || null,
+      lastProductName: memory.last_product_name || null,
+      lastProductNames: memory.last_product_names || null,
+      lastQuantity:
+        typeof memory.last_quantity === 'number' && memory.last_quantity > 0
+          ? memory.last_quantity
+          : null,
+      lastQuery: memory.last_query || null,
+    };
+  }
+
+  private buildUniqueProductNames(
+    names: Array<string | null | undefined>,
+  ): string[] {
+    return Array.from(
+      new Set(
+        names
+          .map((name) => (name || '').trim())
+          .filter((name) => name.length >= 2),
+      ),
+    );
+  }
+
+  private async rememberConversationIntelligence(
+    conversation: TypedConversation | undefined,
+    updates: Partial<ConversationIntelligenceMemory>,
+  ): Promise<void> {
+    if (!conversation) {
+      return;
+    }
+
+    const currentMemory = this.getConversationIntelligenceMemory(conversation);
+    const nextMemory: ConversationIntelligenceMemory = {
+      ...currentMemory,
+      ...updates,
+      last_reference_at: new Date().toISOString(),
+    };
+
+    if (nextMemory.last_product_names) {
+      nextMemory.last_product_names = this.buildUniqueProductNames(nextMemory.last_product_names);
+    }
+
+    await this.conversationService.updateContext(conversation.id, {
+      intelligence_memory: nextMemory,
+    });
+
+    conversation.context = {
+      ...(conversation.context || {}),
+      intelligence_memory: nextMemory,
+    };
+  }
+
+  private async rememberPendingOrderIntelligence(
+    conversation: TypedConversation | undefined,
+    pendingOrder: PendingOrder,
+  ): Promise<void> {
+    const productNames = this.buildUniqueProductNames(
+      pendingOrder.items.map((item) => item.produto_name),
+    );
+    const singleItem = pendingOrder.items.length === 1 ? pendingOrder.items[0] : null;
+
+    await this.rememberConversationIntelligence(conversation, {
+      last_intent: 'order',
+      last_product_name: singleItem?.produto_name || null,
+      last_product_names: productNames,
+      last_quantity: singleItem ? Number(singleItem.quantity || 0) : null,
+      last_query: singleItem?.produto_name || productNames[0] || null,
+    });
   }
 
   private buildTrackingUrl(orderNo: string): string {
@@ -1946,7 +2025,11 @@ export class WhatsappService {
     }
   }
 
-  private async getPremiumPriceResponse(message: string, tenantId: string): Promise<string> {
+  private async getPremiumPriceResponse(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+  ): Promise<string> {
     try {
       const products = await this.getCatalogProducts(tenantId);
       const query = this.extractCatalogQuery(message);
@@ -1954,10 +2037,24 @@ export class WhatsappService {
       if (query) {
         const result = this.findProductByName(products, query);
         if (result.produto) {
+          await this.rememberConversationIntelligence(conversation, {
+            last_intent: 'price',
+            last_product_name: result.produto.name,
+            last_product_names: [result.produto.name],
+            last_quantity: null,
+            last_query: query,
+          });
           return this.buildProductInsightMessage(result.produto, 'price');
         }
 
         if (result.sugestoes?.length) {
+          await this.rememberConversationIntelligence(conversation, {
+            last_intent: 'price',
+            last_product_name: null,
+            last_product_names: result.sugestoes.map((product) => product.name),
+            last_quantity: null,
+            last_query: query,
+          });
           return this.buildSuggestionMessage(
             query,
             result.sugestoes,
@@ -1989,7 +2086,11 @@ export class WhatsappService {
     }
   }
 
-  private async getPremiumStockResponse(message: string, tenantId: string): Promise<string> {
+  private async getPremiumStockResponse(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+  ): Promise<string> {
     try {
       const products = await this.getCatalogProducts(tenantId);
       const query = this.extractCatalogQuery(message);
@@ -1997,10 +2098,24 @@ export class WhatsappService {
       if (query) {
         const result = this.findProductByName(products, query);
         if (result.produto) {
+          await this.rememberConversationIntelligence(conversation, {
+            last_intent: 'stock',
+            last_product_name: result.produto.name,
+            last_product_names: [result.produto.name],
+            last_quantity: null,
+            last_query: query,
+          });
           return this.buildProductInsightMessage(result.produto, 'stock');
         }
 
         if (result.sugestoes?.length) {
+          await this.rememberConversationIntelligence(conversation, {
+            last_intent: 'stock',
+            last_product_name: null,
+            last_product_names: result.sugestoes.map((product) => product.name),
+            last_quantity: null,
+            last_query: query,
+          });
           return this.buildSuggestionMessage(
             query,
             result.sugestoes,
@@ -2058,7 +2173,7 @@ export class WhatsappService {
     }
 
     if (intent.intent === 'consultar' && intent.product) {
-      return await this.getPremiumPriceResponse(`preco de ${intent.product}`, tenantId);
+      return await this.getPremiumPriceResponse(`preco de ${intent.product}`, tenantId, conversation);
     }
 
     return null;
@@ -2067,6 +2182,7 @@ export class WhatsappService {
   private async trySmartConciergeResponse(
     message: string,
     tenantId: string,
+    conversation?: TypedConversation,
   ): Promise<string | null> {
     const normalized = this.normalizeForSearch(message);
     const recommendationKeywords = [
@@ -2100,6 +2216,14 @@ export class WhatsappService {
       return 'Nao encontrei uma recomendacao forte com esse contexto, mas posso te mostrar o catalogo se voce enviar "cardapio".';
     }
 
+    await this.rememberConversationIntelligence(conversation, {
+      last_intent: 'recommendation',
+      last_product_name: recommendations.length === 1 ? recommendations[0].name : null,
+      last_product_names: recommendations.map((product) => product.name),
+      last_quantity: null,
+      last_query: query || null,
+    });
+
     const intro = query
       ? `Pelo que voce descreveu sobre "${query}", estas sao as melhores opcoes que achei agora:`
       : 'Separei algumas opcoes fortes para voce:';
@@ -2130,6 +2254,7 @@ export class WhatsappService {
     }
 
     await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
+    await this.rememberPendingOrderIntelligence(conversation, pendingOrder);
 
     const customerData = conversation?.context?.customer_data as CustomerData | undefined;
 
@@ -3926,6 +4051,16 @@ export class WhatsappService {
     }
 
     // IMPORTANTE: Verificar seleção de método de pagamento
+    const contextualResponse = await this.tryContextualMessageResolution(
+      message,
+      tenantId,
+      conversation,
+      currentState,
+    );
+    if (contextualResponse) {
+      return contextualResponse;
+    }
+
     const isPaymentSelection = this.isPaymentMethodSelection(message);
     if (isPaymentSelection) {
       const pedidoAtivo = await this.resolveRelevantOrder(tenantId, conversation, orderNo);
@@ -4062,12 +4197,12 @@ export class WhatsappService {
 
     // Comando: Preço de [produto]
     if (lowerMessage.includes('preco') || lowerMessage.includes('valor') || lowerMessage.includes('quanto custa')) {
-      return await this.getPremiumPriceResponse(message, tenantId);
+      return await this.getPremiumPriceResponse(message, tenantId, conversation);
     }
 
     // Comando: Estoque de [produto]
     if (lowerMessage.includes('estoque') || lowerMessage.includes('tem') || lowerMessage.includes('disponivel')) {
-      return await this.getPremiumStockResponse(message, tenantId);
+      return await this.getPremiumStockResponse(message, tenantId, conversation);
     }
 
     // Comando: Horário
@@ -4087,7 +4222,7 @@ export class WhatsappService {
     }
 
     // Resposta padrão
-    const conciergeResponse = await this.trySmartConciergeResponse(message, tenantId);
+    const conciergeResponse = await this.trySmartConciergeResponse(message, tenantId, conversation);
     if (conciergeResponse) {
       return conciergeResponse;
     }
@@ -4098,6 +4233,67 @@ export class WhatsappService {
     }
 
     return this.getPremiumFallbackMessage();
+  }
+
+  private async tryContextualMessageResolution(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): Promise<string | null> {
+    if (!conversation) {
+      return null;
+    }
+
+    if (currentState && !['idle', 'order_confirmed', 'order_completed'].includes(currentState)) {
+      return null;
+    }
+
+    const contextSnapshot = this.buildMessageContextSnapshot(conversation);
+    const hasReferenceContext =
+      !!contextSnapshot.lastProductName || !!contextSnapshot.lastProductNames?.length;
+
+    if (!hasReferenceContext) {
+      return null;
+    }
+
+    const contextualAnalysis = this.messageIntelligenceService.analyzeWithContext(
+      message,
+      contextSnapshot,
+    );
+
+    if (
+      !contextualAnalysis.references.contextualFollowUp ||
+      !contextualAnalysis.contextualProductCandidate
+    ) {
+      return null;
+    }
+
+    if (contextualAnalysis.contextualIntent === 'consultar') {
+      if (contextSnapshot.lastIntent === 'stock') {
+        return await this.getPremiumStockResponse(
+          `estoque de ${contextualAnalysis.contextualProductCandidate}`,
+          tenantId,
+          conversation,
+        );
+      }
+
+      return await this.getPremiumPriceResponse(
+        `preco de ${contextualAnalysis.contextualProductCandidate}`,
+        tenantId,
+        conversation,
+      );
+    }
+
+    if (contextualAnalysis.contextualIntent !== 'fazer_pedido') {
+      return null;
+    }
+
+    const syntheticMessage = contextualAnalysis.contextualQuantity
+      ? `quero ${contextualAnalysis.contextualQuantity} ${contextualAnalysis.contextualProductCandidate}`
+      : `quero ${contextualAnalysis.contextualProductCandidate}`;
+
+    return await this.processOrder(syntheticMessage, tenantId, conversation);
   }
 
   private getMultiItemQuantityLeadPattern(): string {
@@ -4436,6 +4632,7 @@ export class WhatsappService {
       };
     }
     await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
+    await this.rememberPendingOrderIntelligence(conversation, pendingOrder);
 
     const customerData = conversation?.context?.customer_data as CustomerData | undefined;
 
@@ -4546,6 +4743,13 @@ export class WhatsappService {
         } else {
           // Múltiplas sugestões - perguntar qual
           let mensagem = `❓ Não encontrei exatamente "${productName}", mas você quis dizer:\n\n`;
+          await this.rememberConversationIntelligence(conversation, {
+            last_intent: 'suggestion',
+            last_product_name: null,
+            last_product_names: resultadoBusca.sugestoes.map((product) => product.name),
+            last_quantity: quantity,
+            last_query: productName,
+          });
           resultadoBusca.sugestoes.forEach((p, index) => {
             mensagem += `${index + 1}. *${p.name}*\n`;
           });
@@ -4561,6 +4765,13 @@ export class WhatsappService {
         
         if (produtosSimilares.length > 0) {
           let mensagem = `❓ Não encontrei "${productName}". Você quis dizer:\n\n`;
+          await this.rememberConversationIntelligence(conversation, {
+            last_intent: 'suggestion',
+            last_product_name: null,
+            last_product_names: produtosSimilares.map((product) => product.name),
+            last_quantity: quantity,
+            last_query: productName,
+          });
           produtosSimilares.slice(0, 5).forEach((p, index) => {
             mensagem += `${index + 1}. *${p.name}*\n`;
           });

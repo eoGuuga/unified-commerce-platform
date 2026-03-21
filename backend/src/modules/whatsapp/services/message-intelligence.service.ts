@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { ConversationIntelligenceIntent } from '../types/whatsapp.types';
 
 export type MessageSignalName =
   | 'order'
@@ -28,6 +29,27 @@ export interface MessageAnalysis {
   confidence: number;
 }
 
+export interface MessageContextSnapshot {
+  lastIntent?: ConversationIntelligenceIntent | null;
+  lastProductName?: string | null;
+  lastProductNames?: string[] | null;
+  lastQuantity?: number | null;
+  lastQuery?: string | null;
+}
+
+export interface ContextualMessageAnalysis extends MessageAnalysis {
+  references: {
+    repeatReference: boolean;
+    pointingReference: boolean;
+    additiveReference: boolean;
+    selectedSuggestionIndex: number | null;
+    contextualFollowUp: boolean;
+  };
+  contextualProductCandidate: string | null;
+  contextualQuantity: number | null;
+  contextualIntent: MessageAnalysis['primaryIntent'];
+}
+
 type WeightedPhraseGroup = {
   phrases: string[];
   weight: number;
@@ -35,6 +57,43 @@ type WeightedPhraseGroup = {
 
 @Injectable()
 export class MessageIntelligenceService {
+  private readonly repeatReferencePhrases = [
+    'o mesmo',
+    'a mesma',
+    'igual ao anterior',
+    'igual ao de antes',
+    'igualzinho',
+    'do mesmo',
+    'da mesma',
+  ];
+
+  private readonly pointingReferencePhrases = [
+    'esse',
+    'esse ai',
+    'esse aqui',
+    'esse mesmo',
+    'essa',
+    'essa ai',
+    'essa aqui',
+    'essa mesma',
+    'desse',
+    'desse ai',
+    'desse aqui',
+    'deste',
+    'dessa',
+    'o de cima',
+  ];
+
+  private readonly additiveReferencePhrases = [
+    'mais',
+    'quero mais',
+    'manda mais',
+    'adiciona',
+    'acrescenta',
+    'coloca mais',
+    'bota mais',
+  ];
+
   private readonly normalizationRules: Array<{ pattern: RegExp; replacement: string }> = [
     { pattern: /[\u0000-\u001F\u007F]/g, replacement: ' ' },
     { pattern: /\b(qro|qru|kero|queroo+)\b/g, replacement: 'quero' },
@@ -332,6 +391,109 @@ export class MessageIntelligenceService {
     };
   }
 
+  analyzeWithContext(
+    message: string,
+    context?: MessageContextSnapshot,
+  ): ContextualMessageAnalysis {
+    const analysis = this.analyze(message);
+    const normalizedText = analysis.normalizedText;
+    const repeatReference = this.hasAnyPhrase(normalizedText, this.repeatReferencePhrases);
+    const pointingReference = this.hasAnyPhrase(normalizedText, this.pointingReferencePhrases);
+    const additiveReference =
+      this.hasAnyPhrase(normalizedText, this.additiveReferencePhrases) ||
+      /^(mais|quero mais)\b/.test(normalizedText);
+    const selectedSuggestionIndex = this.findSelectedSuggestionIndex(normalizedText);
+    const supportsOrdinalSelection = ['suggestion', 'recommendation', 'price', 'stock'].includes(
+      context?.lastIntent || '',
+    );
+    const hasSelectedSuggestion =
+      supportsOrdinalSelection &&
+      selectedSuggestionIndex !== null &&
+      selectedSuggestionIndex <= (context?.lastProductNames || []).length;
+    const contextualFollowUp =
+      !!context &&
+      (repeatReference ||
+        pointingReference ||
+        additiveReference ||
+        hasSelectedSuggestion);
+
+    const selectedProduct =
+      hasSelectedSuggestion
+        ? (context?.lastProductNames || [])[selectedSuggestionIndex - 1] || null
+        : null;
+    const singleContextProduct =
+      context?.lastProductName ||
+      ((context?.lastProductNames || []).length === 1
+        ? (context?.lastProductNames || [])[0]
+        : null);
+
+    const contextualProductCandidate =
+      !analysis.productCandidate || this.isReferenceOnlyCandidate(analysis.productCandidate)
+        ? selectedProduct ||
+          (repeatReference || additiveReference || pointingReference ? singleContextProduct : null)
+        : analysis.productCandidate;
+
+    let contextualQuantity = analysis.quantity;
+    if (hasSelectedSuggestion) {
+      contextualQuantity =
+        selectedProduct &&
+        context?.lastIntent === 'suggestion' &&
+        typeof context.lastQuantity === 'number' &&
+        context.lastQuantity > 0
+          ? context.lastQuantity
+          : null;
+    } else if (contextualQuantity === null) {
+      if (
+        selectedProduct &&
+        context?.lastIntent === 'suggestion' &&
+        typeof context.lastQuantity === 'number' &&
+        context.lastQuantity > 0
+      ) {
+        contextualQuantity = context.lastQuantity;
+      } else if (
+        repeatReference &&
+        typeof context?.lastQuantity === 'number' &&
+        context.lastQuantity > 0
+      ) {
+        contextualQuantity = context.lastQuantity;
+      } else if (additiveReference && (repeatReference || pointingReference)) {
+        contextualQuantity = 1;
+      }
+    }
+
+    let contextualIntent = analysis.primaryIntent;
+    if (contextualProductCandidate && contextualFollowUp) {
+      if (
+        hasSelectedSuggestion &&
+        (context?.lastIntent === 'price' || context?.lastIntent === 'stock') &&
+        analysis.scores.order < 0.45
+      ) {
+        contextualIntent = 'consultar';
+      } else if (repeatReference || additiveReference) {
+        contextualIntent = 'fazer_pedido';
+      } else if (pointingReference || hasSelectedSuggestion) {
+        contextualIntent =
+          context?.lastIntent === 'price' || context?.lastIntent === 'stock'
+            ? 'consultar'
+            : 'fazer_pedido';
+      }
+    }
+
+    return {
+      ...analysis,
+      references: {
+        repeatReference,
+        pointingReference,
+        additiveReference,
+        selectedSuggestionIndex: hasSelectedSuggestion ? selectedSuggestionIndex : null,
+        contextualFollowUp,
+      },
+      contextualProductCandidate,
+      contextualQuantity,
+      contextualIntent,
+    };
+  }
+
   extractQuantity(normalizedValue: string): number | null {
     const normalized = this.normalizeText(normalizedValue);
     const digitMatch = normalized.match(/\b(\d+)\b/);
@@ -409,6 +571,46 @@ export class MessageIntelligenceService {
 
   private collectMatches(normalized: string, phrases: string[]): string[] {
     return phrases.filter((phrase) => normalized.includes(this.normalizeText(phrase)));
+  }
+
+  private isReferenceOnlyCandidate(candidate: string): boolean {
+    const normalized = this.normalizeText(candidate)
+      .replace(/\b\d+\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return new Set([
+      'o mesmo',
+      'a mesma',
+      'esse',
+      'essa',
+      'esse ai',
+      'essa ai',
+      'esse aqui',
+      'essa aqui',
+      'desse',
+      'deste',
+      'dessa',
+      'mais',
+      'quero mais',
+    ]).has(normalized);
+  }
+
+  private findSelectedSuggestionIndex(normalized: string): number | null {
+    const directNumberMatch = normalized.match(/^(?:opcao|opcao numero|numero)?\s*(\d)\b/);
+    if (directNumberMatch) {
+      const index = Number(directNumberMatch[1]);
+      return index >= 1 && index <= 9 ? index : null;
+    }
+
+    const ordinalMap: Array<{ pattern: RegExp; index: number }> = [
+      { pattern: /\b(primeiro|primeira)\b/, index: 1 },
+      { pattern: /\b(segundo|segunda)\b/, index: 2 },
+      { pattern: /\b(terceiro|terceira)\b/, index: 3 },
+      { pattern: /\b(quarto|quarta)\b/, index: 4 },
+    ];
+
+    const ordinal = ordinalMap.find((entry) => entry.pattern.test(normalized));
+    return ordinal ? ordinal.index : null;
   }
 
   private collectWeightedMatches(

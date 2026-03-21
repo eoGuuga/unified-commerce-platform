@@ -176,6 +176,21 @@ $scenarios = @(
         )
     },
     @{
+        Name = "recommendation_follow_up_by_number"
+        Steps = @(
+            @{ Message = "me indica algo para presente"; ExpectAny = @("melhores opcoes", "Separei algumas opcoes") }
+            @{ Message = "1"; ExpectAny = @("Quantos", "gostaria", "Digite a quantidade") }
+        )
+    },
+    @{
+        Name = "repeat_same_item_after_cancelled_draft"
+        Steps = @(
+            @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "No momento esse item ficou sem estoque") }
+            @{ Message = "cancelar"; ExpectAny = @("cancelado", "interrompido", "Nao encontrei um pedido pendente") }
+            @{ Message = "o mesmo"; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo", "REVISAO FINAL DO PEDIDO", "No momento esse item ficou sem estoque") }
+        )
+    },
+    @{
         Name = "colloquial_status_message"
         Steps = @(
             @{ Message = $orderMessage; ExpectAny = @("PEDIDO PREPARADO", "Como voce prefere receber", "nome completo") }

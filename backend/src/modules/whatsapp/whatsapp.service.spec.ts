@@ -630,6 +630,109 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(service.isLooseReplyWithoutContext('to querendo 2 brigadeiro gourmet por favor')).toBe(false);
   });
 
+  it('continues the last ordered product when the customer only asks for more units', async () => {
+    const { service, conversationService } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'mais 2',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'order',
+            last_product_name: 'Brigadeiro Gourmet',
+            last_product_names: ['Brigadeiro Gourmet'],
+            last_quantity: 1,
+          },
+        },
+      }),
+    );
+
+    expect(conversationService.savePendingOrder).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({ produto_name: 'Brigadeiro Gourmet', quantity: 2 }),
+        ]),
+      }),
+    );
+    expect(response).toContain('PEDIDO PREPARADO');
+  });
+
+  it('turns a numeric reply into the intended order when there is remembered suggestion context', async () => {
+    const { service, conversationService } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      '2',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'suggestion',
+            last_product_names: ['Brigadeiro Gourmet', 'Brownie Premium'],
+            last_quantity: 3,
+            last_query: 'brounie',
+          },
+        },
+      }),
+    );
+
+    expect(conversationService.savePendingOrder).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({ produto_name: 'Brownie Premium', quantity: 3 }),
+        ]),
+      }),
+    );
+    expect(response).toContain('PEDIDO PREPARADO');
+  });
+
+  it('keeps consultation mode when selecting a remembered price suggestion by number', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      '1',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'price',
+            last_product_names: ['Brigadeiro Gourmet', 'Brownie Premium'],
+            last_query: 'brigad premium',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Aqui esta a leitura mais clara deste item.');
+    expect(response).toContain('Brigadeiro Gourmet');
+  });
+
+  it('reuses recommendation context when the customer points to a suggested item', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'esse',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_name: 'Brownie Premium',
+            last_product_names: ['Brownie Premium', 'Brigadeiro Gourmet'],
+          },
+        },
+      }),
+    );
+
+    expect(response.toLowerCase()).toContain('quantos *brownie premium*');
+  });
+
   it('accepts noisy payment keywords after normalization', () => {
     const service = createService() as any;
 

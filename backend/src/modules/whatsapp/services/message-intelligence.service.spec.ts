@@ -48,4 +48,39 @@ describe('MessageIntelligenceService', () => {
     expect(analysis.flags.negativeOrder).toBe(true);
     expect(analysis.scores.order).toBeLessThan(0.5);
   });
+
+  it('reuses the last ordered item for "o mesmo"', () => {
+    const analysis = service.analyzeWithContext('o mesmo', {
+      lastIntent: 'order',
+      lastProductName: 'Brigadeiro Gourmet',
+      lastProductNames: ['Brigadeiro Gourmet'],
+      lastQuantity: 2,
+    });
+
+    expect(analysis.contextualIntent).toBe('fazer_pedido');
+    expect(analysis.contextualProductCandidate).toBe('Brigadeiro Gourmet');
+    expect(analysis.contextualQuantity).toBe(2);
+  });
+
+  it('maps numeric suggestion replies to the remembered product and quantity', () => {
+    const analysis = service.analyzeWithContext('2', {
+      lastIntent: 'suggestion',
+      lastProductNames: ['Brigadeiro Gourmet', 'Brownie Premium'],
+      lastQuantity: 3,
+    });
+
+    expect(analysis.contextualIntent).toBe('fazer_pedido');
+    expect(analysis.contextualProductCandidate).toBe('Brownie Premium');
+    expect(analysis.contextualQuantity).toBe(3);
+  });
+
+  it('keeps consult context when selecting a price suggestion by number', () => {
+    const analysis = service.analyzeWithContext('1', {
+      lastIntent: 'price',
+      lastProductNames: ['Brigadeiro Gourmet', 'Brownie Premium'],
+    });
+
+    expect(analysis.contextualIntent).toBe('consultar');
+    expect(analysis.contextualProductCandidate).toBe('Brigadeiro Gourmet');
+  });
 });

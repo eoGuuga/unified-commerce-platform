@@ -78,6 +78,23 @@ export interface PendingOrder {
   total_amount: number;
 }
 
+export type ConversationIntelligenceIntent =
+  | 'order'
+  | 'price'
+  | 'stock'
+  | 'recommendation'
+  | 'suggestion'
+  | 'other';
+
+export interface ConversationIntelligenceMemory {
+  last_intent?: ConversationIntelligenceIntent | null;
+  last_product_name?: string | null;
+  last_product_names?: string[] | null;
+  last_quantity?: number | null;
+  last_query?: string | null;
+  last_reference_at?: string | null;
+}
+
 /**
  * Tipo para contexto de conversa
  */
@@ -98,6 +115,7 @@ export interface ConversationContext {
   last_processed_event_at?: string;
   last_processed_response?: string;
   address_draft_parts?: string[] | null;
+  intelligence_memory?: ConversationIntelligenceMemory;
   [key: string]: unknown; // Para permitir extensibilidade
 }
 
