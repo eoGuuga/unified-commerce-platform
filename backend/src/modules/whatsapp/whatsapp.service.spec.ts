@@ -965,7 +965,32 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Brownie Premium');
     expect(response).toContain('Leitura do catalogo atual: hoje a loja gira em chocolates e doces');
     expect(response).toContain('boa leitura para presente');
-    expect(response).toContain('Voce quer algo mais para presente');
+    expect(response).toContain('Voce quer um presente mais marcante na caixa');
+  });
+
+  it('guides chocolate gift-box conversations with a stronger presentation qualifier', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'me indica algo mais premium para presente',
+      'tenant-id',
+    );
+
+    expect(response).toContain('presente pronto para entregar');
+    expect(response).toContain('marcante na caixa');
+  });
+
+  it('guides chocolate-heavy conversations with an intensity qualifier', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'me indica algo mais chocolatudo e intenso',
+      'tenant-id',
+    );
+
+    expect(response).toContain('bate mais forte em chocolate e desejo');
+    expect(response).toContain('mais intenso no chocolate');
+    expect(response).toContain('Brownie Premium');
   });
 
   it('adapts recommendation language to fashion catalogs', async () => {

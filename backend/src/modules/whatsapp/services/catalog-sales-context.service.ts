@@ -29,6 +29,22 @@ type CatalogThemeSummary = {
   count: number;
 };
 
+type ConfectioneryConversationCueKey =
+  | 'gift_ready'
+  | 'sharing_order'
+  | 'chocolate_focus'
+  | 'self_treat'
+  | 'premium_choice';
+
+type ConfectioneryConversationCue = {
+  key: ConfectioneryConversationCueKey;
+  focusLine: string;
+  qualificationQuestion: string;
+  recommendationReason: string;
+  preferredThemes: CatalogThemeKey[];
+  score: number;
+};
+
 export interface CatalogSalesProfile {
   segment: SalesPlaybookSegment;
   storeLabel: string;
@@ -172,6 +188,7 @@ export class CatalogSalesContextService {
     profile: CatalogSalesProfile,
   ): CatalogSalesFit {
     const matchedThemes = this.getMatchedThemes(product, profile.focusThemes);
+    const confectioneryCues = this.collectConfectioneryConversationCues(profile, analysis);
     const reasons: string[] = [];
     const addReason = (reason: string) => {
       if (reason && !reasons.includes(reason)) {
@@ -212,6 +229,16 @@ export class CatalogSalesContextService {
       addReason('segura melhor uma escolha mais premium');
     }
 
+    confectioneryCues.forEach((cue) => {
+      const matchesCue = cue.preferredThemes.some((themeKey) => this.matchesThemeKey(product, themeKey));
+      if (!matchesCue) {
+        return;
+      }
+
+      score += cue.score;
+      addReason(cue.recommendationReason);
+    });
+
     if (
       profile.segment === 'confectionery' &&
       (this.hasTheme(matchedThemes, 'chocolate') || this.hasTheme(profile.focusThemes, 'chocolate'))
@@ -231,6 +258,23 @@ export class CatalogSalesContextService {
 
   buildCatalogContext(profile: CatalogSalesProfile): string {
     return `Leitura do catalogo atual: ${profile.catalogReading}`;
+  }
+
+  buildConversationFocusLine(
+    profile: CatalogSalesProfile,
+    analysis: SalesConversationAnalysis,
+  ): string | null {
+    return this.collectConfectioneryConversationCues(profile, analysis)[0]?.focusLine || null;
+  }
+
+  buildDynamicQualificationQuestion(
+    profile: CatalogSalesProfile,
+    analysis: SalesConversationAnalysis,
+  ): string {
+    return (
+      this.collectConfectioneryConversationCues(profile, analysis)[0]?.qualificationQuestion ||
+      profile.qualificationQuestion
+    );
   }
 
   buildQualificationQuestion(
@@ -333,6 +377,11 @@ export class CatalogSalesContextService {
     return theme.patterns.some((pattern) => document.includes(pattern));
   }
 
+  private matchesThemeKey(product: ProductWithStock, key: CatalogThemeKey): boolean {
+    const rule = this.themeRules.find((theme) => theme.key === key);
+    return rule ? this.matchesTheme(product, rule) : false;
+  }
+
   private getMatchedThemes(
     product: ProductWithStock,
     themes: Array<Pick<CatalogThemeSummary, 'key' | 'patterns' | 'recommendationReason'>>,
@@ -352,6 +401,146 @@ export class CatalogSalesContextService {
     const ordered = preferred.filter((label) => available.includes(label));
     const leftovers = available.filter((label) => !ordered.includes(label));
     return [...ordered, ...leftovers].slice(0, 3);
+  }
+
+  private collectConfectioneryConversationCues(
+    profile: CatalogSalesProfile,
+    analysis: SalesConversationAnalysis,
+  ): ConfectioneryConversationCue[] {
+    if (profile.segment !== 'confectionery') {
+      return [];
+    }
+
+    const cues: ConfectioneryConversationCue[] = [];
+    const text = analysis.normalizedText;
+    const hasPattern = (patterns: string[]) => patterns.some((pattern) => text.includes(pattern));
+    const addCue = (cue: ConfectioneryConversationCue) => {
+      if (!cues.some((existing) => existing.key === cue.key)) {
+        cues.push(cue);
+      }
+    };
+
+    if (
+      analysis.useCaseTags.includes('gift') ||
+      hasPattern([
+        'caixa',
+        'box',
+        'kit',
+        'embalado',
+        'pra presente',
+        'para presente',
+        'lembrancinha',
+      ])
+    ) {
+      addCue({
+        key: 'gift_ready',
+        focusLine:
+          'Para esse pedido, eu vou puxar o que faz mais sentido para presente pronto para entregar.',
+        qualificationQuestion:
+          'Voce quer um presente mais marcante na caixa ou algo que renda melhor sem perder capricho?',
+        recommendationReason: 'encaixa melhor como presente pronto',
+        preferredThemes: ['gift', 'premium', 'chocolate'],
+        score: 11,
+      });
+    }
+
+    if (
+      analysis.useCaseTags.includes('party') ||
+      hasPattern([
+        'duzia',
+        'meia duzia',
+        'compartilhar',
+        'dividir',
+        'mesa',
+        'festa',
+        'evento',
+        'levar para',
+      ])
+    ) {
+      addCue({
+        key: 'sharing_order',
+        focusLine:
+          'Para esse pedido, eu vou priorizar o que segura melhor compra para dividir ou montar volume.',
+        qualificationQuestion:
+          'Voce quer algo mais para dividir facil ou algo que chegue com mais impacto na mesa?',
+        recommendationReason: 'segura melhor um pedido para compartilhar',
+        preferredThemes: ['sharing', 'celebration', 'gift'],
+        score: 10,
+      });
+    }
+
+    if (
+      hasPattern([
+        'chocolate',
+        'chocolatudo',
+        'mais chocolate',
+        'mais intenso',
+        'cacau',
+        'ganache',
+        'trufa',
+        'brownie',
+        'recheado',
+      ])
+    ) {
+      addCue({
+        key: 'chocolate_focus',
+        focusLine:
+          'Para esse pedido, eu vou puxar o que bate mais forte em chocolate e desejo.',
+        qualificationQuestion:
+          'Voce quer algo mais intenso no chocolate ou mais equilibrado para agradar facil?',
+        recommendationReason: 'responde melhor a uma busca mais chocolatuda',
+        preferredThemes: ['chocolate', 'premium', 'self_treat'],
+        score: 12,
+      });
+    }
+
+    if (
+      hasPattern([
+        'docinho',
+        'mimo',
+        'pra mim',
+        'para mim',
+        'individual',
+        'unidade',
+        'sobremesa',
+      ])
+    ) {
+      addCue({
+        key: 'self_treat',
+        focusLine:
+          'Para esse pedido, eu vou priorizar o que fecha melhor como mimo individual sem enrolacao.',
+        qualificationQuestion:
+          'Voce quer um mimo individual mais intenso ou algo mais leve para matar a vontade?',
+        recommendationReason: 'fecha melhor como mimo individual',
+        preferredThemes: ['self_treat', 'chocolate', 'premium'],
+        score: 9,
+      });
+    }
+
+    if (
+      analysis.pricePreference === 'premium' ||
+      hasPattern([
+        'premium',
+        'marcante',
+        'caprichado',
+        'sofisticado',
+        'mais bonito',
+        'especial',
+      ])
+    ) {
+      addCue({
+        key: 'premium_choice',
+        focusLine:
+          'Para esse pedido, eu vou puxar as opcoes com cara mais premium sem perder aderencia.',
+        qualificationQuestion:
+          'Voce quer algo mais premium pela apresentacao ou mais premium pela intensidade do chocolate?',
+        recommendationReason: 'sustenta melhor uma escolha mais marcante',
+        preferredThemes: ['premium', 'gift', 'chocolate'],
+        score: 8,
+      });
+    }
+
+    return cues;
   }
 
   private collectMetadataStrings(

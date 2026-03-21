@@ -90,6 +90,32 @@ describe('CatalogSalesContextService', () => {
     expect(giftFit.reasons.join(' ')).toContain('presente');
   });
 
+  it('builds a gift-ready focus line and qualification for box-style requests', () => {
+    const playbook = salesPlaybookService.inferPlaybook(chocolateCatalog);
+    const profile = service.buildProfile(chocolateCatalog, playbook);
+    const analysis = salesIntelligenceService.analyze('me indica uma caixa caprichada para presente');
+
+    expect(service.buildConversationFocusLine(profile, analysis)).toContain(
+      'presente pronto para entregar',
+    );
+    expect(service.buildDynamicQualificationQuestion(profile, analysis)).toContain(
+      'marcante na caixa',
+    );
+  });
+
+  it('builds a chocolate-first qualification when the customer wants something more chocolatudo', () => {
+    const playbook = salesPlaybookService.inferPlaybook(chocolateCatalog);
+    const profile = service.buildProfile(chocolateCatalog, playbook);
+    const analysis = salesIntelligenceService.analyze('quero algo mais chocolatudo e intenso');
+
+    expect(service.buildConversationFocusLine(profile, analysis)).toContain(
+      'bate mais forte em chocolate e desejo',
+    );
+    expect(service.buildDynamicQualificationQuestion(profile, analysis)).toContain(
+      'mais intenso no chocolate',
+    );
+  });
+
   it('includes product metadata in the catalog search document', () => {
     const searchDocument = service.buildProductSearchDocument(chocolateCatalog[0]);
 

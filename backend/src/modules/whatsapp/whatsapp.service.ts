@@ -2189,12 +2189,22 @@ export class WhatsappService {
       analysis,
       referenceProduct,
     );
+    const conversationFocus = this.catalogSalesContextService.buildConversationFocusLine(
+      catalogProfile,
+      analysis,
+    );
+    const qualificationQuestion =
+      this.catalogSalesContextService.buildDynamicQualificationQuestion(
+        catalogProfile,
+        analysis,
+      );
 
     return [
       intro,
       '',
       this.salesSegmentStrategyService.buildStrategyContext(playbook, strategy),
       this.catalogSalesContextService.buildCatalogContext(catalogProfile),
+      conversationFocus,
       `Leitura da vertical ${verticalPack.label}: ${verticalPack.salesFrame}`,
       analysis.intent === 'objection'
         ? `Abordagem da objecao: ${strategy.objectionBridge}`
@@ -2209,7 +2219,7 @@ export class WhatsappService {
       '',
       close,
       this.salesVerticalPackService.buildClosingMove(verticalPack, analysis),
-      catalogProfile.qualificationQuestion,
+      qualificationQuestion,
       this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
       this.salesSegmentStrategyService.buildRecommendationRefinement(strategy),
       `Exemplo: "quero 1 ${rankedProducts[0].product.name}" ou "compara ${rankedProducts[0].product.name} com outra opcao".`,
@@ -2244,6 +2254,15 @@ export class WhatsappService {
           ? premium
           : betterValue;
     const labels = this.salesPlaybookService.getComparisonLabels(playbook);
+    const conversationFocus = this.catalogSalesContextService.buildConversationFocusLine(
+      catalogProfile,
+      analysis,
+    );
+    const qualificationQuestion =
+      this.catalogSalesContextService.buildDynamicQualificationQuestion(
+        catalogProfile,
+        analysis,
+      );
 
     return [
       'COMPARATIVO OBJETIVO',
@@ -2254,6 +2273,7 @@ export class WhatsappService {
       `Leitura comercial da ${playbook.label}: ${playbook.salesLens}`,
       this.salesSegmentStrategyService.buildComparisonContext(strategy),
       this.catalogSalesContextService.buildCatalogContext(catalogProfile),
+      conversationFocus,
       `Regra de fechamento da vertical ${verticalPack.label}: ${verticalPack.comparisonFrame}`,
       '',
       'Leitura comercial:',
@@ -2263,8 +2283,11 @@ export class WhatsappService {
       '',
       `${labels.recommendationLead} ${recommended.name}.`,
       this.salesVerticalPackService.buildClosingMove(verticalPack, analysis),
+      qualificationQuestion,
       `Se quiser seguir, envie: "quero 1 ${recommended.name}".`,
-    ].join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
   private buildSalesBudgetMissResponse(
@@ -2275,10 +2298,21 @@ export class WhatsappService {
     verticalPack: SalesVerticalPackProfile,
     closestProducts: RankedSalesProduct[],
   ): string {
+    const conversationFocus = this.catalogSalesContextService.buildConversationFocusLine(
+      catalogProfile,
+      analysis,
+    );
+    const qualificationQuestion =
+      this.catalogSalesContextService.buildDynamicQualificationQuestion(
+        catalogProfile,
+        analysis,
+      );
+
     return [
       `Com esse teto de ate R$ ${this.formatCurrency(analysis.budgetCeiling || 0)}, eu nao encontrei algo realmente forte disponivel agora.`,
       this.salesSegmentStrategyService.buildBudgetBridge(strategy),
       this.catalogSalesContextService.buildCatalogContext(catalogProfile),
+      conversationFocus,
       `Leitura da vertical ${verticalPack.label}: ${verticalPack.budgetFrame}`,
       '',
       'As opcoes mais proximas que ainda fazem sentido comercialmente sao:',
@@ -2286,10 +2320,12 @@ export class WhatsappService {
       '',
       this.salesPlaybookService.buildBudgetMissClose(playbook),
       this.salesVerticalPackService.buildClosingMove(verticalPack, analysis),
-      catalogProfile.qualificationQuestion,
+      qualificationQuestion,
       this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
       this.salesSegmentStrategyService.buildRecommendationRefinement(strategy),
-    ].join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
   private pickRecommendationProducts(
