@@ -115,3 +115,19 @@
 - Backup DEV/TESTE: /opt/ucm-test-repo/backups/whatsapp-catalog-adaptation-20260321-040626
 - Backup PRODUCAO: /opt/ucm/backups/whatsapp-catalog-adaptation-20260321-041335
 
+2026-03-21
+- Ambiente: LOCAL + DEV/TESTE (VPS) /opt/ucm-test-repo + PRODUCAO /opt/ucm
+- Commit funcional publicado: ef8509f
+- Escopo: refinamento da vendedora de chocolate no WhatsApp para presente, caixa, kit, duzia, compartilhamento, mimo individual e busca mais chocolatuda
+- Commits desta rodada: ef8509f (conversation cues de confeitaria aplicados ao ranking, linha de foco e qualificacao dinamica)
+- Validacao local: npm.cmd run test:unit => 136/136 PASS; npm.cmd run lint => PASS; npm.cmd run build => PASS
+- Bateria real WhatsApp: powershell -ExecutionPolicy Bypass -File backend/scripts/test-whatsapp-hardening.ps1
+- Relatorio final: C:\Users\gusta\OneDrive\Desktop\sas\test-whatsapp-hardening-results-20260321-014440.json
+- Resultado bateria: 65 cenarios / 0 falhas
+- DEV/TESTE: https://dev.gtsofthub.com.br/api/v1/health => ok
+- DEV/TESTE: https://dev.gtsofthub.com.br/api/v1/whatsapp/health => ok
+- PRODUCAO: https://gtsofthub.com.br/api/v1/health => ok
+- PRODUCAO: https://gtsofthub.com.br/api/v1/whatsapp/health => ok
+- Backup DEV/TESTE: /opt/ucm-test-repo/backups/whatsapp-chocolate-guidance-20260321-043739
+- Backup PRODUCAO: /opt/ucm/backups/whatsapp-chocolate-guidance-20260321-044536
+
