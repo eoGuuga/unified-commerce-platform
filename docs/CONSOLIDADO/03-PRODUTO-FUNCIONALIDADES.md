@@ -42,3 +42,4 @@ Ultima atualizacao: 2026-02-16
 ## Notas de consistencia
 - Docs antigos citam Stripe e Supabase; estado atual usa Mercado Pago e Postgres local.
 - Alguns valores e planos comerciais sao legados e precisam de revisao antes de uso.
+- Decisao operacional atual para WhatsApp: durante o desenvolvimento, o motor comercial pode ser validado com catalogo provisório; a parametrizacao final com produtos reais, descricoes reais, metadata comercial real e tom definitivo da loja de chocolate fica reservada para a fase final do projeto.

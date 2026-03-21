@@ -16,6 +16,7 @@ Ultima atualizacao: 2026-02-16
 - Onboarding multi-tenant completo (provisionamento e setup rapido).
 - Observabilidade de pagamentos e estoque (logs + alertas).
 - Integracoes futuras (marketplaces, contabilidade, etc).
+- Fase final do projeto: calibracao comercial fina da IA do WhatsApp com catalogo real, descricoes reais, metadata real e playbooks definitivos da loja de chocolate.
 
 ## Dependencias criticas
 - Decisao de politica CSRF para frontend.
@@ -25,3 +26,4 @@ Ultima atualizacao: 2026-02-16
 ## Notas
 - Este roadmap substitui planos e fases antigas espalhadas nos docs.
 - Ajustar prioridades conforme feedback do cliente beta e testes em producao.
+- Decisao atual: ate a fase final, a IA do WhatsApp pode operar com produtos e informacoes provisórias para desenvolvimento, desde que a calibracao final com dados oficiais fique documentada e pendente de fechamento.
