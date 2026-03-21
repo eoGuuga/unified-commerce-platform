@@ -99,3 +99,19 @@
 - Backup DEV/TESTE: /opt/ucm-test-repo/backups/whatsapp-vertical-packs-20260321-034115
 - Backup PRODUCAO: /opt/ucm/backups/whatsapp-vertical-packs-20260321-034904
 
+2026-03-21
+- Ambiente: LOCAL + DEV/TESTE (VPS) /opt/ucm-test-repo + PRODUCAO /opt/ucm
+- Commit funcional publicado: eef72ac
+- Escopo: adaptacao da IA do WhatsApp ao catalogo configurado da loja, lendo nome, descricao, categoria e metadata para vender melhor o que foi cadastrado
+- Commits desta rodada: eef72ac (catalog sales context para recomendacao, qualificacao e ranking orientados pelo catalogo real)
+- Validacao local: npm.cmd run test:unit => 132/132 PASS; npm.cmd run lint => PASS; npm.cmd run build => PASS
+- Bateria real WhatsApp: powershell -ExecutionPolicy Bypass -File backend/scripts/test-whatsapp-hardening.ps1
+- Relatorio final: C:\Users\gusta\OneDrive\Desktop\sas\test-whatsapp-hardening-results-20260321-011316.json
+- Resultado bateria: 65 cenarios / 0 falhas
+- DEV/TESTE: https://dev.gtsofthub.com.br/api/v1/health => ok
+- DEV/TESTE: https://dev.gtsofthub.com.br/api/v1/whatsapp/health => ok
+- PRODUCAO: https://gtsofthub.com.br/api/v1/health => ok
+- PRODUCAO: https://gtsofthub.com.br/api/v1/whatsapp/health => ok
+- Backup DEV/TESTE: /opt/ucm-test-repo/backups/whatsapp-catalog-adaptation-20260321-040626
+- Backup PRODUCAO: /opt/ucm/backups/whatsapp-catalog-adaptation-20260321-041335
+
