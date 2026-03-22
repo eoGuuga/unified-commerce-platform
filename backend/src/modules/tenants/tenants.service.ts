@@ -125,12 +125,24 @@ export class TenantsService {
         throw new NotFoundException(`Tenant com ID ${tenantId} não encontrado`);
       }
 
-      tenant.settings = {
-        ...(tenant.settings || {}),
-        ...partialSettings,
-      };
+      await manager.query(
+        `
+          UPDATE tenants
+          SET settings = COALESCE(settings, '{}'::jsonb) || $2::jsonb
+          WHERE id = $1
+        `,
+        [tenantId, JSON.stringify(partialSettings)],
+      );
 
-      return await repository.save(tenant);
+      const updatedTenant = await repository.findOne({
+        where: { id: tenantId },
+      });
+
+      if (!updatedTenant) {
+        throw new NotFoundException(`Tenant com ID ${tenantId} não encontrado`);
+      }
+
+      return updatedTenant;
     });
   }
 }

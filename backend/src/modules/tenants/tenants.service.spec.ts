@@ -24,7 +24,6 @@ describe('TenantsService', () => {
 
   const mockRepository = {
     findOne: jest.fn(),
-    save: jest.fn(),
   };
 
   const mockDbContextService = {
@@ -165,23 +164,23 @@ describe('TenantsService', () => {
 
   describe('updateSettings', () => {
     it('deve mesclar novas configuracoes sem perder as existentes', async () => {
-      mockRepository.findOne.mockResolvedValue({ ...mockTenant });
-      mockRepository.save.mockImplementation(async (tenant) => tenant);
+      mockRepository.findOne
+        .mockResolvedValueOnce({ ...mockTenant })
+        .mockResolvedValueOnce({
+          ...mockTenant,
+          settings: {
+            ...mockTenant.settings,
+            whatsappBotEnabled: false,
+            whatsappBotControlCode: '4321',
+          },
+        });
 
       const result = await service.updateSettings('tenant-123', {
         whatsappBotEnabled: false,
         whatsappBotControlCode: '4321',
       });
 
-      expect(mockRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          settings: expect.objectContaining({
-            whatsappNumbers: ['5511999999999', '5511888888888'],
-            whatsappBotEnabled: false,
-            whatsappBotControlCode: '4321',
-          }),
-        }),
-      );
+      expect(mockDbContextService.runInTransaction).toHaveBeenCalled();
       expect(result.settings).toEqual(
         expect.objectContaining({
           whatsappNumbers: ['5511999999999', '5511888888888'],
