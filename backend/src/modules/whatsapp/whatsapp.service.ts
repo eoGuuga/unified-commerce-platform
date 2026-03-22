@@ -28,6 +28,7 @@ import { ProductsService } from '../products/products.service';
 import { OrdersService } from '../orders/orders.service';
 import { PaymentsService, CreatePaymentDto } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CacheService } from '../common/services/cache.service';
 import { CanalVenda, PedidoStatus, Pedido } from '../../database/entities/Pedido.entity';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
 import { TypedConversation, ProductSearchResult, toTypedConversation, ConversationState, CustomerData, PendingOrder, PendingOrderItem, StockAdjustmentContext, ConversationIntelligenceMemory } from './types/whatsapp.types';
@@ -122,6 +123,7 @@ export class WhatsappService {
     private salesSegmentStrategyService: SalesSegmentStrategyService,
     private salesVerticalPackService: SalesVerticalPackService,
     private catalogSalesContextService: CatalogSalesContextService,
+    private cacheService: CacheService,
     private conversationService: ConversationService,
     private productsService: ProductsService,
     private ordersService: OrdersService,
@@ -4314,7 +4316,13 @@ export class WhatsappService {
         throw new BadRequestException('Tenant ID é obrigatório para processar mensagens WhatsApp');
       }
       const tenantId = message.tenantId;
-      
+
+      try {
+        return await this.cacheService.withConversationLock(
+          tenantId,
+          message.from,
+          async () => {
+
       // ✅ NOVO: Sanitizar mensagem recebida
       const normalizedBody = this.normalizeIncomingMessageBody(message);
       const sanitizedBody = this.sanitizeInput(normalizedBody);
@@ -4429,6 +4437,19 @@ export class WhatsappService {
 
       this.logger.log(`Response: ${response}`);
       return response;
+          },
+        );
+      } catch (error) {
+        if (error instanceof Error && error.message === 'CONVERSATION_LOCK_TIMEOUT') {
+          this.logger.warn('Timed out waiting for WhatsApp conversation lock', {
+            from: message.from,
+            tenantId,
+          });
+          return 'Estou finalizando sua mensagem anterior. Me envie a proxima instrucao em alguns segundos.';
+        }
+
+        throw error;
+      }
     } catch (error) {
       this.logger.error('Error processing WhatsApp message', {
         error: error instanceof Error ? error.message : String(error),

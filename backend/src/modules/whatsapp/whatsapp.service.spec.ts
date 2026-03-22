@@ -179,6 +179,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     products: Array<Record<string, unknown>> = [],
     overrides?: {
       config?: Record<string, unknown>;
+      cacheService?: Record<string, any>;
       conversation?: Record<string, jest.Mock>;
       orders?: Record<string, jest.Mock>;
       payments?: Record<string, jest.Mock>;
@@ -195,6 +196,13 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     const openAIService = {
       processMessage: jest.fn().mockResolvedValue({ intent: 'outro', confidence: 0.5 }),
+    };
+
+    const cacheService = {
+      withConversationLock: jest.fn(async (_tenantId: string, _customerPhone: string, handler: () => Promise<unknown>) => {
+        return await handler();
+      }),
+      ...(overrides?.cacheService || {}),
     };
 
     const conversationService = {
@@ -254,6 +262,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       salesSegmentStrategyService as any,
       salesVerticalPackService as any,
       catalogSalesContextService as any,
+      cacheService as any,
       conversationService as any,
       productsService as any,
       ordersService as any,
@@ -269,6 +278,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     return {
       service: service as any,
       config,
+      cacheService,
       conversationService,
       ordersService,
       paymentsService,
@@ -1420,6 +1430,182 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(conversationService.saveMessage).not.toHaveBeenCalled();
     expect(conversationService.updateContext).not.toHaveBeenCalled();
     expect(generateResponseSpy).not.toHaveBeenCalled();
+  });
+
+  it('serializes messages from the same customer so one flow finishes before the next starts', async () => {
+    const waitingResolvers = new Map<string, () => void>();
+    const activeLocks = new Map<string, Promise<void>>();
+
+    const { service, cacheService } = createFixture(catalog, {
+      cacheService: {
+        withConversationLock: jest.fn(
+          async (
+            tenantId: string,
+            customerPhone: string,
+            handler: () => Promise<unknown>,
+          ) => {
+            const key = `${tenantId}:${customerPhone}`;
+            const previous = activeLocks.get(key) || Promise.resolve();
+            let release!: () => void;
+            const current = new Promise<void>((resolve) => {
+              release = resolve;
+            });
+
+            activeLocks.set(key, current);
+            await previous;
+
+            try {
+              return await handler();
+            } finally {
+              release();
+              if (activeLocks.get(key) === current) {
+                activeLocks.delete(key);
+              }
+            }
+          },
+        ),
+      },
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(createConversation()),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const startedBodies: string[] = [];
+    const finishedBodies: string[] = [];
+    jest.spyOn(service as any, 'generateResponse').mockImplementation(
+      async (...args: unknown[]) => {
+        const [body] = args as [string];
+        startedBodies.push(body);
+
+        if (body === 'primeira mensagem') {
+          await new Promise<void>((resolve) => {
+            waitingResolvers.set(body, resolve);
+          });
+        }
+
+        finishedBodies.push(body);
+        return `ok:${body}`;
+      },
+    );
+
+    const firstPromise = service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'primeira mensagem',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'lock-1',
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    const secondPromise = service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'segunda mensagem',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'lock-2',
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(cacheService.withConversationLock).toHaveBeenCalledTimes(2);
+    expect(startedBodies).toEqual(['primeira mensagem']);
+
+    waitingResolvers.get('primeira mensagem')?.();
+
+    const responses = await Promise.all([firstPromise, secondPromise]);
+
+    expect(responses).toEqual(['ok:primeira mensagem', 'ok:segunda mensagem']);
+    expect(startedBodies).toEqual(['primeira mensagem', 'segunda mensagem']);
+    expect(finishedBodies).toEqual(['primeira mensagem', 'segunda mensagem']);
+  });
+
+  it('keeps different customers independent so one conversation does not block another', async () => {
+    const activeLocks = new Map<string, Promise<void>>();
+    const waitingResolvers = new Map<string, () => void>();
+
+    const { service } = createFixture(catalog, {
+      cacheService: {
+        withConversationLock: jest.fn(
+          async (
+            tenantId: string,
+            customerPhone: string,
+            handler: () => Promise<unknown>,
+          ) => {
+            const key = `${tenantId}:${customerPhone}`;
+            const previous = activeLocks.get(key) || Promise.resolve();
+            let release!: () => void;
+            const current = new Promise<void>((resolve) => {
+              release = resolve;
+            });
+
+            activeLocks.set(key, current);
+            await previous;
+
+            try {
+              return await handler();
+            } finally {
+              release();
+              if (activeLocks.get(key) === current) {
+                activeLocks.delete(key);
+              }
+            }
+          },
+        ),
+      },
+      conversation: {
+        getOrCreateConversation: jest.fn().mockImplementation(async (_tenantId: string, phone: string) => {
+          return createConversation({ customer_phone: phone });
+        }),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const startedBodies: string[] = [];
+    jest.spyOn(service as any, 'generateResponse').mockImplementation(
+      async (...args: unknown[]) => {
+        const [body] = args as [string];
+        startedBodies.push(body);
+
+        if (body === 'mensagem cliente 1') {
+          await new Promise<void>((resolve) => {
+            waitingResolvers.set(body, resolve);
+          });
+        }
+
+        return `ok:${body}`;
+      },
+    );
+
+    const firstPromise = service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'mensagem cliente 1',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'parallel-1',
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    const secondPromise = service.processIncomingMessage({
+      from: '5511888888888',
+      body: 'mensagem cliente 2',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'parallel-2',
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(startedBodies).toEqual(['mensagem cliente 1', 'mensagem cliente 2']);
+
+    waitingResolvers.get('mensagem cliente 1')?.();
+
+    const responses = await Promise.all([firstPromise, secondPromise]);
+    expect(responses).toEqual(['ok:mensagem cliente 1', 'ok:mensagem cliente 2']);
   });
 
   it('finds the latest order by phone for noisy status requests', async () => {

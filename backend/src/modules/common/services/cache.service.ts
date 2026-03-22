@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
 import Redis, { RedisOptions } from 'ioredis';
 import { ProductWithStock } from '../../products/types/product.types';
 
@@ -7,6 +8,14 @@ import { ProductWithStock } from '../../products/types/product.types';
 export class CacheService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CacheService.name);
   private redis: Redis;
+  private readonly localLocks = new Map<string, string>();
+  private warnedAboutLocalLockFallback = false;
+  private readonly releaseLockScript = `
+    if redis.call("get", KEYS[1]) == ARGV[1] then
+      return redis.call("del", KEYS[1])
+    end
+    return 0
+  `;
 
   constructor(private configService: ConfigService) {
     const redisUrl = this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
@@ -97,6 +106,111 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     if (keys.length > 0) {
       await this.redis.del(...keys);
     }
+  }
+
+  private isRedisReady(): boolean {
+    return this.redis.status === 'ready' || this.redis.status === 'connect';
+  }
+
+  private async sleep(milliseconds: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, milliseconds));
+  }
+
+  private tryAcquireLocalLock(lockKey: string, token: string): boolean {
+    if (this.localLocks.has(lockKey)) {
+      return false;
+    }
+
+    this.localLocks.set(lockKey, token);
+    return true;
+  }
+
+  private releaseLocalLock(lockKey: string, token: string): void {
+    if (this.localLocks.get(lockKey) === token) {
+      this.localLocks.delete(lockKey);
+    }
+  }
+
+  private async tryAcquireRedisLock(
+    lockKey: string,
+    token: string,
+    ttlSeconds: number,
+  ): Promise<'acquired' | 'busy' | 'unavailable'> {
+    if (!this.isRedisReady()) {
+      return 'unavailable';
+    }
+
+    try {
+      const result = await this.redis.set(lockKey, token, 'EX', ttlSeconds, 'NX');
+      return result === 'OK' ? 'acquired' : 'busy';
+    } catch (error) {
+      this.logger.warn(
+        `Redis lock unavailable for ${lockKey}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return 'unavailable';
+    }
+  }
+
+  private async releaseRedisLock(lockKey: string, token: string): Promise<void> {
+    try {
+      await this.redis.eval(this.releaseLockScript, 1, lockKey, token);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to release Redis lock ${lockKey}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  async withConversationLock<T>(
+    tenantId: string,
+    customerPhone: string,
+    handler: () => Promise<T>,
+    options?: {
+      ttlSeconds?: number;
+      waitTimeoutMs?: number;
+      retryDelayMs?: number;
+    },
+  ): Promise<T> {
+    const ttlSeconds = Math.max(options?.ttlSeconds ?? 45, 5);
+    const waitTimeoutMs = Math.max(options?.waitTimeoutMs ?? 15000, 250);
+    const retryDelayMs = Math.max(options?.retryDelayMs ?? 75, 10);
+    const normalizedPhone =
+      String(customerPhone || '').replace(/\D/g, '') || String(customerPhone || '').trim();
+    const lockKey = `wa:conversation-lock:${tenantId}:${normalizedPhone}`;
+    const token = randomUUID();
+    const deadline = Date.now() + waitTimeoutMs;
+
+    while (Date.now() <= deadline) {
+      const redisAttempt = await this.tryAcquireRedisLock(lockKey, token, ttlSeconds);
+      if (redisAttempt === 'acquired') {
+        try {
+          return await handler();
+        } finally {
+          await this.releaseRedisLock(lockKey, token);
+        }
+      }
+
+      if (redisAttempt === 'unavailable') {
+        if (!this.warnedAboutLocalLockFallback) {
+          this.logger.warn(
+            'Redis indisponivel para lock conversacional; usando fallback local nesta instancia.',
+          );
+          this.warnedAboutLocalLockFallback = true;
+        }
+
+        if (this.tryAcquireLocalLock(lockKey, token)) {
+          try {
+            return await handler();
+          } finally {
+            this.releaseLocalLock(lockKey, token);
+          }
+        }
+      }
+
+      await this.sleep(retryDelayMs);
+    }
+
+    throw new Error('CONVERSATION_LOCK_TIMEOUT');
   }
 
   /**

@@ -16,12 +16,14 @@ import { PaymentsModule } from '../payments/payments.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { CouponsModule } from '../coupons/coupons.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { CommonModule } from '../common/common.module';
 import { WhatsappConversation } from '../../database/entities/WhatsappConversation.entity';
 import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([WhatsappConversation, WhatsappMessage]),
+    CommonModule,
     ProductsModule,
     TenantsModule, // Importar TenantsModule para validar tenant e número de WhatsApp
     forwardRef(() => OrdersModule), // forwardRef para evitar dependência circular
