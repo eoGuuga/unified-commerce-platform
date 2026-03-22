@@ -157,6 +157,45 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     },
   ];
 
+  const giftingCatalogWithAccessories = [
+    {
+      id: 'g1',
+      name: 'Brigadeiro individual mimo',
+      description: 'Doce individual com boa leitura para presente rapido.',
+      price: 6,
+      available_stock: 20,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Presentear' },
+    },
+    {
+      id: 'g2',
+      name: 'Caixa presenteavel com 3 brigadeiros',
+      description: 'Caixa pronta para presentear com chocolate artesanal.',
+      price: 12,
+      available_stock: 15,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Presentear' },
+    },
+    {
+      id: 'g3',
+      name: 'Cartao recadinho',
+      description: 'Complemento para acompanhar o presente.',
+      price: 2.5,
+      available_stock: 30,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Presentear' },
+    },
+    {
+      id: 'g4',
+      name: 'Sacola Kraft personalizada G',
+      description: 'Embalagem de apoio para montar o presente.',
+      price: 3,
+      available_stock: 30,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Presentear' },
+    },
+  ];
+
   const fashionCatalog = [
     {
       id: 'f1',
@@ -1395,6 +1434,20 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('algo mais simples e sem exagero');
     expect(response).toContain('segura melhor o orcamento');
     expect(response).toContain('Brigadeiro Gourmet');
+  });
+
+  it('does not promote packaging accessories as the main gift recommendation', async () => {
+    const { service } = createFixture(giftingCatalogWithAccessories);
+
+    const response = await service.generateResponse(
+      'me indica um presente pra minha mae ate 14 reais, sem erro e sem perder tempo',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Brigadeiro individual mimo');
+    expect(response).toContain('Caixa presenteavel com 3 brigadeiros');
+    expect(response).not.toContain('- Cartao recadinho |');
+    expect(response).not.toContain('- Sacola Kraft personalizada G |');
   });
 
   it('adapts recommendation language to fashion catalogs', async () => {

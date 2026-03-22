@@ -708,6 +708,7 @@
   - mensagens como `presente pra minha mae, ate X, sem erro e sem perder tempo` passaram a ser lidas como contexto composto de presente + orcamento + confianca + urgencia
   - a resposta comercial ficou mais humana, espelhando melhor o que foi entendido da mensagem
   - o ranking de produtos passou a valorizar melhor contexto de presente, velocidade, seguranca de indicacao e fechamento sem friccao
+  - itens de apoio como cartao, sacola e embalagem deixaram de aparecer como recomendacao principal quando ja existem produtos centrais bons para presentear
   - a trava de `pedido ambiguo` deixou de sequestrar mensagens consultivas so porque tinham artigo como `um`
 - Arquivos principais:
   - `backend/src/modules/whatsapp/services/sales-intelligence.service.ts`

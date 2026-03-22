@@ -4373,6 +4373,13 @@ export class WhatsappService {
     return this.catalogSalesContextService.buildProductSearchDocument(product);
   }
 
+  private isSupportAccessoryProduct(product: ProductWithStock): boolean {
+    const document = this.buildProductSalesDocument(product);
+    return /(cartao|recadinho|sacola|sacola kraft|embalagem|caixa vazia|laco|fitilho|tag|vela|topper|suporte)/.test(
+      document,
+    );
+  }
+
   private getSalesQueryWords(query?: string | null): string[] {
     if (!query) {
       return [];
@@ -4475,6 +4482,7 @@ export class WhatsappService {
         const price = Number(product.price || 0);
         const normalizedName = this.normalizeForSearch(product.name);
         const searchDocument = this.buildProductSalesDocument(product);
+        const accessoryLike = this.isSupportAccessoryProduct(product);
         const commercialSupport = Boolean(
           product.description?.trim() ||
             (typeof product.metadata === 'object' &&
@@ -4522,6 +4530,18 @@ export class WhatsappService {
             addReason('faz sentido para esse contexto');
           }
         });
+
+        const explicitlyAskedForAccessory =
+          accessoryLike &&
+          queryWords.some((word) => normalizedName.includes(word) || searchDocument.includes(word));
+
+        if (
+          accessoryLike &&
+          !explicitlyAskedForAccessory &&
+          ['recommendation', 'budget', 'objection'].includes(analysis.intent)
+        ) {
+          score -= 36;
+        }
 
         const priceRatio = (price - minPrice) / priceSpan;
         if (analysis.pricePreference === 'budget') {
@@ -4606,6 +4626,28 @@ export class WhatsappService {
   private formatSalesRecommendationLine(item: RankedSalesProduct): string {
     const reasons = item.reasons.slice(0, 2).join(' e ');
     return `- ${this.formatProductHeadline(item.product)}${reasons ? ` | ${reasons}` : ''}`;
+  }
+
+  private prioritizePrimarySalesProducts(
+    rankedProducts: RankedSalesProduct[],
+    analysis: SalesConversationAnalysis,
+  ): RankedSalesProduct[] {
+    const explicitAccessoryQuery =
+      analysis.commercialQuery &&
+      /(cartao|recadinho|sacola|embalagem|laco|fitilho|vela|topper)/.test(
+        this.normalizeForSearch(analysis.commercialQuery),
+      );
+
+    if (explicitAccessoryQuery) {
+      return rankedProducts;
+    }
+
+    const coreProducts = rankedProducts.filter((item) => !this.isSupportAccessoryProduct(item.product));
+    if (coreProducts.length < 2) {
+      return rankedProducts;
+    }
+
+    return coreProducts.slice(0, 4);
   }
 
   private buildSalesNeedLine(strategy: SalesConversationStrategy): string | null {
@@ -5157,13 +5199,16 @@ export class WhatsappService {
     }
 
     const referenceProduct = referencedProducts[0] || null;
-    const rankedProducts = this.rankProductsForSalesConversation(
+    const rankedProducts = this.prioritizePrimarySalesProducts(
+      this.rankProductsForSalesConversation(
       products,
       analysis,
       playbook,
       strategy,
       catalogProfile,
       referenceProduct,
+      ),
+      analysis,
     );
 
     const budgetCeiling = analysis.budgetCeiling;
