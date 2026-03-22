@@ -607,3 +607,4 @@
   - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.service.spec.ts` => `106/106` testes ok
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
+  - `npm.cmd run test:unit -- --runInBand` => `195/195` testes ok
