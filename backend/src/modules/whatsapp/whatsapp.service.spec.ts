@@ -61,6 +61,41 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     },
   ];
 
+  const loucasCatalog = [
+    {
+      id: 'l1',
+      name: 'Bala de brigadeiro',
+      price: 12,
+      available_stock: 40,
+      created_at: '2026-03-21T00:00:00.000Z',
+      categoria: { name: 'Delicias' },
+    },
+    {
+      id: 'l2',
+      name: 'Bala de coco beijinho',
+      price: 12,
+      available_stock: 60,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Docinhos' },
+    },
+    {
+      id: 'l3',
+      name: 'Bolo no pote trufado de maracuja',
+      price: 16,
+      available_stock: 25,
+      created_at: '2026-03-21T00:00:00.000Z',
+      categoria: { name: 'Bolo no Pote 220 ml' },
+    },
+    {
+      id: 'l4',
+      name: 'Banoffe ( torta de banana)',
+      price: 18,
+      available_stock: 40,
+      created_at: '2026-03-21T00:00:00.000Z',
+      categoria: { name: 'Delicias' },
+    },
+  ];
+
   const fashionCatalog = [
     {
       id: 'f1',
@@ -411,6 +446,18 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Agora me envie o numero');
   });
 
+  it('does not guess a stock item when an important qualifier is missing from the catalog match', async () => {
+    const { service } = createFixture(loucasCatalog);
+
+    const response = await service.getPremiumStockResponse(
+      'estoque de bolo de chocolate',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Nao achei o item "bolo chocolate"');
+    expect(response).not.toContain('Aqui esta a leitura mais util deste item agora.');
+  });
+
   it('assembles interrupted address fragments before moving on', async () => {
     const { service, conversationService } = createFixture(catalog);
 
@@ -444,6 +491,34 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       }),
     );
     expect(response).toContain('TELEFONE DE CONTATO');
+  });
+
+  it('does not treat a full delivery address with CEP as a phone number', async () => {
+    const { service, conversationService } = createFixture(loucasCatalog);
+
+    const response = await service.processCustomerAddressPremium(
+      'Rua joana darc, 14, casa, icoaraci, pará. PA, 66814-000',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_address',
+          pending_order: pendingConversationOrder,
+          customer_data: {
+            name: 'Jordan Lincoln Vasconcelos Kzan',
+            delivery_type: 'delivery',
+          },
+        },
+      }),
+    );
+
+    expect(response).not.toContain('Recebi um telefone');
+    expect(response).toContain('Estou montando o endereco por etapas');
+    expect(conversationService.updateContext).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        address_draft_parts: expect.any(Array),
+      }),
+    );
   });
 
   it('parses loose audio-like addresses without commas', async () => {
@@ -480,6 +555,80 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('TELEFONE DE CONTATO');
   });
 
+  it('keeps multi-item orders exact instead of swapping items from the catalog', async () => {
+    const { service, conversationService } = createFixture(loucasCatalog);
+
+    const response = await service.generateResponse(
+      'Quero 5 bala de brigadeiro, 2 bolo de pote trufado de maracuja',
+      'tenant-id',
+      createConversation(),
+    );
+
+    expect(conversationService.savePendingOrder).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            produto_name: 'Bala de brigadeiro',
+            quantity: 5,
+          }),
+          expect.objectContaining({
+            produto_name: 'Bolo no pote trufado de maracuja',
+            quantity: 2,
+          }),
+        ]),
+      }),
+    );
+    expect(response).toContain('PEDIDO PREPARADO');
+  });
+
+  it('adjusts the pending order during name collection instead of treating the message as address noise', async () => {
+    const { service, conversationService } = createFixture(loucasCatalog);
+
+    const response = await service.generateResponse(
+      'vc nao entendeu que faltou 2 bolo de pote trufado de maracuja',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_name',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 5,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 60,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 60,
+          },
+          customer_data: {},
+        },
+      }),
+    );
+
+    expect(conversationService.savePendingOrder).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            produto_name: 'Bala de brigadeiro',
+            quantity: 5,
+          }),
+          expect.objectContaining({
+            produto_name: 'Bolo no pote trufado de maracuja',
+            quantity: 2,
+          }),
+        ]),
+      }),
+    );
+    expect(response).toContain('Pedido ajustado com seguranca.');
+    expect(response).toContain('nome completo');
+  });
+
   it('realigns the flow when an address is sent during phone collection', async () => {
     const service = createService(catalog) as any;
 
@@ -499,6 +648,51 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     );
 
     expect(response).toContain('preciso do telefone de contato');
+  });
+
+  it('does not cancel the whole order when the customer says the final review is not correct', async () => {
+    const { service, conversationService } = createFixture(loucasCatalog);
+
+    const response = await service.processOrderConfirmationPremium(
+      'nao ta certo',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'confirming_order',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 5,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 60,
+            discount_amount: 0,
+            shipping_amount: 10,
+            total_amount: 70,
+          },
+          customer_data: {
+            name: 'Jordan Lincoln Vasconcelos Kzan',
+            delivery_type: 'delivery',
+            phone: '+5591985198675',
+            notes: '',
+            address: {
+              street: 'Rua joana darc',
+              number: '14',
+              neighborhood: 'Icoaraci',
+              city: 'Belem',
+              state: 'PA',
+              zipCode: '66814000',
+            },
+          },
+        },
+      }),
+    );
+
+    expect(conversationService.clearPendingOrder).not.toHaveBeenCalled();
+    expect(response).toContain('vamos ajustar o pedido');
   });
 
   it('recovers loose collection fragments without context instead of guessing intent', async () => {
@@ -774,6 +968,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     expect(service.isReopenIntent('bora continuar meu pedido de onde parei')).toBe(true);
     expect(service.isReopenIntent('pode retomar aqui pra mim')).toBe(true);
+    expect(service.isReopenIntent('reabri pedid')).toBe(true);
   });
 
   it('detects natural order intent from noisy free-form messages', () => {

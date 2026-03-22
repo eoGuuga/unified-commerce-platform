@@ -112,6 +112,60 @@ export class WhatsappService {
     'SE',
     'TO',
   ]);
+  private readonly BRAZIL_STATE_NAME_TO_CODE: Record<string, string> = {
+    acre: 'AC',
+    alagoas: 'AL',
+    amapa: 'AP',
+    amazonas: 'AM',
+    bahia: 'BA',
+    ceara: 'CE',
+    'distrito federal': 'DF',
+    'espirito santo': 'ES',
+    goias: 'GO',
+    maranhao: 'MA',
+    'mato grosso': 'MT',
+    'mato grosso do sul': 'MS',
+    'minas gerais': 'MG',
+    para: 'PA',
+    paraiba: 'PB',
+    parana: 'PR',
+    pernambuco: 'PE',
+    piaui: 'PI',
+    'rio de janeiro': 'RJ',
+    'rio grande do norte': 'RN',
+    'rio grande do sul': 'RS',
+    rondonia: 'RO',
+    roraima: 'RR',
+    'santa catarina': 'SC',
+    'sao paulo': 'SP',
+    sergipe: 'SE',
+    tocantins: 'TO',
+  };
+  private readonly GENERIC_SEARCH_TOKENS = new Set([
+    'produto',
+    'produtos',
+    'item',
+    'itens',
+    'doce',
+    'doces',
+    'sabor',
+    'sabores',
+    'tradicional',
+    'premium',
+    'gourmet',
+    'combo',
+    'kit',
+    'caixa',
+    'presente',
+    'presenteavel',
+    'individual',
+    'unidade',
+    'unidades',
+    'bolo',
+    'bala',
+    'docinho',
+    'docinhos',
+  ]);
   // frete simples (dev/whatsapp) - configurável via env WHATSAPP_DEFAULT_SHIPPING_AMOUNT (fallback 10)
 
   constructor(
@@ -844,6 +898,54 @@ export class WhatsappService {
     return this.sanitizeInput(message).replace(/\D/g, '');
   }
 
+  private extractStateCodeFromText(value: string): string {
+    const sanitized = this.sanitizeInput(value || '');
+    if (!sanitized) {
+      return '';
+    }
+
+    const directCodeMatch = sanitized.toUpperCase().match(
+      new RegExp(`\\b(?:${Array.from(this.BRAZIL_STATE_CODES).join('|')})\\b`),
+    );
+    if (directCodeMatch) {
+      return directCodeMatch[0];
+    }
+
+    const normalized = this.normalizeIntentText(sanitized).replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!normalized) {
+      return '';
+    }
+
+    return this.BRAZIL_STATE_NAME_TO_CODE[normalized] || '';
+  }
+
+  private containsStateReference(value: string): boolean {
+    return Boolean(this.extractStateCodeFromText(value));
+  }
+
+  private looksLikeStandalonePhoneMessage(message: string): boolean {
+    const sanitized = this.sanitizeInput((message || '').trim());
+    if (!sanitized) {
+      return false;
+    }
+
+    if (this.hasAddressKeyword(sanitized) || /\b\d{5}-?\d{3}\b/.test(sanitized)) {
+      return false;
+    }
+
+    const normalized = this.normalizeIntentText(sanitized);
+    const digitsOnly = this.extractPhoneDigitsCandidate(sanitized);
+    if (digitsOnly.length < 10 || digitsOnly.length > 11) {
+      return false;
+    }
+
+    if (/^\+?\d[\d\s().-]{8,}$/.test(sanitized)) {
+      return true;
+    }
+
+    return /^(meu numero|meu telefone|telefone|numero|zap|whatsapp)\b/.test(normalized);
+  }
+
   private normalizeAddressCandidate(message: string): string {
     return this.sanitizeInput(message.trim())
       .replace(
@@ -878,10 +980,7 @@ export class WhatsappService {
       return true;
     }
 
-    return new RegExp(
-      `\\b(?:${Array.from(this.BRAZIL_STATE_CODES).join('|')})\\b`,
-      'i',
-    ).test(normalized);
+    return this.containsStateReference(normalized);
   }
 
   private looksLikeCollectionFragmentWithoutContext(message: string): boolean {
@@ -931,11 +1030,20 @@ export class WhatsappService {
     }
 
     const merged = [...parts];
-    const existingIndex = merged.findIndex(
-      (part) => this.normalizeIntentText(part) === normalizedPart,
-    );
+    const existingIndex = merged.findIndex((part) => {
+      const existing = this.normalizeIntentText(part);
+      return (
+        existing === normalizedPart ||
+        existing.includes(normalizedPart) ||
+        normalizedPart.includes(existing)
+      );
+    });
     if (existingIndex >= 0) {
-      merged[existingIndex] = sanitizedPart;
+      const existing = merged[existingIndex];
+      merged[existingIndex] =
+        this.normalizeIntentText(existing).length >= normalizedPart.length
+          ? existing
+          : sanitizedPart;
       return merged;
     }
 
@@ -993,9 +1101,10 @@ export class WhatsappService {
     }
 
     let state = '';
-    const lastToken = tokens[tokens.length - 1].replace(/[^A-Za-z]/g, '').toUpperCase();
-    if (this.BRAZIL_STATE_CODES.has(lastToken)) {
-      state = lastToken;
+    const lastToken = tokens[tokens.length - 1];
+    const detectedState = this.extractStateCodeFromText(lastToken);
+    if (detectedState) {
+      state = detectedState;
       tokens.pop();
     }
 
@@ -1096,24 +1205,13 @@ export class WhatsappService {
       return hasStreet && hasNumber && hasLocality;
     }
 
-    const commaCount = (candidate.match(/,/g) || []).length;
-    const hasNumber = /\d/.test(candidate);
-    const hasCep = /\b\d{5}-?\d{3}\b/.test(candidate);
-    const hasState = new RegExp(
-      `\\b(?:${Array.from(this.BRAZIL_STATE_CODES).join('|')})\\b`,
-      'i',
-    ).test(candidate);
-
-    return hasNumber && this.hasAddressKeyword(candidate) && (commaCount >= 2 || hasCep || hasState);
+    return false;
   }
 
   private buildPremiumAddressDraftPrompt(draftText: string): string {
     const hasNumber = /\d/.test(draftText);
     const hasCep = /\b\d{5}-?\d{3}\b/.test(draftText);
-    const hasState = new RegExp(
-      `\\b(?:${Array.from(this.BRAZIL_STATE_CODES).join('|')})\\b`,
-      'i',
-    ).test(draftText);
+    const hasState = this.containsStateReference(draftText);
 
     const nextStep = !hasNumber
       ? 'Agora me envie o numero.'
@@ -1946,6 +2044,363 @@ export class WhatsappService {
     });
     lines.push(`Total do pedido: R$ ${this.formatCurrency(Number(pendingOrder.total_amount || 0))}`);
     return lines.join('\n');
+  }
+
+  private getProductSearchTokens(query: string): string[] {
+    const stopWords = new Set([
+      'de',
+      'do',
+      'da',
+      'dos',
+      'das',
+      'com',
+      'sem',
+      'pra',
+      'para',
+      'o',
+      'a',
+      'os',
+      'as',
+      'um',
+      'uma',
+      'uns',
+      'umas',
+      'no',
+      'na',
+      'nos',
+      'nas',
+    ]);
+
+    return this.normalizeForSearch(query)
+      .split(/\s+/)
+      .filter((token) => token.length >= 2 && !stopWords.has(token));
+  }
+
+  private productTokenMatchesQueryToken(queryToken: string, productTokens: string[], normalizedName: string): boolean {
+    if (!queryToken) {
+      return false;
+    }
+
+    if (normalizedName.includes(queryToken)) {
+      return true;
+    }
+
+    return productTokens.some((token) => {
+      return (
+        token === queryToken ||
+        token.startsWith(queryToken) ||
+        queryToken.startsWith(token) ||
+        this.calculateSimilarity(queryToken, token) >= 0.75
+      );
+    });
+  }
+
+  private isConfidentProductMatch(productName: string, product: ProductWithStock): boolean {
+    const queryTokens = this.getProductSearchTokens(productName);
+    if (!queryTokens.length) {
+      return false;
+    }
+
+    const normalizedQuery = this.normalizeForSearch(productName);
+    const normalizedName = this.normalizeForSearch(product.name);
+    if (normalizedName === normalizedQuery) {
+      return true;
+    }
+
+    const productTokens = normalizedName.split(/\s+/).filter(Boolean);
+    const matchedTokens = queryTokens.filter((token) =>
+      this.productTokenMatchesQueryToken(token, productTokens, normalizedName),
+    );
+
+    const importantTokens = queryTokens.filter(
+      (token) => token.length >= 4 && !this.GENERIC_SEARCH_TOKENS.has(token),
+    );
+    const matchedImportantTokens = importantTokens.filter((token) =>
+      this.productTokenMatchesQueryToken(token, productTokens, normalizedName),
+    );
+
+    if (importantTokens.length > 0 && matchedImportantTokens.length < importantTokens.length) {
+      return false;
+    }
+
+    if (queryTokens.length === 1) {
+      return matchedTokens.length === 1;
+    }
+
+    return matchedTokens.length >= Math.max(2, queryTokens.length - 1);
+  }
+
+  private normalizePendingOrderAdjustmentMessage(message: string): string {
+    let normalized = this.normalizeIntentText(message).trim();
+
+    const missingIndex = Math.max(
+      normalized.lastIndexOf('faltou '),
+      normalized.lastIndexOf('faltaram '),
+    );
+    if (missingIndex >= 0) {
+      const afterMissing = normalized
+        .slice(missingIndex)
+        .replace(/^(?:faltou|faltaram)\s+/, '')
+        .trim();
+      if (afterMissing) {
+        normalized = afterMissing;
+      }
+    }
+
+    return normalized
+      .replace(
+        /^(?:corrige(?:\s+o\s+pedido)?|corrigir(?:\s+o\s+pedido)?|ajusta(?:\s+o\s+pedido)?|ajustar(?:\s+o\s+pedido)?|acrescenta|acrescentar|adiciona|adicionar|inclui|incluir|coloca\s+mais|bota\s+mais)\s+/,
+        '',
+      )
+      .trim();
+  }
+
+  private isPendingOrderAdjustmentIntent(
+    message: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): boolean {
+    if (!conversation?.context?.pending_order || !currentState) {
+      return false;
+    }
+
+    if (!['collecting_name', 'collecting_address', 'collecting_phone', 'collecting_notes', 'confirming_order'].includes(currentState)) {
+      return false;
+    }
+
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return false;
+    }
+
+    if (
+      this.isCancelIntent(normalized, conversation, currentState) ||
+      this.looksLikeOrderStatusQuery(normalized, conversation) ||
+      this.isReopenIntent(normalized) ||
+      this.isPaymentMethodSelection(normalized)
+    ) {
+      return false;
+    }
+
+    if (
+      this.looksLikeStandalonePhoneMessage(message) ||
+      this.isAddressLikelyComplete(message) ||
+      this.hasAddressKeyword(message) ||
+      this.hasAddressFragmentSignal(message)
+    ) {
+      return false;
+    }
+
+    if (
+      this.hasAnyNormalizedPhrase(normalized, [
+        'faltou',
+        'faltaram',
+        'nao ta certo',
+        'nao esta certo',
+        'ta errado',
+        'esta errado',
+        'corrige',
+        'corrigir',
+        'ajusta',
+        'ajustar',
+        'acrescenta',
+        'acrescentar',
+        'adiciona',
+        'adicionar',
+        'inclui',
+        'incluir',
+        'coloca mais',
+        'bota mais',
+      ])
+    ) {
+      return true;
+    }
+
+    const normalizedAdjustment = this.normalizePendingOrderAdjustmentMessage(normalized);
+    const multiItem = this.extractMultipleOrderInfos(normalizedAdjustment);
+    if (multiItem && multiItem.length > 0) {
+      return true;
+    }
+
+    const orderInfo = this.extractOrderInfo(normalizedAdjustment);
+    return orderInfo.quantity !== null && !!orderInfo.productName;
+  }
+
+  private buildPendingOrderAdjustmentPrompt(): string {
+    return [
+      'Sem problema, vamos ajustar o pedido antes de fechar.',
+      '',
+      'Me diga exatamente o que precisa mudar.',
+      '- "faltou 2 bolo no pote trufado de maracuja"',
+      '- "adiciona 1 bala de brigadeiro"',
+      '- "cancelar" se quiser interromper o pedido',
+    ].join('\n');
+  }
+
+  private mergePendingOrderItems(
+    existingItems: PendingOrderItem[],
+    newItems: PendingOrderItem[],
+  ): PendingOrderItem[] {
+    const merged = [...existingItems.map((item) => ({ ...item }))];
+
+    newItems.forEach((incomingItem) => {
+      const existingIndex = merged.findIndex(
+        (item) => item.produto_id === incomingItem.produto_id,
+      );
+
+      if (existingIndex >= 0) {
+        merged[existingIndex] = {
+          ...merged[existingIndex],
+          quantity: Number(merged[existingIndex].quantity || 0) + Number(incomingItem.quantity || 0),
+          unit_price: incomingItem.unit_price,
+        };
+        return;
+      }
+
+      merged.push({ ...incomingItem });
+    });
+
+    return merged;
+  }
+
+  private async tryAdjustPendingOrder(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): Promise<string | null> {
+    if (!conversation) {
+      return null;
+    }
+
+    const normalizedIntent = this.normalizeIntentText(message);
+    const explicitAdjustmentIntent = this.hasAnyNormalizedPhrase(normalizedIntent, [
+      'faltou',
+      'faltaram',
+      'nao ta certo',
+      'nao esta certo',
+      'ta errado',
+      'esta errado',
+      'corrige',
+      'corrigir',
+      'ajusta',
+      'ajustar',
+      'acrescenta',
+      'acrescentar',
+      'adiciona',
+      'adicionar',
+      'inclui',
+      'incluir',
+      'coloca mais',
+      'bota mais',
+    ]);
+
+    if (
+      !explicitAdjustmentIntent &&
+      !this.isPendingOrderAdjustmentIntent(message, conversation, currentState)
+    ) {
+      return null;
+    }
+
+    let normalizedAdjustment = this.normalizePendingOrderAdjustmentMessage(message);
+    if (explicitAdjustmentIntent && normalizedAdjustment === normalizedIntent) {
+      const missingTail = normalizedIntent.match(/(?:faltou|faltaram)\s+(.+)$/)?.[1]?.trim();
+      if (missingTail) {
+        normalizedAdjustment = missingTail;
+      }
+    }
+
+    const parsedItems =
+      this.extractMultipleOrderInfos(normalizedAdjustment) ||
+      (() => {
+        const info = this.extractOrderInfo(normalizedAdjustment);
+        if (info.quantity === null || !info.productName) {
+          return null;
+        }
+
+        return [{ quantity: info.quantity, productName: info.productName }];
+      })();
+
+    if (!parsedItems || parsedItems.length === 0) {
+      return this.buildPendingOrderAdjustmentPrompt();
+    }
+
+    const pendingOrder = conversation.context?.pending_order;
+    if (!pendingOrder) {
+      return null;
+    }
+
+    const produtosResult = await this.productsService.findAll(tenantId);
+    const produtos = Array.isArray(produtosResult) ? produtosResult : produtosResult.data;
+
+    const newItems: PendingOrderItem[] = [];
+    for (const part of parsedItems) {
+      const quantityValidation = this.validateQuantity(part.quantity);
+      if (!quantityValidation.valid) {
+        return quantityValidation.error || 'Quantidade invalida.';
+      }
+
+      const resultadoBusca = this.findProductByName(produtos, part.productName);
+      if (!resultadoBusca.produto) {
+        if (resultadoBusca.sugestoes?.length) {
+          return this.buildSuggestionMessage(
+            part.productName,
+            resultadoBusca.sugestoes,
+            `Nao ajustei o pedido porque "${part.productName}" ainda ficou ambigua.`,
+          );
+        }
+
+        return `Ainda nao consegui identificar "${part.productName}" com seguranca. Me envie o nome completo do item.`;
+      }
+
+      newItems.push({
+        produto_id: resultadoBusca.produto.id,
+        produto_name: resultadoBusca.produto.name,
+        quantity: part.quantity,
+        unit_price: Number(resultadoBusca.produto.price || 0),
+      });
+    }
+
+    const mergedItems = this.mergePendingOrderItems(pendingOrder.items || [], newItems);
+    const productById = new Map(produtos.map((product) => [product.id, product]));
+
+    for (const item of mergedItems) {
+      const product = productById.get(item.produto_id);
+      if (!product) {
+        return `Nao encontrei mais o item "${item.produto_name}" no catalogo. Vamos revisar o pedido.`;
+      }
+
+      if (Number(product.available_stock || 0) < Number(item.quantity || 0)) {
+        return [
+          `Nao consegui ajustar *${item.produto_name}* com seguranca.`,
+          `Disponivel agora: ${product.available_stock} unidade(s)`,
+          `Pedido ficaria com: ${item.quantity} unidade(s)`,
+          '',
+          'Se quiser, me diga outra quantidade.',
+        ].join('\n');
+      }
+    }
+
+    const updatedPendingOrder: PendingOrder = {
+      ...pendingOrder,
+      items: mergedItems,
+      subtotal: mergedItems.reduce(
+        (sum, item) => sum + Number(item.unit_price || 0) * Number(item.quantity || 0),
+        0,
+      ),
+    };
+    updatedPendingOrder.total_amount =
+      Number(updatedPendingOrder.subtotal || 0) -
+      Number(updatedPendingOrder.discount_amount || 0) +
+      Number(updatedPendingOrder.shipping_amount || 0);
+
+    const followUp = await this.applyPendingOrderAndProceedPremium(
+      updatedPendingOrder,
+      tenantId,
+      conversation,
+    );
+
+    return ['Pedido ajustado com seguranca.', '', followUp].join('\n');
   }
 
   private extractCatalogQuery(message: string): string {
@@ -2788,7 +3243,7 @@ export class WhatsappService {
 
   private async processCustomerNamePremium(
     message: string,
-    _tenantId: string,
+    tenantId: string,
     conversation?: TypedConversation,
   ): Promise<string> {
     if (!conversation) {
@@ -2800,9 +3255,18 @@ export class WhatsappService {
       return `Nao consegui seguir: ${stateValidation.error}`;
     }
 
+    const adjustmentDuringNameCollection = await this.tryAdjustPendingOrder(
+      message,
+      tenantId,
+      conversation,
+      'collecting_name',
+    );
+    if (adjustmentDuringNameCollection) {
+      return adjustmentDuringNameCollection;
+    }
+
     const sanitizedMessage = this.sanitizeInput(message.trim());
-    const digitsOnly = this.extractPhoneDigitsCandidate(sanitizedMessage);
-    if (digitsOnly.length >= 10 && digitsOnly.length <= 11) {
+    if (this.looksLikeStandalonePhoneMessage(sanitizedMessage)) {
       return 'Recebi um telefone, mas antes preciso do nome completo de quem vai receber o pedido.';
     }
 
@@ -2903,8 +3367,7 @@ export class WhatsappService {
       return this.getPremiumNotesPrompt();
     }
 
-    const digitsOnly = this.extractPhoneDigitsCandidate(sanitizedMessage);
-    if (digitsOnly.length >= 10 && digitsOnly.length <= 11) {
+    if (this.looksLikeStandalonePhoneMessage(sanitizedMessage)) {
       return 'Recebi um telefone, mas nesta etapa preciso primeiro do endereco de entrega.';
     }
 
@@ -3123,6 +3586,29 @@ export class WhatsappService {
       return await this.processOrder(message, tenantId, conversation);
     }
 
+    const adjustmentDuringConfirmation = await this.tryAdjustPendingOrder(
+      message,
+      tenantId,
+      conversation,
+      'confirming_order',
+    );
+    if (adjustmentDuringConfirmation) {
+      return adjustmentDuringConfirmation;
+    }
+
+    if (
+      this.hasAnyNormalizedPhrase(lowerMessage, [
+        'nao ta certo',
+        'nao esta certo',
+        'ta errado',
+        'esta errado',
+        'precisa corrigir',
+        'precisa ajustar',
+      ])
+    ) {
+      return this.buildPendingOrderAdjustmentPrompt();
+    }
+
     if (
       this.isCancelIntent(lowerMessage, conversation, 'confirming_order') ||
       (lowerMessage.includes('nao') && !lowerMessage.includes('sim')) ||
@@ -3338,7 +3824,18 @@ export class WhatsappService {
 
   private isReopenIntent(lowerMessage: string): boolean {
     const analysis = this.messageIntelligenceService.analyze(lowerMessage);
-    return analysis.scores.reopen >= 0.72;
+    if (analysis.scores.reopen >= 0.72) {
+      return true;
+    }
+
+    return this.hasAnyNormalizedPhrase(analysis.normalizedText, [
+      'reabri pedid',
+      'reabri pedido',
+      'reabrir pedid',
+      'reabre pedid',
+      'continuar pedid',
+      'retomar pedid',
+    ]);
   }
 
   private isRepeatOrderIntent(lowerMessage: string): boolean {
@@ -4529,6 +5026,16 @@ export class WhatsappService {
       return await this.handleRepeatOrderIntent(tenantId, conversation);
     }
 
+    const pendingOrderAdjustment = await this.tryAdjustPendingOrder(
+      message,
+      tenantId,
+      conversation,
+      currentState,
+    );
+    if (pendingOrderAdjustment) {
+      return pendingOrderAdjustment;
+    }
+
     if (currentState === 'confirming_stock_adjustment') {
       return await this.processStockAdjustment(message, tenantId, conversation);
     }
@@ -4848,7 +5355,15 @@ export class WhatsappService {
   }
 
   private splitMultiItemOrderParts(message: string): string[] {
-    const normalized = this.normalizeIntentText(message);
+    const normalized = this.applyCommonChatNormalizations(
+      (message || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase(),
+    )
+      .replace(/[?!;:]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
     if (!normalized) {
       return [];
     }
@@ -5145,6 +5660,15 @@ export class WhatsappService {
 
       const resultadoBusca = this.findProductByName(produtos, part.productName);
 
+      if (!resultadoBusca.produto && resultadoBusca.sugestoes?.length) {
+        let msgSug = `Nao encontrei exatamente "${part.productName}" com seguranca. Talvez seja:\n\n`;
+        resultadoBusca.sugestoes.forEach((p, index) => {
+          msgSug += `${index + 1}. *${p.name}*\n`;
+        });
+        msgSug += '\nDigite o nome completo do produto para eu nao errar o pedido.';
+        return msgSug;
+      }
+
       if (!resultadoBusca.produto) {
         if (resultadoBusca.sugestoes && resultadoBusca.sugestoes.length > 0) {
           if (resultadoBusca.sugestoes.length === 1) {
@@ -5323,6 +5847,22 @@ export class WhatsappService {
       const resultadoBusca = this.findProductByName(produtos, productName);
       
       this.logger.debug(`Product search: found=${!!resultadoBusca.produto}, searched="${productName}", suggestions=${resultadoBusca.sugestoes?.length || 0}`);
+
+      if (!resultadoBusca.produto && resultadoBusca.sugestoes?.length) {
+        let mensagem = `Nao encontrei exatamente "${productName}" com seguranca. Voce quis dizer:\n\n`;
+        await this.rememberConversationIntelligence(conversation, {
+          last_intent: 'suggestion',
+          last_product_name: null,
+          last_product_names: resultadoBusca.sugestoes.map((product) => product.name),
+          last_quantity: quantity,
+          last_query: productName,
+        });
+        resultadoBusca.sugestoes.forEach((p, index) => {
+          mensagem += `${index + 1}. *${p.name}*\n`;
+        });
+        mensagem += '\nDigite o numero ou o nome completo do produto que voce quer.';
+        return mensagem;
+      }
 
       // Se não encontrou produto exato, mas tem sugestões
       if (!resultadoBusca.produto && resultadoBusca.sugestoes && resultadoBusca.sugestoes.length > 0) {
@@ -5654,6 +6194,8 @@ export class WhatsappService {
     productName = productName.replace(/\b(para|pra|pro|pras|pros|com|sem|em|na|no|nas|nos)\b/gi, '');
     productName = productName.replace(/\b(pix|cartao|cartão|credito|crédito|debito|débito|dinheiro|boleto|retirada|retirar|entrega|entregar|buscar|pegar|agora|hoje|amanha|amanhã|rapidinho|urgente|favor|ai|ta)\b/gi, '');
     
+    productName = productName.replace(/\b(viagem|delivery)\b/gi, '');
+
     // Remover palavras de questionamento
     productName = productName.replace(/\b(qual|quais|que|quem|onde|quando|como|porque|por que)\b/gi, '');
     
@@ -5797,7 +6339,7 @@ export class WhatsappService {
     }
 
     // Estrategia 3: Buscar por qualquer palavra (se nao encontrou)
-    if (!produto) {
+    if (!produto && palavras.length === 1) {
       produto = pickBestProduct(
         produtos.filter((p) => {
           const nomeNormalizado = normalize(p.name);
@@ -5933,6 +6475,10 @@ export class WhatsappService {
       palavras.length === 1 &&
       queryNormalized.length < 8 &&
       broadMatches.length > 1;
+
+    if (produto && !this.isConfidentProductMatch(productName, produto)) {
+      produto = null;
+    }
 
     if (produto && ambiguousSingleWordQuery) {
       return {
@@ -6882,13 +7428,53 @@ export class WhatsappService {
     }
 
     // Estado = último item com 2 letras (se existir)
+    const complementKeywords = new Set([
+      'apto',
+      'apartamento',
+      'bloco',
+      'bl',
+      'casa',
+      'fundos',
+      'sala',
+      'sl',
+      'cj',
+      'conjunto',
+      'loja',
+      'andar',
+      'cobertura',
+      'cob',
+      'quadra',
+      'qd',
+      'lote',
+      'lt',
+    ]);
+
     let state = '';
     if (parts.length > 0) {
       const last = parts[parts.length - 1];
-      if (/^[A-Za-z]{2}$/.test(last)) {
-        state = last.toUpperCase();
-        parts.pop();
+      const detectedState = this.extractStateCodeFromText(last);
+      if (detectedState) {
+        state = detectedState;
+        const normalizedLast = this.normalizeIntentText(last);
+        const stateName = Object.entries(this.BRAZIL_STATE_NAME_TO_CODE).find(
+          ([name, code]) => code === detectedState && normalizedLast.includes(name),
+        )?.[0];
+        const strippedLast = last
+          .replace(new RegExp(`\\b${detectedState}\\b`, 'i'), ' ')
+          .replace(/[.,-]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (!strippedLast || strippedLast === last || (stateName && this.normalizeIntentText(strippedLast) === stateName)) {
+          parts.pop();
+        } else {
+          parts[parts.length - 1] = strippedLast;
+        }
       }
+    }
+
+    if (parts.length === 4 && complementKeywords.has(this.normalizeIntentText(parts[2]))) {
+      return null;
     }
 
     // Cidade e bairro (a partir do final)
