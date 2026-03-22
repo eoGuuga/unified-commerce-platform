@@ -387,3 +387,18 @@
   - drift antigo preservado em stash e patch de backup antes da limpeza do working tree
   - `https://gtsofthub.com.br/api/v1/health` => ok
   - `https://gtsofthub.com.br/api/v1/whatsapp/health` => ok
+
+2026-03-22
+- Ambiente: LOCAL
+- Escopo: corrigir resposta real do bot via Evolution API
+- Correcao aplicada:
+  - o webhook do WhatsApp processava a mensagem e gerava a resposta, mas nao despachava a saida para a Evolution
+  - `WhatsappController` agora envia a resposta gerada pelo bot de volta ao numero do cliente via `WhatsappService.sendMessage(...)`
+  - respostas vazias continuam sem despacho, para nao gerar lixo operacional
+- Arquivos principais:
+  - `backend/src/modules/whatsapp/whatsapp.controller.ts`
+  - `backend/src/modules/whatsapp/whatsapp.controller.spec.ts`
+- Validacao local:
+  - `npx.cmd jest src/modules/whatsapp/whatsapp.controller.spec.ts --runInBand` => `7/7` testes ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
