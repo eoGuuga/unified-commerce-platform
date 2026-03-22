@@ -1392,6 +1392,36 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('CATALOGO DA LOJA');
   });
 
+  it('silently ignores group messages before touching the conversation flow', async () => {
+    const { service, conversationService } = createFixture(catalog, {
+      conversation: {
+        getOrCreateConversation: jest.fn(),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const generateResponseSpy = jest.spyOn(service as any, 'generateResponse');
+    const response = await service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'oi grupo',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'group-msg-1',
+      metadata: {
+        isGroupMessage: true,
+        sourceJid: '120363022222222222@g.us',
+        participantJid: '5511999999999@s.whatsapp.net',
+      },
+    });
+
+    expect(response).toBe('');
+    expect(conversationService.getOrCreateConversation).not.toHaveBeenCalled();
+    expect(conversationService.saveMessage).not.toHaveBeenCalled();
+    expect(conversationService.updateContext).not.toHaveBeenCalled();
+    expect(generateResponseSpy).not.toHaveBeenCalled();
+  });
+
   it('finds the latest order by phone for noisy status requests', async () => {
     const { service, ordersService } = createFixture([], {
       orders: {

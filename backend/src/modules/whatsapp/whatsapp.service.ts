@@ -245,6 +245,39 @@ export class WhatsappService {
     );
   }
 
+  private readMetadataString(message: WhatsappMessage, key: string): string {
+    const value = message.metadata?.[key];
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  private readMetadataBoolean(message: WhatsappMessage, key: string): boolean {
+    const value = message.metadata?.[key];
+    return value === true || value === 'true' || value === 1 || value === '1';
+  }
+
+  private isGroupOrBroadcastMessage(message: WhatsappMessage): boolean {
+    const chatType = this.readMetadataString(message, 'chatType').toLowerCase();
+    const candidateJids = [
+      String(message.from || '').trim(),
+      this.readMetadataString(message, 'sourceJid'),
+      this.readMetadataString(message, 'remoteJid'),
+    ].filter(Boolean);
+
+    const explicitGroupFlag =
+      this.readMetadataBoolean(message, 'isGroupMessage') ||
+      this.readMetadataBoolean(message, 'isGroup') ||
+      chatType === 'group';
+    const explicitBroadcastFlag =
+      this.readMetadataBoolean(message, 'isBroadcastMessage') ||
+      chatType === 'broadcast';
+
+    return (
+      explicitGroupFlag ||
+      explicitBroadcastFlag ||
+      candidateJids.some((jid) => jid.endsWith('@g.us') || jid === 'status@broadcast')
+    );
+  }
+
   private async rememberConversationIntelligence(
     conversation: TypedConversation | undefined,
     updates: Partial<ConversationIntelligenceMemory>,
@@ -4267,6 +4300,14 @@ export class WhatsappService {
     this.logger.log(`Processing message from ${message.from}: ${message.body}`);
 
     try {
+      if (this.isGroupOrBroadcastMessage(message)) {
+        this.logger.warn('Ignoring WhatsApp group/broadcast message', {
+          from: message.from,
+          messageId: message.messageId,
+          sourceJid: this.readMetadataString(message, 'sourceJid'),
+        });
+        return '';
+      }
       // ⚠️ CRÍTICO: tenantId deve vir obrigatoriamente, nunca usar default hardcoded
       if (!message.tenantId) {
         this.logger.error('Tenant ID missing from WhatsApp message', { from: message.from });

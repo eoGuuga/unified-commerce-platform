@@ -335,3 +335,16 @@
   - `npm.cmd run build` => ok
   - `npm.cmd run test:unit` => `149/149` testes ok
 
+2026-03-21
+- Ambiente: LOCAL
+- Escopo: blindagem para impedir resposta do bot em grupos de WhatsApp
+- Correcao aplicada:
+  - webhook segue ignorando grupos e broadcast antes do processamento
+  - `WhatsappService` agora tambem bloqueia em profundidade qualquer mensagem de grupo/broadcast
+  - fluxo retorna silenciosamente sem salvar conversa, pedido ou estoque quando a origem e `@g.us` ou `status@broadcast`
+  - testes novos cobrindo controller e service para grupo e broadcast
+- Validacao local:
+  - `npx.cmd jest src/modules/whatsapp/whatsapp.controller.spec.ts src/modules/whatsapp/whatsapp.service.spec.ts --runInBand` => `83/83` testes ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run test:unit` => `152/152` testes ok

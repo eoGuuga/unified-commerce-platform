@@ -98,6 +98,59 @@ describe('WhatsappController', () => {
     expect(whatsappService.processIncomingMessage).not.toHaveBeenCalled();
   });
 
+  it('ignores WhatsApp group messages', async () => {
+    const response = await controller.webhook(
+      {
+        event: 'messages.upsert',
+        instance: 'loucas-teste',
+        data: {
+          key: {
+            remoteJid: '120363022222222222@g.us',
+            participant: '5511991234567@s.whatsapp.net',
+            fromMe: false,
+          },
+          message: {
+            conversation: 'oi grupo',
+          },
+        },
+      },
+      'tenant-loucas',
+    );
+
+    expect(response).toEqual({
+      success: true,
+      ignored: true,
+      reason: 'grupo ou broadcast ignorado',
+    });
+    expect(whatsappService.processIncomingMessage).not.toHaveBeenCalled();
+  });
+
+  it('ignores WhatsApp broadcast messages', async () => {
+    const response = await controller.webhook(
+      {
+        event: 'messages.upsert',
+        instance: 'loucas-teste',
+        data: {
+          key: {
+            remoteJid: 'status@broadcast',
+            fromMe: false,
+          },
+          message: {
+            conversation: 'status update',
+          },
+        },
+      },
+      'tenant-loucas',
+    );
+
+    expect(response).toEqual({
+      success: true,
+      ignored: true,
+      reason: 'grupo ou broadcast ignorado',
+    });
+    expect(whatsappService.processIncomingMessage).not.toHaveBeenCalled();
+  });
+
   it('blocks messages from an unexpected Evolution instance', async () => {
     await expect(
       controller.webhook(

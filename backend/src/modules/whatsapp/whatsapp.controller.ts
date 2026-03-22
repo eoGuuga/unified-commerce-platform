@@ -49,6 +49,31 @@ function extractRemoteJid(body: RawWhatsappWebhookBody): string | null {
   return typeof candidate === 'string' ? candidate : null;
 }
 
+function extractParticipantJid(body: RawWhatsappWebhookBody): string | null {
+  const root = getPayloadRoot(body);
+  const candidate =
+    root.key?.participant ||
+    body.key?.participant ||
+    root.participant ||
+    body.participant ||
+    root.sender ||
+    body.sender;
+
+  return typeof candidate === 'string' ? candidate : null;
+}
+
+function isGroupOrBroadcastMessage(body: RawWhatsappWebhookBody): boolean {
+  const root = getPayloadRoot(body);
+  const remoteJid = extractRemoteJid(body) || '';
+  const explicitGroupFlag =
+    root.isGroup === true ||
+    body.isGroup === true ||
+    root.chatType === 'group' ||
+    body.chatType === 'group';
+
+  return explicitGroupFlag || remoteJid.endsWith('@g.us') || remoteJid === 'status@broadcast';
+}
+
 function extractMessageContent(message: Record<string, any> | null | undefined): string | null {
   if (!message || typeof message !== 'object') {
     return null;
@@ -161,13 +186,12 @@ function extractMessageBody(body: RawWhatsappWebhookBody): string | null {
 function shouldIgnoreWebhook(body: RawWhatsappWebhookBody): { ignore: boolean; reason?: string } {
   const eventName = normalizeEventName(body);
   const root = getPayloadRoot(body);
-  const remoteJid = extractRemoteJid(body) || '';
 
   if (eventName && eventName !== 'MESSAGES_UPSERT') {
     return { ignore: true, reason: `evento ${eventName} ignorado` };
   }
 
-  if (remoteJid.endsWith('@g.us') || remoteJid === 'status@broadcast') {
+  if (isGroupOrBroadcastMessage(body)) {
     return { ignore: true, reason: 'grupo ou broadcast ignorado' };
   }
 
@@ -261,6 +285,9 @@ export class WhatsappController {
         transcriptionSource: body.transcriptionSource || null,
         webhookEvent: normalizeEventName(body),
         whatsappInstance: incomingInstance,
+        sourceJid: extractRemoteJid(body),
+        participantJid: extractParticipantJid(body),
+        isGroupMessage: isGroupOrBroadcastMessage(body),
       },
     };
 
