@@ -509,3 +509,22 @@
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
   - `npm.cmd run test:unit -- --runInBand` => `179/179` testes ok
+
+2026-03-22
+- Ambiente: LOCAL
+- Escopo: elevar o catalogo interativo do WhatsApp para um fluxo premium de navegacao e venda
+- Correcao aplicada:
+  - o cardapio interativo agora tem paginacao segura de categorias
+  - o menu raiz passou a oferecer atalhos comerciais clicaveis para presente, opcoes mais em conta e algo mais chocolatudo
+  - ao tocar em um produto, o cliente recebe uma lista de proximos passos com compra direta, parecidos, volta para categoria e retorno ao cardapio
+  - o clique em `quero esse item` inicia o pedido com seguranca pelo mesmo motor transacional do bot
+  - o clique em atalho comercial reaproveita a inteligencia consultiva do bot, em vez de virar menu duro
+- Arquivos principais:
+  - `backend/src/modules/whatsapp/whatsapp.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+- Validacao local:
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.service.spec.ts` => `97/97` testes ok
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.controller.spec.ts` => `8/8` testes ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run test:unit -- --runInBand` => `182/182` testes ok

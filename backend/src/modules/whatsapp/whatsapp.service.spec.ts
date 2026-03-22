@@ -98,6 +98,65 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     },
   ];
 
+  const interactiveCatalog = [
+    {
+      id: 'ic1',
+      name: 'Brigadeiro Tradicional',
+      price: 12,
+      available_stock: 10,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Docinhos' },
+    },
+    {
+      id: 'ic2',
+      name: 'Caixa Presenteavel',
+      price: 34,
+      available_stock: 8,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Presentear' },
+    },
+    {
+      id: 'ic3',
+      name: 'Bolo no Pote',
+      price: 16,
+      available_stock: 9,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Bolo no Pote 220 ml' },
+    },
+    {
+      id: 'ic4',
+      name: 'Acaí 400 ml',
+      price: 16,
+      available_stock: 7,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Açaí' },
+    },
+    {
+      id: 'ic5',
+      name: 'Banoffe',
+      price: 18,
+      available_stock: 6,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Delicias' },
+    },
+    {
+      id: 'ic6',
+      name: 'Cafe Gelado',
+      price: 11,
+      available_stock: 5,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Bebidas' },
+    },
+    {
+      id: 'ic7',
+      name: 'Pudim',
+      price: 14,
+      available_stock: 4,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Sobremesas' },
+    },
+  ];
+
   const fashionCatalog = [
     {
       id: 'f1',
@@ -1777,7 +1836,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
   });
 
   it('returns an interactive catalog list when the customer asks for cardapio from an idle conversation', async () => {
-    const { service, conversationService } = createFixture(loucasCatalog, {
+    const { service, conversationService } = createFixture(interactiveCatalog, {
       conversation: {
         getOrCreateConversation: jest.fn().mockResolvedValue(createConversation()),
         saveMessage: jest.fn(),
@@ -1803,13 +1862,35 @@ describe('WhatsappService defensive WhatsApp flow', () => {
           buttonText: 'Abrir cardapio',
           sections: expect.arrayContaining([
             expect.objectContaining({
-              title: 'Categorias',
+              title: 'Categorias (1/2)',
               rows: expect.arrayContaining([
                 expect.objectContaining({
-                  id: 'catalog_category:delicias',
+                  id: 'catalog_category:acai',
                 }),
                 expect.objectContaining({
                   id: 'catalog_category:docinhos',
+                }),
+              ]),
+            }),
+            expect.objectContaining({
+              title: 'Navegacao',
+              rows: expect.arrayContaining([
+                expect.objectContaining({
+                  id: 'catalog_page:2',
+                }),
+              ]),
+            }),
+            expect.objectContaining({
+              title: 'Atalhos',
+              rows: expect.arrayContaining([
+                expect.objectContaining({
+                  id: 'catalog_recommend:gift',
+                }),
+                expect.objectContaining({
+                  id: 'catalog_recommend:budget',
+                }),
+                expect.objectContaining({
+                  id: 'catalog_recommend:chocolate',
                 }),
               ]),
             }),
@@ -1885,6 +1966,109 @@ describe('WhatsappService defensive WhatsApp flow', () => {
         }),
       }),
     );
+  });
+
+  it('opens a premium action list when the customer clicks a specific product', async () => {
+    const { service } = createFixture(loucasCatalog, {
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(createConversation()),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const response = await service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'catalog_product:l1',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'catalog-list-3',
+      messageType: 'button',
+    });
+
+    expect(typeof response).not.toBe('string');
+    expect(response).toEqual(
+      expect.objectContaining({
+        kind: 'interactive_list',
+        previewText: expect.stringContaining('Bala de brigadeiro'),
+        list: expect.objectContaining({
+          title: 'Bala de brigadeiro',
+          sections: expect.arrayContaining([
+            expect.objectContaining({
+              title: 'Proximos passos',
+              rows: expect.arrayContaining([
+                expect.objectContaining({
+                  id: 'catalog_buy:l1',
+                  title: 'Quero esse item',
+                }),
+                expect.objectContaining({
+                  id: 'catalog_similar:l1',
+                }),
+                expect.objectContaining({
+                  id: 'catalog_root',
+                }),
+              ]),
+            }),
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('starts an order safely when the customer taps the buy action from the catalog', async () => {
+    const { service, conversationService } = createFixture(loucasCatalog, {
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(createConversation()),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const response = await service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'catalog_buy:l1',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'catalog-list-4',
+      messageType: 'button',
+    });
+
+    expect(typeof response).toBe('string');
+    expect(response).toContain('PEDIDO PREPARADO');
+    expect(response).toContain('Bala de brigadeiro');
+    expect(conversationService.savePendingOrder).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            produto_id: 'l1',
+            quantity: 1,
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('uses commercial shortcut actions from the interactive catalog', async () => {
+    const { service } = createFixture(loucasCatalog, {
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(createConversation()),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const response = await service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'catalog_recommend:gift',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'catalog-list-5',
+      messageType: 'button',
+    });
+
+    expect(typeof response).toBe('string');
+    expect(response).toContain('presente');
   });
 
   it('sends an interactive list payload through the notifications service', async () => {

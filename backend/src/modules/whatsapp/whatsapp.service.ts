@@ -58,6 +58,16 @@ export interface ProductInfo {
   stock: number;
 }
 
+type CatalogSelection =
+  | { type: 'root' }
+  | { type: 'root_page'; page: number }
+  | { type: 'category'; key: string }
+  | { type: 'category_page'; key: string; page: number }
+  | { type: 'product'; productId: string }
+  | { type: 'buy'; productId: string }
+  | { type: 'similar'; productId: string }
+  | { type: 'recommendation'; mode: 'gift' | 'budget' | 'chocolate' | 'self_treat' };
+
 export interface WhatsAppInteractiveListRow {
   id: string;
   title: string;
@@ -115,6 +125,8 @@ export class WhatsappService {
   private readonly MAX_QUANTITY = 1000;
   private readonly MIN_QUANTITY = 1;
   private readonly MAX_PRICE = 1000000; // R$ 1.000.000,00
+  private readonly CATALOG_CATEGORY_PAGE_SIZE = 5;
+  private readonly CATALOG_PRODUCT_PAGE_SIZE = 6;
   private readonly BRAZIL_STATE_CODES = new Set([
     'AC',
     'AL',
@@ -2422,23 +2434,70 @@ export class WhatsappService {
 
   private parseCatalogSelection(
     message: string,
-  ): { type: 'category' | 'product'; value: string } | null {
+  ): CatalogSelection | null {
     const normalized = String(message || '').trim();
     if (!normalized) {
       return null;
     }
 
+    if (normalized === 'catalog_root') {
+      return {
+        type: 'root',
+      };
+    }
+
+    const rootPageMatch = normalized.match(/^catalog_page:(\d+)$/);
+    if (rootPageMatch) {
+      return {
+        type: 'root_page',
+        page: Math.max(1, Number(rootPageMatch[1] || 1)),
+      };
+    }
+
+    const categoryPageMatch = normalized.match(/^catalog_category:([^:]+):page:(\d+)$/);
+    if (categoryPageMatch) {
+      return {
+        type: 'category_page',
+        key: categoryPageMatch[1].trim(),
+        page: Math.max(1, Number(categoryPageMatch[2] || 1)),
+      };
+    }
+
     if (normalized.startsWith('catalog_category:')) {
       return {
         type: 'category',
-        value: normalized.substring('catalog_category:'.length).trim(),
+        key: normalized.substring('catalog_category:'.length).trim(),
       };
     }
 
     if (normalized.startsWith('catalog_product:')) {
       return {
         type: 'product',
-        value: normalized.substring('catalog_product:'.length).trim(),
+        productId: normalized.substring('catalog_product:'.length).trim(),
+      };
+    }
+
+    if (normalized.startsWith('catalog_buy:')) {
+      return {
+        type: 'buy',
+        productId: normalized.substring('catalog_buy:'.length).trim(),
+      };
+    }
+
+    if (normalized.startsWith('catalog_similar:')) {
+      return {
+        type: 'similar',
+        productId: normalized.substring('catalog_similar:'.length).trim(),
+      };
+    }
+
+    const recommendationMatch = normalized.match(
+      /^catalog_recommend:(gift|budget|chocolate|self_treat)$/,
+    );
+    if (recommendationMatch) {
+      return {
+        type: 'recommendation',
+        mode: recommendationMatch[1] as 'gift' | 'budget' | 'chocolate' | 'self_treat',
       };
     }
 
@@ -2466,59 +2525,273 @@ export class WhatsappService {
     };
   }
 
-  private buildCatalogMenuSection(products: ProductWithStock[]): WhatsAppInteractiveListSection[] {
+  private getInteractiveCatalogProducts(products: ProductWithStock[]): ProductWithStock[] {
+    return products.filter(
+      (product) => product.is_active !== false && Number(product.available_stock || 0) > 0,
+    );
+  }
+
+  private getCatalogCategoryEntries(
+    products: ProductWithStock[],
+  ): Array<[string, ProductWithStock[]]> {
     const grouped = new Map<string, ProductWithStock[]>();
 
-    products
-      .filter((product) => product.is_active !== false && Number(product.available_stock || 0) > 0)
-      .forEach((product) => {
-        const categoryName = String(product.categoria?.name || 'Outros').trim() || 'Outros';
-        const current = grouped.get(categoryName) || [];
-        current.push(product);
-        grouped.set(categoryName, current);
+    this.getInteractiveCatalogProducts(products).forEach((product) => {
+      const categoryName = String(product.categoria?.name || 'Outros').trim() || 'Outros';
+      const current = grouped.get(categoryName) || [];
+      current.push(product);
+      grouped.set(categoryName, current);
+    });
+
+    return Array.from(grouped.entries()).sort((left, right) =>
+      left[0].localeCompare(right[0], 'pt-BR'),
+    );
+  }
+
+  private paginateRows<T>(items: T[], page: number, pageSize: number): {
+    pageItems: T[];
+    totalPages: number;
+    currentPage: number;
+  } {
+    const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+    const currentPage = Math.min(Math.max(1, page), totalPages);
+    const start = (currentPage - 1) * pageSize;
+    return {
+      pageItems: items.slice(start, start + pageSize),
+      totalPages,
+      currentPage,
+    };
+  }
+
+  private buildCatalogRootSections(
+    products: ProductWithStock[],
+    page = 1,
+  ): WhatsAppInteractiveListSection[] {
+    const groupedEntries = this.getCatalogCategoryEntries(products);
+    const { pageItems, totalPages, currentPage } = this.paginateRows(
+      groupedEntries,
+      page,
+      this.CATALOG_CATEGORY_PAGE_SIZE,
+    );
+
+    const sections: WhatsAppInteractiveListSection[] = [];
+    const categoryRows = pageItems.map(([categoryName, items]) => ({
+      id: `catalog_category:${this.buildCatalogCategoryKey(categoryName)}`,
+      title: categoryName,
+      description: `${items.length} item(ns) com estoque ativo`,
+    }));
+
+    if (categoryRows.length) {
+      sections.push({
+        title:
+          totalPages > 1
+            ? `Categorias (${currentPage}/${totalPages})`
+            : 'Categorias',
+        rows: categoryRows,
       });
+    }
 
-    const categoryRows = Array.from(grouped.entries())
-      .sort((left, right) => left[0].localeCompare(right[0], 'pt-BR'))
-      .slice(0, 10)
-      .map(([categoryName, items]) => ({
-        id: `catalog_category:${this.buildCatalogCategoryKey(categoryName)}`,
-        title: categoryName,
-        description: `${items.length} item(ns) com estoque ativo`,
-      }));
+    const navigationRows: WhatsAppInteractiveListRow[] = [];
+    if (currentPage > 1) {
+      navigationRows.push({
+        id: `catalog_page:${currentPage - 1}`,
+        title: 'Ver categorias anteriores',
+        description: 'Voltar uma pagina do catalogo',
+      });
+    }
+    if (currentPage < totalPages) {
+      navigationRows.push({
+        id: `catalog_page:${currentPage + 1}`,
+        title: 'Ver mais categorias',
+        description: 'Abrir a proxima pagina do catalogo',
+      });
+    }
+    if (navigationRows.length) {
+      sections.push({
+        title: 'Navegacao',
+        rows: navigationRows,
+      });
+    }
 
-    return categoryRows.length
-      ? [
-          {
-            title: 'Categorias',
-            rows: categoryRows,
-          },
-        ]
-      : [];
+    sections.push({
+      title: 'Atalhos',
+      rows: [
+        {
+          id: 'catalog_recommend:gift',
+          title: 'Quero presentear',
+          description: 'Sugestoes para presente e caixa',
+        },
+        {
+          id: 'catalog_recommend:budget',
+          title: 'Quero algo mais em conta',
+          description: 'Opcoes com bom valor percebido',
+        },
+        {
+          id: 'catalog_recommend:chocolate',
+          title: 'Quero algo mais chocolatudo',
+          description: 'Sugestoes mais intensas no chocolate',
+        },
+      ],
+    });
+
+    return sections;
   }
 
   private buildCategoryProductsSection(
     categoryName: string,
     products: ProductWithStock[],
+    page = 1,
   ): WhatsAppInteractiveListSection[] {
-    const rows = products
-      .filter((product) => product.is_active !== false && Number(product.available_stock || 0) > 0)
-      .sort((left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'pt-BR'))
-      .slice(0, 10)
-      .map((product) => ({
-        id: `catalog_product:${product.id}`,
-        title: product.name,
-        description: `R$ ${this.formatCurrency(Number(product.price || 0))}`,
-      }));
+    const activeProducts = this.getInteractiveCatalogProducts(products).sort((left, right) =>
+      String(left.name || '').localeCompare(String(right.name || ''), 'pt-BR'),
+    );
+    const { pageItems, totalPages, currentPage } = this.paginateRows(
+      activeProducts,
+      page,
+      this.CATALOG_PRODUCT_PAGE_SIZE,
+    );
+    const categoryKey = this.buildCatalogCategoryKey(categoryName);
 
-    return rows.length
-      ? [
-          {
-            title: categoryName,
-            rows,
-          },
-        ]
-      : [];
+    const sections: WhatsAppInteractiveListSection[] = [];
+    const rows = pageItems.map((product) => ({
+      id: `catalog_product:${product.id}`,
+      title: product.name,
+      description: `R$ ${this.formatCurrency(Number(product.price || 0))}`,
+    }));
+
+    if (rows.length) {
+      sections.push({
+        title:
+          totalPages > 1
+            ? `${categoryName} (${currentPage}/${totalPages})`
+            : categoryName,
+        rows,
+      });
+    }
+
+    const navigationRows: WhatsAppInteractiveListRow[] = [
+      {
+        id: 'catalog_root',
+        title: 'Voltar ao cardapio',
+        description: 'Ver todas as categorias novamente',
+      },
+    ];
+
+    if (currentPage > 1) {
+      navigationRows.push({
+        id: `catalog_category:${categoryKey}:page:${currentPage - 1}`,
+        title: `Itens anteriores de ${categoryName}`,
+        description: 'Voltar uma pagina nesta categoria',
+      });
+    }
+    if (currentPage < totalPages) {
+      navigationRows.push({
+        id: `catalog_category:${categoryKey}:page:${currentPage + 1}`,
+        title: `Mais itens de ${categoryName}`,
+        description: 'Abrir a proxima pagina desta categoria',
+      });
+    }
+
+    sections.push({
+      title: 'Navegacao',
+      rows: navigationRows,
+    });
+
+    return sections;
+  }
+
+  private buildProductCardDescription(product: ProductWithStock): string {
+    const description = String(product.description || '').replace(/\s+/g, ' ').trim();
+    const stockLine =
+      Number(product.available_stock || 0) > 0
+        ? `${product.available_stock} unidade(s) com estoque ativo`
+        : 'indisponivel agora';
+    const categoryName = String(product.categoria?.name || 'Categoria').trim() || 'Categoria';
+
+    return [
+      `${this.formatProductHeadline(product)}`,
+      `Disponibilidade: ${stockLine}`,
+      description ? description.slice(0, 120) : `Categoria: ${categoryName}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  private findCatalogSimilarProducts(
+    target: ProductWithStock,
+    products: ProductWithStock[],
+  ): ProductWithStock[] {
+    const targetCategory = String(target.categoria?.name || '').trim();
+    const targetPrice = Number(target.price || 0);
+
+    return this.getInteractiveCatalogProducts(products)
+      .filter((product) => String(product.id) !== String(target.id))
+      .map((product) => {
+        let score = 0;
+        if (String(product.categoria?.name || '').trim() === targetCategory) {
+          score += 20;
+        }
+
+        const priceDistance = Math.abs(Number(product.price || 0) - targetPrice);
+        score += Math.max(0, 12 - priceDistance);
+
+        const targetDocument = this.buildProductSalesDocument(target);
+        const productDocument = this.buildProductSalesDocument(product);
+        const targetWords = targetDocument.split(/\s+/).filter((word) => word.length >= 4);
+        targetWords.forEach((word) => {
+          if (productDocument.includes(word)) {
+            score += 2;
+          }
+        });
+
+        return { product, score };
+      })
+      .sort((left, right) => right.score - left.score)
+      .filter((item) => item.score > 0)
+      .slice(0, 3)
+      .map((item) => item.product);
+  }
+
+  private buildProductActionSections(
+    product: ProductWithStock,
+    products: ProductWithStock[],
+  ): WhatsAppInteractiveListSection[] {
+    const categoryName = String(product.categoria?.name || 'Categoria').trim() || 'Categoria';
+    const categoryKey = this.buildCatalogCategoryKey(categoryName);
+    const similarProducts = this.findCatalogSimilarProducts(product, products);
+
+    const actionRows: WhatsAppInteractiveListRow[] = [
+      {
+        id: `catalog_buy:${product.id}`,
+        title: 'Quero esse item',
+        description: 'Comecar um pedido com 1 unidade',
+      },
+      {
+        id: `catalog_category:${categoryKey}`,
+        title: `Ver mais de ${categoryName}`,
+        description: 'Voltar para esta categoria',
+      },
+      {
+        id: 'catalog_root',
+        title: 'Voltar ao cardapio',
+        description: 'Ver todas as categorias novamente',
+      },
+    ];
+
+    if (similarProducts.length) {
+      actionRows.splice(1, 0, {
+        id: `catalog_similar:${product.id}`,
+        title: 'Ver parecidos',
+        description: 'Itens com leitura parecida no catalogo',
+      });
+    }
+
+    return [
+      {
+        title: 'Proximos passos',
+        rows: actionRows,
+      },
+    ];
   }
 
   private async tryBuildInteractiveCatalogResponse(
@@ -2537,25 +2810,144 @@ export class WhatsappService {
 
     const selection = this.parseCatalogSelection(message);
     const products = await this.getCatalogProducts(tenantId);
+    const groupedEntries = this.getCatalogCategoryEntries(products);
 
-    if (selection?.type === 'category') {
-      const grouped = new Map<string, ProductWithStock[]>();
-      products.forEach((product) => {
-        const categoryName = String(product.categoria?.name || 'Outros').trim() || 'Outros';
-        const key = this.buildCatalogCategoryKey(categoryName);
-        const current = grouped.get(key) || [];
-        current.push(product);
-        grouped.set(key, current);
-      });
+    const buildRootResponse = (page = 1): WhatsappOutboundResponse | null => {
+      const sections = this.buildCatalogRootSections(products, page);
+      if (!sections.length) {
+        return null;
+      }
 
-      const categoryProducts = grouped.get(selection.value) || [];
+      const totalPages = Math.max(
+        1,
+        Math.ceil(groupedEntries.length / this.CATALOG_CATEGORY_PAGE_SIZE),
+      );
+      const safePage = Math.min(Math.max(1, page), totalPages);
+      const description =
+        totalPages > 1
+          ? `Escolha uma categoria para navegar melhor pelo catalogo. Pagina ${safePage} de ${totalPages}.`
+          : 'Escolha uma categoria para navegar melhor pelo catalogo. Depois eu te mostro os itens dessa secao.';
+
+      return this.buildCatalogInteractiveResponse(
+        'Cardapio da loja',
+        description,
+        'Abrir cardapio',
+        sections,
+        'Abri o cardapio interativo para voce. Escolha uma categoria na lista.',
+        'Se preferir, voce tambem pode me pedir um produto do seu jeito.',
+      );
+    };
+
+    if (selection?.type === 'root') {
+      return buildRootResponse(1);
+    }
+
+    if (selection?.type === 'root_page') {
+      return buildRootResponse(selection.page);
+    }
+
+    if (selection?.type === 'recommendation') {
+      const syntheticMessage =
+        selection.mode === 'gift'
+          ? 'me indica algo para presente'
+          : selection.mode === 'budget'
+            ? 'quero algo mais em conta'
+            : selection.mode === 'chocolate'
+              ? 'quero algo mais chocolatudo'
+              : 'quero um mimo individual';
+
+      return (
+        (await this.trySmartConciergeResponse(syntheticMessage, tenantId, conversation)) ||
+        'Nao consegui montar uma recomendacao forte agora, mas posso abrir o cardapio para voce.'
+      );
+    }
+
+    if (selection?.type === 'buy') {
+      const selectedProduct = products.find(
+        (product) => String(product.id) === selection.productId,
+      );
+      if (!selectedProduct) {
+        return 'Nao encontrei esse item do catalogo agora. Se quiser, envie "cardapio" e eu abro a lista de novo.';
+      }
+
+      if (currentState && currentState === 'order_confirmed') {
+        return 'Seu pedido atual ainda esta em andamento. Para eu nao misturar duas compras por engano, conclua essa jornada primeiro e depois eu monto o proximo item com voce.';
+      }
+
+      return await this.processOrder(
+        `quero 1 ${selectedProduct.name}`,
+        tenantId,
+        conversation,
+      );
+    }
+
+    if (selection?.type === 'similar') {
+      const selectedProduct = products.find(
+        (product) => String(product.id) === selection.productId,
+      );
+      if (!selectedProduct) {
+        return 'Nao encontrei esse item do catalogo agora. Se quiser, envie "cardapio" e eu abro a lista de novo.';
+      }
+
+      const similarProducts = this.findCatalogSimilarProducts(selectedProduct, products);
+      if (!similarProducts.length) {
+        return `Nao achei parecidos fortes com ${selectedProduct.name} agora. Se quiser, eu te mostro a categoria dele ou o cardapio inteiro.`;
+      }
+
+      const intro = `Itens parecidos com ${selectedProduct.name}`;
+      const rows = similarProducts.map((product) => ({
+        id: `catalog_product:${product.id}`,
+        title: product.name,
+        description: `R$ ${this.formatCurrency(Number(product.price || 0))}`,
+      }));
+
+      return this.buildCatalogInteractiveResponse(
+        intro,
+        'Separei opcoes com leitura parecida para voce comparar sem se perder.',
+        'Ver parecidos',
+        [
+          {
+            title: 'Parecidos',
+            rows,
+          },
+          {
+            title: 'Navegacao',
+            rows: [
+              {
+                id: `catalog_product:${selectedProduct.id}`,
+                title: 'Voltar para este item',
+                description: selectedProduct.name,
+              },
+              {
+                id: 'catalog_root',
+                title: 'Voltar ao cardapio',
+                description: 'Ver todas as categorias novamente',
+              },
+            ],
+          },
+        ],
+        `Separei alguns parecidos com ${selectedProduct.name} para voce comparar.`,
+        'Se quiser, toque em um item e eu detalho melhor.',
+      );
+    }
+
+    if (selection?.type === 'category' || selection?.type === 'category_page') {
+      const categoryKey = selection.type === 'category' ? selection.key : selection.key;
+      const categoryPage = selection.type === 'category_page' ? selection.page : 1;
+      const categoryEntry = groupedEntries.find(
+        ([categoryName]) => this.buildCatalogCategoryKey(categoryName) === categoryKey,
+      );
+      const categoryProducts = categoryEntry?.[1] || [];
       if (!categoryProducts.length) {
         return 'Nao encontrei essa categoria do cardapio agora. Se quiser, envie "cardapio" e eu abro a lista de novo.';
       }
 
-      const categoryName =
-        String(categoryProducts[0]?.categoria?.name || 'Categoria').trim() || 'Categoria';
-      const sections = this.buildCategoryProductsSection(categoryName, categoryProducts);
+      const categoryName = String(categoryEntry?.[0] || 'Categoria').trim() || 'Categoria';
+      const sections = this.buildCategoryProductsSection(
+        categoryName,
+        categoryProducts,
+        categoryPage,
+      );
       if (!sections.length) {
         return `No momento eu nao encontrei itens ativos em ${categoryName}. Se quiser, envie "cardapio" para abrir outra categoria.`;
       }
@@ -2576,7 +2968,9 @@ export class WhatsappService {
     }
 
     if (selection?.type === 'product') {
-      const selectedProduct = products.find((product) => String(product.id) === selection.value);
+      const selectedProduct = products.find(
+        (product) => String(product.id) === selection.productId,
+      );
       if (!selectedProduct) {
         return 'Nao encontrei esse item do cardapio agora. Se quiser, envie "cardapio" e eu abro a lista de novo.';
       }
@@ -2588,26 +2982,21 @@ export class WhatsappService {
         last_query: selectedProduct.name,
       });
 
-      return this.buildProductInsightMessage(selectedProduct, 'price');
+      return this.buildCatalogInteractiveResponse(
+        selectedProduct.name,
+        this.buildProductCardDescription(selectedProduct),
+        'Ver opcoes',
+        this.buildProductActionSections(selectedProduct, products),
+        `Separei ${selectedProduct.name} com os proximos passos para voce seguir sem se perder.`,
+        'Se preferir, tambem pode digitar do seu jeito: "quero 2 desse item".',
+      );
     }
 
     if (!this.isDirectCatalogRequest(message)) {
       return null;
     }
 
-    const sections = this.buildCatalogMenuSection(products);
-    if (!sections.length) {
-      return null;
-    }
-
-    return this.buildCatalogInteractiveResponse(
-      'Cardapio da loja',
-      'Escolha uma categoria para navegar melhor pelo catalogo. Depois eu te mostro os itens dessa secao.',
-      'Abrir cardapio',
-      sections,
-      'Abri o cardapio interativo para voce. Escolha uma categoria na lista.',
-      'Se preferir, voce tambem pode me pedir um produto do seu jeito.',
-    );
+    return buildRootResponse(1);
   }
 
   private getPremiumPhonePrompt(): string {
