@@ -348,3 +348,7 @@
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
   - `npm.cmd run test:unit` => `152/152` testes ok
+- Validacao dev/teste:
+  - `https://dev.gtsofthub.com.br/api/v1/health` => ok
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => ok
+  - `POST /api/v1/whatsapp/test` com `metadata.isGroupMessage=true` => resposta vazia (`response: ""`)
