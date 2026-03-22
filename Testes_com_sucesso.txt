@@ -453,3 +453,11 @@
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
   - `npm.cmd run test:unit -- --runInBand` => `169/169` testes ok
+- Validacao dev/teste:
+  - `https://dev.gtsofthub.com.br/api/v1/health` => ok
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => ok
+  - conversa guiada com numero novo:
+    - `nao entendi, o que voce precisa agora?` em `collecting_phone` => explicou a etapa atual e repetiu o prompt de telefone
+    - `quero falar com alguem porque voce nao entendeu` em `confirming_order` => manteve a revisao final ativa, sem cair em novo pedido
+    - `deu ruim no pix, nao apareceu` em `waiting_payment` => respondeu com orientacao contextual de Pix e preservou o pedido
+    - `deu ruim aqui, acho que voce nao entendeu` fora de fluxo => abriu orientacao livre e humana, sem jogar o cliente num menu seco
