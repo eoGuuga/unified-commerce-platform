@@ -1606,6 +1606,76 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     );
   });
 
+  it('recaps delivery choice instead of jumping straight to address collection', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'me resume o que voce entendeu ate agora',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_address',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 5,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 60,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 60,
+          },
+          customer_data: {
+            name: 'Jordan Lincoln Vasconcelos Kzan',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('RESUMO DO QUE JA ENTENDI');
+    expect(response).toContain('Etapa atual: Escolhendo entrega ou retirada');
+    expect(response).toContain('agora eu so preciso saber se voce prefere entrega ou retirada');
+  });
+
+  it('keeps delivery choice correction focused before an address exists', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'entendeu errado',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_address',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 5,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 60,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 60,
+          },
+          customer_data: {
+            name: 'Jordan Lincoln Vasconcelos Kzan',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('eu so preciso alinhar se vai ser entrega ou retirada');
+    expect(response).toContain('Como voce prefere receber esse pedido?');
+    expect(response).not.toContain('Pode me mandar o endereco novamente');
+  });
+
   it('handles payment problems with a contextual conversational recovery', async () => {
     const { service } = createFixture([], {
       orders: {

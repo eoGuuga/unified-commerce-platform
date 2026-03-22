@@ -484,14 +484,19 @@ export class WhatsappService {
     });
   }
 
-  private getConversationStageLabel(currentState?: ConversationState): string {
+  private getConversationStageLabel(
+    currentState?: ConversationState,
+    customerData?: CustomerData,
+  ): string {
     switch (currentState) {
       case 'collecting_order':
         return 'Montando o pedido';
       case 'collecting_name':
         return 'Coletando o nome do cliente';
       case 'collecting_address':
-        return 'Coletando a forma de recebimento / endereco';
+        return customerData?.delivery_type
+          ? 'Coletando o endereco de entrega'
+          : 'Escolhendo entrega ou retirada';
       case 'collecting_phone':
         return 'Coletando o telefone de contato';
       case 'collecting_notes':
@@ -523,12 +528,12 @@ export class WhatsappService {
     const customerData = (conversation?.context?.customer_data || {}) as CustomerData;
     const pendingOrder = conversation?.context?.pending_order as PendingOrder | undefined;
 
-    if (currentState) {
-      lines.push(`- Etapa atual: ${this.getConversationStageLabel(currentState)}`);
-    }
-
     if (this.shouldExposeCustomerName(customerData?.name)) {
       lines.push(`- Cliente: ${customerData.name}`);
+    }
+
+    if (currentState) {
+      lines.push(`- Etapa atual: ${this.getConversationStageLabel(currentState, customerData)}`);
     }
 
     if (pendingOrder?.items?.length) {
@@ -626,12 +631,17 @@ export class WhatsappService {
     ].join('\n');
   }
 
-  private getCollectionCorrectionPrompt(currentState: ConversationState): string {
+  private getCollectionCorrectionPrompt(
+    currentState: ConversationState,
+    customerData?: CustomerData,
+  ): string {
     switch (currentState) {
       case 'collecting_name':
         return 'Pode me mandar o nome completo do jeito certo que eu ajusto sem apagar o resto.';
       case 'collecting_address':
-        return 'Pode me mandar o endereco novamente do seu jeito que eu remonto por partes sem perder o resto do pedido.';
+        return customerData?.delivery_type
+          ? 'Pode me mandar o endereco novamente do seu jeito que eu remonto por partes sem perder o resto do pedido.'
+          : 'Sem problema. Antes de qualquer coisa, eu so preciso alinhar se vai ser entrega ou retirada.';
       case 'collecting_phone':
         return 'Pode me mandar o telefone novamente com DDD que eu corrijo aqui.';
       case 'collecting_notes':
@@ -647,12 +657,17 @@ export class WhatsappService {
     }
   }
 
-  private getCollectionRecapGuidance(currentState: ConversationState): string {
+  private getCollectionRecapGuidance(
+    currentState: ConversationState,
+    customerData?: CustomerData,
+  ): string {
     switch (currentState) {
       case 'collecting_name':
         return 'Se isso estiver certo ate aqui, agora eu so preciso do nome completo de quem vai receber o pedido.';
       case 'collecting_address':
-        return 'Se isso estiver certo ate aqui, agora eu so preciso do endereco de entrega.';
+        return customerData?.delivery_type
+          ? 'Se isso estiver certo ate aqui, agora eu so preciso do endereco de entrega.'
+          : 'Se isso estiver certo ate aqui, agora eu so preciso saber se voce prefere entrega ou retirada.';
       case 'collecting_phone':
         return 'Se isso estiver certo ate aqui, agora eu so preciso do telefone de contato com DDD.';
       case 'collecting_notes':
@@ -2293,12 +2308,17 @@ export class WhatsappService {
     }
   }
 
-  private getCollectionStageNeedExplanation(currentState: ConversationState): string {
+  private getCollectionStageNeedExplanation(
+    currentState: ConversationState,
+    customerData?: CustomerData,
+  ): string {
     switch (currentState) {
       case 'collecting_name':
         return 'Eu preciso disso para identificar corretamente quem vai receber o pedido.';
       case 'collecting_address':
-        return 'Eu preciso disso para a entrega sair certa, sem erro de rota nem de bairro.';
+        return customerData?.delivery_type
+          ? 'Eu preciso disso para a entrega sair certa, sem erro de rota nem de bairro.'
+          : 'Eu preciso alinhar primeiro se vai ser entrega ou retirada para nao te fazer repetir nada depois.';
       case 'collecting_phone':
         return 'Eu preciso disso para te atualizar se a equipe precisar falar com voce sobre entrega, pagamento ou algum detalhe do pedido.';
       case 'collecting_notes':
@@ -2433,9 +2453,10 @@ export class WhatsappService {
     currentState: ConversationState,
     conversation?: TypedConversation,
   ): string {
+    const customerData = (conversation?.context?.customer_data || {}) as CustomerData;
     const lead = this.getConversationalSupportLead(analysis, plan);
     const whyThisStageMatters = plan.explainWhyCurrentStep
-      ? this.getCollectionStageNeedExplanation(currentState)
+      ? this.getCollectionStageNeedExplanation(currentState, customerData)
       : '';
     const reassurance =
       plan.mode === 'handoff_ready'
@@ -2448,7 +2469,7 @@ export class WhatsappService {
         ? this.buildContextRecapMessage(
             lead,
             this.buildCustomerFocusSnapshot(conversation, currentState),
-            this.getCollectionRecapGuidance(currentState),
+            this.getCollectionRecapGuidance(currentState, customerData),
           )
         : null;
     const handoffMessage =
@@ -2476,21 +2497,26 @@ export class WhatsappService {
           whyThisStageMatters,
           reassurance,
           plan.mode === 'issue_recovery'
-            ? this.getCollectionCorrectionPrompt(currentState)
+            ? this.getCollectionCorrectionPrompt(currentState, customerData)
             : 'Neste momento eu so preciso do nome completo de quem vai receber o pedido.',
           'Exemplo: "Ana Paula Souza".',
         ].join('\n');
       case 'collecting_address':
+        const needsDeliveryChoice = !customerData?.delivery_type;
         return [
           lead,
           '',
           whyThisStageMatters,
           reassurance,
           plan.mode === 'issue_recovery'
-            ? this.getCollectionCorrectionPrompt(currentState)
-            : 'Neste momento eu so preciso do endereco de entrega para fechar sem risco de erro.',
+            ? this.getCollectionCorrectionPrompt(currentState, customerData)
+            : needsDeliveryChoice
+              ? 'Neste momento eu so preciso saber se voce prefere entrega ou retirada.'
+              : 'Neste momento eu so preciso do endereco de entrega para fechar sem risco de erro.',
           '',
-          this.getPremiumAddressPrompt(),
+          needsDeliveryChoice
+            ? this.getPremiumDeliveryChoicePrompt(customerData?.name)
+            : this.getPremiumAddressPrompt(),
         ].join('\n');
       case 'collecting_phone':
         return [
@@ -2499,7 +2525,7 @@ export class WhatsappService {
           whyThisStageMatters,
           reassurance,
           plan.mode === 'issue_recovery'
-            ? this.getCollectionCorrectionPrompt(currentState)
+            ? this.getCollectionCorrectionPrompt(currentState, customerData)
             : 'Neste momento eu so preciso do telefone de contato com DDD para seguir com seguranca.',
           '',
           this.getPremiumPhonePrompt(),
@@ -2511,7 +2537,7 @@ export class WhatsappService {
           whyThisStageMatters,
           reassurance,
           plan.mode === 'issue_recovery'
-            ? this.getCollectionCorrectionPrompt(currentState)
+            ? this.getCollectionCorrectionPrompt(currentState, customerData)
             : 'Neste momento eu so preciso saber se existe alguma observacao importante para a equipe.',
           '',
           this.getPremiumNotesPrompt(),
@@ -2523,7 +2549,7 @@ export class WhatsappService {
           whyThisStageMatters,
           reassurance,
           plan.mode === 'issue_recovery'
-            ? this.getCollectionCorrectionPrompt(currentState)
+            ? this.getCollectionCorrectionPrompt(currentState, customerData)
             : 'Neste momento eu so preciso saber o troco para quanto.',
           'Exemplo: "troco para 100".',
         ].join('\n');
@@ -2534,7 +2560,7 @@ export class WhatsappService {
           whyThisStageMatters,
           reassurance,
           plan.mode === 'issue_recovery'
-            ? this.getCollectionCorrectionPrompt(currentState)
+            ? this.getCollectionCorrectionPrompt(currentState, customerData)
             : 'Eu estou validando a quantidade segura para o estoque agora.',
           plan.mode === 'issue_recovery'
             ? 'Se quiser, eu ajusto a quantidade assim que voce me disser o numero certo.'
@@ -2548,7 +2574,7 @@ export class WhatsappService {
           reassurance,
           'Agora eu estou na revisao final do pedido.',
           plan.mode === 'issue_recovery'
-            ? this.getCollectionCorrectionPrompt(currentState)
+            ? this.getCollectionCorrectionPrompt(currentState, customerData)
             : 'Se algo estiver errado, me diga exatamente o que ajustar.',
           'Se estiver tudo certo, responda "sim" ou "confirmar".',
         ].join('\n');

@@ -591,3 +591,19 @@
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
   - `npm.cmd run test:unit -- --runInBand` => `193/193` testes ok
+
+2026-03-22
+- Ambiente: LOCAL
+- Escopo: refinar recap e correcao para respeitar a etapa real de entrega/retirada
+- Correcao aplicada:
+  - o recap em `collecting_address` agora distingue corretamente entre `escolher entrega ou retirada` e `informar endereco de entrega`
+  - a explicacao da etapa ficou mais fiel ao fluxo real, sem pular direto para endereco quando o cliente ainda nao escolheu como quer receber
+  - a ponte de correcao em `collecting_address` agora pede `entrega ou retirada` quando ainda nao existe `delivery_type`, em vez de mandar reenviar endereco por engano
+  - a resposta conversacional nessa etapa passou a reusar o prompt premium certo (`entrega/retirada` ou `endereco`) conforme o contexto ja salvo
+- Arquivos principais:
+  - `backend/src/modules/whatsapp/whatsapp.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+- Validacao local:
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.service.spec.ts` => `106/106` testes ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
