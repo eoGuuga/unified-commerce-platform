@@ -127,6 +127,7 @@ export interface ConversationContext {
   last_processed_event_key?: string;
   last_processed_event_at?: string;
   last_processed_response?: string;
+  last_processed_response_payload?: string;
   address_draft_parts?: string[] | null;
   intelligence_memory?: ConversationIntelligenceMemory;
   [key: string]: unknown; // Para permitir extensibilidade

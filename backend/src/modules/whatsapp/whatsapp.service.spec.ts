@@ -218,6 +218,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       config?: Record<string, unknown>;
       cacheService?: Record<string, any>;
       conversation?: Record<string, jest.Mock>;
+      notifications?: Record<string, jest.Mock>;
       orders?: Record<string, jest.Mock>;
       payments?: Record<string, jest.Mock>;
       productsService?: Record<string, jest.Mock>;
@@ -277,6 +278,12 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       ...(overrides?.payments || {}),
     };
 
+    const notificationsService = {
+      sendWhatsAppMessage: jest.fn(),
+      sendOrderCreatedNotification: jest.fn(),
+      ...(overrides?.notifications || {}),
+    };
+
     const messageIntelligenceService = new MessageIntelligenceService();
     const conversationalIntelligenceService = new ConversationalIntelligenceService(
       messageIntelligenceService,
@@ -313,9 +320,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       {
         validateCoupon: jest.fn(),
       } as any,
-      {
-        sendOrderCreatedNotification: jest.fn(),
-      } as any,
+      notificationsService as any,
     );
 
     return {
@@ -326,6 +331,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       ordersService,
       paymentsService,
       productsService,
+      notificationsService,
     };
   };
 
@@ -1768,6 +1774,163 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(conversationService.saveMessage).not.toHaveBeenCalled();
     expect(conversationService.updateContext).not.toHaveBeenCalled();
     expect(response).toContain('CATALOGO DA LOJA');
+  });
+
+  it('returns an interactive catalog list when the customer asks for cardapio from an idle conversation', async () => {
+    const { service, conversationService } = createFixture(loucasCatalog, {
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(createConversation()),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const response = await service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'cardapio',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'catalog-list-1',
+    });
+
+    expect(typeof response).not.toBe('string');
+    expect(response).toEqual(
+      expect.objectContaining({
+        kind: 'interactive_list',
+        previewText: expect.stringContaining('cardapio interativo'),
+        list: expect.objectContaining({
+          title: 'Cardapio da loja',
+          buttonText: 'Abrir cardapio',
+          sections: expect.arrayContaining([
+            expect.objectContaining({
+              title: 'Categorias',
+              rows: expect.arrayContaining([
+                expect.objectContaining({
+                  id: 'catalog_category:delicias',
+                }),
+                expect.objectContaining({
+                  id: 'catalog_category:docinhos',
+                }),
+              ]),
+            }),
+          ]),
+        }),
+      }),
+    );
+    expect(conversationService.saveMessage).toHaveBeenCalledWith(
+      'conv-1',
+      'outbound',
+      expect.stringContaining('cardapio interativo'),
+      'button',
+      expect.objectContaining({
+        interactiveType: 'list',
+      }),
+    );
+    expect(conversationService.updateContext).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        last_processed_response_payload: expect.any(String),
+      }),
+    );
+  });
+
+  it('opens a product list when the customer clicks a catalog category row', async () => {
+    const { service, conversationService } = createFixture(loucasCatalog, {
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(createConversation()),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const response = await service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'catalog_category:delicias',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'catalog-list-2',
+      messageType: 'button',
+    });
+
+    expect(typeof response).not.toBe('string');
+    expect(response).toEqual(
+      expect.objectContaining({
+        kind: 'interactive_list',
+        list: expect.objectContaining({
+          title: 'Delicias',
+          sections: expect.arrayContaining([
+            expect.objectContaining({
+              title: 'Delicias',
+              rows: expect.arrayContaining([
+                expect.objectContaining({
+                  id: 'catalog_product:l1',
+                  title: 'Bala de brigadeiro',
+                }),
+                expect.objectContaining({
+                  id: 'catalog_product:l4',
+                  title: 'Banoffe ( torta de banana)',
+                }),
+              ]),
+            }),
+          ]),
+        }),
+      }),
+    );
+    expect(conversationService.updateContext).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        intelligence_memory: expect.objectContaining({
+          last_intent: 'suggestion',
+          last_query: 'Delicias',
+        }),
+      }),
+    );
+  });
+
+  it('sends an interactive list payload through the notifications service', async () => {
+    const { service, notificationsService } = createFixture(loucasCatalog);
+
+    await service.sendOutboundResponse('5511999999999', {
+      kind: 'interactive_list',
+      previewText: 'Abri o cardapio interativo para voce.',
+      list: {
+        title: 'Cardapio da loja',
+        description: 'Escolha uma categoria',
+        buttonText: 'Abrir cardapio',
+        footerText: 'Se preferir, digite o nome do item.',
+        sections: [
+          {
+            title: 'Categorias',
+            rows: [
+              {
+                id: 'catalog_category:docinhos',
+                title: 'Docinhos',
+                description: '4 itens com estoque ativo',
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(notificationsService.sendWhatsAppMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: '5511999999999',
+        message: 'Abri o cardapio interativo para voce.',
+        interactiveList: expect.objectContaining({
+          title: 'Cardapio da loja',
+          buttonText: 'Abrir cardapio',
+          sections: expect.arrayContaining([
+            expect.objectContaining({
+              title: 'Categorias',
+            }),
+          ]),
+        }),
+        metadata: expect.objectContaining({
+          interactiveType: 'list',
+        }),
+      }),
+    );
   });
 
   it('silently ignores group messages before touching the conversation flow', async () => {

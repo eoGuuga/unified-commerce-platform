@@ -58,6 +58,33 @@ export interface ProductInfo {
   stock: number;
 }
 
+export interface WhatsAppInteractiveListRow {
+  id: string;
+  title: string;
+  description?: string;
+}
+
+export interface WhatsAppInteractiveListSection {
+  title: string;
+  rows: WhatsAppInteractiveListRow[];
+}
+
+export interface WhatsAppInteractiveListMessage {
+  title: string;
+  description: string;
+  buttonText: string;
+  footerText?: string;
+  sections: WhatsAppInteractiveListSection[];
+}
+
+export type WhatsappOutboundResponse =
+  | string
+  | {
+      kind: 'interactive_list';
+      previewText: string;
+      list: WhatsAppInteractiveListMessage;
+    };
+
 type StageRecoveryKind =
   | 'phone'
   | 'address'
@@ -259,6 +286,63 @@ export class WhatsappService {
     const parsed = Number(raw.replace(',', '.'));
     if (Number.isFinite(parsed) && parsed >= 0) return parsed;
     return 10;
+  }
+
+  private supportsInteractiveListMessaging(): boolean {
+    const provider = (process.env.WHATSAPP_PROVIDER || 'mock').toLowerCase();
+    return provider === 'evolution' || provider === 'mock';
+  }
+
+  private isInteractiveListResponse(
+    response: WhatsappOutboundResponse,
+  ): response is Extract<WhatsappOutboundResponse, { kind: 'interactive_list' }> {
+    return typeof response !== 'string' && response.kind === 'interactive_list';
+  }
+
+  private getOutboundPreview(response: WhatsappOutboundResponse): string {
+    return this.isInteractiveListResponse(response) ? response.previewText : response;
+  }
+
+  private serializeOutboundResponse(response: WhatsappOutboundResponse): string | null {
+    try {
+      return JSON.stringify(response);
+    } catch {
+      return null;
+    }
+  }
+
+  private deserializeOutboundResponse(payload: unknown): WhatsappOutboundResponse | null {
+    if (!payload) {
+      return null;
+    }
+
+    if (typeof payload === 'string') {
+      try {
+        const parsed = JSON.parse(payload) as WhatsappOutboundResponse;
+        if (
+          typeof parsed === 'string' ||
+          (parsed &&
+            typeof parsed === 'object' &&
+            'kind' in parsed &&
+            (parsed as any).kind === 'interactive_list')
+        ) {
+          return parsed;
+        }
+      } catch {
+        return payload;
+      }
+    }
+
+    if (
+      typeof payload === 'object' &&
+      payload !== null &&
+      'kind' in payload &&
+      (payload as any).kind === 'interactive_list'
+    ) {
+      return payload as WhatsappOutboundResponse;
+    }
+
+    return null;
   }
 
   private getPhonePrompt(): string {
@@ -1657,7 +1741,7 @@ export class WhatsappService {
     message: WhatsappMessage,
     sanitizedBody: string,
     conversation?: TypedConversation,
-  ): { replay: boolean; eventKey: string | null; response?: string } {
+  ): { replay: boolean; eventKey: string | null; response?: WhatsappOutboundResponse } {
     const eventKey = this.buildInboundEventReplayKey(message, sanitizedBody);
     if (!conversation || !eventKey) {
       return { replay: false, eventKey };
@@ -1676,11 +1760,16 @@ export class WhatsappService {
       return { replay: false, eventKey };
     }
 
-    const previousResponse = String(
-      conversation.context?.last_processed_response ||
-      conversation.context?.last_outbound_preview ||
-      '',
-    ).trim();
+    const previousPayload = this.deserializeOutboundResponse(
+      conversation.context?.last_processed_response_payload,
+    );
+    const previousResponse =
+      previousPayload ||
+      String(
+        conversation.context?.last_processed_response ||
+          conversation.context?.last_outbound_preview ||
+          '',
+      ).trim();
 
     return {
       replay: true,
@@ -1706,6 +1795,31 @@ export class WhatsappService {
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 180);
+  }
+
+  private getOutboundMessageType(
+    response: WhatsappOutboundResponse,
+  ): 'text' | 'button' {
+    return this.isInteractiveListResponse(response) ? 'button' : 'text';
+  }
+
+  private buildOutboundMessageMetadata(
+    response: WhatsappOutboundResponse,
+  ): Record<string, unknown> {
+    if (!this.isInteractiveListResponse(response)) {
+      return {};
+    }
+
+    return {
+      interactiveType: 'list',
+      sectionCount: response.list.sections.length,
+      rowCount: response.list.sections.reduce(
+        (total, section) => total + section.rows.length,
+        0,
+      ),
+      buttonText: response.list.buttonText,
+      title: response.list.title,
+    };
   }
 
   private getMessageRepeatWindowMs(): number {
@@ -2297,6 +2411,203 @@ export class WhatsappService {
     const result = await this.productsService.findAll(tenantId);
     const products = Array.isArray(result) ? result : result.data;
     return products.filter((product) => !!product?.name);
+  }
+
+  private buildCatalogCategoryKey(categoryName: string): string {
+    return this.normalizeForSearch(categoryName || '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .substring(0, 40);
+  }
+
+  private parseCatalogSelection(
+    message: string,
+  ): { type: 'category' | 'product'; value: string } | null {
+    const normalized = String(message || '').trim();
+    if (!normalized) {
+      return null;
+    }
+
+    if (normalized.startsWith('catalog_category:')) {
+      return {
+        type: 'category',
+        value: normalized.substring('catalog_category:'.length).trim(),
+      };
+    }
+
+    if (normalized.startsWith('catalog_product:')) {
+      return {
+        type: 'product',
+        value: normalized.substring('catalog_product:'.length).trim(),
+      };
+    }
+
+    return null;
+  }
+
+  private buildCatalogInteractiveResponse(
+    title: string,
+    description: string,
+    buttonText: string,
+    sections: WhatsAppInteractiveListSection[],
+    previewText: string,
+    footerText?: string,
+  ): WhatsappOutboundResponse {
+    return {
+      kind: 'interactive_list',
+      previewText,
+      list: {
+        title,
+        description,
+        buttonText,
+        footerText,
+        sections,
+      },
+    };
+  }
+
+  private buildCatalogMenuSection(products: ProductWithStock[]): WhatsAppInteractiveListSection[] {
+    const grouped = new Map<string, ProductWithStock[]>();
+
+    products
+      .filter((product) => product.is_active !== false && Number(product.available_stock || 0) > 0)
+      .forEach((product) => {
+        const categoryName = String(product.categoria?.name || 'Outros').trim() || 'Outros';
+        const current = grouped.get(categoryName) || [];
+        current.push(product);
+        grouped.set(categoryName, current);
+      });
+
+    const categoryRows = Array.from(grouped.entries())
+      .sort((left, right) => left[0].localeCompare(right[0], 'pt-BR'))
+      .slice(0, 10)
+      .map(([categoryName, items]) => ({
+        id: `catalog_category:${this.buildCatalogCategoryKey(categoryName)}`,
+        title: categoryName,
+        description: `${items.length} item(ns) com estoque ativo`,
+      }));
+
+    return categoryRows.length
+      ? [
+          {
+            title: 'Categorias',
+            rows: categoryRows,
+          },
+        ]
+      : [];
+  }
+
+  private buildCategoryProductsSection(
+    categoryName: string,
+    products: ProductWithStock[],
+  ): WhatsAppInteractiveListSection[] {
+    const rows = products
+      .filter((product) => product.is_active !== false && Number(product.available_stock || 0) > 0)
+      .sort((left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'pt-BR'))
+      .slice(0, 10)
+      .map((product) => ({
+        id: `catalog_product:${product.id}`,
+        title: product.name,
+        description: `R$ ${this.formatCurrency(Number(product.price || 0))}`,
+      }));
+
+    return rows.length
+      ? [
+          {
+            title: categoryName,
+            rows,
+          },
+        ]
+      : [];
+  }
+
+  private async tryBuildInteractiveCatalogResponse(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): Promise<WhatsappOutboundResponse | null> {
+    if (!this.supportsInteractiveListMessaging()) {
+      return null;
+    }
+
+    if (currentState && !['idle', 'order_confirmed', 'order_completed'].includes(currentState)) {
+      return null;
+    }
+
+    const selection = this.parseCatalogSelection(message);
+    const products = await this.getCatalogProducts(tenantId);
+
+    if (selection?.type === 'category') {
+      const grouped = new Map<string, ProductWithStock[]>();
+      products.forEach((product) => {
+        const categoryName = String(product.categoria?.name || 'Outros').trim() || 'Outros';
+        const key = this.buildCatalogCategoryKey(categoryName);
+        const current = grouped.get(key) || [];
+        current.push(product);
+        grouped.set(key, current);
+      });
+
+      const categoryProducts = grouped.get(selection.value) || [];
+      if (!categoryProducts.length) {
+        return 'Nao encontrei essa categoria do cardapio agora. Se quiser, envie "cardapio" e eu abro a lista de novo.';
+      }
+
+      const categoryName =
+        String(categoryProducts[0]?.categoria?.name || 'Categoria').trim() || 'Categoria';
+      const sections = this.buildCategoryProductsSection(categoryName, categoryProducts);
+      if (!sections.length) {
+        return `No momento eu nao encontrei itens ativos em ${categoryName}. Se quiser, envie "cardapio" para abrir outra categoria.`;
+      }
+
+      await this.rememberConversationIntelligence(conversation, {
+        last_intent: 'suggestion',
+        last_query: categoryName,
+      });
+
+      return this.buildCatalogInteractiveResponse(
+        categoryName,
+        `Escolha um item para eu te mostrar com mais clareza dentro de ${categoryName}.`,
+        'Ver itens',
+        sections,
+        `Abri ${categoryName} para voce. Escolha um item na lista e eu explico melhor por aqui.`,
+        'Se preferir, tambem pode digitar o nome do item do seu jeito.',
+      );
+    }
+
+    if (selection?.type === 'product') {
+      const selectedProduct = products.find((product) => String(product.id) === selection.value);
+      if (!selectedProduct) {
+        return 'Nao encontrei esse item do cardapio agora. Se quiser, envie "cardapio" e eu abro a lista de novo.';
+      }
+
+      await this.rememberConversationIntelligence(conversation, {
+        last_intent: 'price',
+        last_product_name: selectedProduct.name,
+        last_product_names: [selectedProduct.name],
+        last_query: selectedProduct.name,
+      });
+
+      return this.buildProductInsightMessage(selectedProduct, 'price');
+    }
+
+    if (!this.isDirectCatalogRequest(message)) {
+      return null;
+    }
+
+    const sections = this.buildCatalogMenuSection(products);
+    if (!sections.length) {
+      return null;
+    }
+
+    return this.buildCatalogInteractiveResponse(
+      'Cardapio da loja',
+      'Escolha uma categoria para navegar melhor pelo catalogo. Depois eu te mostro os itens dessa secao.',
+      'Abrir cardapio',
+      sections,
+      'Abri o cardapio interativo para voce. Escolha uma categoria na lista.',
+      'Se preferir, voce tambem pode me pedir um produto do seu jeito.',
+    );
   }
 
   private getPremiumPhonePrompt(): string {
@@ -5227,7 +5538,7 @@ export class WhatsappService {
     return { valid: true };
   }
 
-  async processIncomingMessage(message: WhatsappMessage): Promise<string> {
+  async processIncomingMessage(message: WhatsappMessage): Promise<WhatsappOutboundResponse> {
     this.logger.log(`Processing message from ${message.from}: ${message.body}`);
 
     try {
@@ -5323,6 +5634,7 @@ export class WhatsappService {
           last_processed_event_key: replayGuard.eventKey,
           last_processed_event_at: new Date().toISOString(),
           last_processed_response: duplicateResponse,
+          last_processed_response_payload: this.serializeOutboundResponse(duplicateResponse),
         });
 
         await this.conversationService.saveMessage(
@@ -5335,18 +5647,28 @@ export class WhatsappService {
         return duplicateResponse;
       }
 
-      // Gerar resposta (usar mensagem sanitizada)
-      const response = await this.generateResponse(
-        sanitizedBody,
-        tenantId,
-        typedConversation,
-      );
+      const currentState = typedConversation.context?.state as ConversationState | undefined;
+      const response =
+        (await this.tryBuildInteractiveCatalogResponse(
+          sanitizedBody,
+          tenantId,
+          typedConversation,
+          currentState,
+        )) ||
+        (await this.generateResponse(
+          sanitizedBody,
+          tenantId,
+          typedConversation,
+        ));
+      const outboundPreview = this.getOutboundPreview(response);
 
       // Salvar mensagem enviada
       await this.conversationService.saveMessage(
         conversation.id,
         'outbound',
-        response,
+        outboundPreview,
+        this.getOutboundMessageType(response),
+        this.buildOutboundMessageMetadata(response),
       );
 
       const nextAbuseCount = this.containsAbusiveLanguage(sanitizedBody)
@@ -5357,14 +5679,15 @@ export class WhatsappService {
         last_inbound_signature: this.buildInboundSignature(sanitizedBody),
         last_inbound_at: new Date().toISOString(),
         last_inbound_repeat_count: 0,
-        last_outbound_preview: this.buildResponsePreview(response),
+        last_outbound_preview: this.buildResponsePreview(outboundPreview),
         abuse_count: nextAbuseCount,
         last_processed_event_key: replayGuard.eventKey,
         last_processed_event_at: new Date().toISOString(),
-        last_processed_response: response,
+        last_processed_response: outboundPreview,
+        last_processed_response_payload: this.serializeOutboundResponse(response),
       });
 
-      this.logger.log(`Response: ${response}`);
+      this.logger.log(`Response: ${outboundPreview}`);
       return response;
           },
         );
@@ -8260,5 +8583,38 @@ export class WhatsappService {
       message,
       metadata: { source: 'whatsapp_service' },
     });
+  }
+
+  async sendOutboundResponse(
+    to: string,
+    response: WhatsappOutboundResponse,
+  ): Promise<void> {
+    if (this.isInteractiveListResponse(response)) {
+      await this.notificationsService.sendWhatsAppMessage({
+        to,
+        message: response.previewText,
+        interactiveList: {
+          title: response.list.title,
+          description: response.list.description,
+          buttonText: response.list.buttonText,
+          footerText: response.list.footerText,
+          sections: response.list.sections.map((section) => ({
+            title: section.title,
+            rows: section.rows.map((row) => ({
+              id: row.id,
+              title: row.title,
+              description: row.description,
+            })),
+          })),
+        },
+        metadata: {
+          source: 'whatsapp_service',
+          interactiveType: 'list',
+        },
+      });
+      return;
+    }
+
+    await this.sendMessage(to, response);
   }
 }

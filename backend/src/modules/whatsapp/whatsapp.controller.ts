@@ -202,6 +202,45 @@ function shouldIgnoreWebhook(body: RawWhatsappWebhookBody): { ignore: boolean; r
   return { ignore: false };
 }
 
+function getOutboundPreview(response: unknown): string {
+  if (typeof response === 'string') {
+    return response;
+  }
+
+  if (
+    response &&
+    typeof response === 'object' &&
+    'kind' in response &&
+    (response as any).kind === 'interactive_list'
+  ) {
+    return String((response as any).previewText || '').trim();
+  }
+
+  return '';
+}
+
+function shouldDispatchOutboundResponse(response: unknown): boolean {
+  if (typeof response === 'string') {
+    return response.trim().length > 0;
+  }
+
+  if (
+    response &&
+    typeof response === 'object' &&
+    'kind' in response &&
+    (response as any).kind === 'interactive_list'
+  ) {
+    const preview = String((response as any).previewText || '').trim();
+    const sections = Array.isArray((response as any).list?.sections)
+      ? (response as any).list.sections
+      : [];
+
+    return preview.length > 0 && sections.length > 0;
+  }
+
+  return false;
+}
+
 @ApiTags('WhatsApp')
 @Controller('whatsapp')
 export class WhatsappController {
@@ -292,17 +331,17 @@ export class WhatsappController {
     };
 
     const response = await this.whatsappService.processIncomingMessage(message);
-    const shouldDispatchResponse = typeof response === 'string' && response.trim().length > 0;
+    const shouldDispatchResponse = shouldDispatchOutboundResponse(response);
 
     if (shouldDispatchResponse) {
-      await this.whatsappService.sendMessage(message.from, response);
+      await this.whatsappService.sendOutboundResponse(message.from, response);
     }
 
     return {
       success: true,
       response,
       ...(body.From && {
-        Message: response,
+        Message: getOutboundPreview(response),
         To: message.from,
       }),
     };

@@ -485,3 +485,27 @@
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
   - `npm.cmd run test:unit -- --runInBand` => `175/175` testes ok
+
+2026-03-22
+- Ambiente: LOCAL
+- Escopo: adicionar catalogo interativo clicavel no WhatsApp com listas da Evolution API
+- Correcao aplicada:
+  - `NotificationsService` passou a suportar envio de listas interativas via `sendList` na Evolution API, mantendo mock e texto tradicionais
+  - `WhatsappService` agora aceita resposta estruturada de saida, com `interactive_list` para catalogo e categorias
+  - o ciclo de processamento passou a salvar preview, payload serializado e metadata da resposta interativa para replay e auditoria
+  - selecao de categoria (`catalog_category:*`) abre uma segunda lista com produtos daquela secao
+  - selecao de item (`catalog_product:*`) cai de volta no motor de resposta textual com contexto do produto
+  - `WhatsappController` passou a despachar respostas interativas pelo mesmo fluxo seguro do webhook
+- Arquivos principais:
+  - `backend/src/modules/notifications/notifications.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.controller.ts`
+  - `backend/src/modules/whatsapp/types/whatsapp.types.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+  - `backend/src/modules/whatsapp/whatsapp.controller.spec.ts`
+- Validacao local:
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.controller.spec.ts` => `8/8` testes ok
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.service.spec.ts` => `94/94` testes ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run test:unit -- --runInBand` => `179/179` testes ok

@@ -6,7 +6,10 @@ import { WhatsappService } from './whatsapp.service';
 
 describe('WhatsappController', () => {
   let controller: WhatsappController;
-  let whatsappService: { processIncomingMessage: jest.Mock; sendMessage: jest.Mock };
+  let whatsappService: {
+    processIncomingMessage: jest.Mock;
+    sendOutboundResponse: jest.Mock;
+  };
   let tenantsService: {
     findOneById: jest.Mock;
     validateWhatsAppNumber: jest.Mock;
@@ -15,7 +18,7 @@ describe('WhatsappController', () => {
   beforeEach(async () => {
     whatsappService = {
       processIncomingMessage: jest.fn().mockResolvedValue('ok'),
-      sendMessage: jest.fn().mockResolvedValue(undefined),
+      sendOutboundResponse: jest.fn().mockResolvedValue(undefined),
     };
 
     tenantsService = {
@@ -73,7 +76,7 @@ describe('WhatsappController', () => {
         }),
       }),
     );
-    expect(whatsappService.sendMessage).toHaveBeenCalledWith('5511991234567', 'ok');
+    expect(whatsappService.sendOutboundResponse).toHaveBeenCalledWith('5511991234567', 'ok');
     expect(response).toEqual({
       success: true,
       response: 'ok',
@@ -102,10 +105,63 @@ describe('WhatsappController', () => {
       'tenant-loucas',
     );
 
-    expect(whatsappService.sendMessage).not.toHaveBeenCalled();
+    expect(whatsappService.sendOutboundResponse).not.toHaveBeenCalled();
     expect(response).toEqual({
       success: true,
       response: '',
+    });
+  });
+
+  it('dispatches an interactive catalog response when the bot returns a list payload', async () => {
+    const interactiveResponse = {
+      kind: 'interactive_list',
+      previewText: 'Abri o cardapio interativo para voce.',
+      list: {
+        title: 'Cardapio da loja',
+        description: 'Escolha uma categoria',
+        buttonText: 'Abrir cardapio',
+        sections: [
+          {
+            title: 'Categorias',
+            rows: [
+              {
+                id: 'catalog_category:docinhos',
+                title: 'Docinhos',
+                description: '4 itens com estoque ativo',
+              },
+            ],
+          },
+        ],
+      },
+    };
+    whatsappService.processIncomingMessage.mockResolvedValueOnce(interactiveResponse);
+
+    const response = await controller.webhook(
+      {
+        event: 'messages.upsert',
+        instance: 'loucas-teste',
+        data: {
+          key: {
+            remoteJid: '5511991234567@s.whatsapp.net',
+            fromMe: false,
+            id: 'msg-list-1',
+          },
+          message: {
+            conversation: 'cardapio',
+          },
+          messageTimestamp: 1711021200,
+        },
+      },
+      'tenant-loucas',
+    );
+
+    expect(whatsappService.sendOutboundResponse).toHaveBeenCalledWith(
+      '5511991234567',
+      interactiveResponse,
+    );
+    expect(response).toEqual({
+      success: true,
+      response: interactiveResponse,
     });
   });
 

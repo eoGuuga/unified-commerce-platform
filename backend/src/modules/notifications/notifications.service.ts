@@ -10,6 +10,20 @@ export interface NotificationMessage {
   to: string; // numero do WhatsApp
   message: string;
   imageUrl?: string; // Para QR Code Pix
+  interactiveList?: {
+    title: string;
+    description: string;
+    buttonText: string;
+    footerText?: string;
+    sections: Array<{
+      title: string;
+      rows: Array<{
+        id: string;
+        title: string;
+        description?: string;
+      }>;
+    }>;
+  };
   metadata?: Record<string, any>;
 }
 
@@ -764,6 +778,11 @@ export class NotificationsService {
       if (notification.imageUrl) {
         this.logger.log(`[MOCK] Would send image: ${notification.imageUrl.substring(0, 50)}...`);
       }
+      if (notification.interactiveList) {
+        this.logger.log(
+          `[MOCK] Would send interactive list to ${notification.to}: ${notification.interactiveList.title}`,
+        );
+      }
       return;
     }
 
@@ -814,9 +833,12 @@ export class NotificationsService {
       }
 
       const canSendMedia = notification.imageUrl && !notification.imageUrl.startsWith('data:');
+      const canSendList = Boolean(notification.interactiveList);
       const endpoint = canSendMedia
         ? `${apiUrl}/message/sendMedia/${instance}`
-        : `${apiUrl}/message/sendText/${instance}`;
+        : canSendList
+          ? `${apiUrl}/message/sendList/${instance}`
+          : `${apiUrl}/message/sendText/${instance}`;
 
       const payload = canSendMedia
         ? {
@@ -825,6 +847,22 @@ export class NotificationsService {
             media: notification.imageUrl,
             caption: notification.message,
           }
+        : canSendList
+          ? {
+              number: notification.to,
+              title: notification.interactiveList?.title,
+              description: notification.interactiveList?.description,
+              buttonText: notification.interactiveList?.buttonText,
+              footerText: notification.interactiveList?.footerText || '',
+              values: (notification.interactiveList?.sections || []).map((section) => ({
+                title: section.title,
+                rows: section.rows.map((row) => ({
+                  title: row.title,
+                  description: row.description || '',
+                  rowId: row.id,
+                })),
+              })),
+            }
         : {
             number: notification.to,
             text: notification.message,
