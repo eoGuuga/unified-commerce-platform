@@ -2127,7 +2127,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     });
   });
 
-  it('returns a paused message to customers when the bot is disabled', async () => {
+  it('returns silence to customers when the bot is disabled', async () => {
     const { service, conversationService } = createFixture([], {
       tenants: {
         findOneById: jest.fn().mockResolvedValue({
@@ -2148,7 +2148,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       tenantId: 'tenant-id',
     });
 
-    expect(response).toContain('ATENDIMENTO AUTOMATICO PAUSADO');
+    expect(response).toBe('');
     expect(conversationService.getOrCreateConversation).not.toHaveBeenCalled();
   });
 

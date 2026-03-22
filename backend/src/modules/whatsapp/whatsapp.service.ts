@@ -357,15 +357,6 @@ export class WhatsappService {
       : 'BOT PAUSADO\n\nO atendimento automatico esta desligado. As mensagens ficam sem fluxo automatico ate voce religar.';
   }
 
-  private getBotDisabledMessage(): string {
-    return [
-      'ATENDIMENTO AUTOMATICO PAUSADO',
-      '',
-      'No momento o bot esta temporariamente desligado.',
-      'Sua mensagem foi recebida e a equipe pode seguir por aqui manualmente.',
-    ].join('\n');
-  }
-
   private async tryHandleBotControlCommand(
     tenant: Tenant,
     message: WhatsappMessage,
@@ -6620,7 +6611,7 @@ export class WhatsappService {
       }
 
       if (!this.isBotEnabled(tenant)) {
-        return this.getBotDisabledMessage();
+        return '';
       }
 
       try {
