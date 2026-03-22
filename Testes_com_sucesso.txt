@@ -643,3 +643,16 @@
   - `scripts/migrations/014-tenants-update-policy.sql`
   - `deploy/scripts/run-migrations-test.sh`
   - `deploy/scripts/run-migrations.sh`
+
+2026-03-22
+- Ambiente: DEV/TESTE
+- Escopo: validar ligar/desligar real do bot por mensagem administrativa
+- Resultado:
+  - `bot 7419 status` => `BOT ATIVO`
+  - `bot 7419 desligar` => `BOT DESLIGADO`
+  - cliente comum apos desligar => `ATENDIMENTO AUTOMATICO PAUSADO`
+  - `bot 7419 ligar` => `BOT LIGADO`
+  - cliente comum apos religar => cardapio interativo normal
+- Evidencia:
+  - o problema nao era mais de codigo do WhatsApp; a causa raiz era RLS sem policy de `UPDATE` em `tenants`
+  - com a migration `014-tenants-update-policy.sql` aplicada no stack `ucmtest`, o estado do bot passou a persistir corretamente
