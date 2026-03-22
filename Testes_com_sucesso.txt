@@ -528,3 +528,22 @@
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
   - `npm.cmd run test:unit -- --runInBand` => `182/182` testes ok
+
+2026-03-22
+- Ambiente: LOCAL
+- Escopo: reforcar memoria contextual do WhatsApp e handoff humano com resumo util
+- Correcao aplicada:
+  - a memoria conversacional agora guarda categoria e produto vistos no catalogo interativo, alem de um resumo pronto para handoff
+  - mensagens como `me mostra outros dessa linha` e `volta pra categoria` passaram a reabrir o contexto certo do catalogo sem o cliente precisar recomecar
+  - pedidos de atendimento humano agora respondem com um resumo do que ja foi entendido na conversa, sem misturar etapa, itens e objetivo
+  - o resumo de handoff passou a citar etapa atual, cliente, itens recentes, categoria em foco e objetivo percebido quando houver contexto suficiente
+- Arquivos principais:
+  - `backend/src/modules/whatsapp/whatsapp.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+  - `backend/src/modules/whatsapp/types/whatsapp.types.ts`
+- Validacao local:
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.service.spec.ts` => `99/99` testes ok
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.controller.spec.ts` => `8/8` testes ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run test:unit -- --runInBand` => `184/184` testes ok

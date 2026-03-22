@@ -484,6 +484,158 @@ export class WhatsappService {
     });
   }
 
+  private getConversationStageLabel(currentState?: ConversationState): string {
+    switch (currentState) {
+      case 'collecting_order':
+        return 'Montando o pedido';
+      case 'collecting_name':
+        return 'Coletando o nome do cliente';
+      case 'collecting_address':
+        return 'Coletando a forma de recebimento / endereco';
+      case 'collecting_phone':
+        return 'Coletando o telefone de contato';
+      case 'collecting_notes':
+        return 'Coletando observacoes finais';
+      case 'collecting_cash_change':
+        return 'Coletando informacao de troco';
+      case 'confirming_stock_adjustment':
+        return 'Confirmando ajuste por estoque';
+      case 'confirming_order':
+        return 'Revisando o pedido antes de fechar';
+      case 'waiting_payment':
+        return 'Aguardando pagamento';
+      case 'order_confirmed':
+        return 'Pedido confirmado';
+      case 'order_completed':
+        return 'Pedido concluido';
+      default:
+        return 'Conversa aberta';
+    }
+  }
+
+  private buildCustomerFocusSnapshot(
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+    orderSummary?: { orderNo?: string | null; statusLabel?: string | null },
+  ): string[] {
+    const lines: string[] = [];
+    const memory = this.getConversationIntelligenceMemory(conversation);
+    const customerData = (conversation?.context?.customer_data || {}) as CustomerData;
+    const pendingOrder = conversation?.context?.pending_order as PendingOrder | undefined;
+
+    if (currentState) {
+      lines.push(`- Etapa atual: ${this.getConversationStageLabel(currentState)}`);
+    }
+
+    if (customerData?.name) {
+      lines.push(`- Cliente: ${customerData.name}`);
+    }
+
+    if (pendingOrder?.items?.length) {
+      const summarizedItems = pendingOrder.items
+        .slice(0, 3)
+        .map((item) => `${item.quantity}x ${item.produto_name}`);
+      const remainder = pendingOrder.items.length - summarizedItems.length;
+      const itemSummary =
+        remainder > 0
+          ? `${this.joinNaturally(summarizedItems)} e mais ${remainder} item(ns)`
+          : this.joinNaturally(summarizedItems);
+      lines.push(`- Pedido em rascunho: ${itemSummary}`);
+      lines.push(
+        `- Total parcial: R$ ${this.formatCurrency(Number(pendingOrder.total_amount || 0))}`,
+      );
+    }
+
+    if (orderSummary?.orderNo) {
+      lines.push(`- Pedido atual: ${orderSummary.orderNo}`);
+    }
+
+    if (orderSummary?.statusLabel) {
+      lines.push(`- Status: ${orderSummary.statusLabel}`);
+    }
+
+    if (memory.last_catalog_category_name) {
+      lines.push(`- Categoria em foco: ${memory.last_catalog_category_name}`);
+    }
+
+    if (memory.last_product_names?.length) {
+      lines.push(
+        `- Itens recentes: ${this.joinNaturally(memory.last_product_names.slice(0, 3))}`,
+      );
+    }
+
+    if (memory.last_customer_goal) {
+      lines.push(`- Objetivo percebido: ${memory.last_customer_goal}`);
+    }
+
+    return lines;
+  }
+
+  private buildMemoryAwareHandoffMessage(
+    lead: string,
+    summaryLines: string[],
+    guidance: string,
+  ): string {
+    return [
+      lead,
+      '',
+      'Posso deixar esse contexto mastigado para atendimento humano, sem te fazer repetir tudo.',
+      '',
+      'RESUMO PRONTO PARA ATENDIMENTO',
+      ...summaryLines,
+      '',
+      guidance,
+    ].join('\n');
+  }
+
+  private isCatalogSimilarFollowUpIntent(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    return this.hasAnyNormalizedPhrase(normalized, [
+      'parecidos',
+      'parecido',
+      'algo parecido',
+      'algo semelhante',
+      'semelhantes',
+      'dessa linha',
+      'nesse estilo',
+      'mais nessa linha',
+      'mais opcoes assim',
+      'outros assim',
+      'outro parecido',
+      'me mostra parecidos',
+    ]);
+  }
+
+  private isCatalogCategoryFollowUpIntent(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    return this.hasAnyNormalizedPhrase(normalized, [
+      'volta pra categoria',
+      'voltar pra categoria',
+      'voltar para categoria',
+      'mais dessa categoria',
+      'ver mais dessa categoria',
+      'mostra a categoria',
+      'me mostra a categoria',
+      'abre a categoria',
+      'volta pros itens',
+      'volta para os itens',
+    ]);
+  }
+
+  private isCatalogProductRecallIntent(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    return this.hasAnyNormalizedPhrase(normalized, [
+      'abre esse item',
+      'mostra esse item',
+      'me mostra esse item',
+      'volta pra esse item',
+      'voltar pra esse item',
+      'detalhes desse item',
+      'detalhe desse item',
+      'me mostra esse de novo',
+    ]);
+  }
+
   private buildTrackingUrl(orderNo: string): string {
     const frontendUrl = (this.config.get<string>('FRONTEND_URL') || '').trim();
     const baseUrl =
@@ -2155,6 +2307,15 @@ export class WhatsappService {
     }
 
     const lead = this.getConversationalSupportLead(analysis, plan);
+    if (plan?.mode === 'handoff_ready') {
+      const summaryLines = this.buildCustomerFocusSnapshot(conversation);
+      return this.buildMemoryAwareHandoffMessage(
+        lead,
+        summaryLines.length ? summaryLines : ['- Contexto aberto sem um pedido travado no momento'],
+        'Se quiser, me diga em uma frase o que precisa que eu deixo esse resumo ainda mais pronto para a equipe.',
+      );
+    }
+
     const bridge =
       analysis.intent === 'handoff'
         ? 'Se depois precisar envolver alguem da equipe, eu ja deixo o contexto organizado sem te fazer repetir tudo.'
@@ -2179,6 +2340,7 @@ export class WhatsappService {
     analysis: ConversationalAnalysis,
     plan: ConversationPlan,
     currentState: ConversationState,
+    conversation?: TypedConversation,
   ): string {
     const lead = this.getConversationalSupportLead(analysis, plan);
     const whyThisStageMatters = plan.explainWhyCurrentStep
@@ -2190,6 +2352,18 @@ export class WhatsappService {
         : plan.mode === 'issue_recovery'
           ? 'Eu nao vou avancar nada errado antes de alinhar esse ponto com voce.'
           : '';
+    const handoffMessage =
+      plan.mode === 'handoff_ready'
+        ? this.buildMemoryAwareHandoffMessage(
+            lead,
+            this.buildCustomerFocusSnapshot(conversation, currentState),
+            'Antes disso, eu ainda consigo resolver por aqui se voce me disser exatamente o que precisa ajustar.',
+          )
+        : null;
+
+    if (handoffMessage) {
+      return handoffMessage;
+    }
 
     switch (currentState) {
       case 'collecting_name':
@@ -2280,6 +2454,19 @@ export class WhatsappService {
       return this.buildPostOrderCourtesyMessage(pedido, currentState);
     }
 
+    if (plan.mode === 'handoff_ready') {
+      return this.buildMemoryAwareHandoffMessage(
+        this.getConversationalSupportLead(analysis, plan),
+        this.buildCustomerFocusSnapshot(conversation, currentState, {
+          orderNo: pedido.order_no,
+          statusLabel: this.getStatusLabel(pedido.status),
+        }),
+        `Se quiser, eu continuo por aqui tambem. Acompanhamento completo: ${this.buildTrackingUrl(
+          pedido.order_no,
+        )}`,
+      );
+    }
+
     if (currentState === 'waiting_payment') {
       return [
         this.getConversationalSupportLead(analysis, plan),
@@ -2364,10 +2551,15 @@ export class WhatsappService {
         analysis,
         plan,
         currentState,
+        conversation,
       );
       await this.rememberConversationIntelligence(conversation, {
         last_response_mode: plan.mode,
         last_customer_goal: plan.customerGoal,
+        last_handoff_summary:
+          plan.mode === 'handoff_ready'
+            ? this.buildCustomerFocusSnapshot(conversation, currentState).join(' | ')
+            : null,
       });
       return response;
     }
@@ -2388,6 +2580,10 @@ export class WhatsappService {
         await this.rememberConversationIntelligence(conversation, {
           last_response_mode: plan.mode,
           last_customer_goal: plan.customerGoal,
+          last_handoff_summary:
+            plan.mode === 'handoff_ready'
+              ? this.buildCustomerFocusSnapshot(conversation, currentState).join(' | ')
+              : null,
         });
       }
       return response;
@@ -2397,6 +2593,10 @@ export class WhatsappService {
     await this.rememberConversationIntelligence(conversation, {
       last_response_mode: plan.mode,
       last_customer_goal: plan.customerGoal,
+      last_handoff_summary:
+        plan.mode === 'handoff_ready'
+          ? this.buildCustomerFocusSnapshot(conversation).join(' | ')
+          : null,
     });
     return response;
   }
@@ -2794,6 +2994,182 @@ export class WhatsappService {
     ];
   }
 
+  private async buildCatalogCategoryInteractiveResponse(
+    categoryName: string,
+    categoryProducts: ProductWithStock[],
+    categoryPage: number,
+    conversation?: TypedConversation,
+  ): Promise<WhatsappOutboundResponse | string> {
+    const sections = this.buildCategoryProductsSection(
+      categoryName,
+      categoryProducts,
+      categoryPage,
+    );
+    if (!sections.length) {
+      return `No momento eu nao encontrei itens ativos em ${categoryName}. Se quiser, envie "cardapio" para abrir outra categoria.`;
+    }
+
+    await this.rememberConversationIntelligence(conversation, {
+      last_intent: 'suggestion',
+      last_query: categoryName,
+      last_catalog_category_key: this.buildCatalogCategoryKey(categoryName),
+      last_catalog_category_name: categoryName,
+      last_catalog_product_id: null,
+    });
+
+    return this.buildCatalogInteractiveResponse(
+      categoryName,
+      `Escolha um item para eu te mostrar com mais clareza dentro de ${categoryName}.`,
+      'Ver itens',
+      sections,
+      `Abri ${categoryName} para voce. Escolha um item na lista e eu explico melhor por aqui.`,
+      'Se preferir, tambem pode digitar o nome do item do seu jeito.',
+    );
+  }
+
+  private async buildCatalogProductInteractiveResponse(
+    selectedProduct: ProductWithStock,
+    products: ProductWithStock[],
+    conversation?: TypedConversation,
+  ): Promise<WhatsappOutboundResponse> {
+    const categoryName =
+      String(selectedProduct.categoria?.name || 'Categoria').trim() || 'Categoria';
+
+    await this.rememberConversationIntelligence(conversation, {
+      last_intent: 'price',
+      last_product_name: selectedProduct.name,
+      last_product_names: [selectedProduct.name],
+      last_query: selectedProduct.name,
+      last_catalog_product_id: String(selectedProduct.id),
+      last_catalog_category_key: this.buildCatalogCategoryKey(categoryName),
+      last_catalog_category_name: categoryName,
+    });
+
+    return this.buildCatalogInteractiveResponse(
+      selectedProduct.name,
+      this.buildProductCardDescription(selectedProduct),
+      'Ver opcoes',
+      this.buildProductActionSections(selectedProduct, products),
+      `Separei ${selectedProduct.name} com os proximos passos para voce seguir sem se perder.`,
+      'Se preferir, tambem pode digitar do seu jeito: "quero 2 desse item".',
+    );
+  }
+
+  private buildCatalogSimilarInteractiveResponse(
+    selectedProduct: ProductWithStock,
+    products: ProductWithStock[],
+  ): WhatsappOutboundResponse | string {
+    const similarProducts = this.findCatalogSimilarProducts(selectedProduct, products);
+    if (!similarProducts.length) {
+      return `Nao achei parecidos fortes com ${selectedProduct.name} agora. Se quiser, eu te mostro a categoria dele ou o cardapio inteiro.`;
+    }
+
+    const intro = `Itens parecidos com ${selectedProduct.name}`;
+    const rows = similarProducts.map((product) => ({
+      id: `catalog_product:${product.id}`,
+      title: product.name,
+      description: `R$ ${this.formatCurrency(Number(product.price || 0))}`,
+    }));
+
+    return this.buildCatalogInteractiveResponse(
+      intro,
+      'Separei opcoes com leitura parecida para voce comparar sem se perder.',
+      'Ver parecidos',
+      [
+        {
+          title: 'Parecidos',
+          rows,
+        },
+        {
+          title: 'Navegacao',
+          rows: [
+            {
+              id: `catalog_product:${selectedProduct.id}`,
+              title: 'Voltar para este item',
+              description: selectedProduct.name,
+            },
+            {
+              id: 'catalog_root',
+              title: 'Voltar ao cardapio',
+              description: 'Ver todas as categorias novamente',
+            },
+          ],
+        },
+      ],
+      `Separei alguns parecidos com ${selectedProduct.name} para voce comparar.`,
+      'Se quiser, toque em um item e eu detalho melhor.',
+    );
+  }
+
+  private async tryMemoryDrivenCatalogResponse(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): Promise<WhatsappOutboundResponse | string | null> {
+    if (!conversation) {
+      return null;
+    }
+
+    if (currentState && !['idle', 'order_confirmed', 'order_completed'].includes(currentState)) {
+      return null;
+    }
+
+    if (!this.supportsInteractiveListMessaging()) {
+      return null;
+    }
+
+    const memory = this.getConversationIntelligenceMemory(conversation);
+    if (
+      !memory.last_catalog_product_id &&
+      !memory.last_catalog_category_key
+    ) {
+      return null;
+    }
+
+    const products = await this.getCatalogProducts(tenantId);
+    const groupedEntries = this.getCatalogCategoryEntries(products);
+
+    if (memory.last_catalog_product_id && this.isCatalogSimilarFollowUpIntent(message)) {
+      const selectedProduct = products.find(
+        (product) => String(product.id) === String(memory.last_catalog_product_id),
+      );
+      if (selectedProduct) {
+        return this.buildCatalogSimilarInteractiveResponse(selectedProduct, products);
+      }
+    }
+
+    if (memory.last_catalog_category_key && this.isCatalogCategoryFollowUpIntent(message)) {
+      const categoryEntry = groupedEntries.find(
+        ([categoryName]) =>
+          this.buildCatalogCategoryKey(categoryName) === memory.last_catalog_category_key,
+      );
+      if (categoryEntry?.[1]?.length) {
+        return await this.buildCatalogCategoryInteractiveResponse(
+          String(categoryEntry[0] || 'Categoria'),
+          categoryEntry[1],
+          1,
+          conversation,
+        );
+      }
+    }
+
+    if (memory.last_catalog_product_id && this.isCatalogProductRecallIntent(message)) {
+      const selectedProduct = products.find(
+        (product) => String(product.id) === String(memory.last_catalog_product_id),
+      );
+      if (selectedProduct) {
+        return await this.buildCatalogProductInteractiveResponse(
+          selectedProduct,
+          products,
+          conversation,
+        );
+      }
+    }
+
+    return null;
+  }
+
   private async tryBuildInteractiveCatalogResponse(
     message: string,
     tenantId: string,
@@ -2889,46 +3265,16 @@ export class WhatsappService {
         return 'Nao encontrei esse item do catalogo agora. Se quiser, envie "cardapio" e eu abro a lista de novo.';
       }
 
-      const similarProducts = this.findCatalogSimilarProducts(selectedProduct, products);
-      if (!similarProducts.length) {
-        return `Nao achei parecidos fortes com ${selectedProduct.name} agora. Se quiser, eu te mostro a categoria dele ou o cardapio inteiro.`;
-      }
+      await this.rememberConversationIntelligence(conversation, {
+        last_catalog_product_id: String(selectedProduct.id),
+        last_catalog_category_key: this.buildCatalogCategoryKey(
+          String(selectedProduct.categoria?.name || 'Categoria'),
+        ),
+        last_catalog_category_name:
+          String(selectedProduct.categoria?.name || 'Categoria').trim() || 'Categoria',
+      });
 
-      const intro = `Itens parecidos com ${selectedProduct.name}`;
-      const rows = similarProducts.map((product) => ({
-        id: `catalog_product:${product.id}`,
-        title: product.name,
-        description: `R$ ${this.formatCurrency(Number(product.price || 0))}`,
-      }));
-
-      return this.buildCatalogInteractiveResponse(
-        intro,
-        'Separei opcoes com leitura parecida para voce comparar sem se perder.',
-        'Ver parecidos',
-        [
-          {
-            title: 'Parecidos',
-            rows,
-          },
-          {
-            title: 'Navegacao',
-            rows: [
-              {
-                id: `catalog_product:${selectedProduct.id}`,
-                title: 'Voltar para este item',
-                description: selectedProduct.name,
-              },
-              {
-                id: 'catalog_root',
-                title: 'Voltar ao cardapio',
-                description: 'Ver todas as categorias novamente',
-              },
-            ],
-          },
-        ],
-        `Separei alguns parecidos com ${selectedProduct.name} para voce comparar.`,
-        'Se quiser, toque em um item e eu detalho melhor.',
-      );
+      return this.buildCatalogSimilarInteractiveResponse(selectedProduct, products);
     }
 
     if (selection?.type === 'category' || selection?.type === 'category_page') {
@@ -2943,27 +3289,11 @@ export class WhatsappService {
       }
 
       const categoryName = String(categoryEntry?.[0] || 'Categoria').trim() || 'Categoria';
-      const sections = this.buildCategoryProductsSection(
+      return await this.buildCatalogCategoryInteractiveResponse(
         categoryName,
         categoryProducts,
         categoryPage,
-      );
-      if (!sections.length) {
-        return `No momento eu nao encontrei itens ativos em ${categoryName}. Se quiser, envie "cardapio" para abrir outra categoria.`;
-      }
-
-      await this.rememberConversationIntelligence(conversation, {
-        last_intent: 'suggestion',
-        last_query: categoryName,
-      });
-
-      return this.buildCatalogInteractiveResponse(
-        categoryName,
-        `Escolha um item para eu te mostrar com mais clareza dentro de ${categoryName}.`,
-        'Ver itens',
-        sections,
-        `Abri ${categoryName} para voce. Escolha um item na lista e eu explico melhor por aqui.`,
-        'Se preferir, tambem pode digitar o nome do item do seu jeito.',
+        conversation,
       );
     }
 
@@ -2975,20 +3305,10 @@ export class WhatsappService {
         return 'Nao encontrei esse item do cardapio agora. Se quiser, envie "cardapio" e eu abro a lista de novo.';
       }
 
-      await this.rememberConversationIntelligence(conversation, {
-        last_intent: 'price',
-        last_product_name: selectedProduct.name,
-        last_product_names: [selectedProduct.name],
-        last_query: selectedProduct.name,
-      });
-
-      return this.buildCatalogInteractiveResponse(
-        selectedProduct.name,
-        this.buildProductCardDescription(selectedProduct),
-        'Ver opcoes',
-        this.buildProductActionSections(selectedProduct, products),
-        `Separei ${selectedProduct.name} com os proximos passos para voce seguir sem se perder.`,
-        'Se preferir, tambem pode digitar do seu jeito: "quero 2 desse item".',
+      return await this.buildCatalogProductInteractiveResponse(
+        selectedProduct,
+        products,
+        conversation,
       );
     }
 
@@ -6039,6 +6359,12 @@ export class WhatsappService {
       const currentState = typedConversation.context?.state as ConversationState | undefined;
       const response =
         (await this.tryBuildInteractiveCatalogResponse(
+          sanitizedBody,
+          tenantId,
+          typedConversation,
+          currentState,
+        )) ||
+        (await this.tryMemoryDrivenCatalogResponse(
           sanitizedBody,
           tenantId,
           typedConversation,

@@ -106,6 +106,10 @@ export interface ConversationIntelligenceMemory {
   last_reference_at?: string | null;
   last_response_mode?: ConversationResponseMode | null;
   last_customer_goal?: string | null;
+  last_catalog_category_key?: string | null;
+  last_catalog_category_name?: string | null;
+  last_catalog_product_id?: string | null;
+  last_handoff_summary?: string | null;
 }
 
 /**

@@ -1587,9 +1587,10 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       }),
     );
 
-    expect(response).toContain('Eu consigo te adiantar isso por aqui sem perder o que ja foi montado.');
-    expect(response).toContain('Agora eu estou na revisao final do pedido.');
-    expect(response).toContain('me diga exatamente o que ajustar');
+    expect(response).toContain('RESUMO PRONTO PARA ATENDIMENTO');
+    expect(response).toContain('Etapa atual: Revisando o pedido antes de fechar');
+    expect(response).toContain('Cliente: Jordan Lincoln Vasconcelos Kzan');
+    expect(response).toContain('Pedido em rascunho: 5x Bala de brigadeiro');
   });
 
   it('replies more humanly to gratitude after the order is confirmed', async () => {
@@ -1963,13 +1964,15 @@ describe('WhatsappService defensive WhatsApp flow', () => {
         intelligence_memory: expect.objectContaining({
           last_intent: 'suggestion',
           last_query: 'Delicias',
+          last_catalog_category_key: 'delicias',
+          last_catalog_category_name: 'Delicias',
         }),
       }),
     );
   });
 
   it('opens a premium action list when the customer clicks a specific product', async () => {
-    const { service } = createFixture(loucasCatalog, {
+    const { service, conversationService } = createFixture(loucasCatalog, {
       conversation: {
         getOrCreateConversation: jest.fn().mockResolvedValue(createConversation()),
         saveMessage: jest.fn(),
@@ -2010,6 +2013,96 @@ describe('WhatsappService defensive WhatsApp flow', () => {
               ]),
             }),
           ]),
+        }),
+      }),
+    );
+    expect(conversationService.updateContext).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        intelligence_memory: expect.objectContaining({
+          last_catalog_product_id: 'l1',
+          last_catalog_category_key: 'delicias',
+          last_catalog_category_name: 'Delicias',
+        }),
+      }),
+    );
+  });
+
+  it('reopens similar product navigation from memory when the customer asks for something in the same line', async () => {
+    const { service } = createFixture(loucasCatalog, {
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(
+          createConversation({
+            context: {
+              state: 'idle',
+              intelligence_memory: {
+                last_catalog_product_id: 'l1',
+                last_catalog_category_key: 'delicias',
+                last_catalog_category_name: 'Delicias',
+                last_product_name: 'Bala de brigadeiro',
+                last_product_names: ['Bala de brigadeiro'],
+              },
+            },
+          }),
+        ),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const response = await service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'me mostra outros dessa linha',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'memory-catalog-1',
+    });
+
+    expect(typeof response).not.toBe('string');
+    expect(response).toEqual(
+      expect.objectContaining({
+        kind: 'interactive_list',
+        list: expect.objectContaining({
+          title: 'Itens parecidos com Bala de brigadeiro',
+        }),
+      }),
+    );
+  });
+
+  it('reopens the last category from memory when the customer asks to go back to the category', async () => {
+    const { service } = createFixture(loucasCatalog, {
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(
+          createConversation({
+            context: {
+              state: 'idle',
+              intelligence_memory: {
+                last_catalog_category_key: 'delicias',
+                last_catalog_category_name: 'Delicias',
+                last_catalog_product_id: 'l1',
+              },
+            },
+          }),
+        ),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const response = await service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'volta pra categoria',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'memory-catalog-2',
+    });
+
+    expect(typeof response).not.toBe('string');
+    expect(response).toEqual(
+      expect.objectContaining({
+        kind: 'interactive_list',
+        list: expect.objectContaining({
+          title: 'Delicias',
         }),
       }),
     );
