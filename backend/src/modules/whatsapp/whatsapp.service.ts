@@ -2020,17 +2020,28 @@ export class WhatsappService {
     }
 
     const orderInfo = this.extractOrderInfo(normalized);
-    const hasOrderShape =
+    const hasDirectOrderVerb = this.hasAnyNormalizedPhrase(normalized, [
+      'quero',
+      'me ve',
+      'me manda',
+      'separa',
+      'comprar',
+      'pedir',
+      'vou querer',
+      'gostaria',
+      'preciso',
+    ]);
+    const hasExplicitOrderPayload =
       this.looksLikeMultiItemOrder(normalized) ||
-      (Number(orderInfo.quantity || 0) > 0 && Boolean(orderInfo.productName)) ||
-      this.hasAnyNormalizedPhrase(normalized, [
-        'quero',
-        'me ve',
-        'me manda',
-        'separa',
-        'comprar',
-        'pedir',
-      ]);
+      (Number(orderInfo.quantity || 0) > 0 && Boolean(orderInfo.productName) && hasDirectOrderVerb);
+
+    if (salesAnalysis.intent !== 'other' && !hasDirectOrderVerb) {
+      return false;
+    }
+
+    const hasOrderShape =
+      hasExplicitOrderPayload ||
+      hasDirectOrderVerb;
 
     if (!hasOrderShape) {
       return false;
@@ -2524,6 +2535,8 @@ export class WhatsappService {
   ): string {
     const detectedNeeds = strategy.detectedNeeds.slice(0, 2).map((need) => need.label);
     const focusThemes = catalogProfile.focusThemes.slice(0, 2).map((theme) => theme.label);
+    const understandingLine = this.buildSalesUnderstandingLine(analysis);
+    const decisionLine = this.buildSalesDecisionLine(analysis);
 
     const lead =
       analysis.intent === 'budget'
@@ -2535,6 +2548,10 @@ export class WhatsappService {
             : 'Pelo que voce me contou, eu puxei primeiro o que mais combina com esse momento da compra.';
 
     const details: string[] = [];
+
+    if (understandingLine) {
+      details.push(understandingLine);
+    }
 
     if (detectedNeeds.length) {
       details.push(`Aqui eu considerei principalmente ${this.joinNaturally(detectedNeeds)}.`);
@@ -2552,7 +2569,78 @@ export class WhatsappService {
       );
     }
 
+    if (decisionLine) {
+      details.push(decisionLine);
+    }
+
     return [lead, ...details].join(' ');
+  }
+
+  private buildSalesUnderstandingLine(analysis: SalesConversationAnalysis): string | null {
+    const pieces: string[] = [];
+
+    if (analysis.useCaseTags.includes('gift') && analysis.recipientHint) {
+      pieces.push(`um presente para ${analysis.recipientHint}`);
+    } else if (analysis.useCaseTags.includes('gift')) {
+      pieces.push('um contexto de presente');
+    }
+
+    if (analysis.useCaseTags.includes('sharing')) {
+      pieces.push('algo para dividir sem perder impacto');
+    }
+
+    if (analysis.useCaseTags.includes('self_treat')) {
+      pieces.push('um mimo mais voltado para voce');
+    }
+
+    if (analysis.useCaseTags.includes('chocolate_focus')) {
+      pieces.push('uma pegada mais intensa no chocolate');
+    }
+
+    if (analysis.useCaseTags.includes('premium')) {
+      pieces.push('uma leitura mais premium');
+    }
+
+    if (analysis.budgetCeiling !== null) {
+      pieces.push(`um teto de ate R$ ${this.formatCurrency(analysis.budgetCeiling)}`);
+    } else if (analysis.conversationDrivers.includes('value_pressure')) {
+      pieces.push('cuidado com o valor da compra');
+    }
+
+    if (analysis.conversationDrivers.includes('reassurance')) {
+      pieces.push('vontade de acertar sem erro');
+    }
+
+    if (analysis.conversationDrivers.includes('urgency')) {
+      pieces.push('pressa para resolver isso agora');
+    }
+
+    if (analysis.conversationDrivers.includes('simplicity')) {
+      pieces.push('algo mais simples e sem exagero');
+    }
+
+    if (!pieces.length) {
+      return null;
+    }
+
+    return `Eu li aqui ${this.joinNaturally(pieces.slice(0, 4))}.`;
+  }
+
+  private buildSalesDecisionLine(analysis: SalesConversationAnalysis): string | null {
+    if (analysis.decisionStage === 'closing') {
+      return 'Como voce ja esta bem perto de fechar, eu puxei poucas opcoes prontas para virar pedido sem friccao.';
+    }
+
+    if (
+      analysis.decisionStage === 'refining' &&
+      (analysis.secondaryIntents.length > 0 ||
+        analysis.conversationDrivers.includes('reassurance') ||
+        analysis.conversationDrivers.includes('urgency'))
+    ) {
+      return 'Entao eu preferi reduzir ruido e organizar so o que mais ajuda a decidir com seguranca.';
+    }
+
+    return null;
   }
 
   private buildConversationalIdleSupportMessage(
@@ -4387,6 +4475,12 @@ export class WhatsappService {
         const price = Number(product.price || 0);
         const normalizedName = this.normalizeForSearch(product.name);
         const searchDocument = this.buildProductSalesDocument(product);
+        const commercialSupport = Boolean(
+          product.description?.trim() ||
+            (typeof product.metadata === 'object' &&
+              product.metadata !== null &&
+              Object.keys(product.metadata).length > 0),
+        );
         const reasons: string[] = [];
         const addReason = (reason: string) => {
           if (reason && !reasons.includes(reason)) {
@@ -4470,6 +4564,35 @@ export class WhatsappService {
             score += 10;
             addReason(`entra abaixo do valor de ${referenceProduct.name}`);
           }
+        }
+
+        if (analysis.conversationDrivers.includes('urgency') && available > 0) {
+          score += 7 + Math.min(available, 6);
+          addReason('resolve mais rapido sem depender de reposicao');
+        }
+
+        if (analysis.conversationDrivers.includes('reassurance') && commercialSupport) {
+          score += 7;
+          addReason('fica mais seguro de indicar sem improviso');
+        }
+
+        if (analysis.conversationDrivers.includes('simplicity')) {
+          score += Math.round((1 - priceRatio) * 8);
+          addReason('segue uma linha mais simples de fechar');
+        }
+
+        if (
+          analysis.useCaseTags.includes('gift') &&
+          analysis.recipientHint &&
+          /(caixa|box|kit|presente|premium|presenteavel)/.test(searchDocument)
+        ) {
+          score += 8;
+          addReason(`tem boa leitura para presentear ${analysis.recipientHint}`);
+        }
+
+        if (analysis.decisionStage === 'closing' && available > 0) {
+          score += 6;
+          addReason('ja daria para fechar sem muita friccao');
         }
 
         score += Math.min(available, 10);

@@ -1304,6 +1304,21 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('presente');
   });
 
+  it('reflects combined intent with recipient, budget, trust and urgency in the sales answer', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'me indica um presente pra minha mae ate 14 reais, sem erro e sem perder tempo',
+      'tenant-id',
+    );
+
+    expect(response).toContain('presentear sua mae');
+    expect(response).toContain('um presente para sua mae');
+    expect(response).toContain('um teto de ate R$ 14,00');
+    expect(response).toContain('vontade de acertar sem erro');
+    expect(response).toContain('Brigadeiro Gourmet');
+  });
+
   it('uses configured product descriptions and metadata to qualify the chocolate sale', async () => {
     const { service } = createFixture(catalog);
 
@@ -1367,6 +1382,19 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('mimo individual');
     expect(response).toContain('mais intenso');
     expect(response).toContain('Brownie Premium');
+  });
+
+  it('keeps recommendation more discrete and lower-friction when the customer asks for something simpler', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'quero uma lembrancinha mais simples, sem exagero e mais em conta',
+      'tenant-id',
+    );
+
+    expect(response).toContain('algo mais simples e sem exagero');
+    expect(response).toContain('segura melhor o orcamento');
+    expect(response).toContain('Brigadeiro Gourmet');
   });
 
   it('adapts recommendation language to fashion catalogs', async () => {

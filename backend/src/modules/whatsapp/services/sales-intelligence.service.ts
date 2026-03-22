@@ -9,15 +9,28 @@ export type SalesConversationIntent =
   | 'other';
 
 export type SalesPricePreference = 'budget' | 'value' | 'premium' | null;
+export type SalesDecisionStage = 'discovering' | 'refining' | 'closing';
+export type SalesConversationDriver =
+  | 'urgency'
+  | 'reassurance'
+  | 'simplicity'
+  | 'recipient_context'
+  | 'value_pressure'
+  | 'exploration'
+  | 'closing_ready';
 
 export interface SalesConversationAnalysis {
   normalizedText: string;
   intent: SalesConversationIntent;
+  secondaryIntents: SalesConversationIntent[];
   confidence: number;
   commercialQuery: string | null;
   budgetCeiling: number | null;
   pricePreference: SalesPricePreference;
   objectionType: 'price' | 'uncertainty' | null;
+  decisionStage: SalesDecisionStage;
+  conversationDrivers: SalesConversationDriver[];
+  recipientHint: string | null;
   useCaseTags: string[];
   signals: {
     comparison: boolean;
@@ -25,6 +38,11 @@ export interface SalesConversationAnalysis {
     budget: boolean;
     objection: boolean;
     indecision: boolean;
+    urgency: boolean;
+    reassurance: boolean;
+    simplicity: boolean;
+    recipientContext: boolean;
+    closing: boolean;
   };
 }
 
@@ -95,8 +113,6 @@ export class SalesIntelligenceService {
     'caro demais',
     'salgado',
     'pesou',
-    'mais em conta',
-    'mais barato',
   ];
 
   private readonly indecisionPhrases = [
@@ -160,13 +176,88 @@ export class SalesIntelligenceService {
     'intenso no chocolate',
   ];
   private readonly quickChoicePhrases = ['sem enrolacao', 'um so', 'uma so', 'o melhor pra fechar'];
+  private readonly urgencyPhrases = [
+    'agora',
+    'pra agora',
+    'para agora',
+    'rapidinho',
+    'rapido',
+    'quanto antes',
+    'sem perder tempo',
+    'to com pressa',
+    'estou com pressa',
+    'pra hoje',
+    'para hoje',
+  ];
+  private readonly reassurancePhrases = [
+    'sem erro',
+    'nao quero errar',
+    'nao posso errar',
+    'quero acertar',
+    'quero fazer certo',
+    'quero ter certeza',
+    'tem certeza',
+    'me ajuda a acertar',
+    'nao quero pagar mico',
+    'nao quero passar vergonha',
+  ];
+  private readonly simplicityPhrases = [
+    'sem exagero',
+    'mais simples',
+    'simples',
+    'delicado',
+    'discreto',
+    'sem inventar',
+    'sem muita coisa',
+    'sem muita firula',
+    'facil de acertar',
+    'pratico',
+    'pratica',
+  ];
+  private readonly closingPhrases = [
+    'ja quero fechar',
+    'quero fechar',
+    'vamos fechar',
+    'pode fechar',
+    'pode ser esse',
+    'pode ser essa',
+    'vou nessa',
+    'vou nesse',
+    'esse mesmo',
+    'essa mesma',
+    'fechou',
+    'separa esse',
+    'separa essa',
+  ];
+  private readonly recipientRules: Array<{ label: string; patterns: string[] }> = [
+    { label: 'sua mae', patterns: ['pra minha mae', 'para minha mae', 'minha mae'] },
+    { label: 'seu pai', patterns: ['pra meu pai', 'para meu pai', 'meu pai'] },
+    { label: 'sua namorada', patterns: ['pra minha namorada', 'para minha namorada', 'minha namorada'] },
+    { label: 'seu namorado', patterns: ['pra meu namorado', 'para meu namorado', 'meu namorado'] },
+    { label: 'sua esposa', patterns: ['pra minha esposa', 'para minha esposa', 'minha esposa'] },
+    { label: 'seu marido', patterns: ['pra meu marido', 'para meu marido', 'meu marido'] },
+    { label: 'sua amiga', patterns: ['pra minha amiga', 'para minha amiga', 'minha amiga'] },
+    { label: 'seu amigo', patterns: ['pra meu amigo', 'para meu amigo', 'meu amigo'] },
+    { label: 'sua filha', patterns: ['pra minha filha', 'para minha filha', 'minha filha'] },
+    { label: 'seu filho', patterns: ['pra meu filho', 'para meu filho', 'meu filho'] },
+    { label: 'sua familia', patterns: ['pra minha familia', 'para minha familia', 'minha familia'] },
+    { label: 'sua equipe', patterns: ['pra minha equipe', 'para minha equipe', 'minha equipe'] },
+    { label: 'seu cliente', patterns: ['pro cliente', 'para o cliente', 'meu cliente'] },
+    { label: 'sua cliente', patterns: ['pra cliente', 'para cliente', 'minha cliente'] },
+    { label: 'outra pessoa', patterns: ['pra alguem', 'para alguem', 'outra pessoa'] },
+  ];
 
   constructor(private readonly messageIntelligenceService: MessageIntelligenceService) {}
 
   analyze(message: string): SalesConversationAnalysis {
     const normalizedText = this.messageIntelligenceService.normalizeText(message);
     const budgetCeiling = this.extractBudgetCeiling(normalizedText);
-    const useCaseTags = this.collectUseCaseTags(normalizedText);
+    const recipientHint = this.extractRecipientHint(normalizedText);
+    const urgency = this.hasAny(normalizedText, this.urgencyPhrases);
+    const reassurance = this.hasAny(normalizedText, this.reassurancePhrases);
+    const simplicity = this.hasAny(normalizedText, this.simplicityPhrases);
+    const closing = this.hasAny(normalizedText, this.closingPhrases);
+    const useCaseTags = this.collectUseCaseTags(normalizedText, recipientHint);
     const comparison =
       this.hasAny(normalizedText, this.comparisonPhrases) ||
       /\b(vs|versus)\b/.test(normalizedText) ||
@@ -177,7 +268,10 @@ export class SalesIntelligenceService {
       this.hasAny(normalizedText, this.recommendationPhrases) ||
       indecision ||
       useCaseTags.length > 0 ||
-      this.hasAny(normalizedText, this.quickChoicePhrases);
+      this.hasAny(normalizedText, this.quickChoicePhrases) ||
+      recipientHint !== null ||
+      reassurance ||
+      simplicity;
     const budget =
       budgetCeiling !== null ||
       this.hasAny(normalizedText, this.budgetPhrases) ||
@@ -206,11 +300,15 @@ export class SalesIntelligenceService {
       (recommendation ? 0.8 : 0) +
         (indecision ? 0.08 : 0) +
         (useCaseTags.length > 0 ? 0.06 : 0) +
+        (recipientHint ? 0.06 : 0) +
+        (reassurance ? 0.05 : 0) +
+        (simplicity ? 0.04 : 0) +
         (premium || bestValue ? 0.04 : 0),
     );
 
     let intent: SalesConversationIntent = 'other';
     let confidence = 0.3;
+    let primaryIntentScore = 0.3;
 
     if (
       comparisonScore >= Math.max(budgetScore, objectionScore, recommendationScore) &&
@@ -218,26 +316,61 @@ export class SalesIntelligenceService {
     ) {
       intent = 'comparison';
       confidence = comparisonScore;
+      primaryIntentScore = comparisonScore;
     } else if (objection && budgetCeiling === null && objectionScore >= 0.72) {
       intent = 'objection';
       confidence = objectionScore;
+      primaryIntentScore = objectionScore;
     } else if (
       budgetScore >= Math.max(objectionScore, recommendationScore) &&
       budgetScore >= 0.72
     ) {
       intent = 'budget';
       confidence = budgetScore;
+      primaryIntentScore = budgetScore;
     } else if (objectionScore >= recommendationScore && objectionScore >= 0.72) {
       intent = 'objection';
       confidence = objectionScore;
+      primaryIntentScore = objectionScore;
     } else if (recommendationScore >= 0.72) {
       intent = 'recommendation';
       confidence = recommendationScore;
+      primaryIntentScore = recommendationScore;
     }
+
+    const secondaryIntents = this.collectSecondaryIntents(intent, primaryIntentScore, {
+      comparison: comparisonScore,
+      budget: budgetScore,
+      objection: objectionScore,
+      recommendation: recommendationScore,
+    });
+    const decisionStage = this.inferDecisionStage(
+      intent,
+      normalizedText,
+      closing,
+      comparison,
+      budget,
+      objection,
+      indecision,
+      reassurance,
+      simplicity,
+      recipientHint,
+      useCaseTags,
+    );
+    const conversationDrivers = this.collectConversationDrivers(
+      decisionStage,
+      recipientHint,
+      urgency,
+      reassurance,
+      simplicity,
+      budget || cheaper || objection,
+      recommendation || indecision || comparison,
+    );
 
     return {
       normalizedText,
       intent,
+      secondaryIntents,
       confidence,
       commercialQuery: this.extractCommercialQuery(normalizedText),
       budgetCeiling,
@@ -247,6 +380,9 @@ export class SalesIntelligenceService {
           ? 'price'
           : 'uncertainty'
         : null,
+      decisionStage,
+      conversationDrivers,
+      recipientHint,
       useCaseTags,
       signals: {
         comparison,
@@ -254,6 +390,11 @@ export class SalesIntelligenceService {
         budget,
         objection,
         indecision,
+        urgency,
+        reassurance,
+        simplicity,
+        recipientContext: recipientHint !== null,
+        closing,
       },
     };
   }
@@ -298,10 +439,14 @@ export class SalesIntelligenceService {
     return null;
   }
 
-  private collectUseCaseTags(normalizedText: string): string[] {
+  private collectUseCaseTags(normalizedText: string, recipientHint: string | null): string[] {
     const tags = new Set<string>();
 
     if (this.hasAny(normalizedText, this.giftPhrases)) {
+      tags.add('gift');
+    }
+
+    if (recipientHint && !this.hasSelfTreatSignal(normalizedText)) {
       tags.add('gift');
     }
 
@@ -326,6 +471,114 @@ export class SalesIntelligenceService {
     }
 
     return Array.from(tags);
+  }
+
+  private extractRecipientHint(normalizedText: string): string | null {
+    for (const rule of this.recipientRules) {
+      if (this.hasAny(normalizedText, rule.patterns)) {
+        return rule.label;
+      }
+    }
+
+    return null;
+  }
+
+  private collectSecondaryIntents(
+    primaryIntent: SalesConversationIntent,
+    primaryScore: number,
+    scores: Record<Exclude<SalesConversationIntent, 'other'>, number>,
+  ): SalesConversationIntent[] {
+    if (primaryIntent === 'other') {
+      return [];
+    }
+
+    return Object.entries(scores)
+      .filter(([intent, score]) => {
+        if (intent === primaryIntent) {
+          return false;
+        }
+
+        return score >= 0.72 || primaryScore - score <= 0.12;
+      })
+      .sort((left, right) => right[1] - left[1])
+      .map(([intent]) => intent as SalesConversationIntent)
+      .slice(0, 2);
+  }
+
+  private inferDecisionStage(
+    intent: SalesConversationIntent,
+    normalizedText: string,
+    closing: boolean,
+    comparison: boolean,
+    budget: boolean,
+    objection: boolean,
+    indecision: boolean,
+    reassurance: boolean,
+    simplicity: boolean,
+    recipientHint: string | null,
+    useCaseTags: string[],
+  ): SalesDecisionStage {
+    if (closing && !comparison && !indecision) {
+      return 'closing';
+    }
+
+    if (
+      comparison ||
+      budget ||
+      objection ||
+      indecision ||
+      reassurance ||
+      simplicity ||
+      recipientHint !== null ||
+      useCaseTags.length >= 2 ||
+      /\b(entre|compar|ajuda a decidir|me ajuda a escolher)\b/.test(normalizedText)
+    ) {
+      return 'refining';
+    }
+
+    return intent === 'recommendation' ? 'discovering' : 'refining';
+  }
+
+  private collectConversationDrivers(
+    decisionStage: SalesDecisionStage,
+    recipientHint: string | null,
+    urgency: boolean,
+    reassurance: boolean,
+    simplicity: boolean,
+    valuePressure: boolean,
+    exploration: boolean,
+  ): SalesConversationDriver[] {
+    const drivers = new Set<SalesConversationDriver>();
+
+    if (urgency) {
+      drivers.add('urgency');
+    }
+
+    if (reassurance) {
+      drivers.add('reassurance');
+    }
+
+    if (simplicity) {
+      drivers.add('simplicity');
+    }
+
+    if (recipientHint) {
+      drivers.add('recipient_context');
+    }
+
+    if (valuePressure) {
+      drivers.add('value_pressure');
+    }
+
+    if (exploration) {
+      drivers.add('exploration');
+    }
+
+    if (decisionStage === 'closing') {
+      drivers.add('closing_ready');
+    }
+
+    return Array.from(drivers);
   }
 
   private hasAny(normalizedText: string, phrases: string[]): boolean {

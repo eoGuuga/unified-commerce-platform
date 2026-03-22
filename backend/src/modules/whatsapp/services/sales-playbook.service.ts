@@ -637,6 +637,10 @@ export class SalesPlaybookService {
     }
 
     if (analysis.useCaseTags.includes('gift')) {
+      if (analysis.recipientHint) {
+        return `Pensando em presentear ${analysis.recipientHint} sem errar a leitura, eu separaria estas opcoes:`;
+      }
+
       return (
         playbook.recommendationIntro.gift ||
         'Separei algumas opcoes que fazem sentido para esse contexto de presente:'

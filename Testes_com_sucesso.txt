@@ -698,3 +698,24 @@
   - caso critico validado no endpoint de teste:
     - entrada: `me indica algo rapido agora porque estou com pressa`
     - comportamento novo: resposta consultiva humana com urgencia, objetivo claro e recomendacoes do catalogo, sem cair em pedido torto
+
+2026-03-22
+- Ambiente: LOCAL
+- Escopo: aprofundar a leitura comercial composta do WhatsApp para entender melhor intencoes e mensagens de venda
+- Melhoria aplicada:
+  - a analise comercial passou a reconhecer intencao primaria + secundaria, em vez de ler a fala por um unico rotulo
+  - o motor agora identifica `recipientHint`, `decisionStage` e `conversationDrivers` como urgencia, seguranca, simplicidade e pressao de valor
+  - mensagens como `presente pra minha mae, ate X, sem erro e sem perder tempo` passaram a ser lidas como contexto composto de presente + orcamento + confianca + urgencia
+  - a resposta comercial ficou mais humana, espelhando melhor o que foi entendido da mensagem
+  - o ranking de produtos passou a valorizar melhor contexto de presente, velocidade, seguranca de indicacao e fechamento sem friccao
+  - a trava de `pedido ambiguo` deixou de sequestrar mensagens consultivas so porque tinham artigo como `um`
+- Arquivos principais:
+  - `backend/src/modules/whatsapp/services/sales-intelligence.service.ts`
+  - `backend/src/modules/whatsapp/services/sales-playbook.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.ts`
+  - `backend/src/modules/whatsapp/services/sales-intelligence.service.spec.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+- Validacao:
+  - `npm.cmd run test:unit` => `213/213` testes ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok

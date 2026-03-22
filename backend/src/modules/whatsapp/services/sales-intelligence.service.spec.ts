@@ -44,4 +44,31 @@ describe('SalesIntelligenceService', () => {
       expect.arrayContaining(['premium', 'chocolate_focus', 'self_treat', 'sharing']),
     );
   });
+
+  it('reads combined sales intent, recipient and reassurance in the same message', () => {
+    const analysis = service.analyze(
+      'me indica um presente pra minha mae ate 40 reais, sem erro e sem perder tempo',
+    );
+
+    expect(analysis.intent).toBe('recommendation');
+    expect(analysis.secondaryIntents).toContain('budget');
+    expect(analysis.useCaseTags).toContain('gift');
+    expect(analysis.recipientHint).toBe('sua mae');
+    expect(analysis.decisionStage).toBe('refining');
+    expect(analysis.conversationDrivers).toEqual(
+      expect.arrayContaining(['urgency', 'reassurance', 'recipient_context', 'value_pressure']),
+    );
+  });
+
+  it('detects a simpler lower-friction buying style when the customer wants something discreet', () => {
+    const analysis = service.analyze(
+      'quero uma lembrancinha mais simples, sem exagero e mais em conta',
+    );
+
+    expect(analysis.intent).toBe('recommendation');
+    expect(analysis.secondaryIntents).toContain('budget');
+    expect(analysis.conversationDrivers).toEqual(
+      expect.arrayContaining(['simplicity', 'value_pressure']),
+    );
+  });
 });
