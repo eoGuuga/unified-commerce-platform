@@ -2,6 +2,7 @@ import { PedidoStatus } from '../../database/entities/Pedido.entity';
 import { WhatsappService } from './whatsapp.service';
 import { MessageIntelligenceService } from './services/message-intelligence.service';
 import { ConversationalIntelligenceService } from './services/conversational-intelligence.service';
+import { ConversationPlannerService } from './services/conversation-planner.service';
 import { SalesIntelligenceService } from './services/sales-intelligence.service';
 import { SalesPlaybookService } from './services/sales-playbook.service';
 import { SalesSegmentStrategyService } from './services/sales-segment-strategy.service';
@@ -280,6 +281,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     const conversationalIntelligenceService = new ConversationalIntelligenceService(
       messageIntelligenceService,
     );
+    const conversationPlannerService = new ConversationPlannerService();
     const salesIntelligenceService = new SalesIntelligenceService(messageIntelligenceService);
     const salesPlaybookService = new SalesPlaybookService(messageIntelligenceService);
     const salesSegmentStrategyService = new SalesSegmentStrategyService(
@@ -297,6 +299,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       openAIService as any,
       messageIntelligenceService as any,
       conversationalIntelligenceService as any,
+      conversationPlannerService as any,
       salesIntelligenceService as any,
       salesPlaybookService as any,
       salesSegmentStrategyService as any,
@@ -1161,10 +1164,10 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       'tenant-id',
     );
 
-    expect(response).toContain('COMPARATIVO OBJETIVO');
+    expect(response).toContain('Vou te comparar do jeito mais util.');
     expect(response).toContain('Brigadeiro Gourmet');
     expect(response).toContain('Brownie Premium');
-    expect(response).toContain('Leitura comercial');
+    expect(response).toContain('Se a prioridade for economizar');
   });
 
   it('answers price objections with safer alternatives from the catalog', async () => {
@@ -1210,8 +1213,9 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       'tenant-id',
     );
 
-    expect(response).toContain('Leitura do catalogo atual');
+    expect(response).toContain('Dentro do catalogo atual da loja');
     expect(response).toContain('chocolates e doces');
+    expect(response).toContain('chocolate');
     expect(response).toContain('presente');
   });
 
@@ -1224,7 +1228,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     );
 
     expect(response).toContain('Brownie Premium');
-    expect(response).toContain('Leitura do catalogo atual: hoje a loja gira em chocolates e doces');
+    expect(response).toContain('Dentro do catalogo atual');
     expect(response).toContain('boa leitura para presente');
     expect(response).toContain('Voce quer um presente mais marcante na caixa');
   });
@@ -1301,7 +1305,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       'tenant-id',
     );
 
-    expect(response).toContain('Estrategia da moda');
+    expect(response).toContain('Aqui eu considerei principalmente uso de trabalho');
     expect(response).toContain('uso de trabalho');
     expect(response).toContain('Blazer Premium');
   });
@@ -1314,8 +1318,8 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       'tenant-id',
     );
 
-    expect(response).toContain('Leitura comercial da pet');
-    expect(response).toContain('Melhor rotina do pet');
+    expect(response).toContain('Vou te comparar do jeito mais util.');
+    expect(response).toContain('aderencia e rotina do pet');
     expect(response).toContain('Racao Premium Porte Medio');
     expect(response).toContain('Petisco Natural Filhote');
   });
@@ -1328,10 +1332,10 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       'tenant-id',
     );
 
-    expect(response).toContain('Estrategia da alimentacao');
+    expect(response).toContain('Pelo valor que voce me passou');
     expect(response).toContain('almoco ou refeicao principal');
     expect(response).toContain('Combo Executivo');
-    expect(response).toContain('Leitura da vertical alimentacao');
+    expect(response).toContain('Estas sao as opcoes que eu colocaria na sua frente agora:');
   });
 
   it('uses electronics strategy to compare products by compatibility', async () => {
@@ -1342,10 +1346,10 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       'tenant-id',
     );
 
-    expect(response).toContain('COMPARATIVO OBJETIVO');
+    expect(response).toContain('Vou te comparar do jeito mais util.');
     expect(response).toContain('compatibilidade');
     expect(response).toContain('iphone');
-    expect(response).toContain('Regra de fechamento da vertical eletronicos');
+    expect(response).toContain('Se a prioridade for');
   });
 
   it('suggests a restaurant complement when the catalog supports it', async () => {
@@ -1356,7 +1360,6 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       'tenant-id',
     );
 
-    expect(response).toContain('Leitura da vertical alimentacao');
     expect(response).toContain('Suco Natural');
     expect(response).toContain('Para esse almoco');
   });
@@ -1369,7 +1372,6 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       'tenant-id',
     );
 
-    expect(response).toContain('Leitura da vertical servicos');
     expect(response).toContain('agendar uma avaliacao');
     expect(response).toContain('Pacote de Manutencao Mensal');
   });
@@ -1437,9 +1439,32 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       }),
     );
 
-    expect(response).toContain('Calma, eu te explico certinho.');
-    expect(response).toContain('Agora eu so preciso do telefone');
+    expect(response).toContain('Eu te explico certinho');
+    expect(response).toContain('Neste momento eu so preciso do telefone');
     expect(response).toContain('TELEFONE DE CONTATO');
+  });
+
+  it('explains why the current stage matters when the customer questions the flow', async () => {
+    const service = createService(catalog) as any;
+
+    const response = await service.generateResponse(
+      'por que precisa disso agora?',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_phone',
+          pending_order: pendingConversationOrder,
+          customer_data: {
+            name: 'Ana Paula',
+            delivery_type: 'pickup',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Eu te explico certinho');
+    expect(response).toContain('Eu preciso disso para te atualizar');
+    expect(response).toContain('telefone de contato com DDD');
   });
 
   it('handles payment problems with a contextual conversational recovery', async () => {
@@ -1462,7 +1487,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       }),
     );
 
-    expect(response).toContain('vamos resolver isso sem perder o contexto');
+    expect(response).toContain('Sem problema, eu te ajudo nisso sem mexer errado no pedido.');
     expect(response).toContain('Pedido: *PED-20260315-CACE*');
     expect(response).toContain('Se o Pix nao apareceu, me diga "pix"');
   });
@@ -1497,7 +1522,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       }),
     );
 
-    expect(response).toContain('Posso te adiantar por aqui sem perder nada');
+    expect(response).toContain('Eu consigo te adiantar isso por aqui sem perder o que ja foi montado.');
     expect(response).toContain('Agora eu estou na revisao final do pedido.');
     expect(response).toContain('me diga exatamente o que ajustar');
   });
@@ -1537,6 +1562,29 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Me diga em uma frase o que deu errado');
     expect(response).toContain('quero um presente ate 50 reais');
     expect(response).toContain('acho que voce nao entendeu o que eu quis dizer');
+  });
+
+  it('keeps a more consultative tone when the customer is hesitant after a recommendation context', async () => {
+    const service = createService(catalog) as any;
+
+    const response = await service.generateResponse(
+      'to meio perdida ainda',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_names: ['Brownie Premium', 'Brigadeiro Gourmet'],
+            last_customer_goal: 'afinar a escolha antes de fechar',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('conduzir isso com voce de um jeito mais consultivo');
+    expect(response).toContain('continuo exatamente de onde a nossa conversa ficou');
+    expect(response).toContain('quero algo mais em conta');
   });
 
   it('asks for clarification when the customer is undecided between products', async () => {

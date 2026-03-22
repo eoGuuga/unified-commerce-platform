@@ -89,6 +89,14 @@ export type ConversationIntelligenceIntent =
   | 'suggestion'
   | 'other';
 
+export type ConversationResponseMode =
+  | 'step_guidance'
+  | 'issue_recovery'
+  | 'post_order_support'
+  | 'handoff_ready'
+  | 'sales_consultative'
+  | 'freeform_support';
+
 export interface ConversationIntelligenceMemory {
   last_intent?: ConversationIntelligenceIntent | null;
   last_product_name?: string | null;
@@ -96,6 +104,8 @@ export interface ConversationIntelligenceMemory {
   last_quantity?: number | null;
   last_query?: string | null;
   last_reference_at?: string | null;
+  last_response_mode?: ConversationResponseMode | null;
+  last_customer_goal?: string | null;
 }
 
 /**

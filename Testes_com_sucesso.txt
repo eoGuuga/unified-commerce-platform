@@ -456,8 +456,32 @@
 - Validacao dev/teste:
   - `https://dev.gtsofthub.com.br/api/v1/health` => ok
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => ok
-  - conversa guiada com numero novo:
+ - conversa guiada com numero novo:
     - `nao entendi, o que voce precisa agora?` em `collecting_phone` => explicou a etapa atual e repetiu o prompt de telefone
     - `quero falar com alguem porque voce nao entendeu` em `confirming_order` => manteve a revisao final ativa, sem cair em novo pedido
     - `deu ruim no pix, nao apareceu` em `waiting_payment` => respondeu com orientacao contextual de Pix e preservou o pedido
     - `deu ruim aqui, acho que voce nao entendeu` fora de fluxo => abriu orientacao livre e humana, sem jogar o cliente num menu seco
+
+2026-03-22
+- Ambiente: LOCAL
+- Escopo: aproximar o WhatsApp de uma IA conversacional mais natural, mantendo o motor seguro de venda e operacao
+- Correcao aplicada:
+  - criada camada de planejamento conversacional para decidir modo de resposta por conversa: explicacao de etapa, recuperacao de problema, suporte pos-pedido, handoff pronto e ponte consultiva de venda
+  - memoria curta agora tambem guarda `last_response_mode` e `last_customer_goal`, deixando a trilha mais coerente por conversa
+  - respostas de coleta ficaram menos roboticas e passaram a explicar o porquê de telefone, endereco, revisao e troco
+  - respostas comerciais ficaram bem mais humanas, removendo linguagem interna de motor como "leitura de vertical" e expondo so a parte util para o cliente
+  - contexto do catalogo agora aparece de forma natural, citando a leitura da loja em vez de texto tecnico
+- Arquivos principais:
+  - `backend/src/modules/whatsapp/services/conversation-planner.service.ts`
+  - `backend/src/modules/whatsapp/services/conversation-planner.service.spec.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+  - `backend/src/modules/whatsapp/whatsapp.module.ts`
+  - `backend/src/modules/whatsapp/types/whatsapp.types.ts`
+- Validacao local:
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/services/conversation-planner.service.spec.ts` => `4/4` testes ok
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/services/conversational-intelligence.service.spec.ts` => `4/4` testes ok
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.service.spec.ts` => `91/91` testes ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run test:unit -- --runInBand` => `175/175` testes ok
