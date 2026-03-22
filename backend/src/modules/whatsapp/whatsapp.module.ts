@@ -4,6 +4,7 @@ import { WhatsappController } from './whatsapp.controller';
 import { WhatsappService } from './whatsapp.service';
 import { OpenAIService } from './services/openai.service';
 import { MessageIntelligenceService } from './services/message-intelligence.service';
+import { ConversationalIntelligenceService } from './services/conversational-intelligence.service';
 import { SalesIntelligenceService } from './services/sales-intelligence.service';
 import { SalesPlaybookService } from './services/sales-playbook.service';
 import { SalesSegmentStrategyService } from './services/sales-segment-strategy.service';
@@ -36,6 +37,7 @@ import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity'
     WhatsappService,
     OpenAIService,
     MessageIntelligenceService,
+    ConversationalIntelligenceService,
     SalesIntelligenceService,
     SalesPlaybookService,
     SalesSegmentStrategyService,

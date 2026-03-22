@@ -1,6 +1,7 @@
 import { PedidoStatus } from '../../database/entities/Pedido.entity';
 import { WhatsappService } from './whatsapp.service';
 import { MessageIntelligenceService } from './services/message-intelligence.service';
+import { ConversationalIntelligenceService } from './services/conversational-intelligence.service';
 import { SalesIntelligenceService } from './services/sales-intelligence.service';
 import { SalesPlaybookService } from './services/sales-playbook.service';
 import { SalesSegmentStrategyService } from './services/sales-segment-strategy.service';
@@ -276,6 +277,9 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     };
 
     const messageIntelligenceService = new MessageIntelligenceService();
+    const conversationalIntelligenceService = new ConversationalIntelligenceService(
+      messageIntelligenceService,
+    );
     const salesIntelligenceService = new SalesIntelligenceService(messageIntelligenceService);
     const salesPlaybookService = new SalesPlaybookService(messageIntelligenceService);
     const salesSegmentStrategyService = new SalesSegmentStrategyService(
@@ -292,6 +296,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       config as any,
       openAIService as any,
       messageIntelligenceService as any,
+      conversationalIntelligenceService as any,
       salesIntelligenceService as any,
       salesPlaybookService as any,
       salesSegmentStrategyService as any,
@@ -1412,6 +1417,126 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     const response = await service.generateResponse('que bot ridiculo responde direito', 'tenant-id');
 
     expect(response).toContain('objetiva e respeitosa');
+  });
+
+  it('clarifies the current collection stage instead of sounding like a rigid menu', async () => {
+    const service = createService(catalog) as any;
+
+    const response = await service.generateResponse(
+      'nao entendi, o que voce precisa agora?',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_phone',
+          pending_order: pendingConversationOrder,
+          customer_data: {
+            name: 'Ana Paula',
+            delivery_type: 'pickup',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Calma, eu te explico certinho.');
+    expect(response).toContain('Agora eu so preciso do telefone');
+    expect(response).toContain('TELEFONE DE CONTATO');
+  });
+
+  it('handles payment problems with a contextual conversational recovery', async () => {
+    const { service } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue(pendingOrder),
+      },
+    });
+
+    const response = await service.generateResponse(
+      'deu ruim no pix, nao apareceu',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'waiting_payment',
+          waiting_payment: true,
+          pedido_id: 'ord-1',
+        },
+      }),
+    );
+
+    expect(response).toContain('vamos resolver isso sem perder o contexto');
+    expect(response).toContain('Pedido: *PED-20260315-CACE*');
+    expect(response).toContain('Se o Pix nao apareceu, me diga "pix"');
+  });
+
+  it('responds to human-help style requests without dropping the active review flow', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero falar com alguem porque voce nao entendeu',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'confirming_order',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 5,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 60,
+            discount_amount: 0,
+            shipping_amount: 10,
+            total_amount: 70,
+          },
+          customer_data: {
+            name: 'Jordan Lincoln Vasconcelos Kzan',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Posso te adiantar por aqui sem perder nada');
+    expect(response).toContain('Agora eu estou na revisao final do pedido.');
+    expect(response).toContain('me diga exatamente o que ajustar');
+  });
+
+  it('replies more humanly to gratitude after the order is confirmed', async () => {
+    const { service } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue(confirmedOrder),
+      },
+    });
+
+    const response = await service.generateResponse(
+      'obrigado',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'order_confirmed',
+          pedido_id: 'ord-1',
+        },
+      }),
+    );
+
+    expect(response).toContain('Ola, Cliente Perfeito!');
+    expect(response).toContain('O pedido segue na trilha certa');
+    expect(response).toContain('/pedido?order=PED-20260315-CACE');
+  });
+
+  it('offers a more open conversational recovery when the customer is lost outside a flow', async () => {
+    const service = createService(catalog) as any;
+
+    const response = await service.generateResponse(
+      'deu ruim aqui, acho que voce nao entendeu',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Me diga em uma frase o que deu errado');
+    expect(response).toContain('quero um presente ate 50 reais');
+    expect(response).toContain('acho que voce nao entendeu o que eu quis dizer');
   });
 
   it('asks for clarification when the customer is undecided between products', async () => {

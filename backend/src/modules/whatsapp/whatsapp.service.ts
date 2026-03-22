@@ -3,6 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { OpenAIService } from './services/openai.service';
 import { MessageIntelligenceService } from './services/message-intelligence.service';
 import {
+  ConversationalAnalysis,
+  ConversationalIntelligenceService,
+} from './services/conversational-intelligence.service';
+import {
   SalesConversationAnalysis,
   SalesIntelligenceService,
 } from './services/sales-intelligence.service';
@@ -172,6 +176,7 @@ export class WhatsappService {
     private config: ConfigService,
     private openAIService: OpenAIService,
     private messageIntelligenceService: MessageIntelligenceService,
+    private conversationalIntelligenceService: ConversationalIntelligenceService,
     private salesIntelligenceService: SalesIntelligenceService,
     private salesPlaybookService: SalesPlaybookService,
     private salesSegmentStrategyService: SalesSegmentStrategyService,
@@ -1851,6 +1856,270 @@ export class WhatsappService {
     );
   }
 
+  private isConversationalSupportBlockedByActionableIntent(
+    normalizedMessage: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): boolean {
+    if (!normalizedMessage) {
+      return true;
+    }
+
+    if (this.salesIntelligenceService.analyze(normalizedMessage).intent !== 'other') {
+      return true;
+    }
+
+    return (
+      this.isPaymentMethodSelection(normalizedMessage) ||
+      this.isPaymentProofIntent(normalizedMessage) ||
+      this.isPostOrderChangeIntent(normalizedMessage) ||
+      this.isCancelIntent(normalizedMessage, conversation, currentState) ||
+      this.looksLikeOrderStatusQuery(normalizedMessage, conversation) ||
+      this.isReopenIntent(normalizedMessage) ||
+      this.isRepeatOrderIntent(normalizedMessage) ||
+      this.isBareOrderIntent(normalizedMessage) ||
+      this.isOrderIntent(normalizedMessage) ||
+      this.looksLikeMultiItemOrder(normalizedMessage) ||
+      this.isDirectCatalogRequest(normalizedMessage) ||
+      this.isDirectPriceQuestion(normalizedMessage) ||
+      this.isDirectStockQuestion(normalizedMessage) ||
+      this.isDirectScheduleQuestion(normalizedMessage)
+    );
+  }
+
+  private getConversationalSupportLead(analysis: ConversationalAnalysis): string {
+    switch (analysis.intent) {
+      case 'issue':
+        return 'Sem problema, vamos resolver isso sem perder o contexto.';
+      case 'handoff':
+        return 'Posso te adiantar por aqui sem perder nada do que ja foi enviado.';
+      case 'hesitation':
+        return 'Sem pressa.';
+      case 'gratitude':
+        return 'Eu que agradeco.';
+      case 'clarification':
+        return 'Calma, eu te explico certinho.';
+      default:
+        return 'Posso te ajudar por aqui.';
+    }
+  }
+
+  private buildConversationalIdleSupportMessage(
+    analysis: ConversationalAnalysis,
+  ): string {
+    if (analysis.intent === 'gratitude') {
+      return [
+        'Eu que agradeco.',
+        '',
+        'Quando quiser continuar, pode falar do seu jeito.',
+        'Exemplo: "quero um presente", "status do pedido" ou "o pix nao apareceu".',
+      ].join('\n');
+    }
+
+    const lead = this.getConversationalSupportLead(analysis);
+    const bridge =
+      analysis.intent === 'handoff'
+        ? 'Se depois precisar envolver alguem da equipe, eu ja deixo o contexto organizado sem te fazer repetir tudo.'
+        : analysis.intent === 'issue'
+          ? 'Me diga em uma frase o que deu errado e eu tento te puxar para o caminho certo sem baguncar pedido, pagamento ou estoque.'
+          : 'Pode me dizer em uma frase o que voce quer resolver agora e eu sigo dai.';
+
+    return [
+      lead,
+      '',
+      bridge,
+      '',
+      'Voce pode falar naturalmente, por exemplo:',
+      '- "quero um presente ate 50 reais"',
+      '- "meu pix nao apareceu"',
+      '- "quero acompanhar meu pedido"',
+      '- "acho que voce nao entendeu o que eu quis dizer"',
+    ].join('\n');
+  }
+
+  private buildConversationalCollectionSupportMessage(
+    analysis: ConversationalAnalysis,
+    currentState: ConversationState,
+  ): string {
+    const lead = this.getConversationalSupportLead(analysis);
+
+    switch (currentState) {
+      case 'collecting_name':
+        return [
+          lead,
+          '',
+          'Agora eu so preciso do nome completo de quem vai receber o pedido.',
+          'Exemplo: "Ana Paula Souza".',
+        ].join('\n');
+      case 'collecting_address':
+        return [
+          lead,
+          '',
+          'Agora eu so preciso do endereco de entrega para fechar sem risco de erro.',
+          '',
+          this.getPremiumAddressPrompt(),
+        ].join('\n');
+      case 'collecting_phone':
+        return [
+          lead,
+          '',
+          'Agora eu so preciso do telefone de contato com DDD para seguir com seguranca.',
+          '',
+          this.getPremiumPhonePrompt(),
+        ].join('\n');
+      case 'collecting_notes':
+        return [
+          lead,
+          '',
+          'Agora eu so preciso saber se existe alguma observacao importante para a equipe.',
+          '',
+          this.getPremiumNotesPrompt(),
+        ].join('\n');
+      case 'collecting_cash_change':
+        return [
+          lead,
+          '',
+          'Agora eu so preciso saber o troco para quanto.',
+          'Exemplo: "troco para 100".',
+        ].join('\n');
+      case 'confirming_stock_adjustment':
+        return [
+          lead,
+          '',
+          'Eu estou validando a quantidade segura para o estoque agora.',
+          'Se quiser seguir, confirme a quantidade sugerida ou me diga outra quantidade.',
+        ].join('\n');
+      case 'confirming_order':
+        return [
+          lead,
+          '',
+          'Agora eu estou na revisao final do pedido.',
+          'Se algo estiver errado, me diga exatamente o que ajustar.',
+          'Se estiver tudo certo, responda "sim" ou "confirmar".',
+        ].join('\n');
+      default:
+        return lead;
+    }
+  }
+
+  private async buildConversationalPostFlowSupportMessage(
+    analysis: ConversationalAnalysis,
+    tenantId: string,
+    conversation: TypedConversation,
+    currentState: ConversationState,
+  ): Promise<string | null> {
+    const pedido = await this.resolveRelevantOrder(tenantId, conversation);
+    if (!pedido) {
+      return null;
+    }
+
+    if (analysis.intent === 'gratitude') {
+      return this.buildPostOrderCourtesyMessage(pedido, currentState);
+    }
+
+    if (currentState === 'waiting_payment') {
+      return [
+        this.getConversationalSupportLead(analysis),
+        '',
+        `Pedido: *${pedido.order_no}*`,
+        `Status atual: *${this.getStatusLabel(pedido.status)}*`,
+        'Agora eu estou aguardando a etapa de pagamento desse pedido.',
+        'Se o Pix nao apareceu, me diga "pix". Se voce ja pagou, me diga "ja paguei".',
+        '',
+        `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+      ].join('\n');
+    }
+
+    return [
+      this.getConversationalSupportLead(analysis),
+      '',
+      `Pedido: *${pedido.order_no}*`,
+      `Status atual: *${this.getStatusLabel(pedido.status)}*`,
+      this.getNextStepSummary(pedido, pedido.status),
+      'Se o problema for entrega, andamento ou alguma duvida dessa compra, me fale em uma frase que eu te respondo sem mexer errado no pedido.',
+      '',
+      `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+    ].join('\n');
+  }
+
+  private async tryConversationalSupportResponse(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): Promise<string | null> {
+    const analysis = this.conversationalIntelligenceService.analyze(message);
+    if (analysis.intent === 'other') {
+      return null;
+    }
+
+    const normalized = analysis.normalizedText;
+    if (
+      this.containsAbusiveLanguage(normalized) &&
+      !analysis.signals.issue &&
+      !analysis.signals.clarification
+    ) {
+      return null;
+    }
+
+    const activeConversationalState = Boolean(
+      currentState &&
+        [
+          'collecting_name',
+          'collecting_address',
+          'collecting_phone',
+          'collecting_notes',
+          'collecting_cash_change',
+          'confirming_stock_adjustment',
+          'confirming_order',
+        ].includes(currentState),
+    );
+    const allowConversationalOverride =
+      activeConversationalState &&
+      ['clarification', 'issue', 'handoff'].includes(analysis.intent);
+
+    if (
+      !allowConversationalOverride &&
+      this.isConversationalSupportBlockedByActionableIntent(
+        normalized,
+        conversation,
+        currentState,
+      )
+    ) {
+      return null;
+    }
+
+    if (
+      currentState &&
+      [
+        'collecting_name',
+        'collecting_address',
+        'collecting_phone',
+        'collecting_notes',
+        'collecting_cash_change',
+        'confirming_stock_adjustment',
+        'confirming_order',
+      ].includes(currentState)
+    ) {
+      return this.buildConversationalCollectionSupportMessage(analysis, currentState);
+    }
+
+    if (
+      conversation &&
+      currentState &&
+      ['waiting_payment', 'order_confirmed', 'order_completed'].includes(currentState)
+    ) {
+      return await this.buildConversationalPostFlowSupportMessage(
+        analysis,
+        tenantId,
+        conversation,
+        currentState,
+      );
+    }
+
+    return this.buildConversationalIdleSupportMessage(analysis);
+  }
+
   private getPremiumBoundaryMessage(abuseCount = 0): string {
     const tone =
       abuseCount >= 2
@@ -1961,13 +2230,14 @@ export class WhatsappService {
     return [
       'Nao quero te deixar preso num menu engessado.',
       '',
-      'Posso te ajudar se voce disser, por exemplo:',
+      'Pode falar do seu jeito que eu tento puxar para o caminho certo.',
+      'Se preferir um atalho, eu tambem consigo ajudar com coisas como:',
       '- "quero 10 brigadeiros"',
       '- "me indica algo para presente"',
       '- "preco de brownie"',
       '- "status do pedido"',
       '',
-      'Se preferir, envie "ajuda" que eu te mostro os caminhos principais.',
+      'Se tiver dado algum problema, pode dizer algo como "o pix nao apareceu" ou "acho que voce nao entendeu".',
     ].join('\n');
   }
 
@@ -5034,6 +5304,16 @@ export class WhatsappService {
     );
     if (pendingOrderAdjustment) {
       return pendingOrderAdjustment;
+    }
+
+    const conversationalSupport = await this.tryConversationalSupportResponse(
+      message,
+      tenantId,
+      conversation,
+      currentState,
+    );
+    if (conversationalSupport) {
+      return conversationalSupport;
     }
 
     if (currentState === 'confirming_stock_adjustment') {

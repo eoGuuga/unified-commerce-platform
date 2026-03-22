@@ -431,3 +431,25 @@
     - `nao ta certo` => abriu fluxo de ajuste, sem cancelar o pedido
     - `faltou 2 bolo de pote trufado de maracuja` => revisao final atualizada com as quantidades corrigidas
     - `Reabri pedid` => caiu na trilha de retomada segura, sem virar busca de produto
+
+2026-03-22
+- Ambiente: LOCAL
+- Escopo: deixar o WhatsApp menos "menu" e mais conversacional sem perder seguranca operacional
+- Correcao aplicada:
+  - criada camada de inteligencia conversacional para entender mensagens fora de fluxo, como pedido de ajuda, confusao, problema operacional, desejo de falar com alguem e agradecimento
+  - respostas em estados ativos ficaram mais humanas e explicam claramente o que falta agora, em vez de soar como menu rigido
+  - problemas em `waiting_payment` agora recebem orientacao contextual de Pix/pagamento sem desviar o pedido
+  - agradecimentos depois do pedido recebem resposta contextual e elegante, preservando acompanhamento
+  - fallback geral ficou mais aberto para conversa natural quando o cliente se perde ou diz que algo deu errado
+- Arquivos principais:
+  - `backend/src/modules/whatsapp/services/conversational-intelligence.service.ts`
+  - `backend/src/modules/whatsapp/services/conversational-intelligence.service.spec.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+  - `backend/src/modules/whatsapp/whatsapp.module.ts`
+- Validacao local:
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/services/conversational-intelligence.service.spec.ts` => `4/4` testes ok
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.service.spec.ts` => `89/89` testes ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run test:unit -- --runInBand` => `169/169` testes ok
