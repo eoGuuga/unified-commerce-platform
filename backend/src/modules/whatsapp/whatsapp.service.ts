@@ -611,6 +611,63 @@ export class WhatsappService {
     ].join('\n');
   }
 
+  private buildContextRecapMessage(
+    lead: string,
+    summaryLines: string[],
+    guidance: string,
+  ): string {
+    return [
+      lead,
+      '',
+      'RESUMO DO QUE JA ENTENDI',
+      ...(summaryLines.length ? summaryLines : ['- Ainda nao tenho contexto suficiente travado aqui.']),
+      '',
+      guidance,
+    ].join('\n');
+  }
+
+  private getCollectionCorrectionPrompt(currentState: ConversationState): string {
+    switch (currentState) {
+      case 'collecting_name':
+        return 'Pode me mandar o nome completo do jeito certo que eu ajusto sem apagar o resto.';
+      case 'collecting_address':
+        return 'Pode me mandar o endereco novamente do seu jeito que eu remonto por partes sem perder o resto do pedido.';
+      case 'collecting_phone':
+        return 'Pode me mandar o telefone novamente com DDD que eu corrijo aqui.';
+      case 'collecting_notes':
+        return 'Pode me mandar a observacao do jeito certo que eu atualizo isso para a equipe.';
+      case 'collecting_cash_change':
+        return 'Pode me dizer o troco correto, por exemplo: "troco para 100".';
+      case 'confirming_stock_adjustment':
+        return 'Me diga a quantidade certa que eu ajusto sem estourar o estoque.';
+      case 'confirming_order':
+        return 'Me diga exatamente o que ajustar: item, quantidade, entrega ou retirada, endereco, telefone ou observacao.';
+      default:
+        return 'Pode me dizer exatamente o que eu preciso corrigir que eu sigo dai.';
+    }
+  }
+
+  private getCollectionRecapGuidance(currentState: ConversationState): string {
+    switch (currentState) {
+      case 'collecting_name':
+        return 'Se isso estiver certo ate aqui, agora eu so preciso do nome completo de quem vai receber o pedido.';
+      case 'collecting_address':
+        return 'Se isso estiver certo ate aqui, agora eu so preciso do endereco de entrega.';
+      case 'collecting_phone':
+        return 'Se isso estiver certo ate aqui, agora eu so preciso do telefone de contato com DDD.';
+      case 'collecting_notes':
+        return 'Se isso estiver certo ate aqui, agora eu so preciso saber se existe alguma observacao importante.';
+      case 'collecting_cash_change':
+        return 'Se isso estiver certo ate aqui, agora eu so preciso saber o troco para quanto.';
+      case 'confirming_stock_adjustment':
+        return 'Se isso estiver certo ate aqui, confirme a quantidade sugerida ou me diga a quantidade correta.';
+      case 'confirming_order':
+        return 'Se algo estiver errado, me diga exatamente o que ajustar. Se estiver tudo certo, responda "sim" ou "confirmar".';
+      default:
+        return 'Se estiver tudo certo ate aqui, pode me dizer o proximo passo que eu continuo com voce.';
+    }
+  }
+
   private isCatalogSimilarFollowUpIntent(message: string): boolean {
     const normalized = this.normalizeIntentText(message);
     return this.hasAnyNormalizedPhrase(normalized, [
@@ -2300,6 +2357,17 @@ export class WhatsappService {
     plan?: ConversationPlan,
     conversation?: TypedConversation,
   ): string {
+    if (plan?.mode === 'context_recap') {
+      const summaryLines = this.buildCustomerFocusSnapshot(conversation);
+      return this.buildContextRecapMessage(
+        this.getConversationalSupportLead(analysis, plan),
+        summaryLines,
+        summaryLines.length
+          ? 'Se estiver tudo certo ate aqui, me diga o proximo passo que eu continuo do ponto certo.'
+          : 'Ainda nao tenho um pedido travado aqui. Se quiser, me diga o que voce quer resolver e eu comeco com voce do jeito certo.',
+      );
+    }
+
     if (analysis.intent === 'gratitude') {
       return [
         'Eu que agradeco.',
@@ -2375,6 +2443,14 @@ export class WhatsappService {
         : plan.mode === 'issue_recovery'
           ? 'Eu nao vou avancar nada errado antes de alinhar esse ponto com voce.'
           : '';
+    const contextRecap =
+      plan.mode === 'context_recap'
+        ? this.buildContextRecapMessage(
+            lead,
+            this.buildCustomerFocusSnapshot(conversation, currentState),
+            this.getCollectionRecapGuidance(currentState),
+          )
+        : null;
     const handoffMessage =
       plan.mode === 'handoff_ready'
         ? this.buildMemoryAwareHandoffMessage(
@@ -2388,6 +2464,10 @@ export class WhatsappService {
       return handoffMessage;
     }
 
+    if (contextRecap) {
+      return contextRecap;
+    }
+
     switch (currentState) {
       case 'collecting_name':
         return [
@@ -2395,7 +2475,9 @@ export class WhatsappService {
           '',
           whyThisStageMatters,
           reassurance,
-          'Neste momento eu so preciso do nome completo de quem vai receber o pedido.',
+          plan.mode === 'issue_recovery'
+            ? this.getCollectionCorrectionPrompt(currentState)
+            : 'Neste momento eu so preciso do nome completo de quem vai receber o pedido.',
           'Exemplo: "Ana Paula Souza".',
         ].join('\n');
       case 'collecting_address':
@@ -2404,7 +2486,9 @@ export class WhatsappService {
           '',
           whyThisStageMatters,
           reassurance,
-          'Neste momento eu so preciso do endereco de entrega para fechar sem risco de erro.',
+          plan.mode === 'issue_recovery'
+            ? this.getCollectionCorrectionPrompt(currentState)
+            : 'Neste momento eu so preciso do endereco de entrega para fechar sem risco de erro.',
           '',
           this.getPremiumAddressPrompt(),
         ].join('\n');
@@ -2414,7 +2498,9 @@ export class WhatsappService {
           '',
           whyThisStageMatters,
           reassurance,
-          'Neste momento eu so preciso do telefone de contato com DDD para seguir com seguranca.',
+          plan.mode === 'issue_recovery'
+            ? this.getCollectionCorrectionPrompt(currentState)
+            : 'Neste momento eu so preciso do telefone de contato com DDD para seguir com seguranca.',
           '',
           this.getPremiumPhonePrompt(),
         ].join('\n');
@@ -2424,7 +2510,9 @@ export class WhatsappService {
           '',
           whyThisStageMatters,
           reassurance,
-          'Neste momento eu so preciso saber se existe alguma observacao importante para a equipe.',
+          plan.mode === 'issue_recovery'
+            ? this.getCollectionCorrectionPrompt(currentState)
+            : 'Neste momento eu so preciso saber se existe alguma observacao importante para a equipe.',
           '',
           this.getPremiumNotesPrompt(),
         ].join('\n');
@@ -2434,7 +2522,9 @@ export class WhatsappService {
           '',
           whyThisStageMatters,
           reassurance,
-          'Neste momento eu so preciso saber o troco para quanto.',
+          plan.mode === 'issue_recovery'
+            ? this.getCollectionCorrectionPrompt(currentState)
+            : 'Neste momento eu so preciso saber o troco para quanto.',
           'Exemplo: "troco para 100".',
         ].join('\n');
       case 'confirming_stock_adjustment':
@@ -2443,8 +2533,12 @@ export class WhatsappService {
           '',
           whyThisStageMatters,
           reassurance,
-          'Eu estou validando a quantidade segura para o estoque agora.',
-          'Se quiser seguir, confirme a quantidade sugerida ou me diga outra quantidade.',
+          plan.mode === 'issue_recovery'
+            ? this.getCollectionCorrectionPrompt(currentState)
+            : 'Eu estou validando a quantidade segura para o estoque agora.',
+          plan.mode === 'issue_recovery'
+            ? 'Se quiser, eu ajusto a quantidade assim que voce me disser o numero certo.'
+            : 'Se quiser seguir, confirme a quantidade sugerida ou me diga outra quantidade.',
         ].join('\n');
       case 'confirming_order':
         return [
@@ -2453,7 +2547,9 @@ export class WhatsappService {
           whyThisStageMatters,
           reassurance,
           'Agora eu estou na revisao final do pedido.',
-          'Se algo estiver errado, me diga exatamente o que ajustar.',
+          plan.mode === 'issue_recovery'
+            ? this.getCollectionCorrectionPrompt(currentState)
+            : 'Se algo estiver errado, me diga exatamente o que ajustar.',
           'Se estiver tudo certo, responda "sim" ou "confirmar".',
         ].join('\n');
       default:
@@ -2475,6 +2571,23 @@ export class WhatsappService {
 
     if (analysis.intent === 'gratitude') {
       return this.buildPostOrderCourtesyMessage(pedido, currentState);
+    }
+
+    if (plan.mode === 'context_recap') {
+      return this.buildContextRecapMessage(
+        this.getConversationalSupportLead(analysis, plan),
+        this.buildCustomerFocusSnapshot(conversation, currentState, {
+          orderNo: pedido.order_no,
+          statusLabel: this.getStatusLabel(pedido.status),
+        }),
+        currentState === 'waiting_payment'
+          ? `Se estiver tudo certo ate aqui, me diga "pix" para gerar outra cobranca ou "ja paguei" se o pagamento ja foi feito. Acompanhamento: ${this.buildTrackingUrl(
+              pedido.order_no,
+            )}`
+          : `Se quiser, eu sigo por aqui com a proxima duvida sem mexer errado no pedido. Acompanhamento: ${this.buildTrackingUrl(
+              pedido.order_no,
+            )}`,
+      );
     }
 
     if (plan.mode === 'handoff_ready') {
@@ -6461,9 +6574,12 @@ export class WhatsappService {
     conversation?: TypedConversation,
   ): Promise<string> {
     const lowerMessage = this.normalizeIntentText(message);
+    const conversationalAnalysis = this.conversationalIntelligenceService.analyze(message);
 
     // ✅ NOVO: Verificar estado da conversa PRIMEIRO (antes de qualquer outra coisa)
     const currentState = conversation?.context?.state as ConversationState | undefined;
+    const shouldPrioritizeConversationalRecap =
+      conversationalAnalysis.intent === 'recap' && (!!conversation || !!currentState);
 
     // ✅ ALTA PRIORIDADE: cupom e status do pedido devem funcionar em qualquer estado
     const couponCode = this.extractCouponCode(message);
@@ -6507,7 +6623,10 @@ export class WhatsappService {
       return await this.handlePremiumReopenIntent(tenantId, conversation);
     }
 
-    if (this.looksLikeOrderStatusQuery(lowerMessage, conversation)) {
+    if (
+      !shouldPrioritizeConversationalRecap &&
+      this.looksLikeOrderStatusQuery(lowerMessage, conversation)
+    ) {
       return await this.handlePremiumOrderStatusQuery(tenantId, conversation, orderNo);
     }
 

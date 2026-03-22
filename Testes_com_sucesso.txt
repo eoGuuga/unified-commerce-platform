@@ -568,3 +568,26 @@
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
   - `npm.cmd run test:unit -- --runInBand` => `187/187` testes ok
+
+2026-03-22
+- Ambiente: LOCAL
+- Escopo: deixar o WhatsApp mais conversacional em recap, correcoes e retomada inteligente de contexto
+- Correcao aplicada:
+  - a inteligencia conversacional agora reconhece pedidos de resumo como `me resume`, `o que voce entendeu`, `como ficou meu pedido` e variacoes proximas
+  - o planner ganhou o modo `context_recap`, para o bot resumir o que ja entendeu sem abandonar o fluxo nem virar consulta de status generica
+  - durante coleta e revisao, o bot agora entrega recap de contexto com etapa atual, cliente, pedido em rascunho, categoria em foco e objetivo percebido quando houver contexto
+  - a ponte de correcao ficou mais precisa quando o cliente diz que o bot entendeu errado, especialmente na revisao final do pedido
+  - em pedidos ja criados, mensagens de resumo agora priorizam o recap conversacional em vez de cair automaticamente na resposta comum de status
+- Arquivos principais:
+  - `backend/src/modules/whatsapp/services/conversational-intelligence.service.ts`
+  - `backend/src/modules/whatsapp/services/conversation-planner.service.ts`
+  - `backend/src/modules/whatsapp/types/whatsapp.types.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+- Validacao local:
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/services/conversational-intelligence.service.spec.ts` => `5/5` testes ok
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/services/conversation-planner.service.spec.ts` => `6/6` testes ok
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.service.spec.ts` => `104/104` testes ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run test:unit -- --runInBand` => `193/193` testes ok

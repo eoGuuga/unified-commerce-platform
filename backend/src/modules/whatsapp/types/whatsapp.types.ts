@@ -92,6 +92,7 @@ export type ConversationIntelligenceIntent =
 export type ConversationResponseMode =
   | 'step_guidance'
   | 'issue_recovery'
+  | 'context_recap'
   | 'post_order_support'
   | 'handoff_ready'
   | 'sales_consultative'

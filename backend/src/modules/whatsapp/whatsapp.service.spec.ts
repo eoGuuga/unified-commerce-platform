@@ -1532,6 +1532,80 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('telefone de contato com DDD');
   });
 
+  it('recaps what the bot already understood during active collection without dropping the flow', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'me resume o que voce entendeu ate agora',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'confirming_order',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 5,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 60,
+            discount_amount: 0,
+            shipping_amount: 10,
+            total_amount: 70,
+          },
+          customer_data: {
+            name: 'Jordan Lincoln Vasconcelos Kzan',
+          },
+          intelligence_memory: {
+            last_catalog_category_name: 'Delicias',
+            last_customer_goal: 'fechar o pedido sem erro',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('RESUMO DO QUE JA ENTENDI');
+    expect(response).toContain('Etapa atual: Revisando o pedido antes de fechar');
+    expect(response).toContain('Cliente: Jordan Lincoln Vasconcelos Kzan');
+    expect(response).toContain('Pedido em rascunho: 5x Bala de brigadeiro');
+    expect(response).toContain('Se algo estiver errado, me diga exatamente o que ajustar.');
+  });
+
+  it('offers a precise correction bridge during final review instead of a generic fallback', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'nao foi isso, entendeu errado',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'confirming_order',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 5,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 60,
+            discount_amount: 0,
+            shipping_amount: 10,
+            total_amount: 70,
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Eu nao vou avancar nada errado antes de alinhar esse ponto com voce.');
+    expect(response).toContain(
+      'Me diga exatamente o que ajustar: item, quantidade, entrega ou retirada, endereco, telefone ou observacao.',
+    );
+  });
+
   it('handles payment problems with a contextual conversational recovery', async () => {
     const { service } = createFixture([], {
       orders: {
@@ -1555,6 +1629,35 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Sem problema, eu te ajudo nisso sem mexer errado no pedido.');
     expect(response).toContain('Pedido: *PED-20260315-CACE*');
     expect(response).toContain('Se o Pix nao apareceu, me diga "pix"');
+  });
+
+  it('recaps the current order context safely after the order is already waiting payment', async () => {
+    const { service } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue(pendingOrder),
+      },
+    });
+
+    const response = await service.generateResponse(
+      'como ficou meu pedido agora?',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'waiting_payment',
+          waiting_payment: true,
+          pedido_id: 'ord-1',
+          intelligence_memory: {
+            last_customer_goal: 'pagar com seguranca',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('RESUMO DO QUE JA ENTENDI');
+    expect(response).toContain('Pedido atual: PED-20260315-CACE');
+    expect(response).toContain('Status: Pagamento pendente');
+    expect(response).toContain('Se estiver tudo certo ate aqui, me diga "pix"');
   });
 
   it('responds to human-help style requests without dropping the active review flow', async () => {

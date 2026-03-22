@@ -53,6 +53,8 @@ export class ConversationPlannerService {
     'nao era isso',
     'nao e isso',
     'na verdade',
+    'entendeu errado',
+    'voce entendeu errado',
     'corrige',
     'corrigir',
     'ajusta',
@@ -92,6 +94,20 @@ export class ConversationPlannerService {
       );
 
     if (stateKind === 'active_collection') {
+      if (input.conversationalAnalysis.intent === 'recap') {
+        return this.buildResponse(
+          'context_recap',
+          'revisar o que eu ja entendi antes de seguir',
+          'Claro. Vou te resumir o que ja entendi para a gente alinhar sem perder nada.',
+          0.93,
+          stateKind,
+          true,
+          true,
+          false,
+          false,
+        );
+      }
+
       if (
         input.conversationalAnalysis.intent === 'handoff'
       ) {
@@ -145,6 +161,20 @@ export class ConversationPlannerService {
     }
 
     if (stateKind === 'post_order') {
+      if (input.conversationalAnalysis.intent === 'recap') {
+        return this.buildResponse(
+          'context_recap',
+          'revisar como esse pedido esta agora',
+          'Claro. Vou te resumir como esse pedido esta neste momento.',
+          0.92,
+          stateKind,
+          true,
+          true,
+          false,
+          false,
+        );
+      }
+
       if (input.conversationalAnalysis.intent === 'gratitude') {
         return this.buildResponse(
           'post_order_support',
@@ -219,6 +249,20 @@ export class ConversationPlannerService {
           true,
         );
       }
+    }
+
+    if (input.conversationalAnalysis.intent === 'recap') {
+      return this.buildResponse(
+        'context_recap',
+        'revisar o contexto que eu tenho antes de continuar',
+        'Claro. Vou te mostrar o que eu tenho entendido ate aqui.',
+        0.8,
+        stateKind,
+        false,
+        false,
+        false,
+        false,
+      );
     }
 
     if (input.conversationalAnalysis.intent === 'handoff') {

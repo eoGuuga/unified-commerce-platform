@@ -4,6 +4,7 @@ import { MessageIntelligenceService } from './message-intelligence.service';
 export type ConversationalIntent =
   | 'clarification'
   | 'issue'
+  | 'recap'
   | 'handoff'
   | 'gratitude'
   | 'hesitation'
@@ -16,6 +17,7 @@ export interface ConversationalAnalysis {
   signals: {
     clarification: boolean;
     issue: boolean;
+    recap: boolean;
     handoff: boolean;
     gratitude: boolean;
     hesitation: boolean;
@@ -86,6 +88,22 @@ export class ConversationalIntelligenceService {
     'suporte',
   ];
 
+  private readonly recapPhrases = [
+    'o que voce entendeu',
+    'o que vc entendeu',
+    'o que voce ja entendeu',
+    'me resume',
+    'resume pra mim',
+    'resume ai',
+    'repete meu pedido',
+    'me mostra como ficou',
+    'como ficou meu pedido',
+    'me fala como ficou',
+    'o que voce anotou',
+    'o que ja ficou salvo',
+    'me relembra',
+  ];
+
   private readonly gratitudePhrases = [
     'obrigado',
     'obrigada',
@@ -127,6 +145,7 @@ export class ConversationalIntelligenceService {
 
     const clarification = this.hasAny(normalizedText, this.clarificationPhrases);
     const issue = this.hasAny(normalizedText, this.issuePhrases);
+    const recap = this.hasAny(normalizedText, this.recapPhrases);
     const handoff = this.hasAny(normalizedText, this.handoffPhrases);
     const gratitude = this.hasAny(normalizedText, this.gratitudePhrases);
     const hesitation = this.hasAny(normalizedText, this.hesitationPhrases);
@@ -138,6 +157,9 @@ export class ConversationalIntelligenceService {
     if (handoff) {
       intent = 'handoff';
       confidence = 0.88;
+    } else if (recap) {
+      intent = 'recap';
+      confidence = 0.86;
     } else if (issue) {
       intent = 'issue';
       confidence = 0.84;
@@ -159,6 +181,7 @@ export class ConversationalIntelligenceService {
       signals: {
         clarification,
         issue,
+        recap,
         handoff,
         gratitude,
         hesitation,

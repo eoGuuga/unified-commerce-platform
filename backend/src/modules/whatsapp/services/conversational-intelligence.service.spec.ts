@@ -25,6 +25,13 @@ describe('ConversationalIntelligenceService', () => {
     expect(analysis.signals.handoff).toBe(true);
   });
 
+  it('detects recap requests without confusing them with a new transactional step', () => {
+    const analysis = service.analyze('me resume o que voce entendeu ate agora');
+
+    expect(analysis.intent).toBe('recap');
+    expect(analysis.signals.recap).toBe(true);
+  });
+
   it('detects gratitude without confusing it with a transactional command', () => {
     const analysis = service.analyze('obrigado, valeu');
 
