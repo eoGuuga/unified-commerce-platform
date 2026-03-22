@@ -352,3 +352,23 @@
   - `https://dev.gtsofthub.com.br/api/v1/health` => ok
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => ok
   - `POST /api/v1/whatsapp/test` com `metadata.isGroupMessage=true` => resposta vazia (`response: ""`)
+
+2026-03-21
+- Ambiente: LOCAL
+- Escopo: serializacao por conversa no WhatsApp para nao misturar mensagens, pedidos e contexto
+- Correcao aplicada:
+  - `WhatsappService` agora processa mensagens com lock por `tenant + telefone`
+  - mensagens do mesmo cliente entram em fila curta e nao executam em paralelo
+  - clientes diferentes continuam independentes e podem ser atendidos ao mesmo tempo
+  - lock usa Redis como caminho principal e fallback local em memoria se Redis ficar indisponivel nesta instancia
+  - se uma conversa do mesmo cliente estiver muito ocupada, o bot responde com orientacao curta para aguardar alguns segundos
+- Arquivos principais:
+  - `backend/src/modules/common/services/cache.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.module.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+- Validacao local:
+  - `npx.cmd jest src/modules/whatsapp/whatsapp.service.spec.ts --runInBand` => ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run test:unit` => `154/154` testes ok
