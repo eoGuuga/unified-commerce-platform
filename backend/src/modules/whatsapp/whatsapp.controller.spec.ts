@@ -6,7 +6,7 @@ import { WhatsappService } from './whatsapp.service';
 
 describe('WhatsappController', () => {
   let controller: WhatsappController;
-  let whatsappService: { processIncomingMessage: jest.Mock };
+  let whatsappService: { processIncomingMessage: jest.Mock; sendMessage: jest.Mock };
   let tenantsService: {
     findOneById: jest.Mock;
     validateWhatsAppNumber: jest.Mock;
@@ -15,6 +15,7 @@ describe('WhatsappController', () => {
   beforeEach(async () => {
     whatsappService = {
       processIncomingMessage: jest.fn().mockResolvedValue('ok'),
+      sendMessage: jest.fn().mockResolvedValue(undefined),
     };
 
     tenantsService = {
@@ -72,9 +73,39 @@ describe('WhatsappController', () => {
         }),
       }),
     );
+    expect(whatsappService.sendMessage).toHaveBeenCalledWith('5511991234567', 'ok');
     expect(response).toEqual({
       success: true,
       response: 'ok',
+    });
+  });
+
+  it('does not dispatch an outbound message when the bot response is empty', async () => {
+    whatsappService.processIncomingMessage.mockResolvedValueOnce('');
+
+    const response = await controller.webhook(
+      {
+        event: 'messages.upsert',
+        instance: 'loucas-teste',
+        data: {
+          key: {
+            remoteJid: '5511991234567@s.whatsapp.net',
+            fromMe: false,
+            id: 'msg-empty',
+          },
+          message: {
+            conversation: 'teste vazio',
+          },
+          messageTimestamp: 1711021200,
+        },
+      },
+      'tenant-loucas',
+    );
+
+    expect(whatsappService.sendMessage).not.toHaveBeenCalled();
+    expect(response).toEqual({
+      success: true,
+      response: '',
     });
   });
 

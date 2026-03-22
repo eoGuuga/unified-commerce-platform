@@ -292,6 +292,11 @@ export class WhatsappController {
     };
 
     const response = await this.whatsappService.processIncomingMessage(message);
+    const shouldDispatchResponse = typeof response === 'string' && response.trim().length > 0;
+
+    if (shouldDispatchResponse) {
+      await this.whatsappService.sendMessage(message.from, response);
+    }
 
     return {
       success: true,
