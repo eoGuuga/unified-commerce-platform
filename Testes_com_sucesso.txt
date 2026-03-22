@@ -402,3 +402,32 @@
   - `npx.cmd jest src/modules/whatsapp/whatsapp.controller.spec.ts --runInBand` => `7/7` testes ok
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
+
+2026-03-22
+- Ambiente: LOCAL + DEV/TESTE
+- Escopo: corrigir bugs reais da conversa da Loucas Por Brigadeiro no WhatsApp
+- Correcao aplicada:
+  - consulta de estoque agora nao "chuta" um item errado quando falta um qualificador importante no nome pesquisado
+  - pedido multi-item com virgula (`5 bala ..., 2 bolo ...`) agora preserva os dois itens em vez de fundir tudo em um nome ambiguo
+  - sugestoes proximas deixam de virar pedido automatico; o bot pede confirmacao quando ainda existe ambiguidade real
+  - durante coleta de nome/endereco/telefone e revisao final, mensagens como `faltou 2 bolo ...` agora ajustam o pedido em vez de serem tratadas como ruido
+  - endereco completo com CEP deixa de ser confundido com telefone so por ter muitos digitos
+  - resposta `nao ta certo` na revisao final deixa de cancelar o pedido inteiro e passa a abrir um fluxo seguro de ajuste
+  - intencoes truncadas como `reabri pedid` passam a cair na logica de retomada, nao em busca de produto
+- Arquivos principais:
+  - `backend/src/modules/whatsapp/whatsapp.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+- Validacao local:
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.service.spec.ts` => `84/84` testes ok
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.controller.spec.ts` => `7/7` testes ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+- Validacao dev/teste:
+  - `https://dev.gtsofthub.com.br/api/v1/health` => ok
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => ok
+  - `POST /api/v1/whatsapp/test` com numero novo:
+    - `Quero 5 bala de brigadeiro, 2 bolo de pote trufado de maracuja` => pedido preparado com os 2 itens corretos
+    - `Rua joana darc, 14, casa, icoaraci, pará. PA, 66814-000` => avancou para telefone, sem confundir com numero de contato
+    - `nao ta certo` => abriu fluxo de ajuste, sem cancelar o pedido
+    - `faltou 2 bolo de pote trufado de maracuja` => revisao final atualizada com as quantidades corrigidas
+    - `Reabri pedid` => caiu na trilha de retomada segura, sem virar busca de produto
