@@ -656,3 +656,14 @@
 - Evidencia:
   - o problema nao era mais de codigo do WhatsApp; a causa raiz era RLS sem policy de `UPDATE` em `tenants`
   - com a migration `014-tenants-update-policy.sql` aplicada no stack `ucmtest`, o estado do bot passou a persistir corretamente
+
+2026-03-22
+- Ambiente: DEV/TESTE
+- Escopo: tornar o bot totalmente silencioso quando estiver desligado
+- Resultado:
+  - `bot 7419 desligar` => `BOT DESLIGADO`
+  - cliente comum com bot desligado => resposta vazia (`""`)
+  - `bot 7419 ligar` => `BOT LIGADO`
+- Arquivos principais:
+  - `backend/src/modules/whatsapp/whatsapp.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
