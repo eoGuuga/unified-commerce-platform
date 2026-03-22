@@ -631,3 +631,15 @@
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
   - `npm.cmd run test:unit -- --runInBand` => `201/201` testes ok
+
+2026-03-22
+- Ambiente: LOCAL
+- Escopo: corrigir persistencia real do ligar/desligar do bot sob RLS
+- Correcao aplicada:
+  - identificada a causa raiz: a tabela `tenants` tinha policy RLS apenas para `SELECT`, entao o app lia o tenant mas nao conseguia persistir `whatsappBotEnabled`
+  - criada migration idempotente `014-tenants-update-policy.sql` para permitir `UPDATE` apenas do proprio tenant sob `app.current_tenant_id`
+  - scripts de migrations de `test` e `producao` foram atualizados para aplicar a nova policy automaticamente
+- Arquivos principais:
+  - `scripts/migrations/014-tenants-update-policy.sql`
+  - `deploy/scripts/run-migrations-test.sh`
+  - `deploy/scripts/run-migrations.sh`
