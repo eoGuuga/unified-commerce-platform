@@ -359,6 +359,7 @@ export class WhatsappController {
     message: string;
     tenantId: string;
     phoneNumber?: string;
+    phone?: string;
     messageId?: string;
     messageType?: 'text' | 'image' | 'document' | 'button' | 'audio';
     mediaUrl?: string;
@@ -368,7 +369,7 @@ export class WhatsappController {
       throw new BadRequestException('tenantId e obrigatorio. Use um tenant valido.');
     }
 
-    const phoneNumber = body.phoneNumber || '5511999999999';
+    const phoneNumber = body.phoneNumber || body.phone || '5511999999999';
     await this.tenantsService.findOneById(body.tenantId);
 
     const message = {

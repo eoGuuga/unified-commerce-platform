@@ -547,3 +547,24 @@
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
   - `npm.cmd run test:unit -- --runInBand` => `184/184` testes ok
+
+2026-03-22
+- Ambiente: LOCAL
+- Escopo: refinar inteligencia contextual do WhatsApp e endurecer ergonomia de testes e handoff
+- Correcao aplicada:
+  - o motor de linguagem passou a reconhecer melhor referencias como `esse item`, `esse produto`, `esse da lista`, `essa opcao` e variacoes proximas
+  - quando o cliente diz `quero esse item` depois de ver um produto, o bot agora usa a memoria correta do catalogo e pede a quantidade de forma segura, sem se perder
+  - o resumo de handoff deixou de expor nomes corrompidos que na pratica eram endereco, telefone ou payload invalido
+  - o endpoint de teste do WhatsApp agora aceita `phone` como alias de `phoneNumber`, reduzindo atrito na homologacao manual
+- Arquivos principais:
+  - `backend/src/modules/whatsapp/services/message-intelligence.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.controller.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+  - `backend/src/modules/whatsapp/whatsapp.controller.spec.ts`
+- Validacao local:
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.controller.spec.ts` => `9/9` testes ok
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.service.spec.ts` => `101/101` testes ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run test:unit -- --runInBand` => `187/187` testes ok

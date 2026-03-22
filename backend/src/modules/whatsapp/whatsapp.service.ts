@@ -527,7 +527,7 @@ export class WhatsappService {
       lines.push(`- Etapa atual: ${this.getConversationStageLabel(currentState)}`);
     }
 
-    if (customerData?.name) {
+    if (this.shouldExposeCustomerName(customerData?.name)) {
       lines.push(`- Cliente: ${customerData.name}`);
     }
 
@@ -569,6 +569,29 @@ export class WhatsappService {
     }
 
     return lines;
+  }
+
+  private shouldExposeCustomerName(name?: string | null): boolean {
+    const candidate = String(name || '').trim();
+    if (!candidate) {
+      return false;
+    }
+
+    if (!this.validateName(candidate).valid) {
+      return false;
+    }
+
+    const normalized = this.normalizeIntentText(candidate);
+    if (
+      normalized.includes('catalog_') ||
+      this.looksLikeStandalonePhoneMessage(candidate) ||
+      this.hasAddressKeyword(candidate) ||
+      this.isAddressLikelyComplete(candidate)
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   private buildMemoryAwareHandoffMessage(

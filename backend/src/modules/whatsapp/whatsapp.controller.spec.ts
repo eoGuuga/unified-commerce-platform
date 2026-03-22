@@ -276,4 +276,26 @@ describe('WhatsappController', () => {
       '5511988887777',
     );
   });
+
+  it('accepts phone as an alias for phoneNumber in the test endpoint', async () => {
+    const response = await controller.test({
+      message: 'oi',
+      tenantId: 'tenant-loucas',
+      phone: '5511977776666',
+    });
+
+    expect(tenantsService.findOneById).toHaveBeenCalledWith('tenant-loucas');
+    expect(whatsappService.processIncomingMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: '5511977776666',
+        body: 'oi',
+        tenantId: 'tenant-loucas',
+      }),
+    );
+    expect(response).toEqual({
+      success: true,
+      request: 'oi',
+      response: 'ok',
+    });
+  });
 });

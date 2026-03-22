@@ -1593,6 +1593,42 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Pedido em rascunho: 5x Bala de brigadeiro');
   });
 
+  it('does not expose corrupted customer names in the handoff summary', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero falar com alguem porque voce nao entendeu',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'confirming_order',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 5,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 60,
+            discount_amount: 0,
+            shipping_amount: 10,
+            total_amount: 70,
+          },
+          customer_data: {
+            name: 'Rua Joana Darc, 14, Icoaraci, Belem, PA',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('RESUMO PRONTO PARA ATENDIMENTO');
+    expect(response).toContain('Etapa atual: Revisando o pedido antes de fechar');
+    expect(response).toContain('Pedido em rascunho: 5x Bala de brigadeiro');
+    expect(response).not.toContain('Cliente: Rua Joana Darc');
+  });
+
   it('replies more humanly to gratitude after the order is confirmed', async () => {
     const { service } = createFixture([], {
       orders: {
@@ -2140,6 +2176,42 @@ describe('WhatsappService defensive WhatsApp flow', () => {
         ]),
       }),
     );
+  });
+
+  it('uses catalog memory when the customer says "quero esse item" after viewing a product', async () => {
+    const { service, conversationService } = createFixture(loucasCatalog, {
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(
+          createConversation({
+            context: {
+              state: 'idle',
+              intelligence_memory: {
+                last_catalog_product_id: 'l1',
+                last_catalog_category_key: 'delicias',
+                last_catalog_category_name: 'Delicias',
+                last_product_name: 'Bala de brigadeiro',
+                last_product_names: ['Bala de brigadeiro'],
+              },
+            },
+          }),
+        ),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const response = await service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'quero esse item',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'catalog-memory-buy-1',
+    });
+
+    expect(typeof response).toBe('string');
+    expect(response).toContain('Quantos *bala de brigadeiro*');
+    expect(response).toContain('Digite a quantidade');
+    expect(conversationService.savePendingOrder).not.toHaveBeenCalled();
   });
 
   it('uses commercial shortcut actions from the interactive catalog', async () => {
