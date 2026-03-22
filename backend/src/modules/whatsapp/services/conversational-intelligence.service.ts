@@ -10,9 +10,18 @@ export type ConversationalIntent =
   | 'hesitation'
   | 'other';
 
+export type ConversationalPosture =
+  | 'confused'
+  | 'frustrated'
+  | 'reassurance'
+  | 'hesitant'
+  | 'urgent'
+  | 'calm';
+
 export interface ConversationalAnalysis {
   normalizedText: string;
   intent: ConversationalIntent;
+  posture: ConversationalPosture;
   confidence: number;
   signals: {
     clarification: boolean;
@@ -22,6 +31,14 @@ export interface ConversationalAnalysis {
     gratitude: boolean;
     hesitation: boolean;
     frustration: boolean;
+    reassurance: boolean;
+    urgency: boolean;
+  };
+  responseStyle: {
+    empathy: boolean;
+    reassurance: boolean;
+    directness: boolean;
+    stepByStep: boolean;
   };
 }
 
@@ -129,6 +146,38 @@ export class ConversationalIntelligenceService {
     'estou vendo ainda',
   ];
 
+  private readonly reassurancePhrases = [
+    'tem certeza',
+    'vai dar certo',
+    'da certo',
+    'pode confiar',
+    'confiavel',
+    'confiavel mesmo',
+    'nao quero errar',
+    'nao posso errar',
+    'quero fazer certo',
+    'sem erro',
+    'quero ter certeza',
+    'me confirma',
+    'garante',
+    'ta seguro',
+    'esta seguro',
+  ];
+
+  private readonly urgencyPhrases = [
+    'agora',
+    'urgente',
+    'rapidinho',
+    'rapido',
+    'o mais rapido possivel',
+    'quanto antes',
+    'pra hoje',
+    'para hoje',
+    'to com pressa',
+    'estou com pressa',
+    'correndo',
+  ];
+
   private readonly frustrationPhrases = [
     'nao ta certo',
     'nao esta certo',
@@ -136,6 +185,19 @@ export class ConversationalIntelligenceService {
     'estranho isso',
     'ta confuso',
     'me perdi',
+    'to irritado',
+    'estou irritado',
+    'to irritada',
+    'estou irritada',
+    'to chateado',
+    'estou chateado',
+    'to chateada',
+    'estou chateada',
+    'to frustrado',
+    'estou frustrado',
+    'to frustrada',
+    'estou frustrada',
+    'sacanagem',
   ];
 
   constructor(private readonly messageIntelligenceService: MessageIntelligenceService) {}
@@ -150,8 +212,11 @@ export class ConversationalIntelligenceService {
     const gratitude = this.hasAny(normalizedText, this.gratitudePhrases);
     const hesitation = this.hasAny(normalizedText, this.hesitationPhrases);
     const frustration = this.hasAny(normalizedText, this.frustrationPhrases);
+    const reassurance = this.hasAny(normalizedText, this.reassurancePhrases);
+    const urgency = this.hasAny(normalizedText, this.urgencyPhrases);
 
     let intent: ConversationalIntent = 'other';
+    let posture: ConversationalPosture = 'calm';
     let confidence = 0.2;
 
     if (handoff) {
@@ -174,9 +239,22 @@ export class ConversationalIntelligenceService {
       confidence = 0.78;
     }
 
+    if (issue || frustration) {
+      posture = 'frustrated';
+    } else if (reassurance) {
+      posture = 'reassurance';
+    } else if (clarification) {
+      posture = 'confused';
+    } else if (hesitation) {
+      posture = 'hesitant';
+    } else if (urgency) {
+      posture = 'urgent';
+    }
+
     return {
       normalizedText,
       intent,
+      posture,
       confidence,
       signals: {
         clarification,
@@ -186,6 +264,14 @@ export class ConversationalIntelligenceService {
         gratitude,
         hesitation,
         frustration,
+        reassurance,
+        urgency,
+      },
+      responseStyle: {
+        empathy: posture === 'frustrated',
+        reassurance: posture === 'reassurance',
+        directness: posture === 'urgent',
+        stepByStep: posture === 'confused' || clarification,
       },
     };
   }

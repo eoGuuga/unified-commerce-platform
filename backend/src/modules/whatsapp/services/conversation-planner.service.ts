@@ -95,23 +95,27 @@ export class ConversationPlannerService {
 
     if (stateKind === 'active_collection') {
       if (input.conversationalAnalysis.intent === 'recap') {
-        return this.buildResponse(
-          'context_recap',
-          'revisar o que eu ja entendi antes de seguir',
-          'Claro. Vou te resumir o que ja entendi para a gente alinhar sem perder nada.',
-          0.93,
-          stateKind,
-          true,
-          true,
-          false,
-          false,
+        return this.refinePlan(
+          this.buildResponse(
+            'context_recap',
+            'revisar o que eu ja entendi antes de seguir',
+            'Claro. Vou te resumir o que ja entendi para a gente alinhar sem perder nada.',
+            0.93,
+            stateKind,
+            true,
+            true,
+            false,
+            false,
+          ),
+          input,
         );
       }
 
       if (
         input.conversationalAnalysis.intent === 'handoff'
       ) {
-        return this.buildResponse(
+        return this.refinePlan(
+          this.buildResponse(
           'handoff_ready',
           'ser atendido sem repetir tudo',
           'Eu consigo te adiantar isso por aqui sem perder o que ja foi montado.',
@@ -121,6 +125,8 @@ export class ConversationPlannerService {
           true,
           true,
           false,
+          ),
+          input,
         );
       }
 
@@ -128,7 +134,8 @@ export class ConversationPlannerService {
         input.conversationalAnalysis.intent === 'issue' ||
         hasCorrectionSignal
       ) {
-        return this.buildResponse(
+        return this.refinePlan(
+          this.buildResponse(
           'issue_recovery',
           'corrigir esse ponto sem baguncar o pedido',
           'Sem problema, eu seguro isso com voce sem avancar nada errado.',
@@ -138,6 +145,8 @@ export class ConversationPlannerService {
           true,
           false,
           false,
+          ),
+          input,
         );
       }
 
@@ -146,7 +155,8 @@ export class ConversationPlannerService {
         hasQuestionSignal ||
         hasReassuranceSignal
       ) {
-        return this.buildResponse(
+        return this.refinePlan(
+          this.buildResponse(
           'step_guidance',
           'entender a etapa atual e seguir com seguranca',
           'Eu te explico certinho sem te fazer perder o que ja foi montado.',
@@ -156,13 +166,16 @@ export class ConversationPlannerService {
           true,
           true,
           false,
+          ),
+          input,
         );
       }
     }
 
     if (stateKind === 'post_order') {
       if (input.conversationalAnalysis.intent === 'recap') {
-        return this.buildResponse(
+        return this.refinePlan(
+          this.buildResponse(
           'context_recap',
           'revisar como esse pedido esta agora',
           'Claro. Vou te resumir como esse pedido esta neste momento.',
@@ -172,11 +185,14 @@ export class ConversationPlannerService {
           true,
           false,
           false,
+          ),
+          input,
         );
       }
 
       if (input.conversationalAnalysis.intent === 'gratitude') {
-        return this.buildResponse(
+        return this.refinePlan(
+          this.buildResponse(
           'post_order_support',
           'ter certeza de que o pedido segue na trilha certa',
           'Eu que agradeco.',
@@ -186,11 +202,14 @@ export class ConversationPlannerService {
           true,
           false,
           false,
+          ),
+          input,
         );
       }
 
       if (input.conversationalAnalysis.intent === 'handoff') {
-        return this.buildResponse(
+        return this.refinePlan(
+          this.buildResponse(
           'handoff_ready',
           'ser atendido sem perder o contexto do pedido',
           'Eu consigo adiantar isso por aqui e, se precisar, deixo o contexto pronto para a equipe.',
@@ -200,6 +219,8 @@ export class ConversationPlannerService {
           true,
           false,
           false,
+          ),
+          input,
         );
       }
 
@@ -215,7 +236,8 @@ export class ConversationPlannerService {
             ? 'resolver o pagamento sem perder o pedido'
             : 'entender ou ajustar algo desse pedido sem mexer errado nele';
 
-        return this.buildResponse(
+        return this.refinePlan(
+          this.buildResponse(
           'post_order_support',
           customerGoal,
           'Sem problema, eu te ajudo nisso sem mexer errado no pedido.',
@@ -225,6 +247,8 @@ export class ConversationPlannerService {
           true,
           false,
           false,
+          ),
+          input,
         );
       }
     }
@@ -234,10 +258,12 @@ export class ConversationPlannerService {
         input.conversationalAnalysis.intent === 'clarification' ||
         input.conversationalAnalysis.intent === 'hesitation' ||
         input.conversationalAnalysis.intent === 'issue' ||
+        input.conversationalAnalysis.posture === 'urgent' ||
         hasQuestionSignal ||
         hasReassuranceSignal
       ) {
-        return this.buildResponse(
+        return this.refinePlan(
+          this.buildResponse(
           'sales_consultative',
           'afinar a escolha antes de fechar',
           'Sem pressa, eu posso conduzir isso com voce de um jeito mais consultivo.',
@@ -247,12 +273,15 @@ export class ConversationPlannerService {
           false,
           false,
           true,
+          ),
+          input,
         );
       }
     }
 
     if (input.conversationalAnalysis.intent === 'recap') {
-      return this.buildResponse(
+      return this.refinePlan(
+        this.buildResponse(
         'context_recap',
         'revisar o contexto que eu tenho antes de continuar',
         'Claro. Vou te mostrar o que eu tenho entendido ate aqui.',
@@ -262,11 +291,14 @@ export class ConversationPlannerService {
         false,
         false,
         false,
+        ),
+        input,
       );
     }
 
     if (input.conversationalAnalysis.intent === 'handoff') {
-      return this.buildResponse(
+      return this.refinePlan(
+        this.buildResponse(
         'handoff_ready',
         'ser atendido sem repetir tudo do zero',
         'Posso organizar isso com voce por aqui e, se precisar, deixar tudo pronto para atendimento humano.',
@@ -276,6 +308,8 @@ export class ConversationPlannerService {
         false,
         false,
         false,
+        ),
+        input,
       );
     }
 
@@ -287,7 +321,8 @@ export class ConversationPlannerService {
       hasCorrectionSignal ||
       hasReassuranceSignal
     ) {
-      return this.buildResponse(
+      return this.refinePlan(
+        this.buildResponse(
         'freeform_support',
         'explicar melhor o que voce precisa ou o que deu errado',
         'Pode me falar com calma que eu separo isso do jeito certo.',
@@ -297,10 +332,15 @@ export class ConversationPlannerService {
         false,
         false,
         false,
+        ),
+        input,
       );
     }
 
-    return this.buildResponse('none', '', '', 0.2, stateKind, false, false, false, false);
+    return this.refinePlan(
+      this.buildResponse('none', '', '', 0.2, stateKind, false, false, false, false),
+      input,
+    );
   }
 
   private getStateKind(currentState?: ConversationState): PlannerStateKind {
@@ -331,6 +371,118 @@ export class ConversationPlannerService {
 
   private hasAny(normalizedText: string, phrases: string[]): boolean {
     return phrases.some((phrase) => normalizedText.includes(phrase));
+  }
+
+  private refinePlan(plan: ConversationPlan, input: ConversationPlanInput): ConversationPlan {
+    if (plan.mode === 'none') {
+      return plan;
+    }
+
+    const posture = input.conversationalAnalysis.posture;
+    const refinedLead = this.getRefinedLead(plan, posture);
+    const refinedGoal = this.getRefinedGoal(plan, posture);
+
+    return {
+      ...plan,
+      lead: refinedLead || plan.lead,
+      customerGoal: refinedGoal || plan.customerGoal,
+    };
+  }
+
+  private getRefinedLead(
+    plan: ConversationPlan,
+    posture: ConversationPlanInput['conversationalAnalysis']['posture'],
+  ): string | null {
+    switch (plan.mode) {
+      case 'step_guidance':
+        if (posture === 'reassurance') {
+          return 'Vou te conduzir com clareza para voce nao confirmar nada no escuro.';
+        }
+        if (posture === 'urgent') {
+          return 'Vou ser direto e te puxar so para a proxima etapa importante.';
+        }
+        if (posture === 'confused') {
+          return 'Vou te explicar em uma etapa por vez para ficar bem claro.';
+        }
+        return null;
+      case 'issue_recovery':
+        return posture === 'frustrated'
+          ? 'Calma, eu vou corrigir isso com voce sem perder o que ja foi montado.'
+          : null;
+      case 'post_order_support':
+        if (posture === 'reassurance') {
+          return 'Eu vou te orientar com seguranca sem mexer errado no pedido.';
+        }
+        if (posture === 'frustrated') {
+          return 'Eu vou tratar isso com voce sem mexer errado no pedido.';
+        }
+        return null;
+      case 'sales_consultative':
+        if (posture === 'hesitant') {
+          return 'Sem pressa, eu te ajudo a afinar a escolha sem te empurrar nada.';
+        }
+        if (posture === 'urgent') {
+          return 'Se voce quiser, eu corto caminho com seguranca e te levo direto para a melhor opcao agora.';
+        }
+        if (posture === 'reassurance') {
+          return 'Eu vou te recomendar com criterio, sem te empurrar nada no escuro.';
+        }
+        return null;
+      case 'freeform_support':
+        if (posture === 'frustrated') {
+          return 'Pode me falar com calma. Eu separo esse problema sem baguncar o resto.';
+        }
+        if (posture === 'urgent') {
+          return 'Me diga em uma frase o ponto principal e eu vou direto no que resolve.';
+        }
+        if (posture === 'reassurance') {
+          return 'Pode falar com calma que eu te respondo com clareza, sem te deixar no escuro.';
+        }
+        return null;
+      default:
+        return null;
+    }
+  }
+
+  private getRefinedGoal(
+    plan: ConversationPlan,
+    posture: ConversationPlanInput['conversationalAnalysis']['posture'],
+  ): string | null {
+    switch (plan.mode) {
+      case 'step_guidance':
+        if (posture === 'reassurance') {
+          return 'seguir com seguranca e entender exatamente o que falta';
+        }
+        if (posture === 'urgent') {
+          return 'resolver a proxima etapa sem perder tempo nem errar';
+        }
+        return null;
+      case 'issue_recovery':
+        return posture === 'frustrated'
+          ? 'corrigir esse ponto sem te fazer repetir tudo'
+          : null;
+      case 'post_order_support':
+        return posture === 'reassurance'
+          ? 'ter seguranca sobre o proximo passo desse pedido'
+          : null;
+      case 'sales_consultative':
+        if (posture === 'hesitant') {
+          return 'afinar a escolha com calma antes de fechar';
+        }
+        if (posture === 'urgent') {
+          return 'chegar rapido na melhor opcao sem comprar no impulso';
+        }
+        if (posture === 'reassurance') {
+          return 'escolher com seguranca sem medo de errar';
+        }
+        return null;
+      case 'freeform_support':
+        return posture === 'frustrated'
+          ? 'explicar o problema sem misturar pedido e ruido'
+          : null;
+      default:
+        return null;
+    }
   }
 
   private buildResponse(

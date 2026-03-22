@@ -1524,7 +1524,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       }),
     );
 
-    expect(response).toContain('Eu te explico certinho');
+    expect(response).toContain('Vou te explicar em uma etapa por vez para ficar bem claro.');
     expect(response).toContain('Neste momento eu so preciso do telefone');
     expect(response).toContain('TELEFONE DE CONTATO');
   });
@@ -1547,7 +1547,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       }),
     );
 
-    expect(response).toContain('Eu te explico certinho');
+    expect(response).toContain('Vou ser direto e te puxar so para a proxima etapa importante.');
     expect(response).toContain('Eu preciso disso para te atualizar');
     expect(response).toContain('telefone de contato com DDD');
   });
@@ -1716,7 +1716,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       }),
     );
 
-    expect(response).toContain('Sem problema, eu te ajudo nisso sem mexer errado no pedido.');
+    expect(response).toContain('Eu vou tratar isso com voce sem mexer errado no pedido.');
     expect(response).toContain('Pedido: *PED-20260315-CACE*');
     expect(response).toContain('Se o Pix nao apareceu, me diga "pix"');
   });
@@ -1880,6 +1880,73 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('conduzir isso com voce de um jeito mais consultivo');
     expect(response).toContain('continuo exatamente de onde a nossa conversa ficou');
     expect(response).toContain('quero algo mais em conta');
+  });
+
+  it('builds more trust when the customer seeks reassurance during collection', async () => {
+    const service = createService(catalog) as any;
+
+    const response = await service.generateResponse(
+      'nao quero errar, me confirma o que falta agora',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_phone',
+          pending_order: pendingConversationOrder,
+          customer_data: {
+            name: 'Ana Paula',
+            delivery_type: 'pickup',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('nao confirmar nada no escuro');
+    expect(response).toContain('telefone de contato com DDD');
+  });
+
+  it('gets more direct without ficar robotico when the customer is urgent in consultative selling', async () => {
+    const service = createService(catalog) as any;
+
+    const response = await service.generateResponse(
+      'me indica algo rapido agora porque estou com pressa',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_names: ['Brownie Premium', 'Brigadeiro Gourmet'],
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('corto caminho com seguranca');
+    expect(response).toContain('chegar rapido na melhor opcao');
+    expect(response).toContain('Estas sao as opcoes que eu colocaria na sua frente agora');
+    expect(response).not.toContain('Quantos *me indica algo rapido');
+  });
+
+  it('builds consultative trust during recommendation instead of sounding like a dry menu', async () => {
+    const service = createService(catalog) as any;
+
+    const response = await service.generateResponse(
+      'me recomenda algo, mas eu quero ter certeza antes de fechar',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_names: ['Brownie Premium', 'Brigadeiro Gourmet'],
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('nao escolher no escuro');
+    expect(response).toContain('Estas sao as opcoes que eu colocaria na sua frente agora');
+    expect(response).toContain('Exemplo: "quero 1');
   });
 
   it('asks for clarification when the customer is undecided between products', async () => {

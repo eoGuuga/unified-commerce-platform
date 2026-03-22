@@ -93,4 +93,40 @@ describe('ConversationPlannerService', () => {
     expect(plan.mode).toBe('context_recap');
     expect(plan.customerGoal).toContain('pedido');
   });
+
+  it('refines collection guidance when the customer is seeking reassurance', () => {
+    const plan = service.buildPlan({
+      message: 'nao quero errar, me confirma o que falta agora',
+      conversationalAnalysis: conversationalIntelligenceService.analyze(
+        'nao quero errar, me confirma o que falta agora',
+      ),
+      salesAnalysis: salesIntelligenceService.analyze(
+        'nao quero errar, me confirma o que falta agora',
+      ),
+      currentState: 'collecting_phone',
+    });
+
+    expect(plan.mode).toBe('step_guidance');
+    expect(plan.lead).toContain('nao confirmar nada no escuro');
+    expect(plan.customerGoal).toContain('seguir com seguranca');
+  });
+
+  it('refines consultative selling when the customer wants speed without perder seguranca', () => {
+    const plan = service.buildPlan({
+      message: 'me indica algo rapido agora porque estou com pressa',
+      conversationalAnalysis: conversationalIntelligenceService.analyze(
+        'me indica algo rapido agora porque estou com pressa',
+      ),
+      salesAnalysis: salesIntelligenceService.analyze(
+        'me indica algo rapido agora porque estou com pressa',
+      ),
+      memory: {
+        last_intent: 'recommendation',
+      },
+    });
+
+    expect(plan.mode).toBe('sales_consultative');
+    expect(plan.lead).toContain('corto caminho com seguranca');
+    expect(plan.customerGoal).toContain('chegar rapido na melhor opcao');
+  });
 });

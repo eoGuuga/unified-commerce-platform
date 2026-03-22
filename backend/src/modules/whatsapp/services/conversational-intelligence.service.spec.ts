@@ -38,4 +38,28 @@ describe('ConversationalIntelligenceService', () => {
     expect(analysis.intent).toBe('gratitude');
     expect(analysis.signals.gratitude).toBe(true);
   });
+
+  it('detects reassurance-seeking posture in trust-sensitive messages', () => {
+    const analysis = service.analyze('nao quero errar, me confirma se vai dar certo');
+
+    expect(analysis.posture).toBe('reassurance');
+    expect(analysis.signals.reassurance).toBe(true);
+    expect(analysis.responseStyle.reassurance).toBe(true);
+  });
+
+  it('detects urgency posture without confusing it with an issue', () => {
+    const analysis = service.analyze('preciso resolver isso rapido agora');
+
+    expect(analysis.posture).toBe('urgent');
+    expect(analysis.signals.urgency).toBe(true);
+    expect(analysis.responseStyle.directness).toBe(true);
+  });
+
+  it('detects frustrated posture when the customer is clearly upset', () => {
+    const analysis = service.analyze('ta confuso, to frustrado com isso');
+
+    expect(analysis.posture).toBe('frustrated');
+    expect(analysis.signals.frustration).toBe(true);
+    expect(analysis.responseStyle.empathy).toBe(true);
+  });
 });

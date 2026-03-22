@@ -2469,6 +2469,28 @@ export class WhatsappService {
     }
   }
 
+  private getConversationalCalibrationLine(
+    analysis: ConversationalAnalysis,
+    plan?: ConversationPlan,
+  ): string {
+    switch (analysis.posture) {
+      case 'frustrated':
+        return plan?.mode === 'issue_recovery' || plan?.mode === 'post_order_support'
+          ? 'Eu vou separar o problema sem perder contexto nem baguncar o que ja esta certo.'
+          : 'Eu vou organizar isso em uma etapa por vez para nao virar mais ruido.';
+      case 'reassurance':
+        return 'Eu vou te orientar com clareza para voce nao confirmar nada sem entender o que esta acontecendo.';
+      case 'urgent':
+        return 'Vou ser objetivo e puxar so o que resolve agora, sem pular o que e critico.';
+      case 'confused':
+        return 'Vou separar isso em uma etapa por vez para ficar claro.';
+      case 'hesitant':
+        return 'Sem pressa: eu posso te ajudar a comparar com criterio antes de fechar.';
+      default:
+        return '';
+    }
+  }
+
   private getCollectionStageNeedExplanation(
     currentState: ConversationState,
     customerData?: CustomerData,
@@ -2538,6 +2560,8 @@ export class WhatsappService {
     plan?: ConversationPlan,
     conversation?: TypedConversation,
   ): string {
+    const calibration = this.getConversationalCalibrationLine(analysis, plan);
+
     if (plan?.mode === 'context_recap') {
       const summaryLines = this.buildCustomerFocusSnapshot(conversation);
       return this.buildContextRecapMessage(
@@ -2567,6 +2591,8 @@ export class WhatsappService {
 
       return [
         this.getConversationalSupportLead(analysis, plan),
+        '',
+        calibration,
         '',
         `Entendi que agora voce quer ${plan.customerGoal}.`,
         bridge,
@@ -2598,6 +2624,8 @@ export class WhatsappService {
     return [
       lead,
       '',
+      calibration,
+      '',
       bridge,
       '',
       'Voce pode falar naturalmente, por exemplo:',
@@ -2616,6 +2644,7 @@ export class WhatsappService {
   ): string {
     const customerData = (conversation?.context?.customer_data || {}) as CustomerData;
     const lead = this.getConversationalSupportLead(analysis, plan);
+    const calibration = this.getConversationalCalibrationLine(analysis, plan);
     const whyThisStageMatters = plan.explainWhyCurrentStep
       ? this.getCollectionStageNeedExplanation(currentState, customerData)
       : '';
@@ -2655,6 +2684,8 @@ export class WhatsappService {
         return [
           lead,
           '',
+          calibration,
+          '',
           whyThisStageMatters,
           reassurance,
           plan.mode === 'issue_recovery'
@@ -2666,6 +2697,8 @@ export class WhatsappService {
         const needsDeliveryChoice = !customerData?.delivery_type;
         return [
           lead,
+          '',
+          calibration,
           '',
           whyThisStageMatters,
           reassurance,
@@ -2683,6 +2716,8 @@ export class WhatsappService {
         return [
           lead,
           '',
+          calibration,
+          '',
           whyThisStageMatters,
           reassurance,
           plan.mode === 'issue_recovery'
@@ -2694,6 +2729,8 @@ export class WhatsappService {
       case 'collecting_notes':
         return [
           lead,
+          '',
+          calibration,
           '',
           whyThisStageMatters,
           reassurance,
@@ -2707,6 +2744,8 @@ export class WhatsappService {
         return [
           lead,
           '',
+          calibration,
+          '',
           whyThisStageMatters,
           reassurance,
           plan.mode === 'issue_recovery'
@@ -2717,6 +2756,8 @@ export class WhatsappService {
       case 'confirming_stock_adjustment':
         return [
           lead,
+          '',
+          calibration,
           '',
           whyThisStageMatters,
           reassurance,
@@ -2730,6 +2771,8 @@ export class WhatsappService {
       case 'confirming_order':
         return [
           lead,
+          '',
+          calibration,
           '',
           whyThisStageMatters,
           reassurance,
@@ -2755,6 +2798,8 @@ export class WhatsappService {
     if (!pedido) {
       return null;
     }
+
+    const calibration = this.getConversationalCalibrationLine(analysis, plan);
 
     if (analysis.intent === 'gratitude') {
       return this.buildPostOrderCourtesyMessage(pedido, currentState);
@@ -2794,6 +2839,8 @@ export class WhatsappService {
       return [
         this.getConversationalSupportLead(analysis, plan),
         '',
+        calibration,
+        '',
         `Entendi que agora voce quer ${plan.customerGoal}.`,
         `Pedido: *${pedido.order_no}*`,
         `Status atual: *${this.getStatusLabel(pedido.status)}*`,
@@ -2806,6 +2853,8 @@ export class WhatsappService {
 
     return [
       this.getConversationalSupportLead(analysis, plan),
+      '',
+      calibration,
       '',
       `Entendi que agora voce quer ${plan.customerGoal}.`,
       `Pedido: *${pedido.order_no}*`,
@@ -4453,6 +4502,7 @@ export class WhatsappService {
     catalogProfile: CatalogSalesProfile,
     verticalPack: SalesVerticalPackProfile,
     crossSellSuggestion: SalesVerticalCrossSellSuggestion | null,
+    conversationPrelude: string[] = [],
     referenceProduct?: ProductWithStock | null,
   ): string {
     const intro = this.salesPlaybookService.buildRecommendationIntro(playbook, analysis);
@@ -4477,6 +4527,8 @@ export class WhatsappService {
       : '';
 
     return [
+      ...conversationPrelude,
+      conversationPrelude.length ? '' : null,
       intro,
       '',
       reasoningLine,
@@ -4505,6 +4557,7 @@ export class WhatsappService {
     strategy: SalesConversationStrategy,
     catalogProfile: CatalogSalesProfile,
     verticalPack: SalesVerticalPackProfile,
+    conversationPrelude: string[] = [],
   ): string {
     const [left, right] = comparedProducts;
     const leftPrice = Number(left.price || 0);
@@ -4537,6 +4590,8 @@ export class WhatsappService {
     const needLine = this.buildSalesNeedLine(strategy);
 
     return [
+      ...conversationPrelude,
+      conversationPrelude.length ? '' : null,
       'Vou te comparar do jeito mais util.',
       '',
       `1. ${this.formatProductHeadline(left)} | Estoque: ${left.available_stock} unidade(s)`,
@@ -4566,6 +4621,7 @@ export class WhatsappService {
     catalogProfile: CatalogSalesProfile,
     verticalPack: SalesVerticalPackProfile,
     closestProducts: RankedSalesProduct[],
+    conversationPrelude: string[] = [],
   ): string {
     const conversationFocus = this.catalogSalesContextService.buildConversationFocusLine(
       catalogProfile,
@@ -4580,6 +4636,8 @@ export class WhatsappService {
     const needLine = this.buildSalesNeedLine(strategy);
 
     return [
+      ...conversationPrelude,
+      conversationPrelude.length ? '' : null,
       `Com esse teto de ate R$ ${this.formatCurrency(analysis.budgetCeiling || 0)}, eu nao encontrei algo realmente forte disponivel agora.`,
       reasoningLine,
       needLine,
@@ -4596,6 +4654,69 @@ export class WhatsappService {
     ]
       .filter(Boolean)
       .join('\n');
+  }
+
+  private buildSalesConversationPrelude(
+    conversationalAnalysis: ConversationalAnalysis,
+    plan: ConversationPlan,
+  ): string[] {
+    const lines: string[] = [];
+
+    if (plan.mode === 'sales_consultative') {
+      lines.push(plan.lead);
+      lines.push(`Entendi que agora voce quer ${plan.customerGoal}.`);
+
+      switch (conversationalAnalysis.posture) {
+        case 'urgent':
+          lines.push(
+            'Por isso, eu vou priorizar as opcoes mais certeiras sem te fazer rodar o catalogo inteiro.',
+          );
+          break;
+        case 'reassurance':
+          lines.push(
+            'Eu vou te mostrar isso com criterio para voce nao decidir no escuro.',
+          );
+          break;
+        case 'frustrated':
+          lines.push(
+            'Eu vou simplificar a leitura para voce bater o olho e entender o que realmente faz sentido.',
+          );
+          break;
+        case 'hesitant':
+          lines.push(
+            'Eu vou manter poucas opcoes boas na mesa para ficar mais facil decidir sem pressao.',
+          );
+          break;
+        case 'confused':
+          lines.push(
+            'Eu vou organizar isso do jeito mais claro possivel antes de sugerir qualquer item.',
+          );
+          break;
+        default:
+          break;
+      }
+
+      return lines;
+    }
+
+    switch (conversationalAnalysis.posture) {
+      case 'urgent':
+        return [
+          'Entendi a pressa, entao eu vou direto nas opcoes com mais chance de encaixar bem agora.',
+        ];
+      case 'reassurance':
+        return ['Vou te recomendar com criterio para voce nao escolher no escuro.'];
+      case 'frustrated':
+        return [
+          'Entendi que isso precisa ficar mais claro, entao eu vou simplificar e te passar so o que faz sentido.',
+        ];
+      case 'hesitant':
+        return ['Sem pressa, eu separo poucas opcoes boas para facilitar sua decisao.'];
+      case 'confused':
+        return ['Vou organizar isso de um jeito simples para voce entender rapido.'];
+      default:
+        return [];
+    }
   }
 
   private pickRecommendationProducts(
@@ -4850,6 +4971,20 @@ export class WhatsappService {
       return null;
     }
 
+    const conversationalAnalysis = this.conversationalIntelligenceService.analyze(message);
+    const currentState = conversation?.context?.state as ConversationState | undefined;
+    const conversationPlan = this.conversationPlannerService.buildPlan({
+      message,
+      conversationalAnalysis,
+      salesAnalysis: analysis,
+      currentState,
+      memory: this.getConversationIntelligenceMemory(conversation),
+    });
+    const conversationPrelude = this.buildSalesConversationPrelude(
+      conversationalAnalysis,
+      conversationPlan,
+    );
+
     const products = await this.getCatalogProducts(tenantId);
     if (!products.length) {
       return 'Ainda nao ha produtos publicados para eu recomendar agora.';
@@ -4882,6 +5017,8 @@ export class WhatsappService {
           last_product_names: comparisonProducts.map((product) => product.name),
           last_quantity: null,
           last_query: analysis.commercialQuery || null,
+          last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
+          last_customer_goal: conversationPlan.customerGoal || null,
         });
 
         return this.buildSalesComparisonResponse(
@@ -4891,6 +5028,7 @@ export class WhatsappService {
           strategy,
           catalogProfile,
           verticalPack,
+          conversationPrelude,
         );
       }
     }
@@ -4922,6 +5060,7 @@ export class WhatsappService {
         catalogProfile,
         verticalPack,
         rankedProducts,
+        conversationPrelude,
       );
     }
 
@@ -4940,6 +5079,8 @@ export class WhatsappService {
       last_product_names: rankedProducts.map((item) => item.product.name),
       last_quantity: null,
       last_query: analysis.commercialQuery || null,
+      last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
+      last_customer_goal: conversationPlan.customerGoal || null,
     });
 
     const crossSellSuggestion = this.salesVerticalPackService.findCrossSellSuggestion(
@@ -4956,6 +5097,7 @@ export class WhatsappService {
       catalogProfile,
       verticalPack,
       crossSellSuggestion,
+      conversationPrelude,
       referenceProduct,
     );
   }
@@ -7098,6 +7240,11 @@ export class WhatsappService {
     }
 
     if (currentState && !['idle', 'order_confirmed', 'order_completed'].includes(currentState)) {
+      return null;
+    }
+
+    const salesAnalysis = this.salesIntelligenceService.analyze(message);
+    if (salesAnalysis.intent !== 'other') {
       return null;
     }
 
