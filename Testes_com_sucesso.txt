@@ -667,3 +667,34 @@
 - Arquivos principais:
   - `backend/src/modules/whatsapp/whatsapp.service.ts`
   - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+
+2026-03-22
+- Ambiente: LOCAL
+- Escopo: aprofundar a inteligencia conversacional de venda do WhatsApp
+- Melhoria aplicada:
+  - a recomendacao comercial passou a ler postura conversacional (`urgent`, `reassurance`, `frustrated`, `hesitant`, `confused`) para responder com mais criterio humano
+  - a memoria contextual deixou de sequestrar mensagens consultivas como se fossem selecao de produto, evitando cair em captura de pedido torta
+  - a recomendacao agora incorpora `lead` e `customerGoal` do planner conversacional antes das opcoes do catalogo
+  - o bot passou a lembrar melhor o objetivo comercial e o modo da ultima resposta tambem em recomendacao/comparacao
+- Arquivos principais:
+  - `backend/src/modules/whatsapp/services/conversational-intelligence.service.ts`
+  - `backend/src/modules/whatsapp/services/conversation-planner.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+- Validacao:
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/services/conversational-intelligence.service.spec.ts src/modules/whatsapp/services/conversation-planner.service.spec.ts src/modules/whatsapp/whatsapp.service.spec.ts` => `128/128` testes ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run test:unit` => `209/209` testes ok
+
+2026-03-22
+- Ambiente: DEV/TESTE
+- Escopo: homologar a nova camada conversacional consultiva da Loucas Por Brigadeiro
+- Resultado:
+  - backend de `dev/teste` atualizado por Git para o commit funcional `62fe26e`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+  - o bot estava pausado no tenant; foi religado via comando administrativo `bot 7419 ligar`
+  - caso critico validado no endpoint de teste:
+    - entrada: `me indica algo rapido agora porque estou com pressa`
+    - comportamento novo: resposta consultiva humana com urgencia, objetivo claro e recomendacoes do catalogo, sem cair em pedido torto
