@@ -34,8 +34,10 @@ import { OrdersService } from '../orders/orders.service';
 import { PaymentsService, CreatePaymentDto } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CacheService } from '../common/services/cache.service';
+import { TenantsService } from '../tenants/tenants.service';
 import { CanalVenda, PedidoStatus, Pedido } from '../../database/entities/Pedido.entity';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
+import { Tenant } from '../../database/entities/Tenant.entity';
 import { TypedConversation, ProductSearchResult, toTypedConversation, ConversationState, CustomerData, PendingOrder, PendingOrderItem, StockAdjustmentContext, ConversationIntelligenceMemory } from './types/whatsapp.types';
 import { ProductWithStock } from '../products/types/product.types';
 import * as crypto from 'crypto';
@@ -225,12 +227,180 @@ export class WhatsappService {
     private catalogSalesContextService: CatalogSalesContextService,
     private cacheService: CacheService,
     private conversationService: ConversationService,
+    private tenantsService: TenantsService,
     private productsService: ProductsService,
     private ordersService: OrdersService,
     private paymentsService: PaymentsService,
     private couponsService: CouponsService,
     private notificationsService: NotificationsService,
   ) {}
+
+  private normalizePhoneForControl(phoneNumber?: string | null): string {
+    return String(phoneNumber || '').replace(/\D/g, '');
+  }
+
+  private getTenantSettingValue<T = unknown>(tenant: Tenant, keys: string[]): T | undefined {
+    const settings = (tenant?.settings || {}) as Record<string, unknown>;
+
+    for (const key of keys) {
+      if (settings[key] !== undefined && settings[key] !== null) {
+        return settings[key] as T;
+      }
+    }
+
+    return undefined;
+  }
+
+  private getBotControlNumbers(tenant: Tenant): string[] {
+    const configured =
+      this.getTenantSettingValue<string[]>(tenant, [
+        'whatsappBotControlNumbers',
+        'whatsapp_bot_control_numbers',
+        'botControlNumbers',
+        'bot_control_numbers',
+      ]) || [];
+
+    if (Array.isArray(configured) && configured.length > 0) {
+      return configured.map((item) => this.normalizePhoneForControl(item)).filter(Boolean);
+    }
+
+    const fallback =
+      this.getTenantSettingValue<string[]>(tenant, ['whatsappNumbers', 'whatsapp_numbers']) || [];
+
+    return Array.isArray(fallback)
+      ? fallback.map((item) => this.normalizePhoneForControl(item)).filter(Boolean)
+      : [];
+  }
+
+  private getBotControlCode(tenant: Tenant): string | null {
+    const configured = this.getTenantSettingValue<string>(tenant, [
+      'whatsappBotControlCode',
+      'whatsapp_bot_control_code',
+      'botControlCode',
+      'bot_control_code',
+    ]);
+
+    const fallback = this.config.get<string>('WHATSAPP_BOT_CONTROL_CODE');
+    return String(configured || fallback || '').trim() || null;
+  }
+
+  private isBotEnabled(tenant: Tenant): boolean {
+    const explicit = this.getTenantSettingValue<boolean>(tenant, [
+      'whatsappBotEnabled',
+      'whatsapp_bot_enabled',
+      'botEnabled',
+      'bot_enabled',
+    ]);
+
+    if (typeof explicit === 'boolean') {
+      return explicit;
+    }
+
+    return true;
+  }
+
+  private isAuthorizedBotControlSender(tenant: Tenant, phoneNumber: string): boolean {
+    const normalizedPhone = this.normalizePhoneForControl(phoneNumber);
+    const controlNumbers = this.getBotControlNumbers(tenant);
+
+    return controlNumbers.some((configuredNumber) => {
+      if (normalizedPhone === configuredNumber) {
+        return true;
+      }
+
+      const last9Phone = normalizedPhone.slice(-9);
+      const last9Configured = configuredNumber.slice(-9);
+      if (last9Phone === last9Configured && last9Phone.length === 9) {
+        return true;
+      }
+
+      const last11Phone = normalizedPhone.slice(-11);
+      const last11Configured = configuredNumber.slice(-11);
+      if (last11Phone === last11Configured && last11Phone.length === 11) {
+        return true;
+      }
+
+      return false;
+    });
+  }
+
+  private parseBotControlCommand(message: string): {
+    matched: boolean;
+    code?: string;
+    action?: 'status' | 'on' | 'off';
+  } {
+    const normalized = String(message || '').trim();
+    const match = normalized.match(/^#?bot\s+(\S+)\s+(ligar|desligar|status|on|off)$/i);
+
+    if (!match) {
+      return { matched: false };
+    }
+
+    const actionToken = match[2].toLowerCase();
+    const action =
+      actionToken === 'ligar' || actionToken === 'on'
+        ? 'on'
+        : actionToken === 'desligar' || actionToken === 'off'
+          ? 'off'
+          : 'status';
+
+    return {
+      matched: true,
+      code: match[1],
+      action,
+    };
+  }
+
+  private buildBotControlStatusMessage(enabled: boolean): string {
+    return enabled
+      ? 'BOT ATIVO\n\nO atendimento automatico esta ligado e respondendo normalmente.'
+      : 'BOT PAUSADO\n\nO atendimento automatico esta desligado. As mensagens ficam sem fluxo automatico ate voce religar.';
+  }
+
+  private getBotDisabledMessage(): string {
+    return [
+      'ATENDIMENTO AUTOMATICO PAUSADO',
+      '',
+      'No momento o bot esta temporariamente desligado.',
+      'Sua mensagem foi recebida e a equipe pode seguir por aqui manualmente.',
+    ].join('\n');
+  }
+
+  private async tryHandleBotControlCommand(
+    tenant: Tenant,
+    message: WhatsappMessage,
+  ): Promise<WhatsappOutboundResponse | null> {
+    const command = this.parseBotControlCommand(message.body || '');
+    if (!command.matched) {
+      return null;
+    }
+
+    if (!this.isAuthorizedBotControlSender(tenant, message.from)) {
+      return null;
+    }
+
+    const configuredCode = this.getBotControlCode(tenant);
+    if (!configuredCode) {
+      return 'Canal administrativo indisponivel. Configure primeiro o codigo de controle do bot.';
+    }
+
+    if (String(command.code || '').trim() !== configuredCode) {
+      return 'Codigo administrativo invalido.';
+    }
+
+    if (command.action === 'status') {
+      return this.buildBotControlStatusMessage(this.isBotEnabled(tenant));
+    }
+
+    const nextEnabled = command.action === 'on';
+    await this.tenantsService.updateSettings(tenant.id, {
+      whatsappBotEnabled: nextEnabled,
+    });
+
+    return nextEnabled
+      ? 'BOT LIGADO\n\nPronto. O atendimento automatico voltou a responder normalmente.'
+      : 'BOT DESLIGADO\n\nPronto. O atendimento automatico foi pausado e nao vai mais responder clientes ate voce religar.';
+  }
 
   /**
    * ✅ IDEMPOTÊNCIA (WhatsApp):
@@ -6427,6 +6597,31 @@ export class WhatsappService {
         throw new BadRequestException('Tenant ID é obrigatório para processar mensagens WhatsApp');
       }
       const tenantId = message.tenantId;
+      const tenant = await this.tenantsService.findOneById(tenantId);
+
+      const normalizedBody = this.normalizeIncomingMessageBody(message);
+      const sanitizedBody = this.sanitizeInput(normalizedBody);
+      if (!sanitizedBody) {
+        return '❌ Mensagem vazia ou inválida. Por favor, envie uma mensagem válida.';
+      }
+
+      if (message.body && message.body.length > this.MAX_MESSAGE_LENGTH) {
+        this.logger.warn(`Message too long: ${message.body.length} characters`, { from: message.from });
+        return `❌ Mensagem muito longa. Por favor, envie uma mensagem com no máximo ${this.MAX_MESSAGE_LENGTH} caracteres.`;
+      }
+
+      const controlResponse = await this.tryHandleBotControlCommand(tenant, {
+        ...message,
+        body: sanitizedBody,
+      });
+      if (controlResponse !== null) {
+        this.logger.log(`Administrative bot-control command handled for ${message.from}`);
+        return controlResponse;
+      }
+
+      if (!this.isBotEnabled(tenant)) {
+        return this.getBotDisabledMessage();
+      }
 
       try {
         return await this.cacheService.withConversationLock(
@@ -6434,19 +6629,6 @@ export class WhatsappService {
           message.from,
           async () => {
 
-      // ✅ NOVO: Sanitizar mensagem recebida
-      const normalizedBody = this.normalizeIncomingMessageBody(message);
-      const sanitizedBody = this.sanitizeInput(normalizedBody);
-      if (!sanitizedBody) {
-        return '❌ Mensagem vazia ou inválida. Por favor, envie uma mensagem válida.';
-      }
-
-      // ✅ NOVO: Validar tamanho da mensagem
-      if (message.body && message.body.length > this.MAX_MESSAGE_LENGTH) {
-        this.logger.warn(`Message too long: ${message.body.length} characters`, { from: message.from });
-        return `❌ Mensagem muito longa. Por favor, envie uma mensagem com no máximo ${this.MAX_MESSAGE_LENGTH} caracteres.`;
-      }
-      
       // Buscar ou criar conversa
       const conversation = await this.conversationService.getOrCreateConversation(
         tenantId,

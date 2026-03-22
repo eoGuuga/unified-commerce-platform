@@ -183,6 +183,14 @@ function extractMessageBody(body: RawWhatsappWebhookBody): string | null {
   return extractMessageContent(root.message);
 }
 
+function looksLikeBotControlCommand(messageBody?: string | null): boolean {
+  const normalized = String(messageBody || '')
+    .trim()
+    .toLowerCase();
+
+  return /^#?bot\s+\S+\s+(ligar|desligar|status|on|off)$/i.test(normalized);
+}
+
 function shouldIgnoreWebhook(body: RawWhatsappWebhookBody): { ignore: boolean; reason?: string } {
   const eventName = normalizeEventName(body);
   const root = getPayloadRoot(body);
@@ -196,6 +204,11 @@ function shouldIgnoreWebhook(body: RawWhatsappWebhookBody): { ignore: boolean; r
   }
 
   if (root.key?.fromMe || body.key?.fromMe) {
+    const messageBody = extractMessageBody(body);
+    if (looksLikeBotControlCommand(messageBody)) {
+      return { ignore: false };
+    }
+
     return { ignore: true, reason: 'mensagem propria ignorada' };
   }
 

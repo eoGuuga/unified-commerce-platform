@@ -8,6 +8,36 @@ export class TenantsService {
 
   constructor(private readonly dbContext: DbContextService) {}
 
+  private normalizePhone(phoneNumber: string): string {
+    return String(phoneNumber || '').replace(/[\s\-\(\)]/g, '');
+  }
+
+  private matchesConfiguredPhone(phoneNumber: string, configuredNumbers: string[]): boolean {
+    const normalizedPhone = this.normalizePhone(phoneNumber);
+
+    return configuredNumbers.some((configuredNumber: string) => {
+      const normalizedConfigured = this.normalizePhone(configuredNumber);
+
+      if (normalizedPhone === normalizedConfigured) {
+        return true;
+      }
+
+      const last9Phone = normalizedPhone.slice(-9);
+      const last9Configured = normalizedConfigured.slice(-9);
+      if (last9Phone === last9Configured && last9Phone.length === 9) {
+        return true;
+      }
+
+      const last11Phone = normalizedPhone.slice(-11);
+      const last11Configured = normalizedConfigured.slice(-11);
+      if (last11Phone === last11Configured && last11Phone.length === 11) {
+        return true;
+      }
+
+      return false;
+    });
+  }
+
   /**
    * Busca um tenant por ID e valida se está ativo
    */
@@ -39,65 +69,32 @@ export class TenantsService {
   async validateWhatsAppNumber(tenantId: string, phoneNumber: string): Promise<boolean> {
     const tenant = await this.findOneById(tenantId);
 
-    // Normalizar número de telefone (remover espaços, traços, parênteses)
-    const normalizedPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
-
-    // Verificar se tenant tem números de WhatsApp configurados
     const whatsappNumbers = tenant.settings?.whatsappNumbers || tenant.settings?.whatsapp_numbers || [];
 
     if (!Array.isArray(whatsappNumbers) || whatsappNumbers.length === 0) {
       const isProduction = process.env.NODE_ENV === 'production';
-      
+
       if (isProduction) {
-        // ✅ CRÍTICO: Em produção, números de WhatsApp são obrigatórios para segurança multi-tenant
         this.logger.error(
-          `[SEGURANÇA] Tenant ${tenantId} não tem números de WhatsApp configurados em PRODUÇÃO. Bloqueando acesso.`,
+          `[SEGURANCA] Tenant ${tenantId} nao tem numeros de WhatsApp configurados em PRODUCAO. Bloqueando acesso.`,
         );
         throw new ForbiddenException(
-          `Tenant ${tenantId} não tem números de WhatsApp configurados. Contate o administrador para configurar os números autorizados.`,
+          `Tenant ${tenantId} nao tem numeros de WhatsApp configurados. Contate o administrador para configurar os numeros autorizados.`,
         );
       }
-      
-      // Em desenvolvimento, permitir mas avisar
+
       this.logger.warn(
-        `[DEV] Tenant ${tenantId} não tem números de WhatsApp configurados. Permitindo em desenvolvimento apenas.`,
+        `[DEV] Tenant ${tenantId} nao tem numeros de WhatsApp configurados. Permitindo em desenvolvimento apenas.`,
       );
       return true;
     }
 
-    // Verificar se o número está na lista de números autorizados
-    // Comparar número completo e últimos 9 dígitos (caso envie com/sem código do país)
-    const isAuthorized = whatsappNumbers.some((authorizedNumber: string) => {
-      const normalizedAuthorized = authorizedNumber.replace(/[\s\-\(\)]/g, '');
-      
-      // Comparação exata
-      if (normalizedPhone === normalizedAuthorized) {
-        return true;
-      }
-
-      // Comparação dos últimos 9 dígitos (número sem código do país)
-      const last9Phone = normalizedPhone.slice(-9);
-      const last9Authorized = normalizedAuthorized.slice(-9);
-      if (last9Phone === last9Authorized && last9Phone.length === 9) {
-        return true;
-      }
-
-      // Comparação dos últimos 11 dígitos (número com código do país)
-      const last11Phone = normalizedPhone.slice(-11);
-      const last11Authorized = normalizedAuthorized.slice(-11);
-      if (last11Phone === last11Authorized && last11Phone.length === 11) {
-        return true;
-      }
-
-      return false;
-    });
+    const isAuthorized = this.matchesConfiguredPhone(phoneNumber, whatsappNumbers);
 
     if (!isAuthorized) {
-      this.logger.warn(
-        `Número de WhatsApp ${phoneNumber} não autorizado para tenant ${tenantId}`,
-      );
+      this.logger.warn(`Numero de WhatsApp ${phoneNumber} nao autorizado para tenant ${tenantId}`);
       throw new ForbiddenException(
-        `Número de WhatsApp ${phoneNumber} não está autorizado para este tenant. Contate o administrador.`,
+        `Numero de WhatsApp ${phoneNumber} nao esta autorizado para este tenant. Contate o administrador.`,
       );
     }
 
@@ -111,5 +108,29 @@ export class TenantsService {
   async validateTenantAndPhone(tenantId: string, phoneNumber: string): Promise<Tenant> {
     await this.validateWhatsAppNumber(tenantId, phoneNumber);
     return await this.findOneById(tenantId);
+  }
+
+  async updateSettings(
+    tenantId: string,
+    partialSettings: Record<string, unknown>,
+  ): Promise<Tenant> {
+    return await this.dbContext.runInTransaction(async (manager) => {
+      await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [tenantId]);
+      const repository = manager.getRepository(Tenant);
+      const tenant = await repository.findOne({
+        where: { id: tenantId },
+      });
+
+      if (!tenant) {
+        throw new NotFoundException(`Tenant com ID ${tenantId} não encontrado`);
+      }
+
+      tenant.settings = {
+        ...(tenant.settings || {}),
+        ...partialSettings,
+      };
+
+      return await repository.save(tenant);
+    });
   }
 }

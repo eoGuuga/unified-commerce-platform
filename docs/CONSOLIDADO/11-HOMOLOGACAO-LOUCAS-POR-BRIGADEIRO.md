@@ -139,6 +139,9 @@ Ultima atualizacao: 2026-03-21
 - `store.hours`: horario da loja
 - `whatsappInstance`: `loucas-teste`
 - catalogo importado com metadata comercial
+- `whatsappBotEnabled`: flag para ligar/desligar o atendimento automatico
+- `whatsappBotControlCode`: codigo secreto para comando administrativo via WhatsApp
+- `whatsappBotControlNumbers`: numeros autorizados a enviar `bot CODIGO ligar|desligar|status`
 
 ## Configuracao minima desejada para o ambiente
 - `WHATSAPP_PROVIDER=evolution`
@@ -161,3 +164,12 @@ Ultima atualizacao: 2026-03-21
 - pareamento final do WhatsApp da loja
 - validacao final com a operacao real do cliente
 - entrada oficial em producao da linha da loja
+
+## Controle administrativo do bot
+- O canal administrativo deve funcionar apenas por mensagem direta, nunca por grupo.
+- Formato recomendado do comando:
+  - `bot CODIGO status`
+  - `bot CODIGO ligar`
+  - `bot CODIGO desligar`
+- Durante a homologacao, o numero pessoal pareado pode ficar em `whatsappBotControlNumbers`.
+- Na virada final, trocar o numero de teste pelo numero oficial da loja nesse mesmo campo.

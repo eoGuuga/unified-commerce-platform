@@ -281,6 +281,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       orders?: Record<string, jest.Mock>;
       payments?: Record<string, jest.Mock>;
       productsService?: Record<string, jest.Mock>;
+      tenants?: Record<string, jest.Mock>;
     },
   ) => {
     const config = {
@@ -315,6 +316,23 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       setPedidoId: jest.fn(),
       findById: jest.fn(),
       ...(overrides?.conversation || {}),
+    };
+
+    const tenantsService = {
+      findOneById: jest.fn().mockResolvedValue({
+        id: 'tenant-id',
+        settings: {
+          whatsappBotEnabled: true,
+        },
+      }),
+      updateSettings: jest.fn().mockImplementation(async (_tenantId: string, partial: Record<string, unknown>) => ({
+        id: 'tenant-id',
+        settings: {
+          whatsappBotEnabled: true,
+          ...partial,
+        },
+      })),
+      ...(overrides?.tenants || {}),
     };
 
     const productsService = {
@@ -373,6 +391,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       catalogSalesContextService as any,
       cacheService as any,
       conversationService as any,
+      tenantsService as any,
       productsService as any,
       ordersService as any,
       paymentsService as any,
@@ -387,6 +406,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       config,
       cacheService,
       conversationService,
+      tenantsService,
       ordersService,
       paymentsService,
       productsService,
@@ -2043,6 +2063,93 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(conversationService.saveMessage).not.toHaveBeenCalled();
     expect(conversationService.updateContext).not.toHaveBeenCalled();
     expect(response).toContain('CATALOGO DA LOJA');
+  });
+
+  it('handles an authorized admin status command without entering customer conversation flow', async () => {
+    const { service, conversationService, tenantsService } = createFixture([], {
+      tenants: {
+        findOneById: jest.fn().mockResolvedValue({
+          id: 'tenant-id',
+          settings: {
+            whatsappBotEnabled: true,
+            whatsappBotControlCode: '4321',
+            whatsappBotControlNumbers: ['5511990001111'],
+          },
+        }),
+        updateSettings: jest.fn(),
+      },
+    });
+
+    const response = await service.processIncomingMessage({
+      from: '5511990001111',
+      body: 'bot 4321 status',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+    });
+
+    expect(response).toContain('BOT ATIVO');
+    expect(tenantsService.updateSettings).not.toHaveBeenCalled();
+    expect(conversationService.getOrCreateConversation).not.toHaveBeenCalled();
+  });
+
+  it('can disable the bot for customers through an authorized admin command', async () => {
+    const { service, tenantsService } = createFixture([], {
+      tenants: {
+        findOneById: jest.fn().mockResolvedValue({
+          id: 'tenant-id',
+          settings: {
+            whatsappBotEnabled: true,
+            whatsappBotControlCode: '4321',
+            whatsappBotControlNumbers: ['5511990001111'],
+          },
+        }),
+        updateSettings: jest.fn().mockResolvedValue({
+          id: 'tenant-id',
+          settings: {
+            whatsappBotEnabled: false,
+            whatsappBotControlCode: '4321',
+            whatsappBotControlNumbers: ['5511990001111'],
+          },
+        }),
+      },
+    });
+
+    const response = await service.processIncomingMessage({
+      from: '5511990001111',
+      body: 'bot 4321 desligar',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+    });
+
+    expect(response).toContain('BOT DESLIGADO');
+    expect(tenantsService.updateSettings).toHaveBeenCalledWith('tenant-id', {
+      whatsappBotEnabled: false,
+    });
+  });
+
+  it('returns a paused message to customers when the bot is disabled', async () => {
+    const { service, conversationService } = createFixture([], {
+      tenants: {
+        findOneById: jest.fn().mockResolvedValue({
+          id: 'tenant-id',
+          settings: {
+            whatsappBotEnabled: false,
+            whatsappBotControlCode: '4321',
+            whatsappBotControlNumbers: ['5511990001111'],
+          },
+        }),
+      },
+    });
+
+    const response = await service.processIncomingMessage({
+      from: '5511999999999',
+      body: 'oi',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+    });
+
+    expect(response).toContain('ATENDIMENTO AUTOMATICO PAUSADO');
+    expect(conversationService.getOrCreateConversation).not.toHaveBeenCalled();
   });
 
   it('returns an interactive catalog list when the customer asks for cardapio from an idle conversation', async () => {

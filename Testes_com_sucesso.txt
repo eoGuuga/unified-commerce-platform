@@ -608,3 +608,26 @@
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
   - `npm.cmd run test:unit -- --runInBand` => `195/195` testes ok
+
+2026-03-22
+- Ambiente: LOCAL
+- Escopo: adicionar canal administrativo para ligar e desligar o bot por mensagem direta no WhatsApp
+- Correcao aplicada:
+  - o tenant agora suporta `whatsappBotEnabled`, `whatsappBotControlCode` e `whatsappBotControlNumbers` nos `settings`
+  - mensagens diretas no formato `bot CODIGO ligar|desligar|status` passam a controlar o estado do bot sem depender de painel
+  - o webhook continua ignorando grupos e mensagens proprias comuns, mas abre uma excecao estreita para comandos administrativos enviados para si mesmo
+  - quando o bot esta pausado, clientes recebem uma resposta curta de atendimento automatico pausado sem entrar no fluxo conversacional
+- Arquivos principais:
+  - `backend/src/modules/tenants/tenants.service.ts`
+  - `backend/src/modules/tenants/tenants.service.spec.ts`
+  - `backend/src/modules/whatsapp/whatsapp.controller.ts`
+  - `backend/src/modules/whatsapp/whatsapp.controller.spec.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.ts`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+- Validacao local:
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.controller.spec.ts` => `11/11` testes ok
+  - `npm.cmd test -- --runInBand src/modules/whatsapp/whatsapp.service.spec.ts` => `109/109` testes ok
+  - `npm.cmd test -- --runInBand src/modules/tenants/tenants.service.spec.ts` => `12/12` testes ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run test:unit -- --runInBand` => `201/201` testes ok

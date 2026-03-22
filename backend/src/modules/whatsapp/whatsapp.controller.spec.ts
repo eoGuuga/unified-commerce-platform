@@ -238,6 +238,65 @@ describe('WhatsappController', () => {
     expect(whatsappService.processIncomingMessage).not.toHaveBeenCalled();
   });
 
+  it('ignores direct self-messages that are not admin commands', async () => {
+    const response = await controller.webhook(
+      {
+        event: 'messages.upsert',
+        instance: 'loucas-teste',
+        data: {
+          key: {
+            remoteJid: '5511991234567@s.whatsapp.net',
+            fromMe: true,
+          },
+          message: {
+            conversation: 'oi eu mesmo',
+          },
+        },
+      },
+      'tenant-loucas',
+    );
+
+    expect(response).toEqual({
+      success: true,
+      ignored: true,
+      reason: 'mensagem propria ignorada',
+    });
+    expect(whatsappService.processIncomingMessage).not.toHaveBeenCalled();
+  });
+
+  it('allows direct self-messages that match the admin bot-control syntax', async () => {
+    const response = await controller.webhook(
+      {
+        event: 'messages.upsert',
+        instance: 'loucas-teste',
+        data: {
+          key: {
+            remoteJid: '5511991234567@s.whatsapp.net',
+            fromMe: true,
+            id: 'msg-admin-1',
+          },
+          message: {
+            conversation: 'bot 4321 status',
+          },
+          messageTimestamp: 1711021200,
+        },
+      },
+      'tenant-loucas',
+    );
+
+    expect(whatsappService.processIncomingMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: '5511991234567',
+        body: 'bot 4321 status',
+        tenantId: 'tenant-loucas',
+      }),
+    );
+    expect(response).toEqual({
+      success: true,
+      response: 'ok',
+    });
+  });
+
   it('blocks messages from an unexpected Evolution instance', async () => {
     await expect(
       controller.webhook(
