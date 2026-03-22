@@ -372,3 +372,18 @@
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
   - `npm.cmd run test:unit` => `154/154` testes ok
+- Validacao dev/teste:
+  - `https://dev.gtsofthub.com.br/api/v1/health` => ok
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => ok
+  - concorrencia no mesmo numero homologada:
+    - `quero 2 brigadeiros tradicionais`
+    - `Ana Paula`
+    - segunda mensagem entrou no estado certo e respondeu com escolha entre `entrega` e `retirada`
+  - concorrencia entre clientes diferentes homologada:
+    - `+5511997777002` => pedido preparado
+    - `+5511997777003` => pedido preparado
+- Validacao producao:
+  - promocao por Git concluida apos regularizacao de ownership do repo
+  - drift antigo preservado em stash e patch de backup antes da limpeza do working tree
+  - `https://gtsofthub.com.br/api/v1/health` => ok
+  - `https://gtsofthub.com.br/api/v1/whatsapp/health` => ok
