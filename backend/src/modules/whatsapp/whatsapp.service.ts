@@ -5533,6 +5533,11 @@ export class WhatsappService {
       return null;
     }
 
+    const localAnalysis = this.messageIntelligenceService.analyze(message);
+    if (localAnalysis.flags.needsClarification || localAnalysis.flags.lowSignal) {
+      return null;
+    }
+
     const intent = await this.openAIService.processMessage(message);
 
     if (intent.intent === 'cancelar' && conversation) {

@@ -3397,6 +3397,20 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Me diga em uma frase o que voce quer agora');
   });
 
+  it('blocks AI routing from turning a vague message into a fake price query', async () => {
+    const service = createService(loucasCatalog) as any;
+    service.openAIService.processMessage.mockResolvedValue({
+      intent: 'consultar',
+      product: 'negocio estranho',
+      confidence: 0.92,
+    });
+
+    const response = await service.generateResponse('asdf qwe negocio estranho', 'tenant-id');
+
+    expect(response).toContain('Quero te entender sem adivinhar coisa errada');
+    expect(response).not.toContain('REFERENCIA RAPIDA DE PRECOS');
+  });
+
   it('suggests the closest catalog options when the requested product does not exist', async () => {
     const service = createService(loucasCatalog) as any;
 

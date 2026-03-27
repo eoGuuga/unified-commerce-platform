@@ -116,6 +116,13 @@ export class OpenAIService {
   private fallbackProcessing(message: string): MessageIntent {
     const analysis = this.messageIntelligenceService.analyze(message);
 
+    if (analysis.flags.needsClarification || analysis.flags.lowSignal) {
+      return {
+        intent: 'outro',
+        confidence: analysis.confidence,
+      };
+    }
+
     if (analysis.primaryIntent === 'cancelar') {
       return {
         intent: 'cancelar',

@@ -743,3 +743,13 @@
   - `npx.cmd jest src/modules/whatsapp/services/message-intelligence.service.spec.ts src/modules/whatsapp/whatsapp.service.spec.ts --runInBand -t "marks very vague messages|asks for clarification instead of faking understanding|suggests the closest catalog options|keeps the product in mind|extracts natural name phrases|does not accept a partial street|assembles interrupted address fragments|does not treat a full delivery address|parses loose audio-like addresses"` => ok
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
+
+2026-03-27  WhatsApp guard against fake AI price routing (local)
+- Corrigido o desvio em que mensagem muito vaga ainda podia cair na rota de consulta e devolver `REFERENCIA RAPIDA DE PRECOS` por inferencia errada.
+- O fallback local do `OpenAIService` agora respeita `needsClarification` e `lowSignal`, em vez de transformar qualquer ruido em `consultar`.
+- A camada `tryAIAssistedRouting` passou a bloquear roteamento quando a analise local indica que a mensagem esta vaga demais para agir com seguranca.
+- Regressao nova garante que nem mesmo uma resposta de IA/classificador malformada consegue transformar `asdf qwe negocio estranho` em consulta de preco.
+- Validacao local:
+  - `npx.cmd jest src/modules/whatsapp/whatsapp.service.spec.ts src/modules/whatsapp/services/message-intelligence.service.spec.ts --runInBand -t "asks for clarification|blocks AI routing|suggests the closest catalog options|keeps the product in mind"` => ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
