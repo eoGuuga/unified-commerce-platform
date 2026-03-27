@@ -3395,6 +3395,8 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     expect(response).toContain('Quero te entender sem adivinhar coisa errada');
     expect(response).toContain('Me diga em uma frase o que voce quer agora');
+    expect(response).toContain('- "quero 2 brigadeiros"');
+    expect(response).not.toContain('preco de asd qwe negocio');
   });
 
   it('blocks AI routing from turning a vague message into a fake price query', async () => {
@@ -3409,6 +3411,8 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     expect(response).toContain('Quero te entender sem adivinhar coisa errada');
     expect(response).not.toContain('REFERENCIA RAPIDA DE PRECOS');
+    expect(response).not.toContain('preco de asdf qwe negocio estranho');
+    expect(response).toContain('- "quero 2 brigadeiros"');
   });
 
   it('suggests the closest catalog options when the requested product does not exist', async () => {

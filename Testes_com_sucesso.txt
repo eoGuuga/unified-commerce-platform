@@ -749,6 +749,7 @@
 - O fallback local do `OpenAIService` agora respeita `needsClarification` e `lowSignal`, em vez de transformar qualquer ruido em `consultar`.
 - A camada `tryAIAssistedRouting` passou a bloquear roteamento quando a analise local indica que a mensagem esta vaga demais para agir com seguranca.
 - Regressao nova garante que nem mesmo uma resposta de IA/classificador malformada consegue transformar `asdf qwe negocio estranho` em consulta de preco.
+- Refinada a clarificacao para nao reciclar a propria frase nonsense do cliente como exemplo de uso, mantendo exemplos genericos e mais humanos.
 - Validacao local:
   - `npx.cmd jest src/modules/whatsapp/whatsapp.service.spec.ts src/modules/whatsapp/services/message-intelligence.service.spec.ts --runInBand -t "asks for clarification|blocks AI routing|suggests the closest catalog options|keeps the product in mind"` => ok
   - `npm.cmd run lint` => ok

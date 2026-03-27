@@ -8088,6 +8088,14 @@ export class WhatsappService {
     const analysis = this.messageIntelligenceService.analyze(message);
     const candidate =
       analysis.productCandidate || this.extractCatalogQuery(message) || null;
+    const shouldMentionCandidate =
+      Boolean(candidate) &&
+      !analysis.flags.lowSignal &&
+      String(candidate).trim().length >= 4 &&
+      (analysis.quantity !== null ||
+        analysis.scores.order >= 0.55 ||
+        analysis.scores.status >= 0.55 ||
+        analysis.scores.payment >= 0.55);
     const stageLabel =
       currentState && currentState !== 'idle'
         ? this.getConversationStageLabel(currentState)
@@ -8095,7 +8103,7 @@ export class WhatsappService {
 
     const lines = ['Quero te entender sem adivinhar coisa errada.'];
 
-    if (candidate) {
+    if (shouldMentionCandidate) {
       lines.push(`A parte mais forte que eu captei foi: *${candidate}*.`);
     }
 
@@ -8106,14 +8114,10 @@ export class WhatsappService {
     lines.push('');
     lines.push('Me diga em uma frase o que voce quer agora, do jeito mais direto possivel.');
 
-    if (candidate) {
-      lines.push(`Exemplos: "quero 2 ${candidate}" ou "preco de ${candidate}".`);
-    } else {
-      lines.push('Exemplos:');
-      lines.push('- "quero 2 brigadeiros"');
-      lines.push('- "preco da banoffe"');
-      lines.push('- "acho que voce nao entendeu o pedido"');
-    }
+    lines.push('Exemplos:');
+    lines.push('- "quero 2 brigadeiros"');
+    lines.push('- "preco da banoffe"');
+    lines.push('- "acho que voce nao entendeu o pedido"');
 
     return lines.join('\n');
   }
