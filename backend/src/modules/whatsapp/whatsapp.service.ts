@@ -1822,9 +1822,11 @@ export class WhatsappService {
 
     const nextStep = !hasNumber
       ? 'Agora me envie o numero.'
-      : !hasState && !hasCep
+      : !hasState
         ? 'Agora complete com bairro, cidade e estado.'
-        : 'Se puder, complete com complemento ou CEP para reduzir erro na entrega.';
+        : !hasCep
+          ? 'Se puder, complete com CEP ou complemento para reduzir erro na entrega.'
+          : 'Se quiser, complete com complemento para reduzir erro na entrega.';
 
     return [
       'Estou montando o endereco por etapas para evitar erro de entrega.',

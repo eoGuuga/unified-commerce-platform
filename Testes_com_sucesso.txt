@@ -771,6 +771,7 @@
 - Mensagens como `Tenho telefone fixo` durante `collecting_phone` agora ficam na etapa certa e respondem de forma humana, sem procurar produto no catalogo.
 - O WhatsApp passou a oferecer e fechar por `PIX` ou `dinheiro` neste fluxo; cartao agora recebe orientacao segura em vez de erro cru de `cardToken`.
 - Troco em dinheiro ganhou limite de sanidade para barrar valores absurdos como `100000`.
+- Refinado o rascunho de endereco para nao pedir `CEP` de novo quando o cliente ja mandou rua + CEP; agora ele continua pedindo localidade/complemento de forma mais coerente.
 - Validacao local:
   - `npx.cmd jest src/modules/whatsapp/whatsapp.service.spec.ts --runInBand -t "delivery choice|zip code sent during address|fixed-phone explanations|card checkout inside WhatsApp|cash-change amounts|outside the store domain|emotional reactions|stops gracefully"` => ok
   - `npm.cmd run lint` => ok
