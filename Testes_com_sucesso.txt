@@ -776,3 +776,17 @@
   - `npx.cmd jest src/modules/whatsapp/whatsapp.service.spec.ts --runInBand -t "delivery choice|zip code sent during address|fixed-phone explanations|card checkout inside WhatsApp|cash-change amounts|outside the store domain|emotional reactions|stops gracefully"` => ok
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
+
+2026-03-27  WhatsApp human QA hardening for review, product understanding and flow exit (local)
+- `nao` na revisao final deixou de cancelar o pedido automaticamente; agora abre ponte de correcao e pede o ajuste certo.
+- Perguntas como `tem desconto?` no meio da coleta deixam de virar busca de produto e respondem o contexto comercial correto, mantendo a etapa atual.
+- Produto escrito como mensagem solta em etapa de nome nao entra mais como nome do cliente; o bot reconhece que aquilo parece item do catalogo.
+- Mensagens de parada como `nao quero` durante a coleta agora encerram o fluxo com parada limpa, sem insistencia robotica.
+- Consulta direta com nome do item, como `Banoffe`, passou a devolver leitura util do produto em vez de cair na clarificacao burra.
+- Busca por termo generico de produto, como `brigadeiros`, passou a pedir clareza em vez de chutar um item aleatorio.
+- Busca por alias pluralizado, como `tortas de banana`, passou a fechar corretamente em `Banoffe`.
+- Ajustado o parser para remover ruido como `tambem`, `tbm` e `mais` do nome do produto quando a pessoa esta adicionando item.
+- Validacao local:
+  - `npx.cmd jest src/modules/whatsapp/whatsapp.service.spec.ts --runInBand -t "keeps generic brigadeiro queries ambiguous|understands pluralized aliases like tortas de banana|stops the active collection flow cleanly|answers discount questions during name collection|treats plain nao during final review|does not accept a product mention as the customer name|returns a useful product reading when the customer sends only the product name in idle state"` => ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok

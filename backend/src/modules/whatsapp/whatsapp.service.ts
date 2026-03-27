@@ -4647,17 +4647,17 @@ export class WhatsappService {
     const directPriceQuestion = this.isDirectPriceQuestion(sanitizedMessage);
     const directStockQuestion = this.isDirectStockQuestion(sanitizedMessage);
 
-    if (currentState === 'collecting_name') {
-      const extractedName = this.extractCustomerNameCandidate(sanitizedMessage);
-      if (
-        this.validateName(extractedName).valid &&
-        !this.looksLikeStandalonePhoneMessage(sanitizedMessage) &&
-        !this.hasAddressKeyword(sanitizedMessage) &&
-        !this.isAddressLikelyComplete(sanitizedMessage)
-      ) {
-        return null;
-      }
-    }
+    const extractedName =
+      currentState === 'collecting_name'
+        ? this.extractCustomerNameCandidate(sanitizedMessage)
+        : null;
+    const validNameCandidate =
+      currentState === 'collecting_name' &&
+      !!extractedName &&
+      this.validateName(extractedName).valid &&
+      !this.looksLikeStandalonePhoneMessage(sanitizedMessage) &&
+      !this.hasAddressKeyword(sanitizedMessage) &&
+      !this.isAddressLikelyComplete(sanitizedMessage);
 
     if (currentState === 'collecting_address') {
       if (['1', '2', 'entrega', 'retirada', 'buscar'].includes(normalized)) {
@@ -4686,6 +4686,15 @@ export class WhatsappService {
       )
     ) {
       return null;
+    }
+
+    if (this.isDiscountQuestion(sanitizedMessage)) {
+      return this.buildCollectionStageDetourMessage(
+        'Hoje, no WhatsApp, eu consigo fechar com 5% de desconto no PIX.',
+        currentState,
+        conversation,
+        ['Primeiro eu fecho esta etapa com voce para nao baguncar o pedido.'],
+      );
     }
 
     const likelyProductQuery =
@@ -4724,6 +4733,9 @@ export class WhatsappService {
     const produtos = Array.isArray(produtosResult) ? produtosResult : produtosResult.data;
 
     if (!likelyProductQuery) {
+      if (validNameCandidate) {
+        return null;
+      }
       return this.buildCollectionStageDetourMessage(
         'Entendi que voce mudou o foco da conversa agora, mas ainda preciso fechar a etapa atual com seguranca.',
         currentState,
@@ -4733,6 +4745,15 @@ export class WhatsappService {
 
     const searchResult = this.findProductByName(produtos, likelyProductQuery);
     if (searchResult.produto) {
+      if (validNameCandidate) {
+        return this.buildCollectionStageDetourMessage(
+          `Entendi que voce quis falar de *${searchResult.produto.name}*.`,
+          currentState,
+          conversation,
+          ['Eu deixo esse item em mente, mas antes preciso do nome de quem vai receber o pedido.'],
+        );
+      }
+
       await this.rememberConversationIntelligence(conversation, {
         last_product_name: searchResult.produto.name,
         last_product_names: [searchResult.produto.name],
@@ -4749,6 +4770,18 @@ export class WhatsappService {
 
     const suggestions = (searchResult.sugestoes || []).slice(0, 3);
     if (suggestions.length > 0) {
+      if (validNameCandidate) {
+        return this.buildCollectionStageDetourMessage(
+          `Nao vou salvar "${sanitizedMessage}" como nome porque isso parece produto.`,
+          currentState,
+          conversation,
+          [
+            'Acho que voce pode estar falando de algo nesta linha:',
+            ...suggestions.map((product) => `- ${product.name}`),
+          ],
+        );
+      }
+
       await this.rememberConversationIntelligence(conversation, {
         last_intent: 'suggestion',
         last_product_name: null,
@@ -4765,6 +4798,10 @@ export class WhatsappService {
           ...suggestions.map((product) => `- ${product.name}`),
         ],
       );
+    }
+
+    if (validNameCandidate) {
+      return null;
     }
 
     return this.buildCollectionStageDetourMessage(
@@ -5886,6 +5923,14 @@ export class WhatsappService {
       return 'Recebi um endereco, mas antes preciso do nome completo de quem vai receber o pedido.';
     }
 
+    if (this.isCollectionStageSoftStopIntent(sanitizedMessage)) {
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.clearCustomerData(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return this.getPremiumSoftResetMessage();
+    }
+
     const normalizedIntent = this.normalizeIntentText(sanitizedMessage);
     if (
       ['1', '2', 'entrega', 'retirada', 'buscar'].includes(normalizedIntent) ||
@@ -5941,6 +5986,14 @@ export class WhatsappService {
     const lowerMessage = this.normalizeIntentText(sanitizedMessage);
     const customerData = conversation.context?.customer_data as CustomerData | undefined;
     const choosingDeliveryType = !customerData?.delivery_type;
+
+    if (this.isCollectionStageSoftStopIntent(sanitizedMessage)) {
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.clearCustomerData(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return this.getPremiumSoftResetMessage();
+    }
 
     if (choosingDeliveryType) {
       const looksLikeDirectAddress =
@@ -6246,6 +6299,14 @@ export class WhatsappService {
       ])
     ) {
       return this.buildPendingOrderAdjustmentPrompt();
+    }
+
+    if (['nao', 'não', 'nao mesmo', 'não mesmo'].includes(lowerMessage)) {
+      return [
+        'Sem problema, eu nao vou fechar nada errado.',
+        '',
+        this.buildPendingOrderAdjustmentPrompt(),
+      ].join('\n');
     }
 
     if (
@@ -7903,6 +7964,19 @@ export class WhatsappService {
       return this.getPremiumContextRecoveryMessage();
     }
 
+    const isCollectionStage =
+      !!currentState &&
+      ['collecting_name', 'collecting_address', 'collecting_phone', 'collecting_notes'].includes(
+        currentState,
+      );
+    if (isCollectionStage && this.isCollectionStageSoftStopIntent(lowerMessage) && conversation) {
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.clearCustomerData(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return this.getPremiumSoftResetMessage();
+    }
+
     if (this.isBareOrderIntent(lowerMessage)) {
       return this.getPremiumOrderNudgeMessage();
     }
@@ -7971,6 +8045,16 @@ export class WhatsappService {
     const aiRouted = await this.tryAIAssistedRouting(message, tenantId, conversation, currentState);
     if (aiRouted) {
       return aiRouted;
+    }
+
+    const productDiscovery = await this.tryDirectProductDiscovery(
+      message,
+      tenantId,
+      conversation,
+      currentState,
+    );
+    if (productDiscovery) {
+      return productDiscovery;
     }
 
     const finalAnalysis = this.messageIntelligenceService.analyze(message);
@@ -8261,6 +8345,50 @@ export class WhatsappService {
     ].join('\n');
   }
 
+  private isCollectionStageSoftStopIntent(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return false;
+    }
+
+    return this.hasAnyNormalizedPhrase(normalized, [
+      'nao quero',
+      'nao quero mais',
+      'nao vou querer',
+      'nao vou mais querer',
+      'quero mais n',
+      'quero mais nao',
+      'desisti',
+      'deixa pra la',
+      'deixa para la',
+      'tira isso',
+      'para com isso',
+      'pare com isso',
+    ]);
+  }
+
+  private isDiscountQuestion(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return false;
+    }
+
+    return (
+      /descont|promo|promoc/.test(normalized) ||
+      this.hasAnyNormalizedPhrase(normalized, [
+        'tem desconto',
+        'tem algum desconto',
+        'rola desconto',
+        'consegue desconto',
+        'tem promocao',
+        'tem promo',
+        'faz um preco melhor',
+        'faz melhor no preco',
+        'tem abatimento',
+      ])
+    );
+  }
+
   private getPremiumNonCommercialRecoveryMessage(): string {
     return [
       'Calma, acho que eu puxei a conversa para o lado errado.',
@@ -8358,6 +8486,74 @@ export class WhatsappService {
     }
 
     return this.isLikelyNonCommercialMessage(normalized);
+  }
+
+  private async tryDirectProductDiscovery(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): Promise<string | null> {
+    if (currentState && !['idle', 'order_confirmed', 'order_completed'].includes(currentState)) {
+      return null;
+    }
+
+    const sanitized = this.sanitizeInput((message || '').trim());
+    if (!sanitized) {
+      return null;
+    }
+
+    if (
+      this.isDirectCatalogRequest(sanitized) ||
+      this.isDirectPriceQuestion(sanitized) ||
+      this.isDirectStockQuestion(sanitized) ||
+      this.isDirectScheduleQuestion(sanitized) ||
+      this.isDirectHelpRequest(sanitized) ||
+      this.isDirectGreeting(sanitized) ||
+      this.looksLikeOrderStatusQuery(sanitized, conversation) ||
+      this.isPaymentMethodSelection(sanitized) ||
+      this.isCancelIntent(sanitized, conversation, currentState) ||
+      this.isReopenIntent(sanitized) ||
+      this.isOrderIntent(sanitized) ||
+      this.looksLikeMultiItemOrder(sanitized) ||
+      this.shouldUseNonCommercialRecovery(sanitized, conversation, currentState)
+    ) {
+      return null;
+    }
+
+    const query =
+      this.messageIntelligenceService.analyze(sanitized).productCandidate ||
+      this.extractCatalogQuery(sanitized) ||
+      sanitized;
+    if (!query || query.trim().length < 3) {
+      return null;
+    }
+
+    const products = await this.getCatalogProducts(tenantId);
+    if (!products.length) {
+      return null;
+    }
+
+    const result = this.findProductByName(products, query);
+    if (result.produto) {
+      await this.rememberConversationIntelligence(conversation, {
+        last_intent: 'suggestion',
+        last_product_name: result.produto.name,
+        last_product_names: [result.produto.name],
+        last_query: query,
+      });
+      return this.buildProductInsightMessage(result.produto, 'insight');
+    }
+
+    if (result.sugestoes?.length) {
+      return this.buildSuggestionMessage(
+        query,
+        result.sugestoes,
+        `Nao fechei "${query}" com seguranca ainda, mas estas parecem as opcoes mais proximas:`,
+      );
+    }
+
+    return null;
   }
 
   private isOrderIntent(lowerMessage: string): boolean {
@@ -9075,6 +9271,7 @@ export class WhatsappService {
     // Remover preposições soltas (mas manter "de" quando faz parte do nome)
     productName = productName.replace(/\b(para|pra|pro|pras|pros|com|sem|em|na|no|nas|nos)\b/gi, '');
     productName = productName.replace(/\b(pix|cartao|cartão|credito|crédito|debito|débito|dinheiro|boleto|retirada|retirar|entrega|entregar|buscar|pegar|agora|hoje|amanha|amanhã|rapidinho|urgente|favor|ai|ta)\b/gi, '');
+    productName = productName.replace(/\b(tambem|também|tb|tbm|mais|so|só)\b/gi, '');
     
     productName = productName.replace(/\b(viagem|delivery)\b/gi, '');
 
@@ -9189,20 +9386,63 @@ export class WhatsappService {
 
     // 2) Fallback: tokenizacao (mantem tokens numericos mesmo com 1 char)
     const stopWords = new Set(['de', 'do', 'da', 'dos', 'das', 'com', 'sem', 'pra', 'para', 'o', 'a', 'os', 'as', 'um', 'uma']);
+    const singularizeWord = (value: string) => {
+      const normalizedValue = normalize(value);
+      if (normalizedValue.endsWith('es') && normalizedValue.length > 5) {
+        return normalizedValue.slice(0, -2);
+      }
+      if (normalizedValue.endsWith('s') && normalizedValue.length > 4) {
+        return normalizedValue.slice(0, -1);
+      }
+      return normalizedValue;
+    };
     const palavras = productName
       .toLowerCase()
       .split(/\s+/)
       .filter((p) => (p.length >= 2 || /^\d+$/.test(p)) && !stopWords.has(normalize(p)));
+    const palavrasSingulares = palavras.map((palavra) => singularizeWord(palavra));
 
     if (palavras.length === 0) return { produto: null };
+
+    if (palavras.length === 1) {
+      const genericToken = singularizeWord(palavras[0]);
+      const singleWordMatches = produtos.filter((product) => {
+        const normalizedName = normalize(product.name);
+        const tokens = normalizedName.split(/\s+/).filter(Boolean);
+        return tokens.some((token) => {
+          const singularToken = singularizeWord(token);
+          return (
+            singularToken === genericToken ||
+            token === genericToken ||
+            token === `${genericToken}s`
+          );
+        });
+      });
+
+      if (singleWordMatches.length > 1) {
+        return {
+          produto: null,
+          sugestoes: singleWordMatches.slice(0, 5),
+        };
+      }
+    }
 
     // Estrategia 1: Buscar por nome exato (todas as palavras, sem acentos)
     let produto = pickBestProduct(
       produtos.filter((p) => {
         const nomeNormalizado = normalize(p.name);
+        const nomeSingularizado = nomeNormalizado
+          .split(/\s+/)
+          .map((token) => singularizeWord(token))
+          .join(' ');
         return palavras.every((palavra) => {
           const palavraNormalizada = normalize(palavra);
-          return nomeNormalizado.includes(palavraNormalizada);
+          const palavraSingular = singularizeWord(palavraNormalizada);
+          return (
+            nomeNormalizado.includes(palavraNormalizada) ||
+            nomeNormalizado.includes(palavraSingular) ||
+            nomeSingularizado.includes(palavraSingular)
+          );
         });
       }),
       queryNormalized,
@@ -9211,10 +9451,19 @@ export class WhatsappService {
     // Estrategia 2: Buscar por nome completo (query completa)
     if (!produto) {
       const queryCompleta = palavras.join(' ');
+      const queryCompletaSingular = palavrasSingulares.join(' ');
       produto = pickBestProduct(
         produtos.filter((p) => {
           const nomeNormalizado = normalize(p.name);
-          return nomeNormalizado.includes(normalize(queryCompleta));
+          const nomeSingularizado = nomeNormalizado
+            .split(/\s+/)
+            .map((token) => singularizeWord(token))
+            .join(' ');
+          return (
+            nomeNormalizado.includes(normalize(queryCompleta)) ||
+            nomeNormalizado.includes(queryCompletaSingular) ||
+            nomeSingularizado.includes(queryCompletaSingular)
+          );
         }),
         queryNormalized,
       );
@@ -9353,10 +9602,21 @@ export class WhatsappService {
     const broadMatches = produtos.filter((product) => {
       return normalize(product.name).includes(queryNormalized);
     });
+    const broadTokenMatches = palavras.length === 1
+      ? produtos.filter((product) => {
+          const normalizedName = normalize(product.name);
+          const singularQuery = singularizeWord(queryNormalized);
+          const pluralQuery = singularQuery.endsWith('s') ? singularQuery : `${singularQuery}s`;
+          return (
+            normalizedName.includes(queryNormalized) ||
+            normalizedName.includes(singularQuery) ||
+            normalizedName.includes(pluralQuery)
+          );
+        })
+      : broadMatches;
     const ambiguousSingleWordQuery =
       palavras.length === 1 &&
-      queryNormalized.length < 8 &&
-      broadMatches.length > 1;
+      broadTokenMatches.length > 1;
 
     if (produto && !this.isConfidentProductMatch(productName, produto)) {
       produto = null;
@@ -9365,7 +9625,7 @@ export class WhatsappService {
     if (produto && ambiguousSingleWordQuery) {
       return {
         produto: null,
-        sugestoes: broadMatches.slice(0, 5),
+        sugestoes: broadTokenMatches.slice(0, 5),
       };
     }
 
@@ -10527,6 +10787,14 @@ export class WhatsappService {
     const sanitizedMessage = this.sanitizeInput(message.trim());
     const normalizedMessage = this.normalizeIntentText(sanitizedMessage);
     const phone = sanitizedMessage.replace(/\D/g, ''); // Remove tudo que não é dígito
+
+    if (this.isCollectionStageSoftStopIntent(sanitizedMessage)) {
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.clearCustomerData(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return this.getPremiumSoftResetMessage();
+    }
 
     if (
       !phone &&
