@@ -93,4 +93,12 @@ describe('MessageIntelligenceService', () => {
     expect(analysis.contextualIntent).toBe('fazer_pedido');
     expect(analysis.contextualProductCandidate).toBe('Brownie Premium');
   });
+
+  it('marks very vague messages as needing clarification instead of pretending to understand', () => {
+    const analysis = service.analyze('asd qwe negocio');
+
+    expect(analysis.flags.lowSignal).toBe(true);
+    expect(analysis.flags.needsClarification).toBe(true);
+    expect(analysis.primaryIntent).toBe('outro');
+  });
 });

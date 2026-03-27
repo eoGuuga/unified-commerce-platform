@@ -3364,4 +3364,54 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Por seguranca');
     expect(response).toContain('PED-20260315-CACE');
   });
+
+  it('keeps the product in mind when the customer talks about catalog items during phone collection', async () => {
+    const { service } = createFixture(loucasCatalog);
+
+    const response = await service.generateResponse(
+      'quero 2 bolo de pote trufado de maracujaa',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_phone',
+          pending_order: pendingConversationOrder,
+          customer_data: {
+            name: 'Ana Paula',
+            delivery_type: 'pickup',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Bolo no pote trufado de maracuja');
+    expect(response).toContain('telefone de contato com DDD');
+    expect(response).not.toContain('Nome certo');
+  });
+
+  it('asks for clarification instead of faking understanding when the message is too vague', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse('asd qwe negocio', 'tenant-id');
+
+    expect(response).toContain('Quero te entender sem adivinhar coisa errada');
+    expect(response).toContain('Me diga em uma frase o que voce quer agora');
+  });
+
+  it('suggests the closest catalog options when the requested product does not exist', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero 1 bolo de chocolate',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+        },
+      }),
+    );
+
+    expect(response).toContain('opcoes mais proximas');
+    expect(response).toContain('Bolo no pote trufado de maracuja');
+    expect(response).not.toContain('PEDIDO PREPARADO');
+  });
 });

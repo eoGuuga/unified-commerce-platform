@@ -732,3 +732,14 @@
 - O ranking comercial agora considera melhor o papel da oferta e a relacao com a necessidade do cliente.
 - As respostas de recomendacao/comparacao agora explicam melhor o papel do item recomendado, em vez de tratar todo produto como igual.
 - Validacao local: backend lint ok, build ok, testes unitarios focados ok.
+
+2026-03-27  WhatsApp semantic recovery and wrong-flow understanding (local)
+- O bot agora entende melhor quando o cliente fala algo confuso, fora da etapa atual, com nome de produto torto ou com item inexistente.
+- Mensagens muito vagas passaram a entrar em clarificacao guiada, em vez de cair direto no fallback generico.
+- Durante coleta de nome, endereco e telefone, o bot agora tenta entender se o cliente mudou para catalogo/produto e responde com memoria de contexto sem perder a etapa certa.
+- A busca por produtos ganhou uma normalizacao comercial mais forte e uma camada extra de sugestao por similaridade para erros como `bolo de pote`, `maracujaa` e consultas proximas do catalogo.
+- Ajustados testes de regressao para nome, endereco, CEP, produto com typo, produto inexistente e mensagem vaga.
+- Validacao local:
+  - `npx.cmd jest src/modules/whatsapp/services/message-intelligence.service.spec.ts src/modules/whatsapp/whatsapp.service.spec.ts --runInBand -t "marks very vague messages|asks for clarification instead of faking understanding|suggests the closest catalog options|keeps the product in mind|extracts natural name phrases|does not accept a partial street|assembles interrupted address fragments|does not treat a full delivery address|parses loose audio-like addresses"` => ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok

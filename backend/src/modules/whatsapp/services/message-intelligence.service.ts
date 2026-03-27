@@ -15,6 +15,7 @@ export interface MessageAnalysis {
   normalizedText: string;
   quantity: number | null;
   productCandidate: string | null;
+  keywords: string[];
   scores: Record<MessageSignalName, number>;
   matches: Record<MessageSignalName, string[]>;
   flags: {
@@ -24,6 +25,8 @@ export interface MessageAnalysis {
     uncertainChoice: boolean;
     hasOrderCode: boolean;
     multiItem: boolean;
+    lowSignal: boolean;
+    needsClarification: boolean;
   };
   primaryIntent: 'consultar' | 'fazer_pedido' | 'cancelar' | 'outro';
   confidence: number;
@@ -57,6 +60,57 @@ type WeightedPhraseGroup = {
 
 @Injectable()
 export class MessageIntelligenceService {
+  private readonly lowSignalStopWords = new Set([
+    'de',
+    'do',
+    'da',
+    'dos',
+    'das',
+    'com',
+    'sem',
+    'para',
+    'pra',
+    'pro',
+    'por',
+    'favor',
+    'o',
+    'a',
+    'os',
+    'as',
+    'um',
+    'uma',
+    'uns',
+    'umas',
+    'me',
+    'te',
+    'voce',
+    'voces',
+    'eu',
+    'isso',
+    'isto',
+    'essa',
+    'esse',
+    'ai',
+    'ae',
+    'aqui',
+    'agora',
+    'entao',
+    'tipo',
+    'assim',
+    'ta',
+    'to',
+    'sei',
+    'la',
+    'mais',
+    'quero',
+    'queria',
+    'preciso',
+    'gostaria',
+    'pedido',
+    'comprar',
+    'pedir',
+  ]);
+
   private readonly repeatReferencePhrases = [
     'o mesmo',
     'a mesma',
@@ -298,6 +352,7 @@ export class MessageIntelligenceService {
     const normalizedText = this.normalizeText(message);
     const quantity = this.extractQuantity(normalizedText);
     const productCandidate = this.extractProductCandidate(message);
+    const keywords = this.extractMeaningfulTokens(normalizedText);
     const hasOrderCode = /\bped[\s-]?\d{8}[\s-]?[a-z0-9]{3,}\b/i.test(normalizedText);
     const multiItem = /\b(e|mais)\b/.test(normalizedText) && /\b\d+\b/.test(normalizedText);
 
@@ -332,6 +387,15 @@ export class MessageIntelligenceService {
     const helpScore = this.clampScore(helpMatches.length > 0 ? 0.8 : 0);
     const greetingScore = this.clampScore(greetingMatches.length > 0 ? 0.68 : 0);
     const courtesyScore = this.clampScore(courtesyMatches.length > 0 ? 0.66 : 0);
+    const rawProductGuessOnly =
+      !!productCandidate &&
+      quantity === null &&
+      productCandidate === normalizedText &&
+      orderScore < 0.45 &&
+      cancelScore < 0.45 &&
+      statusScore < 0.45 &&
+      reopenScore < 0.45 &&
+      paymentScore < 0.45;
 
     let primaryIntent: MessageAnalysis['primaryIntent'] = 'outro';
     let confidence = 0.35;
@@ -349,7 +413,7 @@ export class MessageIntelligenceService {
       helpScore >= 0.6 ||
       greetingScore >= 0.6 ||
       courtesyScore >= 0.6 ||
-      Boolean(productCandidate)
+      (Boolean(productCandidate) && !rawProductGuessOnly)
     ) {
       primaryIntent = 'consultar';
       confidence = Math.max(
@@ -363,10 +427,30 @@ export class MessageIntelligenceService {
       );
     }
 
+    const lowSignal =
+      !normalizedText ||
+      (!quantity &&
+        (keywords.length <= 1 || rawProductGuessOnly) &&
+        orderScore < 0.45 &&
+        cancelScore < 0.45 &&
+        statusScore < 0.45 &&
+        reopenScore < 0.45 &&
+        paymentScore < 0.45 &&
+        helpScore < 0.6 &&
+        greetingScore < 0.6 &&
+        courtesyScore < 0.6);
+
+    const needsClarification =
+      primaryIntent === 'outro' &&
+      (lowSignal ||
+        rawProductGuessOnly ||
+        (!!productCandidate && productCandidate.length < 4 && keywords.length <= 1));
+
     return {
       normalizedText,
       quantity,
       productCandidate,
+      keywords,
       scores: {
         order: orderScore,
         cancel: cancelScore,
@@ -394,6 +478,8 @@ export class MessageIntelligenceService {
         uncertainChoice: uncertaintyMatches.length > 0,
         hasOrderCode,
         multiItem,
+        lowSignal,
+        needsClarification,
       },
       primaryIntent,
       confidence,
@@ -661,5 +747,17 @@ export class MessageIntelligenceService {
 
   private clampScore(value: number): number {
     return Math.max(0, Math.min(1, Number(value.toFixed(2))));
+  }
+
+  private extractMeaningfulTokens(normalized: string): string[] {
+    if (!normalized) {
+      return [];
+    }
+
+    return normalized
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 2 || /^\d+$/.test(token))
+      .filter((token) => !this.lowSignalStopWords.has(token));
   }
 }
