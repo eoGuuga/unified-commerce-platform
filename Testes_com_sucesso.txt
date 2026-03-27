@@ -726,3 +726,9 @@
 - O motor comercial agora sintetiza customerGoalSummary e buyerConcerns para refletir melhor o que entendeu do cliente.
 - Ajustadas respostas de coleta, pos-pedido e recomendacao para explicar melhor o motivo das etapas e soar menos scriptado.
 - Validacao local: backend lint ok, build ok, testes unitarios focados ok.
+
+2026-03-27  WhatsApp product-offer intelligence (local)
+- Criado ProductOfferIntelligenceService para ler papel comercial do produto: gift_ready, sharing, impulse, accessory e tier.
+- O ranking comercial agora considera melhor o papel da oferta e a relacao com a necessidade do cliente.
+- As respostas de recomendacao/comparacao agora explicam melhor o papel do item recomendado, em vez de tratar todo produto como igual.
+- Validacao local: backend lint ok, build ok, testes unitarios focados ok.

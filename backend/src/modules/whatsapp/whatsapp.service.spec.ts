@@ -8,6 +8,7 @@ import { SalesPlaybookService } from './services/sales-playbook.service';
 import { SalesSegmentStrategyService } from './services/sales-segment-strategy.service';
 import { SalesVerticalPackService } from './services/sales-vertical-pack.service';
 import { CatalogSalesContextService } from './services/catalog-sales-context.service';
+import { ProductOfferIntelligenceService } from './services/product-offer-intelligence.service';
 
 describe('WhatsappService defensive WhatsApp flow', () => {
   const catalog = [
@@ -416,6 +417,9 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     const catalogSalesContextService = new CatalogSalesContextService(
       messageIntelligenceService,
     );
+    const productOfferIntelligenceService = new ProductOfferIntelligenceService(
+      messageIntelligenceService,
+    );
 
     const service = new WhatsappService(
       config as any,
@@ -428,6 +432,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       salesSegmentStrategyService as any,
       salesVerticalPackService as any,
       catalogSalesContextService as any,
+      productOfferIntelligenceService as any,
       cacheService as any,
       conversationService as any,
       tenantsService as any,
@@ -3209,6 +3214,23 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('O que eu entendi da sua busca foi');
     expect(response).toContain('presente para sua mae');
     expect(response).toContain('sem passar de R$ 14,00');
+  });
+
+  it('explains the commercial role of the recommended item instead of treating every product the same', async () => {
+    const { service } = createFixture(giftingCatalogWithAccessories);
+
+    const response = await service.generateResponse(
+      'me indica um presente caprichado',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+        },
+      }),
+    );
+
+    expect(response).toContain('entra mais como presente pronto');
+    expect(response).not.toContain('Cartao recadinho entra mais como presente pronto');
   });
 
   it('blocks fresh order restart while payment is pending', async () => {

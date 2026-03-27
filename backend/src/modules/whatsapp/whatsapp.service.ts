@@ -28,6 +28,9 @@ import {
   CatalogSalesContextService,
   CatalogSalesProfile,
 } from './services/catalog-sales-context.service';
+import {
+  ProductOfferIntelligenceService,
+} from './services/product-offer-intelligence.service';
 import { ConversationService } from './services/conversation.service';
 import { ProductsService } from '../products/products.service';
 import { OrdersService } from '../orders/orders.service';
@@ -225,6 +228,7 @@ export class WhatsappService {
     private salesSegmentStrategyService: SalesSegmentStrategyService,
     private salesVerticalPackService: SalesVerticalPackService,
     private catalogSalesContextService: CatalogSalesContextService,
+    private productOfferIntelligenceService: ProductOfferIntelligenceService,
     private cacheService: CacheService,
     private conversationService: ConversationService,
     private tenantsService: TenantsService,
@@ -4477,9 +4481,8 @@ export class WhatsappService {
   }
 
   private isSupportAccessoryProduct(product: ProductWithStock): boolean {
-    const document = this.buildProductSalesDocument(product);
-    return /(cartao|recadinho|sacola|sacola kraft|embalagem|caixa vazia|laco|fitilho|tag|vela|topper|suporte)/.test(
-      document,
+    return (
+      this.productOfferIntelligenceService.analyzeProduct(product, [product]).role === 'accessory'
     );
   }
 
@@ -4624,6 +4627,15 @@ export class WhatsappService {
         score += strategyFit.score;
         strategyFit.reasons.forEach(addReason);
 
+        const offerFit = this.productOfferIntelligenceService.scoreProduct(
+          product,
+          saleableProducts,
+          analysis,
+          referenceProduct,
+        );
+        score += offerFit.score;
+        offerFit.reasons.forEach(addReason);
+
         queryWords.forEach((word) => {
           if (normalizedName.includes(word)) {
             score += 14;
@@ -4762,6 +4774,28 @@ export class WhatsappService {
     return `Aqui eu considerei principalmente ${this.joinNaturally(detectedNeeds)}.`;
   }
 
+  private buildProductOfferReadingLine(
+    product: ProductWithStock,
+    catalog: ProductWithStock[],
+  ): string | null {
+    const profile = this.productOfferIntelligenceService.analyzeProduct(product, catalog);
+
+    switch (profile.role) {
+      case 'gift_ready':
+        return `${product.name} entra mais como presente pronto para impressionar sem muito atrito.`;
+      case 'sharing':
+        return `${product.name} faz mais sentido quando a compra pede volume ou algo para dividir.`;
+      case 'impulse':
+        return `${product.name} funciona melhor como mimo individual ou decisao rapida.`;
+      case 'accessory':
+        return `${product.name} eu leio mais como complemento do que como estrela da recomendacao.`;
+      default:
+        return profile.tier === 'premium'
+          ? `${product.name} segura uma leitura mais premium dentro do catalogo.`
+          : null;
+    }
+  }
+
   private buildSalesRecommendationResponse(
     analysis: SalesConversationAnalysis,
     rankedProducts: RankedSalesProduct[],
@@ -4793,6 +4827,10 @@ export class WhatsappService {
     const crossSellLine = crossSellSuggestion
       ? `${crossSellSuggestion.prompt} ${crossSellSuggestion.product.name}, porque ${crossSellSuggestion.reason}.`
       : '';
+    const offerReadingLine = this.buildProductOfferReadingLine(
+      rankedProducts[0].product,
+      rankedProducts.map((item) => item.product),
+    );
 
     return [
       ...conversationPrelude,
@@ -4802,6 +4840,7 @@ export class WhatsappService {
       reasoningLine,
       needLine,
       conversationFocus,
+      offerReadingLine,
       '',
       'Estas sao as opcoes que eu colocaria na sua frente agora:',
       ...rankedProducts.slice(0, 3).map((item) => this.formatSalesRecommendationLine(item)),
@@ -4856,6 +4895,10 @@ export class WhatsappService {
       );
     const reasoningLine = this.buildHumanSalesReasoning(analysis, strategy, catalogProfile);
     const needLine = this.buildSalesNeedLine(strategy);
+    const recommendedOfferReading = this.buildProductOfferReadingLine(
+      recommended,
+      comparedProducts,
+    );
 
     return [
       ...conversationPrelude,
@@ -4868,6 +4911,7 @@ export class WhatsappService {
       reasoningLine,
       needLine,
       conversationFocus,
+      recommendedOfferReading,
       '',
       `Se a prioridade for economizar: ${cheaper.name}.`,
       `Se a prioridade for algo mais forte ou mais marcante: ${premium.name}.`,
