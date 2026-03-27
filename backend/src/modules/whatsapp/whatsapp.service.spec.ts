@@ -3415,6 +3415,37 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('- "quero 2 brigadeiros"');
   });
 
+  it('does not turn non-commercial chatter into an order when the message is outside the store domain', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse('vou fazer omelete', 'tenant-id');
+
+    expect(response).toContain('Calma, acho que eu puxei a conversa para o lado errado');
+    expect(response).not.toContain('Quantos *vou fazer omelete*');
+  });
+
+  it('uses non-commercial recovery for emotional reactions instead of opening a price flow', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse('meu deus', 'tenant-id');
+
+    expect(
+      response.includes('Calma, acho que eu puxei a conversa para o lado errado') ||
+        response.includes('Pode me falar com calma') ||
+        response.includes('o que voce quer resolver agora'),
+    ).toBe(true);
+    expect(response).not.toContain('REFERENCIA RAPIDA DE PRECOS');
+  });
+
+  it('stops gracefully when the customer asks the bot to stop the current nonsense', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse('tira issoooo', 'tenant-id');
+
+    expect(response).toContain('Sem problema, vou parar por aqui.');
+    expect(response).not.toContain('Quero te entender sem adivinhar coisa errada');
+  });
+
   it('suggests the closest catalog options when the requested product does not exist', async () => {
     const service = createService(loucasCatalog) as any;
 

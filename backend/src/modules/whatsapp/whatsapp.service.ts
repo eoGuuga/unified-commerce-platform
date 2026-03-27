@@ -3141,6 +3141,15 @@ export class WhatsappService {
     currentState?: ConversationState,
   ): Promise<string | null> {
     const analysis = this.conversationalIntelligenceService.analyze(message);
+    const normalized = analysis.normalizedText;
+
+    if (
+      (!currentState || ['idle', 'order_confirmed', 'order_completed'].includes(currentState)) &&
+      this.isOutOfFlowStopIntent(normalized)
+    ) {
+      return this.getPremiumSoftResetMessage();
+    }
+
     const salesAnalysis = this.salesIntelligenceService.analyze(message);
     const plan = this.conversationPlannerService.buildPlan({
       message,
@@ -3153,7 +3162,6 @@ export class WhatsappService {
       return null;
     }
 
-    const normalized = analysis.normalizedText;
     if (
       this.containsAbusiveLanguage(normalized) &&
       !analysis.signals.issue &&
@@ -7785,12 +7793,19 @@ export class WhatsappService {
     ) {
       return this.getPremiumSoftResetMessage();
     }
+    if (isIdleLikeState && this.isOutOfFlowStopIntent(lowerMessage)) {
+      return this.getPremiumSoftResetMessage();
+    }
     if (isIdleLikeState && this.isLooseReplyWithoutContext(lowerMessage)) {
       return this.getPremiumContextRecoveryMessage();
     }
 
     if (this.isBareOrderIntent(lowerMessage)) {
       return this.getPremiumOrderNudgeMessage();
+    }
+
+    if (this.shouldUseNonCommercialRecovery(message, conversation, currentState)) {
+      return this.getPremiumNonCommercialRecoveryMessage();
     }
 
     // IMPORTANTE: Verificar pedidos (antes de outras respostas)
@@ -8136,11 +8151,110 @@ export class WhatsappService {
 
   private getPremiumSoftResetMessage(): string {
     return [
-      'Sem problema.',
+      'Sem problema, vou parar por aqui.',
       '',
       'Quando quiser retomar, eu monto um novo pedido com voce sem perder tempo.',
       'Se preferir, envie "cardapio" para ver os itens ou "ajuda" para ver os atalhos.',
     ].join('\n');
+  }
+
+  private getPremiumNonCommercialRecoveryMessage(): string {
+    return [
+      'Calma, acho que eu puxei a conversa para o lado errado.',
+      '',
+      'Essa mensagem nao parece um pedido da loja, entao eu prefiro nao inventar item, preco ou quantidade.',
+      'Se voce quiser comprar, me diga o produto do seu jeito ou envie "cardapio".',
+      'Se era outro assunto, pode me explicar em uma frase que eu tento te entender sem forcar um pedido.',
+    ].join('\n');
+  }
+
+  private isLikelyNonCommercialMessage(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return false;
+    }
+
+    const emotionalOrRejectivePhrases = [
+      'meu deus',
+      'mds',
+      'socorro',
+      'credo',
+      'aff',
+      'affs',
+      'oxe',
+      'eita',
+      'que isso',
+      'para com isso',
+      'tira isso',
+      'pelo amor de deus',
+    ];
+
+    if (this.hasAnyNormalizedPhrase(normalized, emotionalOrRejectivePhrases)) {
+      return true;
+    }
+
+    return /^(vou|to|estou|fui)\s+(fazer|comer|cozinhar|dormir|sair|trabalhar|estudar)\b/.test(
+      normalized,
+    );
+  }
+
+  private isOutOfFlowStopIntent(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return false;
+    }
+
+    const explicitStopPhrases = [
+      'tira isso',
+      'para com isso',
+      'pare com isso',
+      'deixa isso',
+      'deixa quieto',
+      'para ai',
+      'pare ai',
+    ];
+
+    if (this.hasAnyNormalizedPhrase(normalized, explicitStopPhrases)) {
+      return true;
+    }
+
+    return /^(para|pare|chega)\b/.test(normalized);
+  }
+
+  private shouldUseNonCommercialRecovery(
+    message: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): boolean {
+    if (currentState && !['idle', 'order_confirmed', 'order_completed'].includes(currentState)) {
+      return false;
+    }
+
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return false;
+    }
+
+    if (
+      this.isDirectCatalogRequest(normalized) ||
+      this.isDirectPriceQuestion(normalized) ||
+      this.isDirectStockQuestion(normalized) ||
+      this.isDirectScheduleQuestion(normalized) ||
+      this.isDirectHelpRequest(normalized) ||
+      this.isDirectGreeting(normalized) ||
+      this.isPaymentMethodSelection(normalized) ||
+      this.isCancelIntent(normalized, conversation, currentState) ||
+      this.looksLikeOrderStatusQuery(normalized, conversation) ||
+      this.isReopenIntent(normalized) ||
+      this.isRepeatOrderIntent(normalized) ||
+      this.isBareOrderIntent(normalized) ||
+      this.isOrderIntent(normalized) ||
+      this.looksLikeMultiItemOrder(normalized)
+    ) {
+      return false;
+    }
+
+    return this.isLikelyNonCommercialMessage(normalized);
   }
 
   private isOrderIntent(lowerMessage: string): boolean {
@@ -8451,6 +8565,29 @@ export class WhatsappService {
 
       const hasQuantity = orderInfo.quantity !== null;
       const hasProduct = !!orderInfo.productName;
+
+      if (!hasQuantity && hasProduct) {
+        const produtosSemQuantidadeResult = await this.productsService.findAll(tenantId);
+        const produtosSemQuantidade = Array.isArray(produtosSemQuantidadeResult)
+          ? produtosSemQuantidadeResult
+          : produtosSemQuantidadeResult.data;
+        const resultadoBuscaSemQuantidade = this.findProductByName(
+          produtosSemQuantidade,
+          orderInfo.productName as string,
+        );
+
+        if (!resultadoBuscaSemQuantidade.produto && !resultadoBuscaSemQuantidade.sugestoes?.length) {
+          return this.getPremiumNonCommercialRecoveryMessage();
+        }
+
+        if (!resultadoBuscaSemQuantidade.produto && resultadoBuscaSemQuantidade.sugestoes?.length) {
+          return this.buildSuggestionMessage(
+            orderInfo.productName as string,
+            resultadoBuscaSemQuantidade.sugestoes,
+            `Nao fechei "${orderInfo.productName}" com seguranca, mas estas opcoes parecem proximas:`,
+          );
+        }
+      }
 
       if (hasQuantity && orderInfo.quantity !== null) {
         const quantityValidation = this.validateQuantity(orderInfo.quantity);

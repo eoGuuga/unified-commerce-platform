@@ -289,6 +289,17 @@ export class ConversationalIntelligenceService {
     'to frustrada',
     'estou frustrada',
     'sacanagem',
+    'meu deus',
+    'mds',
+    'tira isso',
+    'para com isso',
+    'que isso',
+    'pelo amor de deus',
+    'credo',
+    'aff',
+    'affs',
+    'oxe',
+    'eita',
   ];
 
   constructor(private readonly messageIntelligenceService: MessageIntelligenceService) {}

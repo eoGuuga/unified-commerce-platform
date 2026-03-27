@@ -754,3 +754,13 @@
   - `npx.cmd jest src/modules/whatsapp/whatsapp.service.spec.ts src/modules/whatsapp/services/message-intelligence.service.spec.ts --runInBand -t "asks for clarification|blocks AI routing|suggests the closest catalog options|keeps the product in mind"` => ok
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
+
+2026-03-27  WhatsApp human recovery for nonsense and emotional chatter (local)
+- Corrigido o caso real em que mensagem sem contexto comercial, como `vou fazer omelete`, podia ser tratada como se fosse pedido.
+- Reforcada a leitura de reacao emocional e rejeicao livre, como `meu deus` e `tira issoooo`, para nao cair em preco, pedido ou menu duro.
+- Pedidos explicitos para parar a conversa fora de fluxo agora vencem a camada conversacional e retornam uma parada limpa: `Sem problema, vou parar por aqui.`
+- Ajustada a regressao para aceitar resposta humana de acolhimento em `meu deus`, desde que nunca abra `REFERENCIA RAPIDA DE PRECOS`.
+- Validacao local:
+  - `npx.cmd jest src/modules/whatsapp/whatsapp.service.spec.ts --runInBand -t "asks for clarification|outside the store domain|emotional reactions|stops gracefully|suggests the closest catalog options"` => ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
