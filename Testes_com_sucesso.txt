@@ -720,3 +720,9 @@
   - `npm.cmd run test:unit` => `213/213` testes ok
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
+2026-03-27  WhatsApp conversational upgrade (local)
+- Enriquecida a leitura conversacional com topic, customerNeeds, correction e decisionHelp.
+- Criados os modos trust_reassurance e decision_coaching para respostas menos roboticas e mais consultivas.
+- O motor comercial agora sintetiza customerGoalSummary e buyerConcerns para refletir melhor o que entendeu do cliente.
+- Ajustadas respostas de coleta, pos-pedido e recomendacao para explicar melhor o motivo das etapas e soar menos scriptado.
+- Validacao local: backend lint ok, build ok, testes unitarios focados ok.

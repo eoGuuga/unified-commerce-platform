@@ -3152,6 +3152,65 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('cancelar esse pedido');
   });
 
+  it('explains the phone step with more trust when the customer fears sending the wrong data', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'nao quero errar, me explica porque precisa do telefone',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_phone',
+          pending_order: pendingConversationOrder,
+          customer_data: {
+            name: 'Ana Paula',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Eu so uso esse telefone para atualizar voce');
+    expect(response).toContain('TELEFONE DE CONTATO');
+  });
+
+  it('uses a stronger decision-coaching tone for consultative sales doubts', async () => {
+    const { service } = createFixture(giftingCatalogWithAccessories);
+
+    const response = await service.generateResponse(
+      'to em duvida, o que voce acha melhor para presente sem erro?',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Eu vou te ajudar a decidir com criterio');
+    expect(response).toContain('sem te empurrar item');
+  });
+
+  it('reflects the customer commercial goal more explicitly in consultative recommendations', async () => {
+    const { service } = createFixture(giftingCatalogWithAccessories);
+
+    const response = await service.generateResponse(
+      'me indica um presente pra minha mae ate 14 reais, sem erro e sem perder tempo',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+        },
+      }),
+    );
+
+    expect(response).toContain('O que eu entendi da sua busca foi');
+    expect(response).toContain('presente para sua mae');
+    expect(response).toContain('sem passar de R$ 14,00');
+  });
+
   it('blocks fresh order restart while payment is pending', async () => {
     const { service, paymentsService } = createFixture([], {
       orders: {

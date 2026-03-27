@@ -62,4 +62,22 @@ describe('ConversationalIntelligenceService', () => {
     expect(analysis.signals.frustration).toBe(true);
     expect(analysis.responseStyle.empathy).toBe(true);
   });
+
+  it('detects trust-sensitive decision help instead of reducing the message to a single rigid intent', () => {
+    const analysis = service.analyze('acho caro e nao quero errar, o que voce acha melhor?');
+
+    expect(analysis.intent).toBe('hesitation');
+    expect(analysis.signals.decisionHelp).toBe(true);
+    expect(analysis.signals.reassurance).toBe(true);
+    expect(analysis.customerNeeds).toContain('ter ajuda para decidir com calma');
+    expect(analysis.customerNeeds).toContain('seguir com seguranca sem errar');
+  });
+
+  it('recognizes payment trust concerns as a specific conversational topic', () => {
+    const analysis = service.analyze('to desconfiado desse pix, nao quero pagar errado');
+
+    expect(analysis.topic).toBe('payment');
+    expect(analysis.signals.reassurance).toBe(true);
+    expect(analysis.customerNeeds).toContain('ter seguranca antes de pagar ou confirmar');
+  });
 });

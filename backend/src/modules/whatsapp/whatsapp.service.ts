@@ -2484,6 +2484,14 @@ export class WhatsappService {
     analysis: ConversationalAnalysis,
     plan?: ConversationPlan,
   ): string {
+    if (plan?.mode === 'trust_reassurance') {
+      return 'Eu vou te explicar o motivo do que eu estou te pedindo e so depois te puxo para qualquer confirmacao.';
+    }
+
+    if (plan?.mode === 'decision_coaching') {
+      return 'Eu vou organizar a decisao com criterio e sem te empurrar item so para girar venda.';
+    }
+
     switch (analysis.posture) {
       case 'frustrated':
         return plan?.mode === 'issue_recovery' || plan?.mode === 'post_order_support'
@@ -2549,8 +2557,20 @@ export class WhatsappService {
 
     const details: string[] = [];
 
+    if (analysis.customerGoalSummary) {
+      details.push(`O que eu entendi da sua busca foi: ${analysis.customerGoalSummary}.`);
+    }
+
     if (understandingLine) {
       details.push(understandingLine);
+    }
+
+    if (analysis.buyerConcerns.length) {
+      details.push(
+        `Eu tambem considerei principalmente ${this.joinNaturally(
+          analysis.buyerConcerns.slice(0, 3),
+        )}.`,
+      );
     }
 
     if (detectedNeeds.length) {
@@ -2670,6 +2690,44 @@ export class WhatsappService {
       ].join('\n');
     }
 
+    if (plan?.mode === 'trust_reassurance') {
+      return [
+        this.getConversationalSupportLead(analysis, plan),
+        '',
+        calibration,
+        '',
+        `Entendi que agora voce quer ${plan.customerGoal}.`,
+        this.getIdleTrustBridge(analysis),
+        '',
+        'Pode me falar do seu jeito, por exemplo:',
+        '- "me explica melhor antes de eu seguir"',
+        '- "o que exatamente voce precisa agora?"',
+        '- "quero ter certeza antes de fechar"',
+      ].join('\n');
+    }
+
+    if (plan?.mode === 'decision_coaching') {
+      const memory = this.getConversationIntelligenceMemory(conversation);
+      const referenceLine =
+        memory.last_product_name
+          ? `Se quiser, eu parto de *${memory.last_product_name}* e te mostro o que muda a partir dele.`
+          : 'Eu nao vou te empurrar nada; vou afinar a decisao com voce do jeito mais seguro.';
+
+      return [
+        this.getConversationalSupportLead(analysis, plan),
+        '',
+        calibration,
+        '',
+        `Entendi que agora voce quer ${plan.customerGoal}.`,
+        referenceLine,
+        '',
+        'Pode me responder do seu jeito, por exemplo:',
+        '- "o que voce escolheria no meu lugar?"',
+        '- "me mostra a opcao mais segura"',
+        '- "me compara com uma mais em conta"',
+      ].join('\n');
+    }
+
     if (plan?.mode === 'sales_consultative') {
       const memory = this.getConversationIntelligenceMemory(conversation);
       const bridge =
@@ -2742,6 +2800,10 @@ export class WhatsappService {
         : plan.mode === 'issue_recovery'
           ? 'Eu nao vou avancar nada errado antes de alinhar esse ponto com voce.'
           : '';
+    const trustLine =
+      plan.mode === 'trust_reassurance'
+        ? this.getCollectionTrustLine(currentState, customerData)
+        : '';
     const contextRecap =
       plan.mode === 'context_recap'
         ? this.buildContextRecapMessage(
@@ -2775,6 +2837,7 @@ export class WhatsappService {
           calibration,
           '',
           whyThisStageMatters,
+          trustLine,
           reassurance,
           plan.mode === 'issue_recovery'
             ? this.getCollectionCorrectionPrompt(currentState, customerData)
@@ -2789,6 +2852,7 @@ export class WhatsappService {
           calibration,
           '',
           whyThisStageMatters,
+          trustLine,
           reassurance,
           plan.mode === 'issue_recovery'
             ? this.getCollectionCorrectionPrompt(currentState, customerData)
@@ -2807,6 +2871,7 @@ export class WhatsappService {
           calibration,
           '',
           whyThisStageMatters,
+          trustLine,
           reassurance,
           plan.mode === 'issue_recovery'
             ? this.getCollectionCorrectionPrompt(currentState, customerData)
@@ -2821,6 +2886,7 @@ export class WhatsappService {
           calibration,
           '',
           whyThisStageMatters,
+          trustLine,
           reassurance,
           plan.mode === 'issue_recovery'
             ? this.getCollectionCorrectionPrompt(currentState, customerData)
@@ -2835,6 +2901,7 @@ export class WhatsappService {
           calibration,
           '',
           whyThisStageMatters,
+          trustLine,
           reassurance,
           plan.mode === 'issue_recovery'
             ? this.getCollectionCorrectionPrompt(currentState, customerData)
@@ -2848,6 +2915,7 @@ export class WhatsappService {
           calibration,
           '',
           whyThisStageMatters,
+          trustLine,
           reassurance,
           plan.mode === 'issue_recovery'
             ? this.getCollectionCorrectionPrompt(currentState, customerData)
@@ -2863,6 +2931,7 @@ export class WhatsappService {
           calibration,
           '',
           whyThisStageMatters,
+          trustLine,
           reassurance,
           'Agora eu estou na revisao final do pedido.',
           plan.mode === 'issue_recovery'
@@ -2921,6 +2990,40 @@ export class WhatsappService {
           pedido.order_no,
         )}`,
       );
+    }
+
+    if (plan.mode === 'trust_reassurance') {
+      const trustLine = this.getPostFlowTrustLine(currentState, analysis);
+
+      if (currentState === 'waiting_payment') {
+        return [
+          this.getConversationalSupportLead(analysis, plan),
+          '',
+          calibration,
+          '',
+          `Entendi que agora voce quer ${plan.customerGoal}.`,
+          `Pedido: *${pedido.order_no}*`,
+          `Status atual: *${this.getStatusLabel(pedido.status)}*`,
+          trustLine,
+          'Se o Pix nao apareceu, me diga "pix". Se voce ja pagou, me diga "ja paguei".',
+          '',
+          `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+        ].join('\n');
+      }
+
+      return [
+        this.getConversationalSupportLead(analysis, plan),
+        '',
+        calibration,
+        '',
+        `Entendi que agora voce quer ${plan.customerGoal}.`,
+        `Pedido: *${pedido.order_no}*`,
+        `Status atual: *${this.getStatusLabel(pedido.status)}*`,
+        trustLine,
+        this.getNextStepSummary(pedido, pedido.status),
+        '',
+        `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+      ].join('\n');
     }
 
     if (currentState === 'waiting_payment') {
@@ -4824,12 +4927,22 @@ export class WhatsappService {
   private buildSalesConversationPrelude(
     conversationalAnalysis: ConversationalAnalysis,
     plan: ConversationPlan,
+    salesAnalysis?: SalesConversationAnalysis,
   ): string[] {
     const lines: string[] = [];
 
-    if (plan.mode === 'sales_consultative') {
+    if (plan.mode === 'sales_consultative' || plan.mode === 'decision_coaching') {
       lines.push(plan.lead);
       lines.push(`Entendi que agora voce quer ${plan.customerGoal}.`);
+      if (salesAnalysis?.customerGoalSummary) {
+        lines.push(`Pelo que voce me disse, a busca aqui e ${salesAnalysis.customerGoalSummary}.`);
+      }
+
+      if (plan.mode === 'decision_coaching') {
+        lines.push(
+          'Eu vou te ajudar a decidir com criterio, sem te empurrar item e sem te deixar rodando em duvida.',
+        );
+      }
 
       switch (conversationalAnalysis.posture) {
         case 'urgent':
@@ -4924,6 +5037,58 @@ export class WhatsappService {
       .filter((item) => item.score > 0)
       .slice(0, 3)
       .map((item) => item.product);
+  }
+
+  private getIdleTrustBridge(analysis: ConversationalAnalysis): string {
+    switch (analysis.topic) {
+      case 'payment':
+        return 'Se a sua duvida e sobre pagar com seguranca, eu te explico o passo certo antes de qualquer cobranca.';
+      case 'delivery':
+        return 'Se a sua preocupacao e entrega, eu te explico exatamente o que eu preciso para nao gerar erro de rota.';
+      case 'order':
+        return 'Se a sua preocupacao e o pedido, eu te resumo o contexto certo antes de te puxar para qualquer confirmacao.';
+      case 'catalog':
+        return 'Se a sua duvida e escolha de produto, eu consigo te orientar sem te empurrar nada no escuro.';
+      default:
+        return 'Eu nao vou te empurrar nada nem te deixar no escuro; posso te explicar primeiro e so depois seguir.';
+    }
+  }
+
+  private getCollectionTrustLine(
+    currentState: ConversationState,
+    customerData?: CustomerData,
+  ): string {
+    switch (currentState) {
+      case 'collecting_name':
+        return 'Eu so preciso do nome para identificar corretamente quem vai receber, nao para travar voce num script.';
+      case 'collecting_address':
+        return customerData?.delivery_type
+          ? 'Eu so vou usar esse endereco para a entrega sair certa, sem erro de rota nem bairro.'
+          : 'Eu preciso alinhar primeiro se vai ser entrega ou retirada para nao te fazer repetir informacao depois.';
+      case 'collecting_phone':
+        return 'Eu so uso esse telefone para atualizar voce sobre pedido, entrega ou pagamento. Nao e para te jogar mensagem aleatoria.';
+      case 'collecting_notes':
+        return 'Essa observacao e opcional; ela so serve para eu alinhar um detalhe fino com a equipe antes de fechar.';
+      case 'collecting_cash_change':
+        return 'Esse dado so serve para o entregador ja sair com o troco certo e evitar transtorno na porta.';
+      case 'confirming_order':
+        return 'Eu prefiro revisar isso com voce agora para o pedido entrar certo de primeira, sem surpresa depois.';
+      default:
+        return 'Eu vou te conduzir com criterio para voce entender o que falta antes de seguir.';
+    }
+  }
+
+  private getPostFlowTrustLine(
+    currentState: ConversationState,
+    analysis: ConversationalAnalysis,
+  ): string {
+    if (currentState === 'waiting_payment') {
+      return analysis.topic === 'payment'
+        ? 'Eu nao vou gerar outra cobranca nem mexer errado no pedido; primeiro eu te explico o ponto do pagamento.'
+        : 'Eu nao vou mexer errado no pedido; primeiro eu te explico o que esta acontecendo e depois te puxo para o proximo passo.';
+    }
+
+    return 'Eu nao vou mexer errado em item, status ou entrega; primeiro eu te explico o contexto certo dessa compra.';
   }
 
   private async getPremiumCardapio(tenantId: string): Promise<string> {
@@ -5148,6 +5313,7 @@ export class WhatsappService {
     const conversationPrelude = this.buildSalesConversationPrelude(
       conversationalAnalysis,
       conversationPlan,
+      analysis,
     );
 
     const products = await this.getCatalogProducts(tenantId);

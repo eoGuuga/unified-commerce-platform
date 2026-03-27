@@ -96,6 +96,8 @@ export type ConversationResponseMode =
   | 'post_order_support'
   | 'handoff_ready'
   | 'sales_consultative'
+  | 'decision_coaching'
+  | 'trust_reassurance'
   | 'freeform_support';
 
 export interface ConversationIntelligenceMemory {

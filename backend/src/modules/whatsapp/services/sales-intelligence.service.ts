@@ -24,6 +24,8 @@ export interface SalesConversationAnalysis {
   intent: SalesConversationIntent;
   secondaryIntents: SalesConversationIntent[];
   confidence: number;
+  customerGoalSummary: string;
+  buyerConcerns: string[];
   commercialQuery: string | null;
   budgetCeiling: number | null;
   pricePreference: SalesPricePreference;
@@ -229,6 +231,15 @@ export class SalesIntelligenceService {
     'separa esse',
     'separa essa',
   ];
+  private readonly antiPushPhrases = [
+    'sem me empurrar',
+    'sem empurrar nada',
+    'nao quero que empurre',
+    'nao quero propaganda',
+    'sem forcar',
+    'sem me jogar qualquer coisa',
+    'sem inventar moda',
+  ];
   private readonly recipientRules: Array<{ label: string; patterns: string[] }> = [
     { label: 'sua mae', patterns: ['pra minha mae', 'para minha mae', 'minha mae'] },
     { label: 'seu pai', patterns: ['pra meu pai', 'para meu pai', 'meu pai'] },
@@ -257,6 +268,7 @@ export class SalesIntelligenceService {
     const reassurance = this.hasAny(normalizedText, this.reassurancePhrases);
     const simplicity = this.hasAny(normalizedText, this.simplicityPhrases);
     const closing = this.hasAny(normalizedText, this.closingPhrases);
+    const antiPush = this.hasAny(normalizedText, this.antiPushPhrases);
     const useCaseTags = this.collectUseCaseTags(normalizedText, recipientHint);
     const comparison =
       this.hasAny(normalizedText, this.comparisonPhrases) ||
@@ -366,12 +378,34 @@ export class SalesIntelligenceService {
       budget || cheaper || objection,
       recommendation || indecision || comparison,
     );
+    const buyerConcerns = this.collectBuyerConcerns({
+      budgetCeiling,
+      objection,
+      reassurance,
+      urgency,
+      simplicity,
+      antiPush,
+      recipientHint,
+      useCaseTags,
+      decisionStage,
+    });
+    const customerGoalSummary = this.buildCustomerGoalSummary({
+      intent,
+      secondaryIntents,
+      budgetCeiling,
+      recipientHint,
+      useCaseTags,
+      decisionStage,
+      buyerConcerns,
+    });
 
     return {
       normalizedText,
       intent,
       secondaryIntents,
       confidence,
+      customerGoalSummary,
+      buyerConcerns,
       commercialQuery: this.extractCommercialQuery(normalizedText),
       budgetCeiling,
       pricePreference: cheaper ? 'budget' : bestValue ? 'value' : premium ? 'premium' : null,
@@ -397,6 +431,98 @@ export class SalesIntelligenceService {
         closing,
       },
     };
+  }
+
+  private collectBuyerConcerns(input: {
+    budgetCeiling: number | null;
+    objection: boolean;
+    reassurance: boolean;
+    urgency: boolean;
+    simplicity: boolean;
+    antiPush: boolean;
+    recipientHint: string | null;
+    useCaseTags: string[];
+    decisionStage: SalesDecisionStage;
+  }): string[] {
+    const concerns = new Set<string>();
+
+    if (input.budgetCeiling !== null || input.objection) {
+      concerns.add('nao gastar errado');
+    }
+
+    if (input.reassurance) {
+      concerns.add('nao errar a escolha');
+    }
+
+    if (input.urgency) {
+      concerns.add('resolver rapido');
+    }
+
+    if (input.simplicity) {
+      concerns.add('nao exagerar na escolha');
+    }
+
+    if (input.antiPush) {
+      concerns.add('nao se sentir empurrado');
+    }
+
+    if (input.recipientHint || input.useCaseTags.includes('gift')) {
+      concerns.add('causar boa impressao');
+    }
+
+    if (input.decisionStage === 'closing') {
+      concerns.add('fechar com seguranca');
+    }
+
+    return Array.from(concerns).slice(0, 4);
+  }
+
+  private buildCustomerGoalSummary(input: {
+    intent: SalesConversationIntent;
+    secondaryIntents: SalesConversationIntent[];
+    budgetCeiling: number | null;
+    recipientHint: string | null;
+    useCaseTags: string[];
+    decisionStage: SalesDecisionStage;
+    buyerConcerns: string[];
+  }): string {
+    const pieces: string[] = [];
+
+    if (input.useCaseTags.includes('gift') && input.recipientHint) {
+      pieces.push(`encontrar um presente para ${input.recipientHint}`);
+    } else if (input.useCaseTags.includes('gift')) {
+      pieces.push('encontrar um presente que faca sentido');
+    } else if (input.useCaseTags.includes('sharing')) {
+      pieces.push('achar algo bom para dividir');
+    } else if (input.useCaseTags.includes('self_treat')) {
+      pieces.push('achar um mimo mais para voce');
+    } else if (input.intent === 'comparison') {
+      pieces.push('decidir entre opcoes com mais criterio');
+    } else {
+      pieces.push('chegar numa boa escolha comercial');
+    }
+
+    if (input.budgetCeiling !== null) {
+      pieces.push(`sem passar de R$ ${this.formatCurrency(input.budgetCeiling)}`);
+    }
+
+    if (input.useCaseTags.includes('chocolate_focus')) {
+      pieces.push('com uma pegada mais forte de chocolate');
+    }
+
+    if (input.useCaseTags.includes('premium')) {
+      pieces.push('com leitura mais premium');
+    }
+
+    if (input.decisionStage === 'closing') {
+      pieces.push('ja perto de fechar');
+    }
+
+    if (input.buyerConcerns.length) {
+      pieces.push(`sem ${input.buyerConcerns[0]}`);
+    }
+
+    return pieces.slice(0, 4).join(', ');
   }
 
   extractCommercialQuery(message: string): string | null {
@@ -610,5 +736,9 @@ export class SalesIntelligenceService {
 
   private clampScore(value: number): number {
     return Math.max(0, Math.min(1, Number(value.toFixed(2))));
+  }
+
+  private formatCurrency(value: number): string {
+    return Number(value || 0).toFixed(2).replace('.', ',');
   }
 }

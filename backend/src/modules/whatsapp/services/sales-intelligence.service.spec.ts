@@ -58,6 +58,11 @@ describe('SalesIntelligenceService', () => {
     expect(analysis.conversationDrivers).toEqual(
       expect.arrayContaining(['urgency', 'reassurance', 'recipient_context', 'value_pressure']),
     );
+    expect(analysis.customerGoalSummary).toContain('presente para sua mae');
+    expect(analysis.customerGoalSummary).toContain('sem passar de R$ 40,00');
+    expect(analysis.buyerConcerns).toEqual(
+      expect.arrayContaining(['nao errar a escolha', 'resolver rapido', 'nao gastar errado']),
+    );
   });
 
   it('detects a simpler lower-friction buying style when the customer wants something discreet', () => {
@@ -69,6 +74,17 @@ describe('SalesIntelligenceService', () => {
     expect(analysis.secondaryIntents).toContain('budget');
     expect(analysis.conversationDrivers).toEqual(
       expect.arrayContaining(['simplicity', 'value_pressure']),
+    );
+  });
+
+  it('captures anti-push fear as part of the commercial reading', () => {
+    const analysis = service.analyze(
+      'me ajuda a escolher um presente sem me empurrar nada e sem erro',
+    );
+
+    expect(analysis.intent).toBe('recommendation');
+    expect(analysis.buyerConcerns).toEqual(
+      expect.arrayContaining(['nao se sentir empurrado', 'nao errar a escolha']),
     );
   });
 });

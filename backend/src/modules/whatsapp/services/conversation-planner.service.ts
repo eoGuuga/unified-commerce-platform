@@ -131,6 +131,29 @@ export class ConversationPlannerService {
       }
 
       if (
+        input.conversationalAnalysis.signals.reassurance &&
+        (input.conversationalAnalysis.signals.clarification ||
+          input.conversationalAnalysis.signals.correction ||
+          hasQuestionSignal ||
+          hasReassuranceSignal)
+      ) {
+        return this.refinePlan(
+          this.buildResponse(
+            'trust_reassurance',
+            this.getActiveCollectionTrustGoal(input),
+            'Eu vou te explicar o motivo dessa etapa sem te empurrar nada nem te fazer repetir informacao.',
+            0.9,
+            stateKind,
+            true,
+            true,
+            true,
+            false,
+          ),
+          input,
+        );
+      }
+
+      if (
         input.conversationalAnalysis.intent === 'issue' ||
         hasCorrectionSignal
       ) {
@@ -225,6 +248,34 @@ export class ConversationPlannerService {
       }
 
       if (
+        input.conversationalAnalysis.signals.reassurance &&
+        (input.conversationalAnalysis.intent === 'issue' ||
+          input.conversationalAnalysis.intent === 'clarification' ||
+          hasQuestionSignal ||
+          hasReassuranceSignal)
+      ) {
+        const customerGoal =
+          currentState === 'waiting_payment'
+            ? 'ter seguranca sobre o pagamento e o proximo passo'
+            : 'ter seguranca sobre esse pedido e o proximo passo';
+
+        return this.refinePlan(
+          this.buildResponse(
+            'trust_reassurance',
+            customerGoal,
+            'Eu vou te orientar com seguranca sem mexer errado em nada desse pedido.',
+            0.9,
+            stateKind,
+            true,
+            true,
+            false,
+            false,
+          ),
+          input,
+        );
+      }
+
+      if (
         input.conversationalAnalysis.intent === 'issue' ||
         input.conversationalAnalysis.intent === 'clarification' ||
         hasQuestionSignal ||
@@ -255,8 +306,29 @@ export class ConversationPlannerService {
 
     if (salesBridgeContext) {
       if (
-        input.conversationalAnalysis.intent === 'clarification' ||
+        input.conversationalAnalysis.signals.decisionHelp ||
         input.conversationalAnalysis.intent === 'hesitation' ||
+        (input.conversationalAnalysis.signals.reassurance &&
+          (hasQuestionSignal || hasReassuranceSignal))
+      ) {
+        return this.refinePlan(
+          this.buildResponse(
+            'decision_coaching',
+            this.getSalesDecisionGoal(input),
+            'Eu nao vou te empurrar nada. Vou te ajudar a decidir como uma consultora de verdade.',
+            0.86,
+            stateKind,
+            false,
+            false,
+            false,
+            true,
+          ),
+          input,
+        );
+      }
+
+      if (
+        input.conversationalAnalysis.intent === 'clarification' ||
         input.conversationalAnalysis.intent === 'issue' ||
         input.conversationalAnalysis.posture === 'urgent' ||
         hasQuestionSignal ||
@@ -277,6 +349,29 @@ export class ConversationPlannerService {
           input,
         );
       }
+    }
+
+    if (
+      input.conversationalAnalysis.signals.reassurance &&
+      (input.conversationalAnalysis.intent === 'clarification' ||
+        input.conversationalAnalysis.intent === 'issue' ||
+        hasQuestionSignal ||
+        hasReassuranceSignal)
+    ) {
+      return this.refinePlan(
+        this.buildResponse(
+          'trust_reassurance',
+          input.conversationalAnalysis.customerNeeds[0] || 'seguir com seguranca sem errar',
+          'Pode ficar tranquilo: eu vou te explicar isso com clareza antes de te puxar para qualquer passo.',
+          0.8,
+          stateKind,
+          false,
+          false,
+          false,
+          false,
+        ),
+        input,
+      );
     }
 
     if (input.conversationalAnalysis.intent === 'recap') {
@@ -394,6 +489,25 @@ export class ConversationPlannerService {
     posture: ConversationPlanInput['conversationalAnalysis']['posture'],
   ): string | null {
     switch (plan.mode) {
+      case 'trust_reassurance':
+        if (posture === 'reassurance') {
+          return 'Pode ficar tranquilo: eu vou te explicar isso com criterio antes de te puxar para qualquer confirmacao.';
+        }
+        if (posture === 'urgent') {
+          return 'Vou ser claro e rapido, mas sem te fazer confirmar nada no escuro.';
+        }
+        return null;
+      case 'decision_coaching':
+        if (posture === 'hesitant') {
+          return 'Sem pressa: eu vou te ajudar a decidir com criterio, sem te empurrar nada.';
+        }
+        if (posture === 'reassurance') {
+          return 'Eu vou te ajudar a decidir com seguranca, sem te empurrar nada no escuro.';
+        }
+        if (posture === 'urgent') {
+          return 'Vou cortar caminho com criterio para voce decidir rapido sem cair numa escolha torta.';
+        }
+        return null;
       case 'step_guidance':
         if (posture === 'reassurance') {
           return 'Vou te conduzir com clareza para voce nao confirmar nada no escuro.';
@@ -449,6 +563,25 @@ export class ConversationPlannerService {
     posture: ConversationPlanInput['conversationalAnalysis']['posture'],
   ): string | null {
     switch (plan.mode) {
+      case 'trust_reassurance':
+        if (posture === 'reassurance') {
+          return 'seguir com seguranca sem confirmar nada no escuro';
+        }
+        if (posture === 'urgent') {
+          return 'entender o suficiente para seguir rapido sem errar';
+        }
+        return null;
+      case 'decision_coaching':
+        if (posture === 'hesitant') {
+          return 'decidir com calma sem se sentir empurrado';
+        }
+        if (posture === 'reassurance') {
+          return 'decidir com seguranca sem comprar no impulso';
+        }
+        if (posture === 'urgent') {
+          return 'chegar rapido na melhor opcao sem erro bobo';
+        }
+        return null;
       case 'step_guidance':
         if (posture === 'reassurance') {
           return 'seguir com seguranca e entender exatamente o que falta';
@@ -507,5 +640,42 @@ export class ConversationPlannerService {
       explainWhyCurrentStep,
       offerSalesBridge,
     };
+  }
+
+  private getActiveCollectionTrustGoal(input: ConversationPlanInput): string {
+    switch (input.currentState) {
+      case 'collecting_name':
+        return 'entender por que eu preciso do nome antes de seguir';
+      case 'collecting_address':
+        return 'entender como eu vou usar o endereco sem criar risco de entrega errada';
+      case 'collecting_phone':
+        return 'entender por que eu preciso do telefone antes de continuar';
+      case 'collecting_notes':
+        return 'entender se essa observacao e realmente necessaria agora';
+      case 'confirming_order':
+        return 'revisar com seguranca antes de confirmar';
+      default:
+        return input.conversationalAnalysis.customerNeeds[0] || 'seguir com seguranca sem errar';
+    }
+  }
+
+  private getSalesDecisionGoal(input: ConversationPlanInput): string {
+    if (input.salesAnalysis.intent === 'comparison') {
+      return 'decidir entre as melhores opcoes com criterio';
+    }
+
+    if (input.salesAnalysis.intent === 'budget') {
+      return 'chegar numa opcao segura dentro do valor que faz sentido';
+    }
+
+    if (input.conversationalAnalysis.signals.reassurance) {
+      return 'decidir com seguranca sem comprar no impulso';
+    }
+
+    if (input.conversationalAnalysis.posture === 'urgent') {
+      return 'decidir rapido sem errar a mao';
+    }
+
+    return 'afinar a escolha com calma antes de fechar';
   }
 }

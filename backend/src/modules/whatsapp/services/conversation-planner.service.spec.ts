@@ -129,4 +129,40 @@ describe('ConversationPlannerService', () => {
     expect(plan.lead).toContain('corto caminho com seguranca');
     expect(plan.customerGoal).toContain('chegar rapido na melhor opcao');
   });
+
+  it('opens a trust-reassurance mode during collection when the customer fears sending the wrong data', () => {
+    const plan = service.buildPlan({
+      message: 'nao quero errar, me explica porque precisa do telefone',
+      conversationalAnalysis: conversationalIntelligenceService.analyze(
+        'nao quero errar, me explica porque precisa do telefone',
+      ),
+      salesAnalysis: salesIntelligenceService.analyze(
+        'nao quero errar, me explica porque precisa do telefone',
+      ),
+      currentState: 'collecting_phone',
+    });
+
+    expect(plan.mode).toBe('trust_reassurance');
+    expect(plan.shouldOverrideTransactional).toBe(true);
+    expect(plan.customerGoal).toContain('telefone');
+  });
+
+  it('opens a decision-coaching mode when the customer wants help choosing with more confidence', () => {
+    const plan = service.buildPlan({
+      message: 'to em duvida, o que voce acha melhor para presente?',
+      conversationalAnalysis: conversationalIntelligenceService.analyze(
+        'to em duvida, o que voce acha melhor para presente?',
+      ),
+      salesAnalysis: salesIntelligenceService.analyze(
+        'to em duvida, o que voce acha melhor para presente?',
+      ),
+      memory: {
+        last_intent: 'recommendation',
+      },
+    });
+
+    expect(plan.mode).toBe('decision_coaching');
+    expect(plan.offerSalesBridge).toBe(true);
+    expect(plan.customerGoal).toContain('decidir');
+  });
 });

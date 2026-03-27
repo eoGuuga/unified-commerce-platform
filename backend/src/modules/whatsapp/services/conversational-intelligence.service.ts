@@ -18,9 +18,20 @@ export type ConversationalPosture =
   | 'urgent'
   | 'calm';
 
+export type ConversationalTopic =
+  | 'payment'
+  | 'delivery'
+  | 'catalog'
+  | 'order'
+  | 'human_support'
+  | 'general';
+
 export interface ConversationalAnalysis {
   normalizedText: string;
   intent: ConversationalIntent;
+  secondaryIntents: ConversationalIntent[];
+  topic: ConversationalTopic;
+  customerNeeds: string[];
   posture: ConversationalPosture;
   confidence: number;
   signals: {
@@ -30,6 +41,9 @@ export interface ConversationalAnalysis {
     handoff: boolean;
     gratitude: boolean;
     hesitation: boolean;
+    correction: boolean;
+    decisionHelp: boolean;
+    trust: boolean;
     frustration: boolean;
     reassurance: boolean;
     urgency: boolean;
@@ -90,6 +104,24 @@ export class ConversationalIntelligenceService {
     'esta errado',
   ];
 
+  private readonly correctionPhrases = [
+    'entendeu errado',
+    'voce entendeu errado',
+    'nao era isso',
+    'nao e isso',
+    'na verdade',
+    'deixa eu corrigir',
+    'vou corrigir',
+    'corrige',
+    'corrigir',
+    'ajusta',
+    'ajusta isso',
+    'nao foi isso',
+    'faltou',
+    'confundiu',
+    'ficou errado',
+  ];
+
   private readonly handoffPhrases = [
     'falar com alguem',
     'falar com uma pessoa',
@@ -146,6 +178,20 @@ export class ConversationalIntelligenceService {
     'estou vendo ainda',
   ];
 
+  private readonly decisionHelpPhrases = [
+    'o que voce acha',
+    'qual voce acha melhor',
+    'me ajuda a escolher',
+    'me ajuda a decidir',
+    'nao sei qual escolher',
+    'qual faz mais sentido',
+    'qual compensa mais para mim',
+    'qual vale mais a pena para mim',
+    'to em duvida',
+    'estou em duvida',
+    'em duvida ainda',
+  ];
+
   private readonly reassurancePhrases = [
     'tem certeza',
     'vai dar certo',
@@ -162,6 +208,51 @@ export class ConversationalIntelligenceService {
     'garante',
     'ta seguro',
     'esta seguro',
+  ];
+
+  private readonly paymentTopicPhrases = [
+    'pix',
+    'pagamento',
+    'pagar',
+    'comprovante',
+    'cobranca',
+    'cobrar',
+    'paguei',
+    'ja paguei',
+  ];
+
+  private readonly deliveryTopicPhrases = [
+    'entrega',
+    'retirada',
+    'retirar',
+    'endereco',
+    'rua',
+    'bairro',
+    'cep',
+    'motoboy',
+    'entregador',
+  ];
+
+  private readonly catalogTopicPhrases = [
+    'cardapio',
+    'catalogo',
+    'menu',
+    'produto',
+    'produtos',
+    'item',
+    'itens',
+    'opcao',
+    'opcoes',
+  ];
+
+  private readonly orderTopicPhrases = [
+    'pedido',
+    'encomenda',
+    'status',
+    'acompanhar',
+    'codigo',
+    'order',
+    'rastrear',
   ];
 
   private readonly urgencyPhrases = [
@@ -211,12 +302,20 @@ export class ConversationalIntelligenceService {
     const handoff = this.hasAny(normalizedText, this.handoffPhrases);
     const gratitude = this.hasAny(normalizedText, this.gratitudePhrases);
     const hesitation = this.hasAny(normalizedText, this.hesitationPhrases);
+    const correction = this.hasAny(normalizedText, this.correctionPhrases);
+    const decisionHelp = this.hasAny(normalizedText, this.decisionHelpPhrases);
     const frustration = this.hasAny(normalizedText, this.frustrationPhrases);
     const reassurance = this.hasAny(normalizedText, this.reassurancePhrases);
     const urgency = this.hasAny(normalizedText, this.urgencyPhrases);
+    const trust = reassurance;
+    const paymentTopic = this.hasAny(normalizedText, this.paymentTopicPhrases);
+    const deliveryTopic = this.hasAny(normalizedText, this.deliveryTopicPhrases);
+    const catalogTopic = this.hasAny(normalizedText, this.catalogTopicPhrases);
+    const orderTopic = recap || this.hasAny(normalizedText, this.orderTopicPhrases);
 
     let intent: ConversationalIntent = 'other';
     let posture: ConversationalPosture = 'calm';
+    let topic: ConversationalTopic = 'general';
     let confidence = 0.2;
 
     if (handoff) {
@@ -228,12 +327,12 @@ export class ConversationalIntelligenceService {
     } else if (issue) {
       intent = 'issue';
       confidence = 0.84;
-    } else if (clarification || frustration) {
+    } else if (clarification || correction || frustration) {
       intent = 'clarification';
-      confidence = clarification ? 0.82 : 0.74;
-    } else if (hesitation) {
+      confidence = clarification || correction ? 0.82 : 0.74;
+    } else if (hesitation || decisionHelp) {
       intent = 'hesitation';
-      confidence = 0.76;
+      confidence = decisionHelp ? 0.79 : 0.76;
     } else if (gratitude) {
       intent = 'gratitude';
       confidence = 0.78;
@@ -241,19 +340,60 @@ export class ConversationalIntelligenceService {
 
     if (issue || frustration) {
       posture = 'frustrated';
-    } else if (reassurance) {
+    } else if (trust) {
       posture = 'reassurance';
-    } else if (clarification) {
+    } else if (clarification || correction) {
       posture = 'confused';
-    } else if (hesitation) {
+    } else if (hesitation || decisionHelp) {
       posture = 'hesitant';
     } else if (urgency) {
       posture = 'urgent';
     }
 
+    if (paymentTopic) {
+      topic = 'payment';
+    } else if (deliveryTopic) {
+      topic = 'delivery';
+    } else if (catalogTopic) {
+      topic = 'catalog';
+    } else if (handoff) {
+      topic = 'human_support';
+    } else if (orderTopic) {
+      topic = 'order';
+    }
+
+    const secondaryIntents = this.collectSecondaryIntents({
+      primaryIntent: intent,
+      recap,
+      handoff,
+      issue,
+      clarification,
+      gratitude,
+      hesitation,
+      correction,
+      decisionHelp,
+    });
+    const customerNeeds = this.buildCustomerNeeds({
+      intent,
+      topic,
+      recap,
+      handoff,
+      issue,
+      clarification,
+      hesitation,
+      correction,
+      decisionHelp,
+      frustration,
+      reassurance,
+      urgency,
+    });
+
     return {
       normalizedText,
       intent,
+      secondaryIntents,
+      topic,
+      customerNeeds,
       posture,
       confidence,
       signals: {
@@ -263,17 +403,109 @@ export class ConversationalIntelligenceService {
         handoff,
         gratitude,
         hesitation,
+        correction,
+        decisionHelp,
+        trust,
         frustration,
         reassurance,
         urgency,
       },
       responseStyle: {
         empathy: posture === 'frustrated',
-        reassurance: posture === 'reassurance',
+        reassurance: posture === 'reassurance' || trust,
         directness: posture === 'urgent',
-        stepByStep: posture === 'confused' || clarification,
+        stepByStep: posture === 'confused' || clarification || correction,
       },
     };
+  }
+
+  private collectSecondaryIntents(flags: {
+    primaryIntent: ConversationalIntent;
+    recap: boolean;
+    handoff: boolean;
+    issue: boolean;
+    clarification: boolean;
+    gratitude: boolean;
+    hesitation: boolean;
+    correction: boolean;
+    decisionHelp: boolean;
+  }): ConversationalIntent[] {
+    const candidates: Array<{ intent: ConversationalIntent; active: boolean }> = [
+      { intent: 'handoff', active: flags.handoff },
+      { intent: 'recap', active: flags.recap },
+      { intent: 'issue', active: flags.issue },
+      { intent: 'clarification', active: flags.clarification || flags.correction },
+      { intent: 'hesitation', active: flags.hesitation || flags.decisionHelp },
+      { intent: 'gratitude', active: flags.gratitude },
+    ];
+
+    return candidates
+      .filter((candidate) => candidate.active && candidate.intent !== flags.primaryIntent)
+      .map((candidate) => candidate.intent)
+      .slice(0, 2);
+  }
+
+  private buildCustomerNeeds(flags: {
+    intent: ConversationalIntent;
+    topic: ConversationalTopic;
+    recap: boolean;
+    handoff: boolean;
+    issue: boolean;
+    clarification: boolean;
+    hesitation: boolean;
+    correction: boolean;
+    decisionHelp: boolean;
+    frustration: boolean;
+    reassurance: boolean;
+    urgency: boolean;
+  }): string[] {
+    const needs = new Set<string>();
+
+    if (flags.recap) {
+      needs.add(
+        flags.topic === 'order'
+          ? 'revisar como o pedido esta agora'
+          : 'revisar o que eu ja entendi antes de seguir',
+      );
+    }
+
+    if (flags.handoff) {
+      needs.add('nao repetir tudo para falar com alguem');
+    }
+
+    if (flags.issue || flags.correction || flags.frustration) {
+      needs.add(
+        flags.topic === 'payment'
+          ? 'resolver o pagamento sem criar mais confusao'
+          : 'corrigir esse ponto sem baguncar o que ja foi feito',
+      );
+    }
+
+    if (flags.clarification) {
+      needs.add('entender melhor o que esta acontecendo agora');
+    }
+
+    if (flags.hesitation || flags.decisionHelp) {
+      needs.add('ter ajuda para decidir com calma');
+    }
+
+    if (flags.reassurance) {
+      needs.add(
+        flags.topic === 'payment'
+          ? 'ter seguranca antes de pagar ou confirmar'
+          : 'seguir com seguranca sem errar',
+      );
+    }
+
+    if (flags.urgency) {
+      needs.add('resolver isso rapido sem pular o que e critico');
+    }
+
+    if (!needs.size) {
+      needs.add('ter uma resposta clara para seguir');
+    }
+
+    return Array.from(needs).slice(0, 3);
   }
 
   private hasAny(normalizedText: string, phrases: string[]): boolean {
