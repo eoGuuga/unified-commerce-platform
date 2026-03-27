@@ -1782,6 +1782,111 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).not.toContain('Pode me mandar o endereco novamente');
   });
 
+  it('does not treat invalid delivery choice numbers as address fragments', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      '0',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_address',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 1,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 12,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 12,
+          },
+          customer_data: {
+            name: 'Jordan Lincoln Kzan',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('preciso alinhar se vai ser entrega ou retirada');
+    expect(response).not.toContain('Rascunho atual: 0');
+  });
+
+  it('does not confuse a zip code sent during address collection with order quantity', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      '08060150',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_address',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 1,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 12,
+            discount_amount: 0,
+            shipping_amount: 10,
+            total_amount: 22,
+          },
+          customer_data: {
+            name: 'Jordan Lincoln Kzan',
+            delivery_type: 'delivery',
+          },
+          address_draft_parts: ['Rua Ceara 455'],
+        },
+      }),
+    );
+
+    expect(response).not.toContain('Quantidade maxima');
+    expect(response).toContain('Rascunho atual');
+  });
+
+  it('guides fixed-phone explanations back to the phone step instead of searching products', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'Tenho telefone fixo',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_phone',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 1,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 12,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 12,
+          },
+          customer_data: {
+            name: 'Jordan Lincoln Kzan',
+            delivery_type: 'pickup',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Pode ser celular ou telefone fixo');
+    expect(response).not.toContain('ainda nao fechou com seguranca no catalogo');
+  });
+
   it('handles payment problems with a contextual conversational recovery', async () => {
     const { service } = createFixture([], {
       orders: {
@@ -3080,6 +3185,61 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(paymentsService.createPayment).not.toHaveBeenCalled();
     expect(response).toContain('nao precisa ser escolhido novamente');
     expect(response).toContain('PED-20260315-CACE');
+  });
+
+  it('does not offer or attempt card checkout inside WhatsApp when only pix or cash are supported', async () => {
+    const { service, paymentsService } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue(pendingOrder),
+      },
+    });
+
+    const response = await service.generateResponse(
+      'credito',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'waiting_payment',
+          waiting_payment: true,
+          pedido_id: 'ord-1',
+        },
+      }),
+    );
+
+    expect(paymentsService.createPayment).not.toHaveBeenCalled();
+    expect(response).toContain('PIX');
+    expect(response).toContain('dinheiro');
+    expect(response).not.toContain('cardToken');
+  });
+
+  it('rejects absurd cash-change amounts instead of accepting nonsense', async () => {
+    const { service, paymentsService } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue({
+          ...pendingOrder,
+          total_amount: 22,
+        }),
+      },
+      payments: {
+        createPayment: jest.fn(),
+      },
+    });
+
+    const response = await service.generateResponse(
+      '100000',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'collecting_cash_change',
+          pedido_id: 'ord-1',
+        },
+      }),
+    );
+
+    expect(paymentsService.createPayment).not.toHaveBeenCalled();
+    expect(response).toContain('valor para troco ficou alto demais');
   });
 
   it('responds with contextual courtesy after confirmation', async () => {

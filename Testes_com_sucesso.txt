@@ -764,3 +764,14 @@
   - `npx.cmd jest src/modules/whatsapp/whatsapp.service.spec.ts --runInBand -t "asks for clarification|outside the store domain|emotional reactions|stops gracefully|suggests the closest catalog options"` => ok
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
+
+2026-03-27  WhatsApp QA hardening for delivery, phone and payment (local)
+- Corrigido o fluxo em que escolha invalida como `0` podia ser tratada como rascunho de endereco antes mesmo de alinhar entrega ou retirada.
+- CEP e fragmentos numericos durante `collecting_address` deixaram de cair em ajuste de pedido/quantidade, evitando respostas absurdas como `Quantidade maxima e 1000`.
+- Mensagens como `Tenho telefone fixo` durante `collecting_phone` agora ficam na etapa certa e respondem de forma humana, sem procurar produto no catalogo.
+- O WhatsApp passou a oferecer e fechar por `PIX` ou `dinheiro` neste fluxo; cartao agora recebe orientacao segura em vez de erro cru de `cardToken`.
+- Troco em dinheiro ganhou limite de sanidade para barrar valores absurdos como `100000`.
+- Validacao local:
+  - `npx.cmd jest src/modules/whatsapp/whatsapp.service.spec.ts --runInBand -t "delivery choice|zip code sent during address|fixed-phone explanations|card checkout inside WhatsApp|cash-change amounts|outside the store domain|emotional reactions|stops gracefully"` => ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok

@@ -1020,7 +1020,7 @@ export class WhatsappService {
   private getOrderStatusAction(_pedido: Pedido, status: PedidoStatus): string | null {
     switch (status) {
       case PedidoStatus.PENDENTE_PAGAMENTO:
-        return 'Se quiser concluir agora aqui no WhatsApp, responda: "pix", "credito", "debito" ou "dinheiro".';
+        return 'Se quiser concluir agora aqui no WhatsApp, responda: "pix" ou "dinheiro".';
       case PedidoStatus.CONFIRMADO:
       case PedidoStatus.EM_PRODUCAO:
       case PedidoStatus.PRONTO:
@@ -1084,12 +1084,10 @@ export class WhatsappService {
       'FORMAS DE PAGAMENTO',
       '',
       `1. PIX com 5% de desconto (R$ ${this.formatCurrency(pixAmount)})`,
-      '2. Cartao de credito',
-      '3. Cartao de debito',
-      '4. Dinheiro',
+      '2. Dinheiro',
       '',
       'Responda com o numero ou o nome do metodo.',
-      'Exemplo: "1", "pix" ou "credito".',
+      'Exemplo: "1", "pix" ou "dinheiro".',
     ].join('\n');
   }
 
@@ -1286,8 +1284,6 @@ export class WhatsappService {
       '',
       'Para seguir agora, responda com a forma de pagamento:',
       '- pix',
-      '- credito',
-      '- debito',
       '- dinheiro',
       pedido ? `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}` : '',
     ]
@@ -1617,6 +1613,24 @@ export class WhatsappService {
       return parts;
     }
 
+    const looksLikeFreshAddress =
+      this.hasAddressKeyword(sanitizedPart) && /\d/.test(sanitizedPart) && sanitizedPart.length >= 12;
+    if (looksLikeFreshAddress) {
+      const existingHasStreetLike = parts.some((part) => this.hasAddressKeyword(part));
+      const existingOnlyLooseFragments = parts.every((part) => {
+        const normalizedExisting = this.normalizeAddressCandidate(part);
+        return (
+          /^\d{1,8}[A-Za-z]?$/.test(normalizedExisting) ||
+          /\b\d{5}-?\d{3}\b/.test(normalizedExisting) ||
+          !this.hasAddressKeyword(normalizedExisting)
+        );
+      });
+
+      if (existingHasStreetLike || existingOnlyLooseFragments) {
+        return [sanitizedPart];
+      }
+    }
+
     const merged = [...parts];
     const existingIndex = merged.findIndex((part) => {
       const existing = this.normalizeIntentText(part);
@@ -1654,9 +1668,14 @@ export class WhatsappService {
       return false;
     }
 
+    const trimmed = text.trim();
+    if (trimmed === '0') {
+      return false;
+    }
+
     return (
       this.hasAddressKeyword(normalized) ||
-      /^\d+[A-Za-z]?$/.test(text.trim()) ||
+      /^(?:[1-9]\d{0,5}[A-Za-z]?)$/.test(trimmed) ||
       /\b\d{5}-?\d{3}\b/.test(text)
     );
   }
@@ -3972,6 +3991,7 @@ export class WhatsappService {
       'TELEFONE DE CONTATO',
       '',
       'Antes de fechar, preciso do melhor numero para atualizar voce sobre o pedido.',
+      'Pode ser celular ou telefone fixo, desde que venha com DDD.',
       'Pode enviar no formato:',
       '- (11) 98765-4321',
       '- 11987654321',
@@ -3998,6 +4018,26 @@ export class WhatsappService {
       '2. Retirada',
       '',
       'Responda com "1", "2", "entrega" ou "retirada".',
+    ].join('\n');
+  }
+
+  private getPremiumDeliveryChoiceValidationMessage(customerName?: string): string {
+    return [
+      customerName ? `Perfeito, ${customerName}.` : 'Perfeito.',
+      '',
+      'Antes de seguir, eu preciso alinhar se vai ser entrega ou retirada para nao montar endereco errado.',
+      'Responda so com uma destas opcoes:',
+      '1. Entrega',
+      '2. Retirada',
+    ].join('\n');
+  }
+
+  private getPremiumCardPaymentFallbackMessage(): string {
+    return [
+      'No WhatsApp, eu consigo fechar este pedido com seguranca por *PIX* ou *dinheiro*.',
+      '',
+      'Para cartao, a equipe precisa concluir manualmente para nao gerar erro no pagamento.',
+      'Se quiser seguir agora por aqui, responda: "pix" ou "dinheiro".',
     ].join('\n');
   }
 
@@ -4282,6 +4322,29 @@ export class WhatsappService {
       this.hasAddressFragmentSignal(message)
     ) {
       return false;
+    }
+
+    if (currentState === 'collecting_address') {
+      const deliveryType =
+        (conversation.context?.customer_data as CustomerData | undefined)?.delivery_type || null;
+      if (!deliveryType) {
+        return false;
+      }
+
+      if (/^\d{1,8}$/.test(this.sanitizeInput(message).trim())) {
+        return false;
+      }
+    }
+
+    if (currentState === 'collecting_phone') {
+      const digitsOnly = this.extractPhoneDigitsCandidate(message);
+      if (
+        /^\d{1,11}$/.test(this.sanitizeInput(message).trim()) ||
+        (digitsOnly.length > 0 && digitsOnly.length <= 11) ||
+        this.hasAnyNormalizedPhrase(normalized, ['telefone', 'numero', 'celular', 'fixo', 'whatsapp', 'zap'])
+      ) {
+        return false;
+      }
     }
 
     if (
@@ -4610,6 +4673,16 @@ export class WhatsappService {
     }
 
     if (currentState === 'collecting_phone' && this.looksLikeStandalonePhoneMessage(sanitizedMessage)) {
+      return null;
+    }
+
+    if (
+      currentState === 'collecting_phone' &&
+      (
+        /^\d{1,11}$/.test(sanitizedMessage) ||
+        this.hasAnyNormalizedPhrase(normalized, ['telefone', 'numero', 'celular', 'fixo', 'whatsapp', 'zap'])
+      )
+    ) {
       return null;
     }
 
@@ -5864,6 +5937,26 @@ export class WhatsappService {
 
     const sanitizedMessage = this.sanitizeInput(message.trim());
     const lowerMessage = this.normalizeIntentText(sanitizedMessage);
+    const customerData = conversation.context?.customer_data as CustomerData | undefined;
+    const choosingDeliveryType = !customerData?.delivery_type;
+
+    if (choosingDeliveryType) {
+      const looksLikeDirectAddress =
+        this.isAddressLikelyComplete(sanitizedMessage) ||
+        this.hasAddressKeyword(sanitizedMessage) ||
+        this.isAddressDraftWorthy(this.normalizeAddressCandidate(sanitizedMessage));
+
+      if (
+        lowerMessage !== '1' &&
+        lowerMessage !== '2' &&
+        !lowerMessage.includes('entrega') &&
+        !lowerMessage.includes('retirada') &&
+        !lowerMessage.includes('buscar') &&
+        !looksLikeDirectAddress
+      ) {
+        return this.getPremiumDeliveryChoiceValidationMessage(customerData?.name);
+      }
+    }
 
     if (lowerMessage === '1' || lowerMessage.includes('entrega')) {
       await this.conversationService.saveCustomerData(conversation.id, { delivery_type: 'delivery' });
@@ -6438,11 +6531,9 @@ export class WhatsappService {
     return (
       `💳 *ESCOLHA A FORMA DE PAGAMENTO:*\n\n` +
       `1️⃣ *PIX* - Desconto de 5% (R$ ${this.formatCurrency(pixAmount)})\n` +
-      `2️⃣ *Cartão de Crédito*\n` +
-      `3️⃣ *Cartão de Débito*\n` +
-      `4️⃣ *Dinheiro* (retirada)\n\n` +
+      `2️⃣ *Dinheiro*\n\n` +
       `💬 Digite o número ou o nome do método de pagamento.\n` +
-      `Exemplo: "1", "pix", "cartão de crédito"`
+      `Exemplo: "1", "pix", "dinheiro"`
     );
   }
 
@@ -7662,6 +7753,14 @@ export class WhatsappService {
       if (
         !/\d/.test(message) &&
         !this.hasAddressKeyword(message) &&
+        !this.hasAnyNormalizedPhrase(this.normalizeIntentText(message), [
+          'telefone',
+          'numero',
+          'celular',
+          'fixo',
+          'whatsapp',
+          'zap',
+        ]) &&
         this.validateName(extractedName).valid
       ) {
         return 'Nome certo. Agora preciso do telefone de contato com DDD para seguir.';
@@ -7744,6 +7843,8 @@ export class WhatsappService {
 
     if (
       this.containsAbusiveLanguage(lowerMessage) &&
+      !conversationalAnalysis.signals.issue &&
+      !conversationalAnalysis.signals.clarification &&
       !this.hasActionableIntent(lowerMessage, conversation, currentState)
     ) {
       return this.getPremiumBoundaryMessage(
@@ -9745,7 +9846,7 @@ export class WhatsappService {
       return (
         {
           '1': MetodoPagamento.PIX,
-          '2': MetodoPagamento.CREDITO,
+          '2': MetodoPagamento.DINHEIRO,
           '3': MetodoPagamento.DEBITO,
           '4': MetodoPagamento.DINHEIRO,
         } as Record<string, MetodoPagamento>
@@ -9792,9 +9893,7 @@ export class WhatsappService {
         return '❌ Método de pagamento não reconhecido.\n\n' +
                '💬 Digite:\n' +
                '*1* ou *PIX*\n' +
-               '*2* ou *Cartão de Crédito*\n' +
-               '*3* ou *Cartão de Débito*\n' +
-               '*4* ou *Dinheiro*';
+               '*2* ou *Dinheiro*';
       }
 
       // Buscar pedido_id do contexto da conversa
@@ -9834,6 +9933,10 @@ export class WhatsappService {
 
       if (pedidoPendente.status !== PedidoStatus.PENDENTE_PAGAMENTO) {
         return this.buildPaymentStageGuardMessage(pedidoPendente);
+      }
+
+      if ([MetodoPagamento.CREDITO, MetodoPagamento.DEBITO].includes(metodo)) {
+        return this.getPremiumCardPaymentFallbackMessage();
       }
 
       if (metodo === MetodoPagamento.DINHEIRO) {
@@ -9923,7 +10026,7 @@ export class WhatsappService {
     if (lowerMessage.includes('cancelar') || lowerMessage.includes('voltar')) {
       await this.conversationService.updateState(conversation.id, 'waiting_payment');
       return '✅ Ok! Escolha a forma de pagamento:\n' +
-        '*1* PIX\n*2* Cartão de Crédito\n*3* Cartão de Débito\n*4* Dinheiro';
+        '*1* PIX\n*2* Dinheiro';
     }
 
     const pedidoId = conversation.pedido_id || conversation.context?.pedido_id;
@@ -9972,6 +10075,17 @@ export class WhatsappService {
           `Total: R$ ${this.formatCurrency(totalAmount)}\n\n` +
           `Informe um valor maior ou igual ao total.`
         );
+      }
+
+      const maxReasonableChangeFor = Math.max(totalAmount * 5, 500);
+      if (parsed > maxReasonableChangeFor) {
+        return [
+          'Esse valor para troco ficou alto demais para eu assumir com seguranca por aqui.',
+          `Total do pedido: R$ ${this.formatCurrency(totalAmount)}`,
+          '',
+          'Me diga um valor mais proximo do que voce realmente vai pagar.',
+          'Exemplos: "50", "100" ou "sem".',
+        ].join('\n');
       }
 
       changeFor = parsed;
@@ -10409,12 +10523,37 @@ export class WhatsappService {
 
     // ✅ NOVO: Sanitizar e validar telefone
     const sanitizedMessage = this.sanitizeInput(message.trim());
+    const normalizedMessage = this.normalizeIntentText(sanitizedMessage);
     const phone = sanitizedMessage.replace(/\D/g, ''); // Remove tudo que não é dígito
+
+    if (
+      !phone &&
+      this.hasAnyNormalizedPhrase(normalizedMessage, [
+        'telefone',
+        'numero',
+        'celular',
+        'fixo',
+        'whatsapp',
+        'zap',
+      ])
+    ) {
+      return [
+        'Pode ser celular ou telefone fixo, sem problema.',
+        '',
+        'Eu so preciso do numero com DDD para a equipe conseguir te atualizar se necessario.',
+        'Exemplo: 11987654321',
+      ].join('\n');
+    }
     
     const phoneValidation = this.validatePhone(phone);
     if (!phoneValidation.valid) {
-      return `❌ ${phoneValidation.error}\n\n` +
-             'Exemplo: (11) 98765-4321 ou 11987654321';
+      return [
+        'Ainda nao consegui fechar o telefone com seguranca.',
+        phoneValidation.error || 'Telefone invalido.',
+        '',
+        'Pode ser celular ou telefone fixo, mas preciso do numero com DDD.',
+        'Exemplo: (11) 98765-4321 ou 11987654321',
+      ].join('\n');
     }
 
     // Formatar telefone
