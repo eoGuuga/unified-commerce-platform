@@ -531,6 +531,22 @@ export class WhatsappService {
     return sanitized.replace(/\s+/g, ' ').trim();
   }
 
+  private repairPotentialMojibake(input: string): string {
+    const raw = String(input || '');
+    if (!raw || !/[ÃÂâ�]/.test(raw)) {
+      return raw;
+    }
+
+    try {
+      const repaired = Buffer.from(raw, 'latin1').toString('utf8');
+      const originalNoise = (raw.match(/[ÃÂâ�]/g) || []).length;
+      const repairedNoise = (repaired.match(/[ÃÂâ�]/g) || []).length;
+      return repairedNoise < originalNoise ? repaired : raw;
+    } catch {
+      return raw;
+    }
+  }
+
   private getDefaultShippingAmount(): number {
     const raw = (this.config.get<string>('WHATSAPP_DEFAULT_SHIPPING_AMOUNT') || '').trim();
     if (!raw) return 10;
@@ -1478,7 +1494,7 @@ export class WhatsappService {
 
   private normalizeForSearch(value: string): string {
     return this.applyCommonChatNormalizations(
-      (value || '')
+      this.repairPotentialMojibake(value || '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
@@ -4770,6 +4786,14 @@ export class WhatsappService {
       return null;
     }
 
+    if (this.isCollectionStageSoftStopIntent(sanitizedMessage)) {
+      await this.conversationService.clearPendingOrder(conversation.id);
+      await this.conversationService.clearPedido(conversation.id);
+      await this.conversationService.clearCustomerData(conversation.id);
+      await this.conversationService.updateState(conversation.id, 'idle');
+      return this.getPremiumSoftResetMessage();
+    }
+
     const normalized = this.normalizeIntentText(sanitizedMessage);
     const analysis = this.messageIntelligenceService.analyze(sanitizedMessage);
     const orderInfo = this.extractOrderInfo(sanitizedMessage);
@@ -4924,7 +4948,7 @@ export class WhatsappService {
           `Entendi que voce quis falar de *${searchResult.produto.name}*.`,
           currentState,
           conversation,
-          ['Eu deixo esse item em mente, mas antes preciso do nome de quem vai receber o pedido.'],
+          ['Eu deixo esse item em mente para a gente voltar nele sem perder contexto.'],
         );
       }
 

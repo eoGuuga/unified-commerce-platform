@@ -60,6 +60,22 @@ type WeightedPhraseGroup = {
 
 @Injectable()
 export class MessageIntelligenceService {
+  private repairPotentialMojibake(value: string): string {
+    const raw = String(value || '');
+    if (!raw || !/[ÃÂâ�]/.test(raw)) {
+      return raw;
+    }
+
+    try {
+      const repaired = Buffer.from(raw, 'latin1').toString('utf8');
+      const originalNoise = (raw.match(/[ÃÂâ�]/g) || []).length;
+      const repairedNoise = (repaired.match(/[ÃÂâ�]/g) || []).length;
+      return repairedNoise < originalNoise ? repaired : raw;
+    } catch {
+      return raw;
+    }
+  }
+
   private readonly lowSignalStopWords = new Set([
     'de',
     'do',
@@ -327,7 +343,7 @@ export class MessageIntelligenceService {
   private readonly uncertaintyPhrases = ['nao sei', 'to em duvida', 'estou em duvida', 'talvez'];
 
   normalizeText(value: string): string {
-    let normalized = (value || '')
+    let normalized = this.repairPotentialMojibake(value || '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase();

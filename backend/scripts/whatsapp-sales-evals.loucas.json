@@ -226,6 +226,64 @@
       ]
     },
     {
+      "name": "mojibake_alias_adjustment_should_still_work",
+      "steps": [
+        {
+          "message": "quero 1 bala de brigadeiro",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Quero tambÃ©m 2 banoffes",
+          "expectAny": [
+            "Pedido ajustado com seguranca.",
+            "Banoffe ( torta de banana)",
+            "Quantidade: 2 unidade(s)"
+          ],
+          "forbidAny": [
+            "ainda ficou ambigua"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "soft_stop_during_name_collection_should_reset_cleanly",
+      "steps": [
+        {
+          "message": "quero 1 bala de brigadeiro",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Nao quero",
+          "expectAny": [
+            "Sem problema, vou parar por aqui."
+          ],
+          "forbidAny": [
+            "Acho que voce pode estar falando",
+            "produto agora"
+          ]
+        },
+        {
+          "message": "Banoffe",
+          "expectAny": [
+            "Banoffe",
+            "Disponibilidade:",
+            "Se quiser seguir"
+          ],
+          "forbidAny": [
+            "nome completo"
+          ]
+        }
+      ]
+    },
+    {
       "name": "new_order_after_cancel_should_start_clean",
       "steps": [
         {
@@ -357,6 +415,29 @@
           ],
           "forbidAny": [
             "Quero te entender sem adivinhar coisa errada."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "product_detour_during_name_should_not_duplicate_requirement_prompt",
+      "steps": [
+        {
+          "message": "quero 1 bala de brigadeiro",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Banoffe",
+          "expectAny": [
+            "Banoffe",
+            "Antes disso, preciso do nome completo"
+          ],
+          "forbidAny": [
+            "mas antes preciso do nome de quem vai receber o pedido"
           ]
         }
       ]

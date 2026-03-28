@@ -956,3 +956,17 @@
 - Validacao local desta rodada:
   - `node ./node_modules/jest/bin/jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand` => `155/155` ok
   - `npm.cmd run build` => ok
+
+2026-03-28  Endurecimento semantico da coleta e normalizacao de texto quebrado
+- Melhorias de inteligencia:
+  - mensagens com encoding torto, como `tambÃ©m`, agora passam por reparo antes da leitura semantica
+  - abandono no meio da coleta (`nao quero`, `quero mais n`, `tira isso`) agora interrompe de forma limpa antes de cair no fallback de produto
+  - detour de produto no meio da coleta deixou de repetir de forma feia o mesmo prompt de nome
+- Qualidade automatizada expandida:
+  - o corpus `backend/scripts/whatsapp-sales-evals.loucas.json` passou a validar tambem:
+    - alias com mojibake em ajuste de pedido
+    - parada limpa durante coleta de nome
+    - desvio de produto sem duplicar prompt de requisito
+- Validacao local desta rodada:
+  - `node ./node_modules/jest/bin/jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand` => `158/158` ok
+  - `npm.cmd run build` => ok

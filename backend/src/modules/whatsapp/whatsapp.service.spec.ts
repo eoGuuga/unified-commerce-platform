@@ -2195,6 +2195,47 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Pedido ajustado com seguranca.');
   });
 
+  it('adjusts the pending order when the add-on arrives with mojibake accents during name collection', async () => {
+    const { service, conversationService } = createFixture(loucasCatalog);
+
+    const response = await service.generateResponse(
+      'Quero tambÃ©m 2 banoffes',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_name',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 1,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 12,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 12,
+          },
+        },
+      }),
+    );
+
+    expect(conversationService.savePendingOrder).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            produto_name: 'Banoffe ( torta de banana)',
+            quantity: 2,
+          }),
+        ]),
+      }),
+    );
+    expect(response).toContain('Pedido ajustado com seguranca.');
+  });
+
   it('adjusts the pending order from a bare "mais" add-on instruction during name collection', async () => {
     const { service, conversationService } = createFixture(loucasCatalog);
 
@@ -2331,8 +2372,73 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       }),
     );
 
-    expect(response).toContain('antes preciso do nome');
+    expect(response).toContain('Antes disso, preciso do nome completo');
     expect(response).toContain('Banoffe');
+  });
+
+  it('does not duplicate the name requirement when a product detours the name collection', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'Banoffe',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_name',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 1,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 12,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 12,
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Banoffe');
+    expect(response).toContain('Antes disso, preciso do nome completo');
+    expect(response).not.toContain('mas antes preciso do nome de quem vai receber o pedido');
+  });
+
+  it('stops cleanly when the customer gives up during name collection', async () => {
+    const { service, conversationService } = createFixture(loucasCatalog);
+
+    const response = await service.generateResponse(
+      'Nao quero',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_name',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 1,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 12,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 12,
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Sem problema, vou parar por aqui.');
+    expect(conversationService.clearPendingOrder).toHaveBeenCalledWith('conv-1');
+    expect(conversationService.clearCustomerData).toHaveBeenCalledWith('conv-1');
+    expect(conversationService.updateState).toHaveBeenCalledWith('conv-1', 'idle');
   });
 
   it('does not try to search the catalog when the customer asks a random question during name collection', async () => {
