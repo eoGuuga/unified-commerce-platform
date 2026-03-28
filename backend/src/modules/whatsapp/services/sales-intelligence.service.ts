@@ -503,7 +503,7 @@ export class SalesIntelligenceService {
     }
 
     if (input.budgetCeiling !== null) {
-      pieces.push(`sem passar de R$ ${this.formatCurrency(input.budgetCeiling)}`);
+      pieces.push(`com um teto de ate R$ ${this.formatCurrency(input.budgetCeiling)}`);
     }
 
     if (input.useCaseTags.includes('chocolate_focus')) {
@@ -519,10 +519,43 @@ export class SalesIntelligenceService {
     }
 
     if (input.buyerConcerns.length) {
-      pieces.push(`sem ${input.buyerConcerns[0]}`);
+      const primaryConcern =
+        input.buyerConcerns.find((concern) =>
+          [
+            'nao errar a escolha',
+            'nao exagerar na escolha',
+            'causar boa impressao',
+            'resolver rapido',
+          ].includes(concern),
+        ) || input.buyerConcerns[0];
+      const concernPhrase = this.buildGoalConstraintPhrase(primaryConcern);
+      if (concernPhrase) {
+        pieces.push(concernPhrase);
+      }
     }
 
     return pieces.slice(0, 4).join(', ');
+  }
+
+  private buildGoalConstraintPhrase(concern: string): string | null {
+    switch (concern) {
+      case 'nao gastar errado':
+        return 'com cuidado com o valor';
+      case 'nao errar a escolha':
+        return 'com vontade de acertar sem erro';
+      case 'resolver rapido':
+        return 'com agilidade';
+      case 'nao exagerar na escolha':
+        return 'sem exagero';
+      case 'nao se sentir empurrado':
+        return 'sem pressao';
+      case 'causar boa impressao':
+        return 'com boa apresentacao';
+      case 'fechar com seguranca':
+        return 'ja perto de fechar';
+      default:
+        return concern ? `com cuidado para ${concern}` : null;
+    }
   }
 
   extractCommercialQuery(message: string): string | null {

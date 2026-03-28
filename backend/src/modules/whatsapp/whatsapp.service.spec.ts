@@ -1440,6 +1440,21 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Brigadeiro Gourmet');
   });
 
+  it('keeps consultative recommendations concise and asks only one next-step question', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'me indica um presente pra minha mae ate 14 reais, sem erro e sem perder tempo',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Se eu entendi certo');
+    expect(response).not.toContain('Eu li aqui');
+    expect(response).not.toContain('Voce quer um presente mais marcante na caixa');
+    expect((response.match(/\?/g) || []).length).toBeLessThanOrEqual(1);
+    expect(response.split('\n').length).toBeLessThanOrEqual(16);
+  });
+
   it('uses configured product descriptions and metadata to qualify the chocolate sale', async () => {
     const { service } = createFixture(catalog);
 
@@ -1513,9 +1528,9 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       'tenant-id',
     );
 
-    expect(response).toContain('algo mais simples e sem exagero');
-    expect(response).toContain('segura melhor o orcamento');
+    expect(response).toContain('sem exagero');
     expect(response).toContain('Brigadeiro Gourmet');
+    expect(response).not.toContain('Brownie Premium entra mais');
   });
 
   it('does not promote packaging accessories as the main gift recommendation', async () => {
@@ -2446,7 +2461,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     );
 
     expect(response).toContain('corto caminho com seguranca');
-    expect(response).toContain('chegar rapido na melhor opcao');
+    expect(response).toContain('te poupar tempo');
     expect(response).toContain('Estas sao as opcoes que eu colocaria na sua frente agora');
     expect(response).not.toContain('Quantos *me indica algo rapido');
   });
@@ -2470,7 +2485,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     expect(response).toContain('nao escolher no escuro');
     expect(response).toContain('Estas sao as opcoes que eu colocaria na sua frente agora');
-    expect(response).toContain('Exemplo: "quero 1');
+    expect((response.match(/\?/g) || []).length).toBeLessThanOrEqual(1);
   });
 
   it('asks for clarification when the customer is undecided between products', async () => {
@@ -3704,9 +3719,9 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       }),
     );
 
-    expect(response).toContain('O que eu entendi da sua busca foi');
+    expect(response).toContain('Se eu entendi certo');
     expect(response).toContain('presente para sua mae');
-    expect(response).toContain('sem passar de R$ 14,00');
+    expect(response).toContain('com um teto de ate R$ 14,00');
   });
 
   it('explains the commercial role of the recommended item instead of treating every product the same', async () => {

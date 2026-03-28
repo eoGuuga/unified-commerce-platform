@@ -2673,30 +2673,24 @@ export class WhatsappService {
     const details: string[] = [];
 
     if (analysis.customerGoalSummary) {
-      details.push(`O que eu entendi da sua busca foi: ${analysis.customerGoalSummary}.`);
-    }
-
-    if (understandingLine) {
+      details.push(`Se eu entendi certo, voce quer ${analysis.customerGoalSummary}.`);
+    } else if (understandingLine) {
       details.push(understandingLine);
     }
 
     if (analysis.buyerConcerns.length) {
       details.push(
-        `Eu tambem considerei principalmente ${this.joinNaturally(
-          analysis.buyerConcerns.slice(0, 3),
+        `O ponto mais sensivel aqui e ${this.joinNaturally(
+          analysis.buyerConcerns.slice(0, 2),
         )}.`,
       );
-    }
-
-    if (detectedNeeds.length) {
+    } else if (detectedNeeds.length) {
       details.push(`Aqui eu considerei principalmente ${this.joinNaturally(detectedNeeds)}.`);
     }
 
     if (focusThemes.length) {
       details.push(
-        `Dentro do catalogo atual da loja, eu estou lendo melhor uma vitrine de ${
-          catalogProfile.storeLabel
-        }, com saida mais forte para ${this.joinNaturally(focusThemes)}.`,
+        `Dentro do catalogo atual da loja, ${catalogProfile.catalogReading}`,
       );
     } else if (catalogProfile.storeLabel) {
       details.push(
@@ -2708,7 +2702,7 @@ export class WhatsappService {
       details.push(decisionLine);
     }
 
-    return [lead, ...details].join(' ');
+    return [lead, ...details.slice(0, 3)].join(' ');
   }
 
   private buildSalesUnderstandingLine(analysis: SalesConversationAnalysis): string | null {
@@ -2758,7 +2752,7 @@ export class WhatsappService {
       return null;
     }
 
-    return `Eu li aqui ${this.joinNaturally(pieces.slice(0, 4))}.`;
+    return `Se eu entendi certo, voce quer ${this.joinNaturally(pieces.slice(0, 3))}.`;
   }
 
   private buildSalesDecisionLine(analysis: SalesConversationAnalysis): string | null {
@@ -5099,8 +5093,16 @@ export class WhatsappService {
         }
 
         if (analysis.conversationDrivers.includes('simplicity')) {
-          score += Math.round((1 - priceRatio) * 8);
+          score += Math.round((1 - priceRatio) * 14);
           addReason('segue uma linha mais simples de fechar');
+
+          if (/(premium|caixa|box|kit|presenteavel)/.test(searchDocument)) {
+            score -= 8;
+          }
+
+          if (/(individual|mimo|simples|brigadeiro|tradicional)/.test(searchDocument)) {
+            score += 8;
+          }
         }
 
         if (
@@ -5169,9 +5171,9 @@ export class WhatsappService {
 
     switch (profile.role) {
       case 'gift_ready':
-        return `${product.name} entra mais como presente pronto para impressionar sem muito atrito.`;
+        return `${product.name} entra mais como presente pronto para entregar e impressionar sem muito atrito.`;
       case 'sharing':
-        return `${product.name} faz mais sentido quando a compra pede volume ou algo para dividir.`;
+        return `${product.name} faz mais sentido quando a compra pede volume ou algo para dividir facil.`;
       case 'impulse':
         return `${product.name} funciona melhor como mimo individual ou decisao rapida.`;
       case 'accessory':
@@ -5181,6 +5183,116 @@ export class WhatsappService {
           ? `${product.name} segura uma leitura mais premium dentro do catalogo.`
           : null;
     }
+  }
+
+  private buildSalesResponseSections(sections: Array<string | null | undefined>): string {
+    return sections
+      .map((section) => (section || '').trim())
+      .filter(Boolean)
+      .join('\n\n');
+  }
+
+  private buildCompactSalesPrelude(conversationPrelude: string[]): string | null {
+    if (!conversationPrelude.length) {
+      return null;
+    }
+
+    const compact = conversationPrelude
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 2);
+
+    return compact.length ? compact.join(' ') : null;
+  }
+
+  private isGenericQualificationQuestion(question: string | null | undefined): boolean {
+    const normalizedQuestion = (question || '').trim().toLowerCase();
+    if (!normalizedQuestion) {
+      return false;
+    }
+
+    return (
+      normalizedQuestion.startsWith('voce quer algo mais para ') ||
+      normalizedQuestion.startsWith('voce quer isso mais para ') ||
+      normalizedQuestion.startsWith('se eu afinar a recomendacao')
+    );
+  }
+
+  private choosePreferredStructuredQuestion(
+    catalogQualificationQuestion?: string | null,
+    verticalQualificationQuestion?: string | null,
+  ): string | null {
+    const catalogQuestion = (catalogQualificationQuestion || '').trim();
+    const verticalQuestion = (verticalQualificationQuestion || '').trim();
+
+    if (catalogQuestion && verticalQuestion) {
+      if (
+        this.isGenericQualificationQuestion(catalogQuestion) &&
+        !this.isGenericQualificationQuestion(verticalQuestion)
+      ) {
+        return verticalQuestion;
+      }
+
+      return catalogQuestion;
+    }
+
+    return catalogQuestion || verticalQuestion || null;
+  }
+
+  private buildSalesNextStepQuestion(
+    analysis: SalesConversationAnalysis,
+    topProduct: ProductWithStock,
+    catalogQualificationQuestion?: string | null,
+    verticalQualificationQuestion?: string | null,
+  ): string {
+    const preferredStructuredQuestion = this.choosePreferredStructuredQuestion(
+      catalogQualificationQuestion,
+      verticalQualificationQuestion,
+    );
+
+    if (analysis.intent === 'comparison') {
+      return `Se quiser, eu comparo com mais objetividade ou ja separo ${topProduct.name}.`;
+    }
+
+    if (analysis.budgetCeiling !== null) {
+      return `Quer que eu fique estritamente ate R$ ${this.formatCurrency(analysis.budgetCeiling)} ou ja separo ${topProduct.name}?`;
+    }
+
+    if (
+      analysis.conversationDrivers.includes('urgency') &&
+      (!preferredStructuredQuestion || this.isGenericQualificationQuestion(preferredStructuredQuestion))
+    ) {
+      return `Se fizer sentido, eu ja separo ${topProduct.name} para te poupar tempo.`;
+    }
+
+    if (preferredStructuredQuestion) {
+      return preferredStructuredQuestion;
+    }
+
+    if (analysis.useCaseTags.includes('gift')) {
+      return `Voce quer algo mais marcante para presente ou quer que eu ja separe ${topProduct.name}?`;
+    }
+
+    return `Se fizer sentido, eu ja separo ${topProduct.name} ou comparo com outra opcao proxima.`;
+  }
+
+  private shouldIncludeCrossSellSuggestion(
+    analysis: SalesConversationAnalysis,
+    crossSellSuggestion: SalesVerticalCrossSellSuggestion | null,
+  ): boolean {
+    if (!crossSellSuggestion) {
+      return false;
+    }
+
+    if (analysis.intent === 'budget' || analysis.intent === 'objection') {
+      return false;
+    }
+
+    if (analysis.conversationDrivers.includes('urgency')) {
+      return false;
+    }
+
+    return true;
   }
 
   private buildSalesRecommendationResponse(
@@ -5218,30 +5330,37 @@ export class WhatsappService {
       rankedProducts[0].product,
       rankedProducts.map((item) => item.product),
     );
+    const compactPrelude = this.buildCompactSalesPrelude(conversationPrelude);
+    const crossSellSection = this.shouldIncludeCrossSellSuggestion(analysis, crossSellSuggestion)
+      ? crossSellLine
+      : null;
+    const focusedNeedLine =
+      needLine && !reasoningLine.includes('Aqui eu considerei principalmente') ? needLine : null;
+    const focusedConversationLine =
+      conversationFocus && !reasoningLine.includes(conversationFocus)
+        ? conversationFocus
+        : null;
 
-    return [
-      ...conversationPrelude,
-      conversationPrelude.length ? '' : null,
-      intro,
-      '',
-      reasoningLine,
-      needLine,
-      conversationFocus,
-      offerReadingLine,
-      '',
-      'Estas sao as opcoes que eu colocaria na sua frente agora:',
-      ...rankedProducts.slice(0, 3).map((item) => this.formatSalesRecommendationLine(item)),
-      crossSellLine,
-      '',
-      close,
-      this.salesVerticalPackService.buildClosingMove(verticalPack, analysis),
-      qualificationQuestion,
-      this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
-      this.salesSegmentStrategyService.buildRecommendationRefinement(strategy),
-      `Exemplo: "quero 1 ${rankedProducts[0].product.name}" ou "compara ${rankedProducts[0].product.name} com outra opcao".`,
-    ]
-      .filter(Boolean)
-      .join('\n');
+    return this.buildSalesResponseSections([
+      compactPrelude,
+      [intro, reasoningLine, focusedNeedLine, focusedConversationLine, offerReadingLine]
+        .filter(Boolean)
+        .join(' '),
+      [
+        'Estas sao as opcoes que eu colocaria na sua frente agora:',
+        ...rankedProducts.slice(0, 3).map((item) => this.formatSalesRecommendationLine(item)),
+      ].join('\n'),
+      crossSellSection,
+      [close, this.salesVerticalPackService.buildClosingMove(verticalPack, analysis)]
+        .filter(Boolean)
+        .join(' '),
+      this.buildSalesNextStepQuestion(
+        analysis,
+        rankedProducts[0].product,
+        qualificationQuestion,
+        this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
+      ),
+    ]);
   }
 
   private buildSalesComparisonResponse(
@@ -5286,31 +5405,46 @@ export class WhatsappService {
       recommended,
       comparedProducts,
     );
+    const focusedNeedLine =
+      needLine && !reasoningLine.includes('Aqui eu considerei principalmente') ? needLine : null;
+    const focusedConversationLine =
+      conversationFocus && !reasoningLine.includes(conversationFocus)
+        ? conversationFocus
+        : null;
 
-    return [
-      ...conversationPrelude,
-      conversationPrelude.length ? '' : null,
-      'Vou te comparar do jeito mais util.',
-      '',
-      `1. ${this.formatProductHeadline(left)} | Estoque: ${left.available_stock} unidade(s)`,
-      `2. ${this.formatProductHeadline(right)} | Estoque: ${right.available_stock} unidade(s)`,
-      '',
-      reasoningLine,
-      needLine,
-      conversationFocus,
-      recommendedOfferReading,
-      '',
-      `Se a prioridade for economizar: ${cheaper.name}.`,
-      `Se a prioridade for algo mais forte ou mais marcante: ${premium.name}.`,
-      `Se a prioridade for equilibrio: ${betterValue.name}.`,
-      '',
-      `${labels.recommendationLead} ${recommended.name}.`,
-      this.salesVerticalPackService.buildClosingMove(verticalPack, analysis),
-      qualificationQuestion,
-      `Se quiser seguir, envie: "quero 1 ${recommended.name}".`,
-    ]
-      .filter(Boolean)
-      .join('\n');
+    return this.buildSalesResponseSections([
+      this.buildCompactSalesPrelude(conversationPrelude),
+      [
+        'Vou te comparar do jeito mais util.',
+        reasoningLine,
+        focusedNeedLine,
+        focusedConversationLine,
+        recommendedOfferReading,
+      ]
+        .filter(Boolean)
+        .join(' '),
+      [
+        `1. ${this.formatProductHeadline(left)} | Estoque: ${left.available_stock} unidade(s)`,
+        `2. ${this.formatProductHeadline(right)} | Estoque: ${right.available_stock} unidade(s)`,
+      ].join('\n'),
+      [
+        `Se a prioridade for economizar: ${cheaper.name}.`,
+        `Se a prioridade for algo mais forte ou mais marcante: ${premium.name}.`,
+        `Se a prioridade for equilibrio: ${betterValue.name}.`,
+      ].join('\n'),
+      [
+        `${labels.recommendationLead} ${recommended.name}.`,
+        this.salesVerticalPackService.buildClosingMove(verticalPack, analysis),
+      ]
+        .filter(Boolean)
+        .join(' '),
+      this.buildSalesNextStepQuestion(
+        analysis,
+        recommended,
+        qualificationQuestion,
+        this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
+      ),
+    ]);
   }
 
   private buildSalesBudgetMissResponse(
@@ -5333,26 +5467,40 @@ export class WhatsappService {
       );
     const reasoningLine = this.buildHumanSalesReasoning(analysis, strategy, catalogProfile);
     const needLine = this.buildSalesNeedLine(strategy);
+    const focusedNeedLine =
+      needLine && !reasoningLine.includes('Aqui eu considerei principalmente') ? needLine : null;
+    const focusedConversationLine =
+      conversationFocus && !reasoningLine.includes(conversationFocus)
+        ? conversationFocus
+        : null;
 
-    return [
-      ...conversationPrelude,
-      conversationPrelude.length ? '' : null,
-      `Com esse teto de ate R$ ${this.formatCurrency(analysis.budgetCeiling || 0)}, eu nao encontrei algo realmente forte disponivel agora.`,
-      reasoningLine,
-      needLine,
-      conversationFocus,
-      '',
-      'As opcoes mais proximas que eu analisaria agora seriam:',
-      ...closestProducts.slice(0, 2).map((item) => this.formatSalesRecommendationLine(item)),
-      '',
-      this.salesPlaybookService.buildBudgetMissClose(playbook),
-      this.salesVerticalPackService.buildClosingMove(verticalPack, analysis),
-      qualificationQuestion,
-      this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
-      this.salesSegmentStrategyService.buildRecommendationRefinement(strategy),
-    ]
-      .filter(Boolean)
-      .join('\n');
+    return this.buildSalesResponseSections([
+      this.buildCompactSalesPrelude(conversationPrelude),
+      [
+        `Com esse teto de ate R$ ${this.formatCurrency(analysis.budgetCeiling || 0)}, eu nao encontrei algo realmente forte disponivel agora.`,
+        reasoningLine,
+        focusedNeedLine,
+        focusedConversationLine,
+      ]
+        .filter(Boolean)
+        .join(' '),
+      [
+        'As opcoes mais proximas que eu analisaria agora seriam:',
+        ...closestProducts.slice(0, 2).map((item) => this.formatSalesRecommendationLine(item)),
+      ].join('\n'),
+      [
+        this.salesPlaybookService.buildBudgetMissClose(playbook),
+        this.salesVerticalPackService.buildClosingMove(verticalPack, analysis),
+      ]
+        .filter(Boolean)
+        .join(' '),
+      this.buildSalesNextStepQuestion(
+        analysis,
+        closestProducts[0].product,
+        qualificationQuestion,
+        this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
+      ),
+    ]);
   }
 
   private buildSalesConversationPrelude(
@@ -5363,49 +5511,39 @@ export class WhatsappService {
     const lines: string[] = [];
 
     if (plan.mode === 'sales_consultative' || plan.mode === 'decision_coaching') {
-      lines.push(plan.lead);
-      lines.push(`Entendi que agora voce quer ${plan.customerGoal}.`);
-      if (salesAnalysis?.customerGoalSummary) {
-        lines.push(`Pelo que voce me disse, a busca aqui e ${salesAnalysis.customerGoalSummary}.`);
+      if (plan.mode === 'decision_coaching') {
+        lines.push('Eu vou te ajudar a decidir com criterio, sem te empurrar item e sem te deixar rodando em duvida.');
+      } else {
+        lines.push(plan.lead);
       }
 
-      if (plan.mode === 'decision_coaching') {
-        lines.push(
-          'Eu vou te ajudar a decidir com criterio, sem te empurrar item e sem te deixar rodando em duvida.',
-        );
-      }
+      lines.push(
+        salesAnalysis?.customerGoalSummary
+          ? `Se eu entendi certo, voce quer ${salesAnalysis.customerGoalSummary}.`
+          : `Entendi que agora voce quer ${plan.customerGoal}.`,
+      );
 
       switch (conversationalAnalysis.posture) {
         case 'urgent':
-          lines.push(
-            'Por isso, eu vou priorizar as opcoes mais certeiras sem te fazer rodar o catalogo inteiro.',
-          );
+          lines.push('Eu vou cortar caminho e te mostrar so o que tem mais chance de encaixar agora.');
           break;
         case 'reassurance':
-          lines.push(
-            'Eu vou te mostrar isso com criterio para voce nao decidir no escuro.',
-          );
+          lines.push('Eu vou te mostrar isso com criterio para voce nao decidir no escuro.');
           break;
         case 'frustrated':
-          lines.push(
-            'Eu vou simplificar a leitura para voce bater o olho e entender o que realmente faz sentido.',
-          );
+          lines.push('Eu vou simplificar a leitura para voce bater o olho e ver o que realmente faz sentido.');
           break;
         case 'hesitant':
-          lines.push(
-            'Eu vou manter poucas opcoes boas na mesa para ficar mais facil decidir sem pressao.',
-          );
+          lines.push('Eu vou manter poucas opcoes boas na mesa para ficar mais facil decidir sem pressao.');
           break;
         case 'confused':
-          lines.push(
-            'Eu vou organizar isso do jeito mais claro possivel antes de sugerir qualquer item.',
-          );
+          lines.push('Eu vou organizar isso do jeito mais claro possivel antes de sugerir qualquer item.');
           break;
         default:
           break;
       }
 
-      return lines;
+      return lines.slice(0, 2);
     }
 
     switch (conversationalAnalysis.posture) {
