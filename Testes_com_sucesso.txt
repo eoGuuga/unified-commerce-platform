@@ -819,3 +819,24 @@
   - `WHATSAPP_LLM_ASSIST_ENABLED=false` no `dev/teste`
   - `dev/teste` voltou a responder com saude `ok`
 - Observacao importante: no hardware atual, IA local gratuita com esse nivel de modelo nao atende o requisito de velocidade do projeto.
+
+2026-03-28  Hardening conversacional da Loucas antes de novo QA humano
+- O bot ficou menos formulario e mais seguro exatamente nos pontos mais humilhantes do QA real.
+- Ajustes principais no `WhatsAppService`:
+  - produto escrito como mensagem solta durante a coleta de nome deixa de ser salvo como nome do cliente
+  - plural de `banoffe` passa a fechar corretamente em busca e ajuste de pedido
+  - pedido adicional natural como `quero tambem 2 banoffes` agora ajusta o pedido pendente sem se perder
+  - etapa de entrega ou retirada rejeita entrada invalida como `0` sem transformar isso em endereco
+  - frustração e abuso em plena coleta deixam de repetir o prompt bruto e passam a impor limite com mais criterio
+  - respostas de confianca na coleta passaram a deixar explicito que o bot nao vai fazer o cliente confirmar nada no escuro
+- Regressao nova adicionada para garantir:
+  - ambiguidade segura em termos genericos de familia de produto
+  - aliases pluralizados no catalogo da Loucas
+  - produto nao ser salvo como nome na etapa errada
+  - ajuste de pedido por linguagem natural no meio da coleta
+  - boundary em abuso dentro da coleta
+- Validacao local completa:
+  - `node ./node_modules/jest/bin/jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand` => `147/147` ok
+  - `node ./node_modules/jest/bin/jest.js src/modules/whatsapp/whatsapp.controller.spec.ts --runInBand` => `11/11` ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok

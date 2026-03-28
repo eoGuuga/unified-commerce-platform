@@ -860,7 +860,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     const response = await service.generateResponse('nao vou querer mais', 'tenant-id');
 
-    expect(response).toContain('Sem problema.');
+    expect(response).toContain('Sem problema');
   });
 
   it('normalizes colloquial negative phrases without context', async () => {
@@ -868,7 +868,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     const response = await service.generateResponse('num vou querer mais', 'tenant-id');
 
-    expect(response).toContain('Sem problema.');
+    expect(response).toContain('Sem problema');
   });
 
   it('rejects zero and negative quantities before product lookup', async () => {
@@ -1067,6 +1067,62 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     const service = createService(loucasCatalog) as any;
 
     const result = service.findProductByName(loucasCatalog, 'tortas de banana');
+
+    expect(result.produto?.name.toLowerCase()).toContain('banoffe');
+  });
+
+  it('keeps generic brigadeiro family requests ambiguous in a richer chocolate catalog', () => {
+    const service = createService([
+      ...loucasCatalog,
+      {
+        id: 'l5',
+        name: '10 Brigadeiros tradicionais',
+        price: 25,
+        available_stock: 30,
+        created_at: '2026-03-21T00:00:00.000Z',
+        categoria: { name: 'Docinhos' },
+      },
+      {
+        id: 'l6',
+        name: 'Caixa presenteavel com 6 brigadeiros tradicionais',
+        price: 26,
+        available_stock: 12,
+        created_at: '2026-03-21T00:00:00.000Z',
+        categoria: { name: 'Presentear' },
+      },
+    ]) as any;
+
+    const result = service.findProductByName(
+      [
+        ...loucasCatalog,
+        {
+          id: 'l5',
+          name: '10 Brigadeiros tradicionais',
+          price: 25,
+          available_stock: 30,
+          created_at: '2026-03-21T00:00:00.000Z',
+          categoria: { name: 'Docinhos' },
+        },
+        {
+          id: 'l6',
+          name: 'Caixa presenteavel com 6 brigadeiros tradicionais',
+          price: 26,
+          available_stock: 12,
+          created_at: '2026-03-21T00:00:00.000Z',
+          categoria: { name: 'Presentear' },
+        },
+      ],
+      'brigadeiros',
+    );
+
+    expect(result.produto).toBeNull();
+    expect(result.sugestoes?.length).toBeGreaterThan(1);
+  });
+
+  it('understands pluralized banoffe mentions during catalog matching', () => {
+    const service = createService(loucasCatalog) as any;
+
+    const result = service.findProductByName(loucasCatalog, 'banoffes');
 
     expect(result.produto?.name.toLowerCase()).toContain('banoffe');
   });
@@ -1970,6 +2026,113 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     expect(response).toContain('5% de desconto no PIX');
     expect(response).toContain('nome completo');
+  });
+
+  it('does not treat a direct product name as if it were the customer name during name collection', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'Torta supreme de morango',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_name',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 5,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 60,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 60,
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('isso parece produto');
+    expect(response).toContain('nome completo de quem vai receber o pedido');
+    expect(response).not.toContain('Como voce prefere receber esse pedido?');
+  });
+
+  it('keeps the delivery-choice step focused when the customer sends an invalid numeric option', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      '0',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_address',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 1,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 12,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 12,
+          },
+          customer_data: {
+            name: 'Jordan Lincoln Kzan',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('entrega ou retirada');
+    expect(response).not.toContain('Rascunho atual: 0');
+  });
+
+  it('adjusts the pending order from natural add-on language during name collection', async () => {
+    const { service, conversationService } = createFixture(loucasCatalog);
+
+    const response = await service.generateResponse(
+      'Quero tambem 2 banoffes',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_name',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 5,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 60,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 60,
+          },
+        },
+      }),
+    );
+
+    expect(conversationService.savePendingOrder).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            produto_name: 'Banoffe ( torta de banana)',
+            quantity: 2,
+          }),
+        ]),
+      }),
+    );
+    expect(response).toContain('Pedido ajustado com seguranca.');
   });
 
   it('treats plain nao during final review as correction instead of immediate cancellation', async () => {
@@ -3718,6 +3881,40 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).not.toContain('Nome certo');
   });
 
+  it('does not reuse stale customer data when a fresh order starts from idle', async () => {
+    const { service, conversationService } = createFixture(loucasCatalog);
+
+    const response = await service.generateResponse(
+      'quero 2 bala de brigadeiro',
+      'tenant-id',
+      createConversation({
+        customer_name: 'Jordan Antigo',
+        context: {
+          state: 'idle',
+          customer_data: {
+            name: 'Jordan Antigo',
+            delivery_type: 'pickup',
+            phone: '+5511999999999',
+            notes: 'sem',
+            address: {
+              street: 'Rua Antiga',
+              number: '10',
+              neighborhood: 'Centro',
+              city: 'Sao Paulo',
+              state: 'SP',
+              zipCode: '01000-000',
+            },
+          },
+        },
+      }),
+    );
+
+    expect(conversationService.clearCustomerData).toHaveBeenCalledWith('conv-1');
+    expect(conversationService.updateState).toHaveBeenCalledWith('conv-1', 'collecting_name');
+    expect(response).toContain('nome completo');
+    expect(response).not.toContain('Jordan Antigo');
+  });
+
   it('asks for clarification instead of faking understanding when the message is too vague', async () => {
     const service = createService(loucasCatalog) as any;
 
@@ -3727,6 +3924,17 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Me diga em uma frase o que voce quer agora');
     expect(response).toContain('- "quero 2 brigadeiros"');
     expect(response).not.toContain('preco de asd qwe negocio');
+  });
+
+  it('gives targeted order-tracking guidance for bare status probes without active context', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse('cade', 'tenant-id');
+
+    expect(response).toContain('acompanhar um pedido');
+    expect(response).toContain('status do pedido');
+    expect(response).toContain('PED-20260108-001');
+    expect(response).not.toContain('Quero te entender sem adivinhar coisa errada');
   });
 
   it('uses conversational LLM assist on vague messages when the local AI layer is enabled', async () => {
@@ -3802,6 +4010,28 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     expect(response).toContain('Sem problema, vou parar por aqui.');
     expect(response).not.toContain('Quero te entender sem adivinhar coisa errada');
+  });
+
+  it('sets a boundary instead of repeating the collection prompt when the customer becomes abusive during collection', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'Se fode vai',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_address',
+          pending_order: pendingConversationOrder,
+          customer_data: {
+            name: 'Ana Paula',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('mensagem venha objetiva e respeitosa');
+    expect(response).not.toContain('Como voce prefere receber esse pedido?');
+    expect(response).not.toContain('Rascunho atual');
   });
 
   it('suggests the closest catalog options when the requested product does not exist', async () => {

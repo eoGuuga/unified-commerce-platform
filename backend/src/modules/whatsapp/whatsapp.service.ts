@@ -1423,7 +1423,7 @@ export class WhatsappService {
       .replace(/\bbrigadeir[oa]s?\b/g, 'brigadeiro')
       .replace(/\bbrigader[oa]s?\b/g, 'brigadeiro')
       .replace(/\bmaracuj[ao]*\b/g, 'maracuja')
-      .replace(/\bbanof+e\b/g, 'banoffe')
+      .replace(/\bbanof+es?\b/g, 'banoffe')
       .replace(/\bpresent(eavel|avel)\b/g, 'presenteavel')
       .replace(/\s+/g, ' ')
       .trim();
@@ -2106,6 +2106,22 @@ export class WhatsappService {
     );
   }
 
+  private hasConsultativeMemory(conversation?: TypedConversation): boolean {
+    const memory = this.getConversationIntelligenceMemory(conversation);
+    if (!memory) {
+      return false;
+    }
+
+    return (
+      ['recommendation', 'comparison', 'budget', 'objection'].includes(
+        String(memory.last_intent || ''),
+      ) ||
+      !!memory.last_customer_goal ||
+      !!memory.last_product_name ||
+      Boolean(memory.last_product_names?.length)
+    );
+  }
+
   private isAmbiguousChoiceOrderIntent(lowerMessage: string): boolean {
     const normalized = this.normalizeIntentText(lowerMessage);
     if (!normalized) {
@@ -2452,6 +2468,7 @@ export class WhatsappService {
       'filho da puta',
       'vai tomar no cu',
       'vai se fuder',
+      'se fode',
       'sacanagem',
       'ridiculo',
       'ridicula',
@@ -2583,7 +2600,7 @@ export class WhatsappService {
     plan?: ConversationPlan,
   ): string {
     if (plan?.mode === 'trust_reassurance') {
-      return 'Eu vou te explicar o motivo do que eu estou te pedindo e so depois te puxo para qualquer confirmacao.';
+      return 'Eu vou te explicar o motivo do que eu estou te pedindo e so depois te puxo para qualquer confirmacao, para voce nao confirmar nada no escuro.';
     }
 
     if (plan?.mode === 'decision_coaching') {
@@ -2747,6 +2764,13 @@ export class WhatsappService {
   private buildSalesDecisionLine(analysis: SalesConversationAnalysis): string | null {
     if (analysis.decisionStage === 'closing') {
       return 'Como voce ja esta bem perto de fechar, eu puxei poucas opcoes prontas para virar pedido sem friccao.';
+    }
+
+    if (
+      analysis.conversationDrivers.includes('simplicity') &&
+      analysis.conversationDrivers.includes('value_pressure')
+    ) {
+      return 'Entao eu puxei o que segura melhor o orcamento sem exagerar na escolha.';
     }
 
     if (
@@ -4659,6 +4683,14 @@ export class WhatsappService {
       !this.hasAddressKeyword(sanitizedMessage) &&
       !this.isAddressLikelyComplete(sanitizedMessage);
 
+    if (
+      currentState === 'collecting_name' &&
+      validNameCandidate &&
+      this.looksLikeExplicitNameIntroduction(sanitizedMessage)
+    ) {
+      return null;
+    }
+
     if (currentState === 'collecting_address') {
       if (['1', '2', 'entrega', 'retirada', 'buscar'].includes(normalized)) {
         return null;
@@ -4731,8 +4763,29 @@ export class WhatsappService {
 
     const produtosResult = await this.productsService.findAll(tenantId);
     const produtos = Array.isArray(produtosResult) ? produtosResult : produtosResult.data;
+    const detourQueries = [
+      likelyProductQuery,
+      currentState === 'collecting_name' &&
+      !this.looksLikeExplicitNameIntroduction(sanitizedMessage)
+        ? sanitizedMessage
+        : null,
+    ]
+      .map((query) => (query || '').trim())
+      .filter((query, index, all) => query.length >= 2 && all.indexOf(query) === index);
 
-    if (!likelyProductQuery) {
+    let resolvedDetourQuery = likelyProductQuery || null;
+    let searchResult: ProductSearchResult = { produto: null };
+
+    for (const query of detourQueries) {
+      const currentResult = this.findProductByName(produtos, query);
+      if (currentResult.produto || currentResult.sugestoes?.length) {
+        resolvedDetourQuery = query;
+        searchResult = currentResult;
+        break;
+      }
+    }
+
+    if (!likelyProductQuery && !searchResult.produto && !(searchResult.sugestoes?.length)) {
       if (validNameCandidate) {
         return null;
       }
@@ -4742,8 +4795,6 @@ export class WhatsappService {
         conversation,
       );
     }
-
-    const searchResult = this.findProductByName(produtos, likelyProductQuery);
     if (searchResult.produto) {
       if (validNameCandidate) {
         return this.buildCollectionStageDetourMessage(
@@ -4757,7 +4808,7 @@ export class WhatsappService {
       await this.rememberConversationIntelligence(conversation, {
         last_product_name: searchResult.produto.name,
         last_product_names: [searchResult.produto.name],
-        last_query: likelyProductQuery,
+        last_query: resolvedDetourQuery,
       });
 
       return this.buildCollectionStageDetourMessage(
@@ -4786,11 +4837,11 @@ export class WhatsappService {
         last_intent: 'suggestion',
         last_product_name: null,
         last_product_names: suggestions.map((product) => product.name),
-        last_query: likelyProductQuery,
+        last_query: resolvedDetourQuery,
       });
 
       return this.buildCollectionStageDetourMessage(
-        `Nao fechei "${likelyProductQuery}" com seguranca ainda.`,
+        `Nao fechei "${resolvedDetourQuery}" com seguranca ainda.`,
         currentState,
         conversation,
         [
@@ -4805,7 +4856,7 @@ export class WhatsappService {
     }
 
     return this.buildCollectionStageDetourMessage(
-      `Entendi que voce tentou falar de um produto agora, mas "${likelyProductQuery}" ainda nao fechou com seguranca no catalogo.`,
+      `Entendi que voce tentou falar de um produto agora, mas "${resolvedDetourQuery || likelyProductQuery}" ainda nao fechou com seguranca no catalogo.`,
       currentState,
       conversation,
       ['Se quiser, depois eu te ajudo a encontrar o item certo sem chutar errado.'],
@@ -5440,7 +5491,7 @@ export class WhatsappService {
   ): string {
     switch (currentState) {
       case 'collecting_name':
-        return 'Eu so preciso do nome para identificar corretamente quem vai receber, nao para travar voce num script.';
+        return 'Eu so preciso do nome para identificar corretamente quem vai receber, nao para travar voce num script nem te fazer confirmar nada no escuro.';
       case 'collecting_address':
         return customerData?.delivery_type
           ? 'Eu so vou usar esse endereco para a entrega sair certa, sem erro de rota nem bairro.'
@@ -5840,7 +5891,7 @@ export class WhatsappService {
     await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
     await this.rememberPendingOrderIntelligence(conversation, pendingOrder);
 
-    const customerData = conversation?.context?.customer_data as CustomerData | undefined;
+    const customerData = await this.getReusableCustomerDataForNewPendingOrder(conversation);
 
     if (customerData?.name) {
       if (!customerData.address && !customerData.delivery_type) {
@@ -7780,6 +7831,17 @@ export class WhatsappService {
       return conversationalSupport;
     }
 
+    if (
+      this.containsAbusiveLanguage(lowerMessage) &&
+      !conversationalAnalysis.signals.issue &&
+      !conversationalAnalysis.signals.clarification &&
+      !this.hasActionableIntent(lowerMessage, conversation, currentState)
+    ) {
+      return this.getPremiumBoundaryMessage(
+        Number(conversation?.context?.abuse_count || 0) + 1,
+      );
+    }
+
     if (currentState === 'confirming_stock_adjustment') {
       return await this.processStockAdjustment(message, tenantId, conversation);
     }
@@ -7960,7 +8022,11 @@ export class WhatsappService {
     if (isIdleLikeState && this.isOutOfFlowStopIntent(lowerMessage)) {
       return this.getPremiumSoftResetMessage();
     }
-    if (isIdleLikeState && this.isLooseReplyWithoutContext(lowerMessage)) {
+    if (
+      isIdleLikeState &&
+      this.isLooseReplyWithoutContext(lowerMessage) &&
+      !this.hasConsultativeMemory(conversation)
+    ) {
       return this.getPremiumContextRecoveryMessage();
     }
 
@@ -8307,6 +8373,7 @@ export class WhatsappService {
     currentState?: ConversationState,
   ): string {
     const analysis = this.messageIntelligenceService.analyze(message);
+    const normalized = this.normalizeIntentText(message);
     const candidate =
       analysis.productCandidate || this.extractCatalogQuery(message) || null;
     const shouldMentionCandidate =
@@ -8321,6 +8388,17 @@ export class WhatsappService {
       currentState && currentState !== 'idle'
         ? this.getConversationStageLabel(currentState)
         : null;
+
+    if (this.isBareStatusProbeWithoutContext(normalized, currentState)) {
+      return [
+        'Se voce quer acompanhar um pedido, eu consigo fazer isso por aqui.',
+        '',
+        'Me envie uma destas opcoes:',
+        '- "status do pedido"',
+        '- o codigo do pedido, ex.: "PED-20260108-001"',
+        '- ou "quero 2 brigadeiros" se voce quer montar um novo pedido',
+      ].join('\n');
+    }
 
     const lines = ['Quero te entender sem adivinhar coisa errada.'];
 
@@ -8341,6 +8419,76 @@ export class WhatsappService {
     lines.push('- "acho que voce nao entendeu o pedido"');
 
     return lines.join('\n');
+  }
+
+  private isBareStatusProbeWithoutContext(
+    normalizedMessage: string,
+    currentState?: ConversationState,
+  ): boolean {
+    if (!normalizedMessage || (currentState && currentState !== 'idle')) {
+      return false;
+    }
+
+    return new Set([
+      'cade',
+      'cade?',
+      'status',
+      'pedido',
+      'meu pedido',
+      'acompanhar',
+      'acompanha',
+      'rastrear',
+      'rastrear pedido',
+      'cancelou',
+      'cancelou?',
+      'cancelado',
+      'onde ta',
+      'aonde ta',
+      'como ta',
+    ]).has(normalizedMessage);
+  }
+
+  private shouldReuseCustomerDataForCurrentOrder(
+    conversation?: TypedConversation,
+  ): boolean {
+    const currentState = conversation?.context?.state as ConversationState | undefined;
+    if (!currentState) {
+      return false;
+    }
+
+    return new Set<ConversationState>([
+      'collecting_order',
+      'collecting_name',
+      'collecting_address',
+      'collecting_phone',
+      'collecting_notes',
+      'collecting_cash_change',
+      'confirming_order',
+      'confirming_stock_adjustment',
+    ]).has(currentState);
+  }
+
+  private async getReusableCustomerDataForNewPendingOrder(
+    conversation?: TypedConversation,
+  ): Promise<CustomerData | undefined> {
+    const customerData = conversation?.context?.customer_data as CustomerData | undefined;
+    if (!conversation || !customerData) {
+      return undefined;
+    }
+
+    if (this.shouldReuseCustomerDataForCurrentOrder(conversation)) {
+      return customerData;
+    }
+
+    await this.conversationService.clearCustomerData(conversation.id);
+    conversation.customer_name = undefined;
+
+    if (conversation.context) {
+      const { customer_data: _customerData, ...restContext } = conversation.context;
+      conversation.context = restContext;
+    }
+
+    return undefined;
   }
 
   private async tryLLMConversationalAssist(
@@ -8632,6 +8780,11 @@ export class WhatsappService {
       return null;
     }
 
+    const salesAnalysis = this.salesIntelligenceService.analyze(sanitized);
+    if (salesAnalysis.intent !== 'other') {
+      return null;
+    }
+
     if (
       this.isDirectCatalogRequest(sanitized) ||
       this.isDirectPriceQuestion(sanitized) ||
@@ -8707,6 +8860,16 @@ export class WhatsappService {
     }
 
     const extractedOrder = this.extractOrderInfo(normalized);
+    if (
+      this.shouldPreferConsultativeSalesRouting(
+        normalized,
+        salesAnalysis,
+        extractedOrder.productName || '',
+      )
+    ) {
+      return false;
+    }
+
     if (extractedOrder.quantity !== null && !!extractedOrder.productName) {
       return true;
     }
@@ -8742,6 +8905,81 @@ export class WhatsappService {
       palavrasPedido.some((palavra) => normalized.includes(this.normalizeForSearch(palavra))) &&
       Boolean(analysis.productCandidate)
     );
+  }
+
+  private looksLikeExplicitNameIntroduction(message: string): boolean {
+    return /^(?:meu\s+nome\s+[eé]|o\s+nome\s+[eé]|nome\s+[eé]|me\s+chamo|eu\s+sou|sou\s+(?:o|a)|prazer\b)/i.test(
+      this.sanitizeInput((message || '').trim()),
+    );
+  }
+
+  private hasSpecificProductOrderShape(
+    normalizedMessage: string,
+    productName: string,
+  ): boolean {
+    const normalizedProduct = this.normalizeForSearch(productName || '');
+    if (!normalizedProduct) {
+      return false;
+    }
+
+    if (
+      !/^(quero|me ve|me manda|manda|separa|traz|coloca|bota|preciso|vou querer|gostaria de)\b/.test(
+        normalizedMessage,
+      )
+    ) {
+      return false;
+    }
+
+    if (/^(algo|opcao|opcoes|presente|mimo|lembranc|coisa|negocio)\b/.test(normalizedProduct)) {
+      return false;
+    }
+
+    if (/\b(reais?|real|conta|erro|tempo|duvida)\b/.test(normalizedProduct)) {
+      return false;
+    }
+
+    return normalizedProduct.split(/\s+/).filter(Boolean).length <= 6;
+  }
+
+  private shouldPreferConsultativeSalesRouting(
+    normalizedMessage: string,
+    salesAnalysis: SalesConversationAnalysis,
+    extractedProductName: string,
+  ): boolean {
+    if (salesAnalysis.intent === 'other') {
+      return false;
+    }
+
+    const consultativeLead =
+      salesAnalysis.budgetCeiling !== null ||
+      salesAnalysis.recipientHint !== null ||
+      this.hasAnyNormalizedPhrase(normalizedMessage, [
+        'me indica',
+        'me recomenda',
+        'recomenda',
+        'indica',
+        'sugere',
+        'sugestao',
+        'qual voce indica',
+        'qual voce recomenda',
+        'qual e melhor',
+        'qual melhor',
+        'vale mais a pena',
+        'mais em conta',
+        'mais barato',
+        'algo',
+        'opcao',
+        'opcoes',
+        'lembrancinha',
+        'lembranca',
+        'mimo',
+      ]);
+
+    if (!consultativeLead) {
+      return false;
+    }
+
+    return !this.hasSpecificProductOrderShape(normalizedMessage, extractedProductName);
   }
 
   private isDirectCatalogRequest(message: string): boolean {
@@ -8935,7 +9173,7 @@ export class WhatsappService {
     await this.conversationService.savePendingOrder(conversation.id, pendingOrder);
     await this.rememberPendingOrderIntelligence(conversation, pendingOrder);
 
-    const customerData = conversation?.context?.customer_data as CustomerData | undefined;
+    const customerData = await this.getReusableCustomerDataForNewPendingOrder(conversation);
 
     // Se já temos nome, seguir o fluxo padrão de entrega/retirada/confirmação
     if (customerData?.name) {
