@@ -318,6 +318,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       cacheService?: Record<string, any>;
       conversation?: Record<string, jest.Mock>;
       notifications?: Record<string, jest.Mock>;
+      openAIService?: Record<string, jest.Mock>;
       orders?: Record<string, jest.Mock>;
       payments?: Record<string, jest.Mock>;
       productsService?: Record<string, jest.Mock>;
@@ -334,6 +335,8 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     const openAIService = {
       processMessage: jest.fn().mockResolvedValue({ intent: 'outro', confidence: 0.5 }),
+      generateConversationalAssist: jest.fn().mockResolvedValue(null),
+      ...(overrides?.openAIService || {}),
     };
 
     const cacheService = {
@@ -448,6 +451,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     return {
       service: service as any,
       config,
+      openAIService,
       cacheService,
       conversationService,
       tenantsService,
@@ -3723,6 +3727,34 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Me diga em uma frase o que voce quer agora');
     expect(response).toContain('- "quero 2 brigadeiros"');
     expect(response).not.toContain('preco de asd qwe negocio');
+  });
+
+  it('uses conversational LLM assist on vague messages when the local AI layer is enabled', async () => {
+    const fixture = createFixture(loucasCatalog, {
+      config: {
+        get: jest.fn((key: string) => {
+          if (key === 'FRONTEND_URL') return 'https://gtsofthub.com.br';
+          if (key === 'WHATSAPP_LLM_ASSIST_ENABLED') return 'true';
+          if (key === 'WHATSAPP_LLM_ASSIST_MAX_PRODUCTS') return '4';
+          return undefined;
+        }),
+      },
+      openAIService: {
+        generateConversationalAssist: jest.fn().mockResolvedValue({
+          safeReply:
+            'Entendi que isso saiu do contexto da loja. Se voce quiser, eu te ajudo com cardapio, pedido ou pagamento sem te fazer repetir tudo.',
+          confidence: 0.88,
+          detectedGoal: 'entender melhor o que a pessoa quer agora',
+          detectedEmotion: 'confused',
+          shouldStayInCurrentStage: false,
+        }),
+      },
+    });
+
+    const response = await fixture.service.generateResponse('asd qwe negocio', 'tenant-id');
+
+    expect(response).toContain('saiu do contexto da loja');
+    expect(fixture.openAIService.generateConversationalAssist).toHaveBeenCalled();
   });
 
   it('blocks AI routing from turning a vague message into a fake price query', async () => {

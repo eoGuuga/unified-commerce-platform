@@ -790,3 +790,19 @@
   - `npx.cmd jest src/modules/whatsapp/whatsapp.service.spec.ts --runInBand -t "keeps generic brigadeiro queries ambiguous|understands pluralized aliases like tortas de banana|stops the active collection flow cleanly|answers discount questions during name collection|treats plain nao during final review|does not accept a product mention as the customer name|returns a useful product reading when the customer sends only the product name in idle state"` => ok
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
+
+2026-03-27  WhatsApp hybrid local-AI lane for zero-cost conversational recovery (local)
+- Preparada uma camada hibrida para o WhatsApp: o motor transacional continua deterministico para pedido, pagamento e estoque, enquanto um LLM local pode entrar apenas nas mensagens ambiguas, vagas ou fora de fluxo.
+- `OpenAIService` passou a suportar duas trilhas estruturadas via API OpenAI-compativel:
+  - classificacao robusta com `response_format`
+  - assistencia conversacional curta e segura com JSON estruturado
+- O WhatsApp agora tenta usar esse assistente apenas no fallback semantico e na clarificacao final, evitando deixar o fluxo inteiro lento.
+- Adicionados parametros de ambiente para ativar a camada local sem custo:
+  - `WHATSAPP_LLM_ASSIST_ENABLED`
+  - `WHATSAPP_LLM_ASSIST_TIMEOUT_MS`
+  - `WHATSAPP_LLM_ASSIST_MAX_PRODUCTS`
+- `deploy/docker-compose.test.yml` ganhou um servico opcional `ollama` em profile `ai`, para ligar IA local no `dev/teste` sem depender de API paga.
+- Validacao local:
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+  - `npx.cmd jest src/modules/whatsapp/services/openai.service.spec.ts src/modules/whatsapp/whatsapp.service.spec.ts --runInBand -t "conversational LLM assist|structured purchase intent|structured conversational assist|asks for clarification instead of faking understanding when the message is too vague|uses conversational LLM assist"` => ok

@@ -13,6 +13,7 @@ version: '3.8'
 #
 # Uso:
 #   docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.test.yml --project-name ucmtest up -d --build
+#   docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.test.yml --project-name ucmtest --profile ai up -d --build
 #
 
 services:
@@ -56,6 +57,23 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+    networks:
+      - ucm-test-net
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ucm-ollama-test
+    restart: unless-stopped
+    init: true
+    profiles:
+      - ai
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - ollama_test_data:/root/.ollama
     networks:
       - ucm-test-net
 
@@ -132,6 +150,7 @@ services:
 volumes:
   postgres_test_data:
   redis_test_data:
+  ollama_test_data:
 
 networks:
   ucm-test-net:

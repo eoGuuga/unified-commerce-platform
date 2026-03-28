@@ -8059,7 +8059,26 @@ export class WhatsappService {
 
     const finalAnalysis = this.messageIntelligenceService.analyze(message);
     if (finalAnalysis.flags.needsClarification) {
+      const llmAssist = await this.tryLLMConversationalAssist(
+        message,
+        tenantId,
+        conversation,
+        currentState,
+      );
+      if (llmAssist) {
+        return llmAssist;
+      }
       return this.buildSemanticClarificationMessage(message, currentState);
+    }
+
+    const llmAssist = await this.tryLLMConversationalAssist(
+      message,
+      tenantId,
+      conversation,
+      currentState,
+    );
+    if (llmAssist) {
+      return llmAssist;
     }
 
     return this.getPremiumFallbackMessage();
@@ -8322,6 +8341,116 @@ export class WhatsappService {
     lines.push('- "acho que voce nao entendeu o pedido"');
 
     return lines.join('\n');
+  }
+
+  private async tryLLMConversationalAssist(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): Promise<string | null> {
+    const enabled =
+      String(this.config.get('WHATSAPP_LLM_ASSIST_ENABLED') || '').toLowerCase() === 'true';
+    if (!enabled) {
+      return null;
+    }
+
+    try {
+      const products = await this.getCatalogProducts(tenantId);
+      const memory = this.getConversationIntelligenceMemory(conversation);
+      const assist = await this.openAIService.generateConversationalAssist({
+        message,
+        currentState: currentState || 'idle',
+        stageLabel:
+          currentState && currentState !== 'idle'
+            ? this.getConversationStageLabel(currentState)
+            : null,
+        catalogSummary: this.buildCompactCatalogSummary(products, memory),
+        memory: {
+          lastIntent: memory?.last_intent || null,
+          lastProductName: memory?.last_product_name || null,
+          lastProductNames: memory?.last_product_names || null,
+          lastCustomerGoal: memory?.last_customer_goal || null,
+        },
+      });
+
+      if (!assist || assist.confidence < 0.55 || !assist.safeReply) {
+        return null;
+      }
+
+      return assist.safeReply;
+    } catch (error) {
+      this.logger.warn('LLM conversational assist fallback failed', {
+        error: error instanceof Error ? error.message : String(error),
+        tenantId,
+      });
+      return null;
+    }
+  }
+
+  private buildCompactCatalogSummary(
+    products: ProductWithStock[],
+    memory?: ConversationIntelligenceMemory | null,
+  ): string[] {
+    if (!products.length) {
+      return [];
+    }
+
+    const categoryNames = Array.from(
+      new Set(
+        products
+          .map((product) => String(product.categoria?.name || '').trim())
+          .filter(Boolean),
+      ),
+    ).slice(0, 6);
+
+    const prioritized = [...products].sort((left, right) => {
+      const leftName = this.normalizeIntentText(left.name);
+      const rightName = this.normalizeIntentText(right.name);
+      const leftScore =
+        (memory?.last_product_name &&
+        leftName.includes(this.normalizeIntentText(memory.last_product_name))
+          ? 3
+          : 0) +
+        ((memory?.last_product_names || []).some((name) =>
+          leftName.includes(this.normalizeIntentText(name)),
+        )
+          ? 2
+          : 0) +
+        (left.available_stock > 0 ? 1 : 0);
+      const rightScore =
+        (memory?.last_product_name &&
+        rightName.includes(this.normalizeIntentText(memory.last_product_name))
+          ? 3
+          : 0) +
+        ((memory?.last_product_names || []).some((name) =>
+          rightName.includes(this.normalizeIntentText(name)),
+        )
+          ? 2
+          : 0) +
+        (right.available_stock > 0 ? 1 : 0);
+
+      if (rightScore !== leftScore) {
+        return rightScore - leftScore;
+      }
+
+      return Number(right.available_stock || 0) - Number(left.available_stock || 0);
+    });
+
+    const sampleProducts = prioritized
+      .filter((product) => Number(product.available_stock || 0) > 0)
+      .slice(0, Number(this.config.get('WHATSAPP_LLM_ASSIST_MAX_PRODUCTS') || 6))
+      .map(
+        (product) =>
+          `${product.name} (${product.categoria?.name || 'Categoria'}) - R$ ${this.formatCurrency(Number(product.price || 0))}`,
+      );
+
+    const summary: string[] = [];
+    if (categoryNames.length) {
+      summary.push(`Categorias ativas: ${categoryNames.join(', ')}`);
+    }
+    summary.push(...sampleProducts);
+    return summary;
   }
 
   private getPremiumContextRecoveryMessage(): string {
