@@ -13,6 +13,7 @@
     "test:cov": "jest --coverage",
     "test:integration": "jest --testRegex='.*\\.integration\\.spec\\.ts$'",
     "test:unit": "jest --testRegex='.*\\.spec\\.ts$' --testPathIgnorePatterns='integration'",
+    "test:whatsapp:evals": "powershell -ExecutionPolicy Bypass -File scripts/run-whatsapp-sales-evals.ps1",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "migration:generate": "typeorm migration:generate",
     "migration:run": "typeorm migration:run",

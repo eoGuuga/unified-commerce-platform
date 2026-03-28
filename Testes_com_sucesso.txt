@@ -915,3 +915,31 @@
   - `node ./node_modules/jest/bin/jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand` => `154/154` ok
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
+
+2026-03-27  Bateria conversacional de vendas para reduzir QA manual
+- Objetivo:
+  - parar de depender so de conversa manual no WhatsApp para descobrir regressao
+  - avaliar o bot com um corpus fixo de cenarios que imitam conversa humana ruim, desvio de fluxo, ajuste de pedido e navegacao comercial
+- Estrutura criada:
+  - `backend/scripts/whatsapp-sales-evals.loucas.json`
+    - corpus inicial da Loucas com cenarios de:
+      - fala sem sentido
+      - emocao solta
+      - parada limpa da conversa
+      - ajuste com `mais`
+      - rejeicao de decimal
+      - protecao de duplicidade sem loop
+      - pergunta aleatoria durante coleta
+      - pergunta de desconto durante coleta
+      - nome de produto isolado
+      - termo generico ambiguo como `brigadeiros`
+  - `backend/scripts/run-whatsapp-sales-evals.ps1`
+    - runner que executa o corpus no endpoint real do WhatsApp de teste
+    - gera arquivo json com resultado por cenario e por passo
+  - script npm:
+    - `npm run test:whatsapp:evals`
+- Ganho pratico:
+  - antes de te pedir QA, eu agora consigo rodar uma bateria mais proxima de conversa real e ver se o bot ainda soa robo, se sai do trilho ou se volta a errar casos que ja doeram
+- Validacao desta rodada:
+  - `npm.cmd run test:whatsapp:evals` => `10/10` cenarios ok em `dev/teste`
+  - resultado local descartavel salvo em `backend/whatsapp-sales-evals-results-20260327-232533.json`

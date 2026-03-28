@@ -37,6 +37,7 @@ coverage/
 artifacts/
 test-results/
 test-whatsapp-hardening-results-*.json
+backend/whatsapp-sales-evals-results-*.json
 
 # Temporary
 tmp/

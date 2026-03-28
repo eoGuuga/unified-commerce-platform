@@ -1,0 +1,238 @@
+{
+  "name": "loucas-sales-evals",
+  "description": "Bateria conversacional para validar se o bot da Loucas soa menos formulario e mais atendimento comercial seguro.",
+  "scenarios": [
+    {
+      "name": "nonsense_should_not_turn_into_order",
+      "steps": [
+        {
+          "message": "vou fazer omelete",
+          "expectAny": [
+            "acho que eu puxei a conversa para o lado errado",
+            "Quero te entender",
+            "Me diga em uma frase",
+            "Como posso te ajudar",
+            "nao parece um pedido da loja"
+          ],
+          "forbidAny": [
+            "PEDIDO PREPARADO",
+            "Quantos vou fazer omelete",
+            "REFERENCIA RAPIDA DE PRECOS"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "emotion_should_not_open_catalog",
+      "steps": [
+        {
+          "message": "meu deus",
+          "expectAny": [
+            "Pode me falar com calma",
+            "Quero te entender",
+            "Me diga em uma frase",
+            "Como posso te ajudar",
+            "o que voce quer resolver agora"
+          ],
+          "forbidAny": [
+            "REFERENCIA RAPIDA DE PRECOS",
+            "PEDIDO PREPARADO"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stop_current_nonsense_cleanly",
+      "steps": [
+        {
+          "message": "vou fazer omelete",
+          "expectAny": [
+            "acho que eu puxei a conversa para o lado errado",
+            "Quero te entender",
+            "Me diga em uma frase",
+            "nao parece um pedido da loja"
+          ],
+          "forbidAny": [
+            "PEDIDO PREPARADO",
+            "REFERENCIA RAPIDA DE PRECOS"
+          ]
+        },
+        {
+          "message": "tira issoooo",
+          "expectAny": [
+            "Sem problema",
+            "vou parar por aqui"
+          ],
+          "forbidAny": [
+            "REFERENCIA RAPIDA DE PRECOS",
+            "PEDIDO PREPARADO"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bare_more_adjustment_during_name_collection",
+      "steps": [
+        {
+          "message": "quero 5 bala de brigadeiro",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Mais 5 balas de brigadeiro",
+          "expectAny": [
+            "Pedido ajustado com seguranca.",
+            "Quantidade: 10 unidade(s)"
+          ],
+          "forbidAny": [
+            "Antes disso, preciso do nome completo sem ajustar"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "decimal_adjustment_must_be_rejected",
+      "steps": [
+        {
+          "message": "quero 5 bala de brigadeiro",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Adiciona mais 1,5 balas de brigadeiro",
+          "expectAny": [
+            "Quantidade deve ser um numero inteiro."
+          ],
+          "forbidAny": [
+            "Pedido ajustado com seguranca."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "duplicate_protection_must_not_loop_recursively",
+      "steps": [
+        {
+          "message": "quero 5 bala de brigadeiro",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Adiciona mais 5 balas de brigadeiro",
+          "expectAny": [
+            "Pedido ajustado com seguranca.",
+            "Quantidade: 10 unidade(s)"
+          ]
+        },
+        {
+          "message": "Adiciona mais 5 balas de brigadeiro",
+          "expectAny": [
+            "Ja recebi essa mesma mensagem ha instantes"
+          ],
+          "forbidAny": [
+            "Ultima orientacao: Ja recebi essa mesma mensagem"
+          ]
+        },
+        {
+          "message": "Adiciona mais 5 balas de brigadeiro",
+          "expectAny": [
+            "Ja recebi essa mesma mensagem ha instantes"
+          ],
+          "forbidAny": [
+            "Ultima orientacao: Ja recebi essa mesma mensagem"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "random_question_during_name_should_stay_on_step",
+      "steps": [
+        {
+          "message": "quero 1 bala de brigadeiro",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Foi de berco?",
+          "expectAny": [
+            "primeiro preciso fechar a etapa atual",
+            "nome completo"
+          ],
+          "forbidAny": [
+            "catalogo",
+            "nao fechou com seguranca"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "discount_question_during_name_should_not_break_flow",
+      "steps": [
+        {
+          "message": "quero 1 bala de brigadeiro",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Tem desconto?",
+          "expectAny": [
+            "pix",
+            "desconto",
+            "nome completo"
+          ],
+          "forbidAny": [
+            "Pedido cancelado"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "single_product_name_should_return_useful_reading",
+      "steps": [
+        {
+          "message": "Banoffe",
+          "expectAny": [
+            "Banoffe",
+            "Disponibilidade:",
+            "Se quiser seguir"
+          ],
+          "forbidAny": [
+            "Quero te entender sem adivinhar coisa errada."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "generic_brigadeiros_should_stay_ambiguous",
+      "steps": [
+        {
+          "message": "Quero 5 brigadeiros",
+          "expectAny": [
+            "ainda ficou ambigua",
+            "10 Brigadeiros tradicionais",
+            "3 Brigadeiros tradicionais"
+          ],
+          "forbidAny": [
+            "Agua crystal com gas",
+            "PEDIDO PREPARADO"
+          ]
+        }
+      ]
+    }
+  ]
+}
