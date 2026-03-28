@@ -879,3 +879,23 @@
   - `node ./node_modules/jest/bin/jest.js src/modules/whatsapp/whatsapp.controller.spec.ts --runInBand` => `11/11` ok
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
+
+2026-03-27  Blindagem silenciosa para numero direto ignorado
+- Objetivo operacional:
+  - o bot continua respondendo apenas conversas diretas
+  - grupos e broadcasts seguem ignorados
+  - o numero `+55 11 95351-1566` agora entra em silencio total, igual grupo, sem resposta nenhuma
+- Implementacao:
+  - `WhatsappController` passou a ignorar o webhook desse numero antes de entrar no fluxo
+  - `WhatsappService` passou a:
+    - ignorar o numero bloqueado logo na entrada
+    - respeitar a lista tambem no envio, para evitar qualquer resposta futura por caminho indireto
+  - a lista virou configuracao por env: `WHATSAPP_IGNORED_PHONES`
+- Matching aplicado:
+  - compara o numero normalizado completo
+  - aceita tambem a equivalencia por ultimos 11 digitos para nao depender do formato exato com `+55`
+- Validacao local completa desta rodada:
+  - `node ./node_modules/jest/bin/jest.js src/modules/whatsapp/whatsapp.controller.spec.ts --runInBand` => `12/12` ok
+  - `node ./node_modules/jest/bin/jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand` => `150/150` ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok

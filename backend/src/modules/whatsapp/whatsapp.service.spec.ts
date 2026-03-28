@@ -311,6 +311,10 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     },
   ];
 
+  afterEach(() => {
+    delete process.env.WHATSAPP_IGNORED_PHONES;
+  });
+
   const createFixture = (
     products: Array<Record<string, unknown>> = [],
     overrides?: {
@@ -3168,6 +3172,35 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     );
   });
 
+  it('suppresses outbound sends to blocked direct numbers', async () => {
+    process.env.WHATSAPP_IGNORED_PHONES = '5511953511566';
+
+    const { service, notificationsService } = createFixture(loucasCatalog);
+
+    await service.sendOutboundResponse('5511953511566', {
+      kind: 'interactive_list',
+      previewText: 'Abri o cardapio interativo para voce.',
+      list: {
+        title: 'Cardapio da loja',
+        description: 'Escolha uma categoria',
+        buttonText: 'Abrir cardapio',
+        sections: [
+          {
+            title: 'Categorias',
+            rows: [
+              {
+                id: 'catalog_category:docinhos',
+                title: 'Docinhos',
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(notificationsService.sendWhatsAppMessage).not.toHaveBeenCalled();
+  });
+
   it('silently ignores group messages before touching the conversation flow', async () => {
     const { service, conversationService } = createFixture(catalog, {
       conversation: {
@@ -3189,6 +3222,33 @@ describe('WhatsappService defensive WhatsApp flow', () => {
         sourceJid: '120363022222222222@g.us',
         participantJid: '5511999999999@s.whatsapp.net',
       },
+    });
+
+    expect(response).toBe('');
+    expect(conversationService.getOrCreateConversation).not.toHaveBeenCalled();
+    expect(conversationService.saveMessage).not.toHaveBeenCalled();
+    expect(conversationService.updateContext).not.toHaveBeenCalled();
+    expect(generateResponseSpy).not.toHaveBeenCalled();
+  });
+
+  it('silently ignores blocked direct numbers before touching the conversation flow', async () => {
+    process.env.WHATSAPP_IGNORED_PHONES = '5511953511566';
+
+    const { service, conversationService } = createFixture(catalog, {
+      conversation: {
+        getOrCreateConversation: jest.fn(),
+        saveMessage: jest.fn(),
+        updateContext: jest.fn(),
+      },
+    });
+
+    const generateResponseSpy = jest.spyOn(service as any, 'generateResponse');
+    const response = await service.processIncomingMessage({
+      from: '5511953511566',
+      body: 'oi',
+      timestamp: new Date().toISOString(),
+      tenantId: 'tenant-id',
+      messageId: 'blocked-msg-1',
     });
 
     expect(response).toBe('');

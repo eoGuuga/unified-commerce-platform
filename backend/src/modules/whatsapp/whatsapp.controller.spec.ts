@@ -42,6 +42,10 @@ describe('WhatsappController', () => {
     controller = module.get<WhatsappController>(WhatsappController);
   });
 
+  afterEach(() => {
+    delete process.env.WHATSAPP_IGNORED_PHONES;
+  });
+
   it('processes a raw Evolution messages.upsert payload', async () => {
     const response = await controller.webhook(
       {
@@ -234,6 +238,34 @@ describe('WhatsappController', () => {
       success: true,
       ignored: true,
       reason: 'grupo ou broadcast ignorado',
+    });
+    expect(whatsappService.processIncomingMessage).not.toHaveBeenCalled();
+  });
+
+  it('ignores configured blocked direct numbers', async () => {
+    process.env.WHATSAPP_IGNORED_PHONES = '5511953511566';
+
+    const response = await controller.webhook(
+      {
+        event: 'messages.upsert',
+        instance: 'loucas-teste',
+        data: {
+          key: {
+            remoteJid: '5511953511566@s.whatsapp.net',
+            fromMe: false,
+          },
+          message: {
+            conversation: 'oi',
+          },
+        },
+      },
+      'tenant-loucas',
+    );
+
+    expect(response).toEqual({
+      success: true,
+      ignored: true,
+      reason: 'numero ignorado',
     });
     expect(whatsappService.processIncomingMessage).not.toHaveBeenCalled();
   });

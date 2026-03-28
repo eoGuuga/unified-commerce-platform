@@ -243,6 +243,80 @@ export class WhatsappService {
     return String(phoneNumber || '').replace(/\D/g, '');
   }
 
+  private parsePhoneList(value: unknown): string[] {
+    if (Array.isArray(value)) {
+      return Array.from(
+        new Set(
+          value
+            .map((item) => this.normalizePhoneForControl(item))
+            .filter(Boolean),
+        ),
+      );
+    }
+
+    const rawValue = String(value || '').trim();
+    if (!rawValue) {
+      return [];
+    }
+
+    return Array.from(
+      new Set(
+        rawValue
+          .split(/[\s,;]+/)
+          .map((item) => this.normalizePhoneForControl(item))
+          .filter(Boolean),
+      ),
+    );
+  }
+
+  private getIgnoredInboundPhones(tenant?: Tenant): string[] {
+    const tenantConfigured = tenant
+      ? this.getTenantSettingValue<string[] | string>(tenant, [
+          'whatsappIgnoredPhones',
+          'whatsapp_ignored_phones',
+          'ignoredWhatsappPhones',
+          'ignored_whatsapp_phones',
+        ])
+      : undefined;
+    const envConfigured =
+      this.config.get<string>('WHATSAPP_IGNORED_PHONES') || process.env.WHATSAPP_IGNORED_PHONES;
+
+    return Array.from(
+      new Set([
+        ...this.parsePhoneList(tenantConfigured),
+        ...this.parsePhoneList(envConfigured),
+      ]),
+    );
+  }
+
+  private matchesConfiguredPhoneNumber(phoneNumber: string, configuredPhone: string): boolean {
+    const normalizedPhone = this.normalizePhoneForControl(phoneNumber);
+    const normalizedConfigured = this.normalizePhoneForControl(configuredPhone);
+
+    if (!normalizedPhone || !normalizedConfigured) {
+      return false;
+    }
+
+    if (normalizedPhone === normalizedConfigured) {
+      return true;
+    }
+
+    const last11Phone = normalizedPhone.slice(-11);
+    const last11Configured = normalizedConfigured.slice(-11);
+
+    return (
+      last11Phone.length === 11 &&
+      last11Configured.length === 11 &&
+      last11Phone === last11Configured
+    );
+  }
+
+  private isIgnoredInboundPhone(phoneNumber: string, tenant?: Tenant): boolean {
+    return this.getIgnoredInboundPhones(tenant).some((configuredPhone) =>
+      this.matchesConfiguredPhoneNumber(phoneNumber, configuredPhone),
+    );
+  }
+
   private getTenantSettingValue<T = unknown>(tenant: Tenant, keys: string[]): T | undefined {
     const settings = (tenant?.settings || {}) as Record<string, unknown>;
 
@@ -7694,6 +7768,13 @@ export class WhatsappService {
         });
         return '';
       }
+      if (this.isIgnoredInboundPhone(message.from)) {
+        this.logger.warn('Ignoring WhatsApp message from blocked direct number', {
+          from: message.from,
+          messageId: message.messageId,
+        });
+        return '';
+      }
       // ⚠️ CRÍTICO: tenantId deve vir obrigatoriamente, nunca usar default hardcoded
       if (!message.tenantId) {
         this.logger.error('Tenant ID missing from WhatsApp message', { from: message.from });
@@ -7701,6 +7782,15 @@ export class WhatsappService {
       }
       const tenantId = message.tenantId;
       const tenant = await this.tenantsService.findOneById(tenantId);
+
+      if (this.isIgnoredInboundPhone(message.from, tenant)) {
+        this.logger.warn('Ignoring WhatsApp message from tenant-blocked direct number', {
+          from: message.from,
+          tenantId,
+          messageId: message.messageId,
+        });
+        return '';
+      }
 
       const normalizedBody = this.normalizeIncomingMessageBody(message);
       const sanitizedBody = this.sanitizeInput(normalizedBody);
@@ -11614,6 +11704,13 @@ export class WhatsappService {
     to: string,
     response: WhatsappOutboundResponse,
   ): Promise<void> {
+    if (this.isIgnoredInboundPhone(to)) {
+      this.logger.warn('Suppressing outbound WhatsApp response to blocked direct number', {
+        to,
+      });
+      return;
+    }
+
     if (this.isInteractiveListResponse(response)) {
       await this.notificationsService.sendWhatsAppMessage({
         to,

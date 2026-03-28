@@ -18,6 +18,50 @@ function normalizeDigits(value?: string | null): string {
   return String(value || '').replace(/\D/g, '');
 }
 
+function parseIgnoredDirectPhonesFromEnv(): string[] {
+  const rawValue = String(process.env.WHATSAPP_IGNORED_PHONES || '').trim();
+  if (!rawValue) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      rawValue
+        .split(/[\s,;]+/)
+        .map((item) => normalizeDigits(item))
+        .filter(Boolean),
+    ),
+  );
+}
+
+function matchesIgnoredDirectPhone(phoneNumber: string, configuredPhone: string): boolean {
+  const normalizedPhone = normalizeDigits(phoneNumber);
+  const normalizedConfigured = normalizeDigits(configuredPhone);
+
+  if (!normalizedPhone || !normalizedConfigured) {
+    return false;
+  }
+
+  if (normalizedPhone === normalizedConfigured) {
+    return true;
+  }
+
+  const last11Phone = normalizedPhone.slice(-11);
+  const last11Configured = normalizedConfigured.slice(-11);
+
+  return (
+    last11Phone.length === 11 &&
+    last11Configured.length === 11 &&
+    last11Phone === last11Configured
+  );
+}
+
+function isIgnoredDirectPhone(phoneNumber: string): boolean {
+  return parseIgnoredDirectPhonesFromEnv().some((configuredPhone) =>
+    matchesIgnoredDirectPhone(phoneNumber, configuredPhone),
+  );
+}
+
 function getPayloadRoot(body: RawWhatsappWebhookBody): Record<string, any> {
   if (body.data && typeof body.data === 'object') {
     return body.data;
@@ -290,6 +334,14 @@ export class WhatsappController {
       throw new BadRequestException(
         'Campos obrigatorios: remetente valido e texto da mensagem.',
       );
+    }
+
+    if (isIgnoredDirectPhone(from)) {
+      return {
+        success: true,
+        ignored: true,
+        reason: 'numero ignorado',
+      };
     }
 
     if (!tenantId) {
