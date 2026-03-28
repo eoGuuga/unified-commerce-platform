@@ -202,6 +202,150 @@
       ]
     },
     {
+      "name": "pluralized_alias_adjustment_should_work_during_collection",
+      "steps": [
+        {
+          "message": "quero 1 bala de brigadeiro",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "quero tambem 2 tortas de banana",
+          "expectAny": [
+            "Pedido ajustado com seguranca.",
+            "Banoffe ( torta de banana)",
+            "Quantidade: 2 unidade(s)"
+          ],
+          "forbidAny": [
+            "Eu continuo com esse item em mente para nao me perder."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "new_order_after_cancel_should_start_clean",
+      "steps": [
+        {
+          "message": "quero 1 bala de brigadeiro",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Jordan Lincoln",
+          "expectAny": [
+            "Como voce prefere receber esse pedido?"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "retirada",
+          "expectAny": [
+            "TELEFONE DE CONTATO"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "11999999999",
+          "expectAny": [
+            "OBSERVACOES DO PEDIDO"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "mandar 100 de brinde",
+          "expectAny": [
+            "REVISAO FINAL DO PEDIDO"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "cancelar",
+          "expectAny": [
+            "Pedido interrompido com sucesso."
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "quero 1 banoffe",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": [
+            "Jordania",
+            "mandar 100 de brinde",
+            "retirada na loja"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "unsupported_payment_message_should_recenter_to_supported_methods",
+      "steps": [
+        {
+          "message": "quero 1 bala de brigadeiro",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Jordan Lincoln",
+          "expectAny": [
+            "Como voce prefere receber esse pedido?"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "retirada",
+          "expectAny": [
+            "TELEFONE DE CONTATO"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "11999999999",
+          "expectAny": [
+            "OBSERVACOES DO PEDIDO"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "sem",
+          "expectAny": [
+            "REVISAO FINAL DO PEDIDO"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "sim",
+          "expectAny": [
+            "FORMAS DE PAGAMENTO"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "bolsa familia",
+          "expectAny": [
+            "Pagamento pendente",
+            "pix",
+            "dinheiro"
+          ],
+          "forbidAny": [
+            "cardToken",
+            "erro"
+          ]
+        }
+      ]
+    },
+    {
       "name": "single_product_name_should_return_useful_reading",
       "steps": [
         {

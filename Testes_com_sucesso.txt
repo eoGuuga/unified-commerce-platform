@@ -943,3 +943,16 @@
 - Validacao desta rodada:
   - `npm.cmd run test:whatsapp:evals` => `10/10` cenarios ok em `dev/teste`
   - resultado local descartavel salvo em `backend/whatsapp-sales-evals-results-20260327-232533.json`
+
+2026-03-27  Expansao da bateria conversacional e ajuste de alias em pedido pendente
+- Evolucao do corpus:
+  - a bateria de vendas passou a validar tambem:
+    - pedido novo apos cancelamento sem reaproveitar contexto velho
+    - metodo de pagamento estranho recenterando para `pix` e `dinheiro`
+    - ajuste de pedido com alias pluralizado, como `quero tambem 2 tortas de banana`
+- Ajuste funcional:
+  - `WhatsappService.normalizePendingOrderAdjustmentMessage` passou a limpar melhor prefixos de adicao, como `quero tambem`, `quero mais`, `tambem` e `tbm`
+  - `WhatsappService.isPendingOrderAdjustmentIntent` passou a priorizar melhor mensagens com cara clara de adicao de item, mesmo quando a heuristica de endereco tentava atrapalhar por causa de numero + texto
+- Validacao local desta rodada:
+  - `node ./node_modules/jest/bin/jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand` => `155/155` ok
+  - `npm.cmd run build` => ok

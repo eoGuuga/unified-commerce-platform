@@ -4385,7 +4385,7 @@ export class WhatsappService {
 
     return normalized
       .replace(
-        /^(?:corrige(?:\s+o\s+pedido)?|corrigir(?:\s+o\s+pedido)?|ajusta(?:\s+o\s+pedido)?|ajustar(?:\s+o\s+pedido)?|acrescenta|acrescentar|adiciona|adicionar|inclui|incluir|coloca\s+mais|bota\s+mais|mais)\s+/,
+        /^(?:corrige(?:\s+o\s+pedido)?|corrigir(?:\s+o\s+pedido)?|ajusta(?:\s+o\s+pedido)?|ajustar(?:\s+o\s+pedido)?|acrescenta|acrescentar|adiciona|adicionar|inclui|incluir|coloca\s+mais|bota\s+mais|quero\s+tambem|quero\s+tbm|quero\s+mais|tambem|tbm|mais)\s+/,
         '',
       )
       .trim();
@@ -4408,12 +4408,21 @@ export class WhatsappService {
     if (!normalized) {
       return false;
     }
+    const normalizedAdjustment = this.normalizePendingOrderAdjustmentMessage(message);
     const startsWithBareMore = /^mais\s+/.test(normalized);
+    const startsWithExplicitAddOnLead = /^(?:quero\s+(?:tambem|tbm|mais)|tambem\s+|tbm\s+|mais\s+|adiciona|adicionar|inclui|incluir|acrescenta|acrescentar|coloca\s+mais|bota\s+mais)\b/.test(normalized);
     const bareMoreOrderInfo = startsWithBareMore ? this.extractOrderInfo(message) : null;
+    const explicitAdjustmentOrderInfo = startsWithExplicitAddOnLead
+      ? this.extractOrderInfo(normalizedAdjustment)
+      : null;
     const looksLikeBareMoreAdjustment =
       startsWithBareMore &&
       bareMoreOrderInfo?.quantity !== null &&
       !!bareMoreOrderInfo?.productName;
+    const looksLikeExplicitAdjustmentOrder =
+      startsWithExplicitAddOnLead &&
+      explicitAdjustmentOrderInfo?.quantity !== null &&
+      !!explicitAdjustmentOrderInfo?.productName;
 
     if (
       this.isCancelIntent(normalized, conversation, currentState) ||
@@ -4426,6 +4435,7 @@ export class WhatsappService {
 
     if (
       !looksLikeBareMoreAdjustment &&
+      !looksLikeExplicitAdjustmentOrder &&
       (this.looksLikeStandalonePhoneMessage(message) ||
         this.isAddressLikelyComplete(message) ||
         this.hasAddressKeyword(message) ||
@@ -4486,7 +4496,6 @@ export class WhatsappService {
       return true;
     }
 
-    const normalizedAdjustment = this.normalizePendingOrderAdjustmentMessage(normalized);
     const multiItem = this.extractMultipleOrderInfos(normalizedAdjustment);
     if (multiItem && multiItem.length > 0) {
       return true;
