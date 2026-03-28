@@ -2445,6 +2445,14 @@ export class WhatsappService {
     return 15000;
   }
 
+  private isDuplicateProtectionPreview(preview: string): boolean {
+    const normalized = this.normalizeIntentText(preview);
+    return (
+      normalized.includes('ja recebi essa mesma mensagem') &&
+      normalized.includes('evitando duplicidade')
+    );
+  }
+
   private shouldSuppressRepeatedInbound(
     message: string,
     conversation?: TypedConversation,
@@ -2497,6 +2505,7 @@ export class WhatsappService {
       typeof conversation?.context?.last_outbound_preview === 'string'
         ? String(conversation.context.last_outbound_preview)
         : '';
+    const safeLastPreview = this.isDuplicateProtectionPreview(lastPreview) ? '' : lastPreview;
 
     const intro =
       currentState === 'waiting_payment'
@@ -2511,7 +2520,7 @@ export class WhatsappService {
     return [
       intro,
       '',
-      lastPreview ? `Ultima orientacao: ${lastPreview}` : '',
+      safeLastPreview ? `Ultima orientacao: ${safeLastPreview}` : '',
       followUp,
     ]
       .filter(Boolean)
@@ -4376,7 +4385,7 @@ export class WhatsappService {
 
     return normalized
       .replace(
-        /^(?:corrige(?:\s+o\s+pedido)?|corrigir(?:\s+o\s+pedido)?|ajusta(?:\s+o\s+pedido)?|ajustar(?:\s+o\s+pedido)?|acrescenta|acrescentar|adiciona|adicionar|inclui|incluir|coloca\s+mais|bota\s+mais)\s+/,
+        /^(?:corrige(?:\s+o\s+pedido)?|corrigir(?:\s+o\s+pedido)?|ajusta(?:\s+o\s+pedido)?|ajustar(?:\s+o\s+pedido)?|acrescenta|acrescentar|adiciona|adicionar|inclui|incluir|coloca\s+mais|bota\s+mais|mais)\s+/,
         '',
       )
       .trim();
@@ -4399,6 +4408,12 @@ export class WhatsappService {
     if (!normalized) {
       return false;
     }
+    const startsWithBareMore = /^mais\s+/.test(normalized);
+    const bareMoreOrderInfo = startsWithBareMore ? this.extractOrderInfo(message) : null;
+    const looksLikeBareMoreAdjustment =
+      startsWithBareMore &&
+      bareMoreOrderInfo?.quantity !== null &&
+      !!bareMoreOrderInfo?.productName;
 
     if (
       this.isCancelIntent(normalized, conversation, currentState) ||
@@ -4410,10 +4425,11 @@ export class WhatsappService {
     }
 
     if (
-      this.looksLikeStandalonePhoneMessage(message) ||
-      this.isAddressLikelyComplete(message) ||
-      this.hasAddressKeyword(message) ||
-      this.hasAddressFragmentSignal(message)
+      !looksLikeBareMoreAdjustment &&
+      (this.looksLikeStandalonePhoneMessage(message) ||
+        this.isAddressLikelyComplete(message) ||
+        this.hasAddressKeyword(message) ||
+        this.hasAddressFragmentSignal(message))
     ) {
       return false;
     }
@@ -4466,6 +4482,10 @@ export class WhatsappService {
       return true;
     }
 
+    if (looksLikeBareMoreAdjustment) {
+      return true;
+    }
+
     const normalizedAdjustment = this.normalizePendingOrderAdjustmentMessage(normalized);
     const multiItem = this.extractMultipleOrderInfos(normalizedAdjustment);
     if (multiItem && multiItem.length > 0) {
@@ -4485,6 +4505,11 @@ export class WhatsappService {
       '- "adiciona 1 bala de brigadeiro"',
       '- "cancelar" se quiser interromper o pedido',
     ].join('\n');
+  }
+
+  private hasDecimalQuantityToken(message: string): boolean {
+    const normalized = this.normalizeForSearch(message);
+    return /(^|\s)-?\d+[.,]\d+(\s|$)/.test(normalized);
   }
 
   private mergePendingOrderItems(
@@ -4558,6 +4583,10 @@ export class WhatsappService {
       if (missingTail) {
         normalizedAdjustment = missingTail;
       }
+    }
+
+    if (this.hasDecimalQuantityToken(message)) {
+      return 'Quantidade deve ser um numero inteiro.';
     }
 
     const parsedItems =
@@ -4738,6 +4767,15 @@ export class WhatsappService {
     const directCatalogRequest = this.isDirectCatalogRequest(sanitizedMessage);
     const directPriceQuestion = this.isDirectPriceQuestion(sanitizedMessage);
     const directStockQuestion = this.isDirectStockQuestion(sanitizedMessage);
+    const questionLikeSmallTalk =
+      sanitizedMessage.includes('?') &&
+      !directCatalogRequest &&
+      !directPriceQuestion &&
+      !directStockQuestion &&
+      !this.isOrderIntent(sanitizedMessage) &&
+      !this.looksLikeMultiItemOrder(sanitizedMessage) &&
+      !this.looksLikeOrderStatusQuery(normalized, conversation) &&
+      !this.isPaymentMethodSelection(normalized);
 
     const extractedName =
       currentState === 'collecting_name'
@@ -4794,6 +4832,14 @@ export class WhatsappService {
         currentState,
         conversation,
         ['Primeiro eu fecho esta etapa com voce para nao baguncar o pedido.'],
+      );
+    }
+
+    if (questionLikeSmallTalk && !validNameCandidate) {
+      return this.buildCollectionStageDetourMessage(
+        'Posso responder isso com voce depois, mas primeiro preciso fechar a etapa atual sem me perder.',
+        currentState,
+        conversation,
       );
     }
 
@@ -7869,18 +7915,30 @@ export class WhatsappService {
           typedConversation,
           duplicateGuard.repeatCount,
         );
+        const previousPreview =
+          typeof typedConversation.context?.last_outbound_preview === 'string'
+            ? String(typedConversation.context.last_outbound_preview)
+            : '';
+        const previousProcessedResponse =
+          typedConversation.context?.last_processed_response || null;
+        const previousProcessedPayload =
+          typedConversation.context?.last_processed_response_payload || null;
 
         await this.conversationService.updateContext(conversation.id, {
           last_inbound_signature: this.buildInboundSignature(sanitizedBody),
           last_inbound_at: new Date().toISOString(),
           last_inbound_repeat_count: duplicateGuard.repeatCount,
-          last_outbound_preview: this.buildResponsePreview(
-            duplicateResponse,
-          ),
+          ...(previousPreview
+            ? { last_outbound_preview: previousPreview }
+            : {}),
           last_processed_event_key: replayGuard.eventKey,
           last_processed_event_at: new Date().toISOString(),
-          last_processed_response: duplicateResponse,
-          last_processed_response_payload: this.serializeOutboundResponse(duplicateResponse),
+          ...(previousProcessedResponse
+            ? { last_processed_response: previousProcessedResponse }
+            : {}),
+          ...(previousProcessedPayload
+            ? { last_processed_response_payload: previousProcessedPayload }
+            : {}),
         });
 
         await this.conversationService.saveMessage(
@@ -9715,6 +9773,7 @@ export class WhatsappService {
     // ============================================
     let quantity: number | null = null;
     const hasExplicitNegative = /(^|\s)-\d+/.test(lowerMessage);
+    const hasDecimalQuantity = /(^|\s)-?\d+[.,]\d+(\s|$)/.test(lowerMessage);
     
     // 1.1. Expressões de quantidade PRIMEIRO (dúzia, meia dúzia, quilo, etc.)
     // IMPORTANTE: Verificar ANTES de números por extenso para evitar conflitos
@@ -9750,7 +9809,7 @@ export class WhatsappService {
     
     // 1.2. Números escritos por extenso (um, dois, três, etc.)
     // IMPORTANTE: Só verificar se não encontrou quantidade nas expressões acima
-    if (!quantity) {
+    if (!quantity && !hasDecimalQuantity) {
       const numerosExtenso: Record<string, number> = {
         'um': 1, 'uma': 1, 'dois': 2, 'duas': 2, 'três': 3, 'tres': 3,
         'quatro': 4, 'cinco': 5, 'seis': 6, 'sete': 7, 'oito': 8,
@@ -9770,7 +9829,7 @@ export class WhatsappService {
     }
     
     // 1.3. Números digitais (5, 10, 100, etc.)
-    if (!quantity) {
+    if (!quantity && !hasDecimalQuantity) {
       const quantityMatch = lowerMessage.match(/-?\d+/);
       if (quantityMatch) {
         quantity = parseInt(quantityMatch[0]);
@@ -9779,7 +9838,7 @@ export class WhatsappService {
     
     // 1.4. Quantidades indefinidas (uns, algumas, vários, etc.)
     // Se não encontrou quantidade específica, mas tem palavras de quantidade indefinida
-    if (!quantity) {
+    if (!quantity && !hasDecimalQuantity) {
       const indefinidas = ['uns', 'umas', 'alguns', 'algumas', 'vários', 'várias', 'um monte', 'muitos', 'muitas'];
       const temIndefinida = indefinidas.some(palavra => lowerMessage.includes(palavra));
       if (temIndefinida) {
@@ -9787,7 +9846,11 @@ export class WhatsappService {
         quantity = 5; // Quantidade padrão
       }
     }
-    
+
+    if (hasDecimalQuantity) {
+      quantity = Number.NaN;
+    }
+
     // ============================================
     // ETAPA 2: REMOVER PALAVRAS DE AÇÃO (múltiplas variações)
     // ============================================

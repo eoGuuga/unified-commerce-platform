@@ -899,3 +899,19 @@
   - `node ./node_modules/jest/bin/jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand` => `150/150` ok
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
+
+2026-03-27  Ajustes finos de QA para pedido pendente, duplicidade e conversa humana
+- Problemas atacados a partir do QA real:
+  - `Mais 5 balas de brigadeiro` durante `collecting_name` estava sendo filtrado como se fosse endereco e nao ajustava o pedido
+  - mensagens repetidas podiam cair num loop feio de `Ultima orientacao: Ja recebi essa mesma mensagem...`
+  - quantidades decimais como `1,5 balas` estavam virando `1` por erro de parsing
+  - perguntas soltas como `Foi de berco?` durante a coleta podiam cair em busca de produto e parecer um formulario travado
+- Ajustes principais:
+  - `WhatsappService.isPendingOrderAdjustmentIntent` passou a dar prioridade segura para ajustes que comecam com `mais` e fecham em `quantidade + item`, antes dos heuristicas de endereco
+  - `WhatsappService.tryAdjustPendingOrder` passou a rejeitar decimal diretamente pela mensagem original, sem deixar a normalizacao destruir o contexto
+  - `WhatsappService.buildDuplicateProtectionMessage` e o bloco de duplicidade passaram a preservar a ultima resposta util, em vez de retroalimentar a propria mensagem de duplicidade
+  - `WhatsappService.tryHandleCollectionStageDetour` passou a responder perguntas pequenas fora de fluxo com acolhimento de etapa, sem abrir catalogo por engano
+- Validacao local completa desta rodada:
+  - `node ./node_modules/jest/bin/jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand` => `154/154` ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok

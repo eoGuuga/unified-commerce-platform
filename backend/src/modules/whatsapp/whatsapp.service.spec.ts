@@ -2154,6 +2154,78 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Pedido ajustado com seguranca.');
   });
 
+  it('adjusts the pending order from a bare "mais" add-on instruction during name collection', async () => {
+    const { service, conversationService } = createFixture(loucasCatalog);
+
+    const response = await service.generateResponse(
+      'Mais 5 balas de brigadeiro',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_name',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 5,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 60,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 60,
+          },
+        },
+      }),
+    );
+
+    expect(conversationService.savePendingOrder).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            produto_name: 'Bala de brigadeiro',
+            quantity: 10,
+          }),
+        ]),
+      }),
+    );
+    expect(response).toContain('Pedido ajustado com seguranca.');
+  });
+
+  it('rejects decimal quantities during pending-order adjustment', async () => {
+    const { service, conversationService } = createFixture(loucasCatalog);
+
+    const response = await service.generateResponse(
+      'Adiciona mais 1,5 balas de brigadeiro',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_name',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 5,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 60,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 60,
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Quantidade deve ser um numero inteiro');
+    expect(conversationService.savePendingOrder).not.toHaveBeenCalled();
+  });
+
   it('treats plain nao during final review as correction instead of immediate cancellation', async () => {
     const service = createService(loucasCatalog) as any;
 
@@ -2220,6 +2292,39 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     expect(response).toContain('antes preciso do nome');
     expect(response).toContain('Banoffe');
+  });
+
+  it('does not try to search the catalog when the customer asks a random question during name collection', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'Foi de berco?',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_name',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 1,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 12,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 12,
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('primeiro preciso fechar a etapa atual');
+    expect(response).toContain('nome completo');
+    expect(response).not.toContain('catalogo');
+    expect(response).not.toContain('nao fechou com seguranca');
   });
 
   it('returns a useful product reading when the customer sends only the product name in idle state', async () => {
@@ -2630,6 +2735,24 @@ describe('WhatsappService defensive WhatsApp flow', () => {
         last_inbound_repeat_count: 2,
       }),
     );
+  });
+
+  it('does not recursively quote duplicate-protection messages inside duplicate-protection messages', async () => {
+    const service = createService() as any;
+
+    const response = service.buildDuplicateProtectionMessage(
+      createConversation({
+        context: {
+          state: 'collecting_name',
+          last_outbound_preview:
+            'Ja recebi essa mesma mensagem ha instantes e estou evitando duplicidade por seguranca.',
+        },
+      }),
+      3,
+    );
+
+    expect(response).toContain('Ja recebi essa mesma mensagem');
+    expect(response).not.toContain('Ultima orientacao: Ja recebi essa mesma mensagem');
   });
 
   it('replays the previous response when the same webhook event arrives twice', async () => {
