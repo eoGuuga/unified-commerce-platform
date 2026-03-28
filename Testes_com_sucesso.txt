@@ -806,3 +806,16 @@
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
   - `npx.cmd jest src/modules/whatsapp/services/openai.service.spec.ts src/modules/whatsapp/whatsapp.service.spec.ts --runInBand -t "conversational LLM assist|structured purchase intent|structured conversational assist|asks for clarification instead of faking understanding when the message is too vague|uses conversational LLM assist"` => ok
+
+2026-03-28  Benchmark real de IA local zero-custo no VPS de dev/teste
+- O pipeline hibrido foi publicado no Git e levado ao `dev/teste` com suporte opcional a `Ollama` no compose de teste.
+- Modelo testado no VPS atual: `qwen3:4b`.
+- Resultado real de desempenho no hardware atual do VPS:
+  - primeira resposta curta (cold start): ~218s
+  - segunda resposta curta (warm): ~49.7s
+- Conclusao operacional: desempenho muito lento para atendimento de loja em WhatsApp.
+- Decisao aplicada:
+  - arquitetura de IA local mantida no codigo
+  - `WHATSAPP_LLM_ASSIST_ENABLED=false` no `dev/teste`
+  - `dev/teste` voltou a responder com saude `ok`
+- Observacao importante: no hardware atual, IA local gratuita com esse nivel de modelo nao atende o requisito de velocidade do projeto.
