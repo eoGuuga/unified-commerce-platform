@@ -5980,6 +5980,15 @@ export class WhatsappService {
           };
         })
         .sort((left, right) => right.score - left.score);
+
+      if (analysis?.useCaseTags.includes('gift') && referenceCategory) {
+        const sameCategory = refined.filter(
+          (item) => this.normalizeForSearch(item.product.categoria?.name || '') === referenceCategory,
+        );
+        if (sameCategory.length) {
+          refined = sameCategory;
+        }
+      }
     }
 
     return refined.slice(0, 4);
