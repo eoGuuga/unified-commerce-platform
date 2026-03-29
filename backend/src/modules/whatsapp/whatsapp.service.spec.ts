@@ -1459,6 +1459,32 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).not.toContain('Bala de brigadeiro presente');
   });
 
+  it('anchors Loucas creamy dessert requests in banoffe or bolo no pote instead of generic docinhos', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero uma sobremesa cremosa pra agora',
+      'tenant-id',
+    );
+
+    expect(response).toMatch(/Banoffe \( torta de banana\)|Bolo no pote trufado de maracuja/);
+    expect(response).not.toContain('Bala de coco beijinho');
+    expect(response).not.toContain('Dentro do catalogo atual da loja, hoje a loja gira em chocolates e doces');
+  });
+
+  it('anchors Loucas brigadeiro cravings in the brigadeiro line instead of sobremesa de pote', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero algo bem de brigadeiro pra agora',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Bala de brigadeiro');
+    expect(response).not.toContain('Banoffe ( torta de banana) entra melhor');
+    expect(response).not.toContain('Calma, acho que eu puxei a conversa para o lado errado');
+  });
+
   it('answers price objections with safer alternatives from the catalog', async () => {
     const { service } = createFixture(catalog);
 

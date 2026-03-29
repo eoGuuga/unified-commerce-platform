@@ -29,12 +29,16 @@ type CatalogThemeSummary = {
   count: number;
 };
 
+type StorePersona = 'loucas_brigadeiro';
+
 type ConfectioneryConversationCueKey =
   | 'gift_ready'
   | 'sharing_order'
   | 'chocolate_focus'
   | 'self_treat'
-  | 'premium_choice';
+  | 'premium_choice'
+  | 'loucas_docinhos'
+  | 'loucas_creamy_dessert';
 
 type ConfectioneryConversationCue = {
   key: ConfectioneryConversationCueKey;
@@ -47,6 +51,7 @@ type ConfectioneryConversationCue = {
 
 export interface CatalogSalesProfile {
   segment: SalesPlaybookSegment;
+  storePersona: StorePersona | null;
   storeLabel: string;
   dominantCategory: string | null;
   catalogReading: string;
@@ -159,6 +164,7 @@ export class CatalogSalesContextService {
     products: ProductWithStock[],
     playbook: SalesPlaybookProfile,
   ): CatalogSalesProfile {
+    const storePersona = this.inferStorePersona(products);
     const allThemes = this.themeRules
       .map((rule) => ({
         ...rule,
@@ -174,15 +180,16 @@ export class CatalogSalesContextService {
       .slice(0, 3);
 
     const dominantCategory = this.getDominantCategory(products);
-    const storeLabel = this.buildStoreLabel(playbook, allThemes, dominantCategory);
+    const storeLabel = this.buildStoreLabel(playbook, allThemes, dominantCategory, storePersona);
 
     return {
       segment: playbook.segment,
+      storePersona,
       storeLabel,
       dominantCategory,
       focusThemes,
-      catalogReading: this.buildCatalogReading(playbook, storeLabel, focusThemes),
-      qualificationQuestion: this.buildQualificationQuestion(playbook, focusThemes),
+      catalogReading: this.buildCatalogReading(playbook, storeLabel, focusThemes, storePersona),
+      qualificationQuestion: this.buildQualificationQuestion(playbook, focusThemes, storePersona),
     };
   }
 
@@ -207,6 +214,7 @@ export class CatalogSalesContextService {
   ): CatalogSalesFit {
     const matchedThemes = this.getMatchedThemes(product, profile.focusThemes);
     const confectioneryCues = this.collectConfectioneryConversationCues(profile, analysis);
+    const productDocument = this.buildProductSearchDocument(product);
     const reasons: string[] = [];
     const addReason = (reason: string) => {
       if (reason && !reasons.includes(reason)) {
@@ -285,6 +293,37 @@ export class CatalogSalesContextService {
       addReason('tem boa leitura dentro da loja de chocolate');
     }
 
+    if (profile.storePersona === 'loucas_brigadeiro') {
+      const wantsLoucasDocinhos = /\b(brigadeiro|beijinho|docinho|bala|tradicional)\b/.test(
+        analysis.normalizedText,
+      );
+      const wantsLoucasCreamyDessert = /\b(banoffe|bolo no pote|pudim|torta|sobremesa|cremosa|de colher)\b/.test(
+        analysis.normalizedText,
+      );
+      const isLoucasDocinho = /\b(brigadeiro|beijinho|docinho|bala)\b/.test(productDocument);
+      const isLoucasCreamyDessert = /\b(banoffe|bolo no pote|pudim|torta|sobremesa|pote)\b/.test(
+        productDocument,
+      );
+
+      if (wantsLoucasDocinhos && isLoucasDocinho) {
+        score += 12;
+        addReason('puxa melhor a linha de brigadeiros e docinhos da Loucas');
+      }
+
+      if (wantsLoucasDocinhos && !isLoucasDocinho && isLoucasCreamyDessert) {
+        score -= 8;
+      }
+
+      if (wantsLoucasCreamyDessert && isLoucasCreamyDessert) {
+        score += 16;
+        addReason('encaixa melhor nas sobremesas cremosas da Loucas');
+      }
+
+      if (wantsLoucasCreamyDessert && !isLoucasCreamyDessert && isLoucasDocinho) {
+        score -= 16;
+      }
+    }
+
     const metadataHint = this.extractMetadataHint(product);
     if (metadataHint) {
       score += 6;
@@ -318,10 +357,15 @@ export class CatalogSalesContextService {
   buildQualificationQuestion(
     playbook: SalesPlaybookProfile,
     focusThemes: CatalogThemeSummary[],
+    storePersona: StorePersona | null,
   ): string {
     const questionLabels = focusThemes.map((theme) => theme.questionLabel);
 
     if (playbook.segment === 'confectionery') {
+      if (storePersona === 'loucas_brigadeiro') {
+        return 'Voce quer ir mais para brigadeiro e docinho, para sobremesa cremosa tipo banoffe e bolo no pote, ou para algo prontinho de presentear?';
+      }
+
       const ordered = this.pickQuestionLabels(questionLabels, [
         'presente',
         'mimo individual',
@@ -352,10 +396,19 @@ export class CatalogSalesContextService {
     playbook: SalesPlaybookProfile,
     storeLabel: string,
     focusThemes: CatalogThemeSummary[],
+    storePersona: StorePersona | null,
   ): string {
     const themeLabels = focusThemes.map((theme) => theme.label);
 
     if (playbook.segment === 'confectionery') {
+      if (storePersona === 'loucas_brigadeiro') {
+        if (themeLabels.length >= 3) {
+          return `hoje a Loucas gira em ${storeLabel}, com boa saida para ${themeLabels[0]}, ${themeLabels[1]} e ${themeLabels[2]}, sempre puxando o que faz mais sentido entre brigadeiro, sobremesa cremosa e presente.`;
+        }
+
+        return `hoje a Loucas gira em ${storeLabel}, sempre puxando o que faz mais sentido entre brigadeiro, sobremesa cremosa e presente.`;
+      }
+
       if (themeLabels.length >= 3) {
         return `hoje a loja gira em ${storeLabel}, com saida forte para ${themeLabels[0]}, ${themeLabels[1]} e ${themeLabels[2]}.`;
       }
@@ -378,7 +431,12 @@ export class CatalogSalesContextService {
     playbook: SalesPlaybookProfile,
     focusThemes: CatalogThemeSummary[],
     dominantCategory: string | null,
+    storePersona: StorePersona | null,
   ): string {
+    if (storePersona === 'loucas_brigadeiro') {
+      return 'brigadeiros, sobremesas cremosas e presentes';
+    }
+
     if (
       playbook.segment === 'confectionery' &&
       focusThemes.some((theme) => theme.key === 'chocolate')
@@ -391,6 +449,44 @@ export class CatalogSalesContextService {
     }
 
     return playbook.label;
+  }
+
+  private inferStorePersona(products: ProductWithStock[]): StorePersona | null {
+    const slugCounter = new Map<string, number>();
+
+    products.forEach((product) => {
+      const slug = String(
+        product.metadata?.source_store_slug || product.metadata?.store_slug || '',
+      )
+        .trim()
+        .toLowerCase();
+
+      if (!slug) {
+        return;
+      }
+
+      slugCounter.set(slug, (slugCounter.get(slug) || 0) + 1);
+    });
+
+    const dominantSlug = Array.from(slugCounter.entries()).sort((left, right) => right[1] - left[1])[0]?.[0];
+    if (dominantSlug === 'loucas-por-brigadeiro') {
+      return 'loucas_brigadeiro';
+    }
+
+    const loucasSignatureHits = products.reduce((total, product) => {
+      const document = this.buildProductSearchDocument(product);
+      if (
+        /\b(bala de brigadeiro|banoffe|bolo no pote|beijinho|presenteavel|presenteável)\b/.test(
+          document,
+        )
+      ) {
+        return total + 1;
+      }
+
+      return total;
+    }, 0);
+
+    return loucasSignatureHits >= 2 ? 'loucas_brigadeiro' : null;
   }
 
   private getDominantCategory(products: ProductWithStock[]): string | null {
@@ -479,6 +575,53 @@ export class CatalogSalesContextService {
         recommendationReason: 'encaixa melhor como presente pronto',
         preferredThemes: ['gift', 'premium', 'chocolate'],
         score: 11,
+      });
+    }
+
+    if (
+      profile.storePersona === 'loucas_brigadeiro' &&
+      hasPattern([
+        'brigadeiro',
+        'beijinho',
+        'docinho',
+        'tradicional',
+        'bala de brigadeiro',
+        'bala de coco',
+      ])
+    ) {
+      addCue({
+        key: 'loucas_docinhos',
+        focusLine:
+          'Para esse pedido, eu vou puxar primeiro a linha de brigadeiros e docinhos da Loucas, porque ela resolve bem vontade, mimo e presente sem complicar.',
+        qualificationQuestion:
+          'Voce quer docinhos avulsos para matar a vontade, uma caixinha pronta ou quantidade para dividir com mais gente?',
+        recommendationReason: 'encaixa melhor na linha classica de brigadeiros e docinhos da Loucas',
+        preferredThemes: ['self_treat', 'gift', 'sharing'],
+        score: 13,
+      });
+    }
+
+    if (
+      profile.storePersona === 'loucas_brigadeiro' &&
+      hasPattern([
+        'banoffe',
+        'bolo no pote',
+        'pudim',
+        'torta',
+        'sobremesa',
+        'cremosa',
+        'de colher',
+      ])
+    ) {
+      addCue({
+        key: 'loucas_creamy_dessert',
+        focusLine:
+          'Para esse pedido, eu vou puxar as sobremesas mais cremosas da Loucas, porque e ali que a conversa costuma ficar mais certeira.',
+        qualificationQuestion:
+          'Voce quer uma sobremesa mais cremosa para agora ou algo mais redondo para levar e impressionar?',
+        recommendationReason: 'encaixa melhor na linha de sobremesas cremosas da Loucas',
+        preferredThemes: ['self_treat', 'premium', 'chocolate'],
+        score: 13,
       });
     }
 

@@ -19,6 +19,13 @@ describe('SalesIntelligenceService', () => {
     expect(analysis.signals.comparison).toBe(true);
   });
 
+  it('keeps explicit comparison above self-treat noise in the Loucas catalog language', () => {
+    const analysis = service.analyze('me compara bala de brigadeiro e banoffe');
+
+    expect(analysis.intent).toBe('comparison');
+    expect(analysis.signals.comparison).toBe(true);
+  });
+
   it('detects price objections as sales guidance instead of trivia', () => {
     const analysis = service.analyze('ta caro, tem algo mais em conta?');
 
@@ -45,6 +52,13 @@ describe('SalesIntelligenceService', () => {
     );
   });
 
+  it('does not treat a bare Loucas product name as consultative recommendation by itself', () => {
+    const analysis = service.analyze('Banoffe');
+
+    expect(analysis.intent).toBe('other');
+    expect(analysis.useCaseTags).not.toContain('self_treat');
+  });
+
   it('reads combined sales intent, recipient and reassurance in the same message', () => {
     const analysis = service.analyze(
       'me indica um presente pra minha mae ate 40 reais, sem erro e sem perder tempo',
@@ -59,7 +73,7 @@ describe('SalesIntelligenceService', () => {
       expect.arrayContaining(['urgency', 'reassurance', 'recipient_context', 'value_pressure']),
     );
     expect(analysis.customerGoalSummary).toContain('presente para sua mae');
-    expect(analysis.customerGoalSummary).toContain('sem passar de R$ 40,00');
+    expect(analysis.customerGoalSummary).toContain('com um teto de ate R$ 40,00');
     expect(analysis.buyerConcerns).toEqual(
       expect.arrayContaining(['nao errar a escolha', 'resolver rapido', 'nao gastar errado']),
     );

@@ -5545,6 +5545,42 @@ export class WhatsappService {
     return coreProducts.slice(0, 4);
   }
 
+  private prioritizeLoucasFocusedProducts(
+    rankedProducts: RankedSalesProduct[],
+    analysis: SalesConversationAnalysis,
+    catalogProfile: CatalogSalesProfile,
+  ): RankedSalesProduct[] {
+    if (catalogProfile.storePersona !== 'loucas_brigadeiro') {
+      return rankedProducts;
+    }
+
+    const normalized = analysis.normalizedText;
+    const wantsCreamyDessert = /\b(banoffe|bolo no pote|pudim|torta|sobremesa|cremosa|de colher)\b/.test(
+      normalized,
+    );
+    const wantsDocinhos = /\b(brigadeiro|beijinho|docinho|docinhos|bala|tradicional)\b/.test(
+      normalized,
+    );
+    const filterByPattern = (pattern: RegExp) =>
+      rankedProducts.filter((item) => pattern.test(this.buildProductSalesDocument(item.product)));
+
+    if (wantsCreamyDessert) {
+      const creamyProducts = filterByPattern(/\b(banoffe|bolo no pote|pudim|torta|sobremesa|pote)\b/);
+      if (creamyProducts.length >= 2) {
+        return [...creamyProducts, ...rankedProducts.filter((item) => !creamyProducts.includes(item))];
+      }
+    }
+
+    if (wantsDocinhos) {
+      const docinhoProducts = filterByPattern(/\b(brigadeiro|beijinho|docinho|bala)\b/);
+      if (docinhoProducts.length >= 2) {
+        return [...docinhoProducts, ...rankedProducts.filter((item) => !docinhoProducts.includes(item))];
+      }
+    }
+
+    return rankedProducts;
+  }
+
   private buildSalesNeedLine(strategy: SalesConversationStrategy): string | null {
     const detectedNeeds = strategy.detectedNeeds.slice(0, 2).map((need) => need.label);
     if (!detectedNeeds.length) {
@@ -6426,16 +6462,20 @@ export class WhatsappService {
     const catalogProfile = this.catalogSalesContextService.buildProfile(products, playbook);
     const verticalPack = this.salesVerticalPackService.buildPack(playbook, products);
     const rankedProducts = this.filterRankedProductsForContextAwareSales(
-      this.prioritizePrimarySalesProducts(
-        this.rankProductsForSalesConversation(
-          products,
+      this.prioritizeLoucasFocusedProducts(
+        this.prioritizePrimarySalesProducts(
+          this.rankProductsForSalesConversation(
+            products,
+            analysis,
+            playbook,
+            strategy,
+            catalogProfile,
+            referenceProduct,
+          ),
           analysis,
-          playbook,
-          strategy,
-          catalogProfile,
-          referenceProduct,
         ),
         analysis,
+        catalogProfile,
       ),
       conversation,
       referenceProduct,
@@ -7503,16 +7543,20 @@ export class WhatsappService {
     }
 
     const referenceProduct = referencedProducts[0] || null;
-    const rankedProducts = this.prioritizePrimarySalesProducts(
-      this.rankProductsForSalesConversation(
-      products,
-      analysis,
-      playbook,
-      strategy,
-      catalogProfile,
-      referenceProduct,
+    const rankedProducts = this.prioritizeLoucasFocusedProducts(
+      this.prioritizePrimarySalesProducts(
+        this.rankProductsForSalesConversation(
+          products,
+          analysis,
+          playbook,
+          strategy,
+          catalogProfile,
+          referenceProduct,
+        ),
+        analysis,
       ),
       analysis,
+      catalogProfile,
     );
 
     const budgetCeiling = analysis.budgetCeiling;
@@ -9844,6 +9888,16 @@ export class WhatsappService {
     }
 
     // Resposta padrão
+    const exactProductInsight = await this.tryBareExactProductInsight(
+      message,
+      tenantId,
+      conversation,
+      currentState,
+    );
+    if (exactProductInsight) {
+      return exactProductInsight;
+    }
+
     const conciergeResponse = await this.trySmartConciergeResponse(message, tenantId, conversation);
     if (conciergeResponse) {
       return conciergeResponse;
@@ -10697,7 +10751,152 @@ export class WhatsappService {
       return false;
     }
 
+    if (
+      this.hasImplicitSingularOrderLead(normalizedMessage) &&
+      this.isAbstractConsultativeNeed(normalizedProduct)
+    ) {
+      return false;
+    }
+
     return normalizedProduct.split(/\s+/).filter(Boolean).length <= 6;
+  }
+
+  private hasImplicitSingularOrderLead(normalizedMessage: string): boolean {
+    return /^(quero|me ve|me manda|manda|separa|traz|coloca|bota|preciso|vou querer|gostaria de)\s+(um|uma)\b/.test(
+      normalizedMessage,
+    );
+  }
+
+  private isAbstractConsultativeNeed(normalizedProduct: string): boolean {
+    const words = normalizedProduct
+      .split(/\s+/)
+      .map((word) => word.trim())
+      .filter(Boolean);
+
+    if (!words.length) {
+      return false;
+    }
+
+    const abstractWords = new Set([
+      'algo',
+      'opcao',
+      'opcoes',
+      'sobremesa',
+      'sobremesas',
+      'cremosa',
+      'cremoso',
+      'colher',
+      'doce',
+      'doces',
+      'docinho',
+      'docinhos',
+      'brigadeiro',
+      'brigadeiros',
+      'beijinho',
+      'beijinhos',
+      'presente',
+      'presentear',
+      'mimo',
+      'lembranca',
+      'lembrancinha',
+      'chocolate',
+      'chocolatudo',
+    ]);
+    const specificTokens = new Set([
+      'banoffe',
+      'brownie',
+      'bala',
+      'pudim',
+      'morango',
+      'uva',
+      'prestigio',
+      'maracuja',
+      'nutella',
+      'acai',
+      'torta',
+      'supreme',
+      'pote',
+      'caixa',
+      'kit',
+      'cestinha',
+      'individual',
+    ]);
+
+    if (words.some((word) => specificTokens.has(word))) {
+      return false;
+    }
+
+    return words.every((word) => abstractWords.has(word));
+  }
+
+  private isBareExactProductInsightCandidate(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return false;
+    }
+
+    if (
+      this.isOrderIntent(normalized) ||
+      this.looksLikeMultiItemOrder(normalized) ||
+      this.isDirectCatalogRequest(normalized) ||
+      this.isDirectPriceQuestion(normalized) ||
+      this.isDirectStockQuestion(normalized) ||
+      this.isDirectHelpRequest(normalized) ||
+      this.isDirectGreeting(normalized) ||
+      this.isDirectScheduleQuestion(normalized) ||
+      this.isPaymentMethodSelection(normalized) ||
+      this.isCancelIntent(normalized) ||
+      this.isReopenIntent(normalized) ||
+      this.looksLikeOrderStatusQuery(normalized)
+    ) {
+      return false;
+    }
+
+    return !/\b(me indica|me recomenda|recomenda|indica|sugere|qual|compar|vs|versus|mais barato|mais em conta|caro|presente|algo|opcao|orcamento|orçamento)\b/.test(
+      normalized,
+    );
+  }
+
+  private async tryBareExactProductInsight(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): Promise<string | null> {
+    if (currentState && !['idle', 'order_confirmed', 'order_completed'].includes(currentState)) {
+      return null;
+    }
+
+    if (!this.isBareExactProductInsightCandidate(message)) {
+      return null;
+    }
+
+    const products = await this.getCatalogProducts(tenantId);
+    if (!products.length) {
+      return null;
+    }
+
+    const query =
+      this.messageIntelligenceService.analyze(message).productCandidate ||
+      this.extractCatalogQuery(message) ||
+      this.normalizeForSearch(message);
+    if (!query || query.length < 3) {
+      return null;
+    }
+
+    const result = this.findProductByName(products, query);
+    if (!result.produto) {
+      return null;
+    }
+
+    await this.rememberConversationIntelligence(conversation, {
+      last_intent: 'suggestion',
+      last_product_name: result.produto.name,
+      last_product_names: [result.produto.name],
+      last_query: query,
+    });
+
+    return this.buildProductInsightMessage(result.produto, 'insight');
   }
 
   private shouldPreferConsultativeSalesRouting(
@@ -10729,6 +10928,11 @@ export class WhatsappService {
         'algo',
         'opcao',
         'opcoes',
+        'sobremesa',
+        'cremosa',
+        'de colher',
+        'docinho',
+        'docinhos',
         'lembrancinha',
         'lembranca',
         'mimo',

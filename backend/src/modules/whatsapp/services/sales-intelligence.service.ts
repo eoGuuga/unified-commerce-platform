@@ -155,7 +155,7 @@ export class SalesIntelligenceService {
     'pra geral',
     'para geral',
   ];
-  private readonly selfTreatPhrases = [
+  private readonly selfTreatDirectPhrases = [
     'mimo',
     'mimo individual',
     'vontade',
@@ -166,6 +166,14 @@ export class SalesIntelligenceService {
     'só pra mim',
     'pra mim mesmo',
     'para mim mesmo',
+  ];
+  private readonly selfTreatDessertPhrases = [
+    'sobremesa',
+    'cremosa',
+    'de colher',
+    'banoffe',
+    'bolo no pote',
+    'pudim',
   ];
   private readonly chocolateFocusPhrases = [
     'chocolatudo',
@@ -270,9 +278,10 @@ export class SalesIntelligenceService {
     const closing = this.hasAny(normalizedText, this.closingPhrases);
     const antiPush = this.hasAny(normalizedText, this.antiPushPhrases);
     const useCaseTags = this.collectUseCaseTags(normalizedText, recipientHint);
+    const explicitComparison =
+      this.hasAny(normalizedText, this.comparisonPhrases) || /\b(vs|versus)\b/.test(normalizedText);
     const comparison =
-      this.hasAny(normalizedText, this.comparisonPhrases) ||
-      /\b(vs|versus)\b/.test(normalizedText) ||
+      explicitComparison ||
       (/\bou\b/.test(normalizedText) &&
         /(qual|melhor|vale|compensa|diferen|entre|escolher)/.test(normalizedText));
     const indecision = this.hasAny(normalizedText, this.indecisionPhrases);
@@ -322,7 +331,11 @@ export class SalesIntelligenceService {
     let confidence = 0.3;
     let primaryIntentScore = 0.3;
 
-    if (
+    if (explicitComparison && comparisonScore >= 0.72) {
+      intent = 'comparison';
+      confidence = comparisonScore;
+      primaryIntentScore = comparisonScore;
+    } else if (
       comparisonScore >= Math.max(budgetScore, objectionScore, recommendationScore) &&
       comparisonScore >= 0.72
     ) {
@@ -747,8 +760,23 @@ export class SalesIntelligenceService {
   }
 
   private hasSelfTreatSignal(normalizedText: string): boolean {
-    if (this.hasAny(normalizedText, this.selfTreatPhrases)) {
+    if (this.hasAny(normalizedText, this.selfTreatDirectPhrases)) {
       return true;
+    }
+
+    const hasDessertCue = this.hasAny(normalizedText, this.selfTreatDessertPhrases);
+    if (hasDessertCue) {
+      const consultativeLead =
+        /\b(quero|queria|algo|opcao|opcoes|pra agora|para agora|agora|matar a vontade|mais)\b/.test(
+          normalizedText,
+        ) ||
+        normalizedText.includes('pra mim') ||
+        normalizedText.includes('para mim');
+      const shortBareMention = normalizedText.split(/\s+/).filter(Boolean).length <= 2;
+
+      if (consultativeLead || !shortBareMention) {
+        return true;
+      }
     }
 
     const containsForMe =

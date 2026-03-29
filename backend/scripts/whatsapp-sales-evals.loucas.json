@@ -781,6 +781,38 @@
       ]
     },
     {
+      "name": "loucas_creamy_dessert_request_should_anchor_in_banoffe_or_bolo_no_pote",
+      "steps": [
+        {
+          "message": "quero uma sobremesa cremosa pra agora",
+          "expectAny": [
+            "Banoffe",
+            "Bolo no pote"
+          ],
+          "forbidAny": [
+            "Calma, acho que eu puxei a conversa para o lado errado",
+            "nao parece um pedido da loja"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "loucas_brigadeiro_craving_should_anchor_in_the_brigadeiro_line",
+      "steps": [
+        {
+          "message": "quero algo bem de brigadeiro pra agora",
+          "expectAny": [
+            "Bala de brigadeiro",
+            "brigadeiro"
+          ],
+          "forbidAny": [
+            "Calma, acho que eu puxei a conversa para o lado errado",
+            "nao parece um pedido da loja"
+          ]
+        }
+      ]
+    },
+    {
       "name": "consultative_negative_feedback_should_focus_the_next_step",
       "steps": [
         {
