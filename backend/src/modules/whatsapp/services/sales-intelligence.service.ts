@@ -51,6 +51,7 @@ export interface SalesConversationAnalysis {
 @Injectable()
 export class SalesIntelligenceService {
   private readonly recommendationPhrases = [
+    'quero algo',
     'me indica',
     'me recomenda',
     'recomenda',
@@ -154,6 +155,14 @@ export class SalesIntelligenceService {
     'com o pessoal',
     'pra geral',
     'para geral',
+    'visita',
+    'pra visita',
+    'para visita',
+    'levar pra visita',
+    'levar para visita',
+    'cafe da tarde',
+    'cafe da manha',
+    'cha da tarde',
   ];
   private readonly selfTreatDirectPhrases = [
     'mimo',
@@ -223,6 +232,11 @@ export class SalesIntelligenceService {
     'facil de acertar',
     'pratico',
     'pratica',
+    'menos doce',
+    'menos enjoativo',
+    'menos enjoativa',
+    'leve no doce',
+    'mais leve no sabor',
   ];
   private readonly closingPhrases = [
     'ja quero fechar',

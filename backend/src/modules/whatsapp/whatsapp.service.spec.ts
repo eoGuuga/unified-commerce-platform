@@ -1574,6 +1574,19 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).not.toContain('10 Brigadeiros tradicionais | R$ 25,00');
   });
 
+  it('treats visit occasion as a commercial Loucas request instead of non-store recovery', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero algo pra levar pra visita',
+      'tenant-id',
+    );
+
+    expect(response).toMatch(/10 Brigadeiros tradicionais|Banoffe \( torta de banana\)|Brownie tradicional/);
+    expect(response).not.toContain('Calma, acho que eu puxei a conversa para o lado errado');
+    expect(response).not.toContain('nao parece um pedido da loja');
+  });
+
   it('keeps Loucas sharing recommendations on products that look better for dividing', async () => {
     const service = createService(loucasConsultativeCatalog) as any;
 
@@ -1583,6 +1596,19 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     );
 
     expect(response).toMatch(/10 Brigadeiros tradicionais|Caixa presenteavel 12 brigadeiros tradicionais/);
+    expect(response).not.toContain('Brigadeiro individual mimo | R$ 6,00');
+  });
+
+  it('keeps Loucas coffee-sharing recommendations away from single-serve bowls', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero algo pra dividir no cafe da tarde',
+      'tenant-id',
+    );
+
+    expect(response).toMatch(/10 Brigadeiros tradicionais|Banoffe \( torta de banana\)|Brownie tradicional/);
+    expect(response).not.toContain('Bolo no pote trufado de maracuja');
     expect(response).not.toContain('Brigadeiro individual mimo | R$ 6,00');
   });
 
@@ -1687,6 +1713,19 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('mais seguro');
     expect(response).toContain('Brigadeiro individual mimo');
     expect(response).not.toContain('Pensando em presentear bem, separei algumas opcoes');
+  });
+
+  it('treats pretty-and-safe Loucas requests as gift-safe recommendations instead of generic catalog reading', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'me indica algo bonito e seguro',
+      'tenant-id',
+    );
+
+    expect(response).toMatch(/Brigadeiro individual mimo|3 Brigadeiros tradicionais/);
+    expect(response).not.toContain('Dentro do catalogo atual da loja');
+    expect(response).not.toContain('Aqui eu considerei principalmente');
   });
 
   it('keeps high-confidence social-proof recommendations lean', async () => {
@@ -5021,6 +5060,35 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).not.toContain('Caixa presenteavel com 6 brigadeiros tradicionais');
     expect(response).not.toContain('Calma, acho que eu puxei a conversa para o lado errado');
     expect(response).not.toContain('Nao encontrei um item exatamente como');
+  });
+
+  it('refines Loucas recommendations when the customer wants something less sweet', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero algo menos doce',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_name: 'Brigadeiro individual mimo',
+            last_product_names: [
+              'Brigadeiro individual mimo',
+              '3 Brigadeiros tradicionais',
+              'Brownie tradicional',
+            ],
+            last_customer_goal: 'um presente bonito para a minha mae',
+            last_query: 'me indica um presente bonito pra minha mae',
+          },
+        },
+      }),
+    );
+
+    expect(response).toMatch(/Brownie tradicional|Banoffe \( torta de banana\)|Bolo no pote trufado de maracuja|Pudim de leite condensado/);
+    expect(response).not.toContain('Nao fechei "algo menos doce"');
+    expect(response).not.toContain('Calma, acho que eu puxei a conversa para o lado errado');
   });
 
   it('continues the consultative thread when the customer asks for another option', async () => {

@@ -5570,9 +5570,16 @@ export class WhatsappService {
       /\b(presente|presentear|lembranc|mimo|mae|mãe|pai|namorad|amiga|amigo|esposa|marido)\b/.test(
         normalized,
       );
+    const wantsSafePrettyGift =
+      this.isSalesSafeChoiceQuery(analysis) &&
+      /\b(bonit|bonita|delicad|seguro|segura)\b/.test(normalized);
+    const wantsVisit =
+      /\b(visita|pra visita|para visita|levar pra visita|levar para visita)\b/.test(
+        normalized,
+      );
     const wantsSharing =
       analysis.useCaseTags.includes('sharing') ||
-      /\b(dividir|compartilhar|familia|família|mesa|galera|todo mundo|mais gente)\b/.test(
+      /\b(dividir|compartilhar|familia|família|mesa|galera|todo mundo|mais gente|cafe da tarde|cafe da manha|cha da tarde)\b/.test(
         normalized,
       );
     const wantsSelfTreat =
@@ -5580,6 +5587,8 @@ export class WhatsappService {
       /\b(pra agora|para agora|matar a vontade|vontade|so pra mim|só pra mim|pra mim)\b/.test(
         normalized,
       );
+    const wantsLighterTaste =
+      /\b(menos doce|menos enjoativ|leve no doce|mais leve no sabor)\b/.test(normalized);
     const wantsChocolateFocus =
       analysis.useCaseTags.includes('chocolate_focus') ||
       /\b(chocolatudo|mais chocolate|chocolate forte|brigadeiro|brownie|brigaleite|prestigio|prestígio)\b/.test(
@@ -5603,7 +5612,21 @@ export class WhatsappService {
       }
     }
 
-    if (wantsGift) {
+    if (wantsLighterTaste) {
+      const lighterProducts = filterByPattern(
+        /\b(brownie tradicional|maracuja|maracujÃ¡|pao de mel|pÃ£o de mel|bolo gelado|pudim|banoffe|bolo no pote)\b/,
+      ).filter(
+        (item) =>
+          !/\b(10 brigadeiros|12 brigadeiros|caixa presenteavel 12|combo 3 unidades)\b/.test(
+            getNormalizedLoucasDocument(item),
+          ),
+      );
+      if (lighterProducts.length >= 2) {
+        return [...lighterProducts, ...rankedProducts.filter((item) => !lighterProducts.includes(item))];
+      }
+    }
+
+    if (wantsGift || wantsSafePrettyGift) {
       const safeGiftPool = rankedProducts.filter((item) => {
         const document = getNormalizedLoucasDocument(item);
         return !/\b(combo 3 unidades|cartao|cartao recadinho|sacola|embalagem)\b/.test(document);
@@ -5618,10 +5641,25 @@ export class WhatsappService {
       }
     }
 
+    if (wantsVisit) {
+      const visitPool = rankedProducts.filter((item) => {
+        const document = getNormalizedLoucasDocument(item);
+        return !/\b(individual|mimo|combo 3 unidades|bolo no pote|400 ml)\b/.test(document);
+      });
+      const visitProducts = visitPool.filter((item) =>
+        /\b(6 brigadeiros|10 brigadeiros|12 brigadeiros|caixa|kit|bolo gelado|torta|banoffe|brownie)\b/.test(
+          getNormalizedLoucasDocument(item),
+        ),
+      );
+      if (visitProducts.length >= 2) {
+        return [...visitProducts, ...visitPool.filter((item) => !visitProducts.includes(item))];
+      }
+    }
+
     if (wantsSharing) {
       const safeSharingPool = rankedProducts.filter(
         (item) =>
-          !/\b(individual|mimo|combo 3 unidades|presentear|presenteavel|bombom|bala de brigadeiro presente)\b/.test(
+          !/\b(individual|mimo|combo 3 unidades|presentear|presenteavel|bombom|bala de brigadeiro presente|bolo no pote|400 ml)\b/.test(
             getNormalizedLoucasDocument(item),
           ),
       );
@@ -5767,7 +5805,7 @@ export class WhatsappService {
   }
 
   private isSalesSafeChoiceQuery(analysis: SalesConversationAnalysis): boolean {
-    return /\b(mais seguro|mais segura|opcao mais segura|sem erro|nao quero errar|facil de acertar|sem arriscar)\b/.test(
+    return /\b(mais seguro|mais segura|opcao mais segura|sem erro|nao quero errar|facil de acertar|sem arriscar|bonito e seguro|bonita e segura|seguro e bonito|segura e bonita)\b/.test(
       analysis.normalizedText,
     );
   }
@@ -5888,6 +5926,10 @@ export class WhatsappService {
       return true;
     }
 
+    if (/\b(menos doce|menos enjoativ|leve no doce|mais leve no sabor)\b/.test(normalized)) {
+      return true;
+    }
+
     return this.hasAnyNormalizedPhrase(normalized, [
       'algo menor que esse',
       'algo menor que essa',
@@ -5905,6 +5947,11 @@ export class WhatsappService {
       'menos chamativo que essa',
       'mais leve que esse',
       'mais leve que essa',
+      'algo menos doce',
+      'algo menos enjoativo',
+      'algo menos enjoativa',
+      'quero algo menos doce',
+      'quero algo menos enjoativo',
       'isso ficou muito grande',
       'ficou muito grande',
       'ficou chamativo demais',
@@ -6047,8 +6094,8 @@ export class WhatsappService {
 
     if (mode === 'simplify') {
       const simplifyBase = referenceProduct
-        ? `me indica algo menor, mais delicado, discreto e sem exagero do que ${referenceProduct.name}`
-        : 'me indica algo menor, mais delicado, discreto e sem exagero';
+        ? `me indica algo menor, mais delicado, discreto, menos doce e sem exagero do que ${referenceProduct.name}`
+        : 'me indica algo menor, mais delicado, discreto, menos doce e sem exagero';
       return rememberedContext ? `${rememberedContext}. Agora ${simplifyBase}` : simplifyBase;
     }
 
@@ -6416,6 +6463,7 @@ export class WhatsappService {
     if (mode === 'simplify' && referenceProduct) {
       const referencePrice = Number(referenceProduct.price || 0);
       const referenceCategory = this.normalizeForSearch(referenceProduct.categoria?.name || '');
+      const wantsLighterTaste = this.isTasteLighteningRefinement(analysis?.normalizedText || '');
       refined = refined
         .map((item) => {
           const productPrice = Number(item.product.price || 0);
@@ -6452,11 +6500,12 @@ export class WhatsappService {
             score -= 10;
           }
 
-          if (referenceCategory && normalizedCategory === referenceCategory) {
+          if (!wantsLighterTaste && referenceCategory && normalizedCategory === referenceCategory) {
             score += 8;
           }
 
           if (
+            !wantsLighterTaste &&
             analysis?.useCaseTags.includes('gift') &&
             normalizedCategory &&
             normalizedCategory !== referenceCategory
@@ -6464,11 +6513,15 @@ export class WhatsappService {
             score -= 14;
           }
 
-          if (analysis?.useCaseTags.includes('gift') && profile.role === 'gift_ready') {
+          if (!wantsLighterTaste && analysis?.useCaseTags.includes('gift') && profile.role === 'gift_ready') {
             score += 10;
           }
 
-          if (analysis?.useCaseTags.includes('gift') && /(presente|presenteavel|mimo|lembranc)/.test(searchDocument)) {
+          if (
+            !wantsLighterTaste &&
+            analysis?.useCaseTags.includes('gift') &&
+            /(presente|presenteavel|mimo|lembranc)/.test(searchDocument)
+          ) {
             score += 8;
           }
 
@@ -6487,7 +6540,7 @@ export class WhatsappService {
         })
         .sort((left, right) => right.score - left.score);
 
-      if (referenceCategory) {
+      if (!wantsLighterTaste && referenceCategory) {
         const sameCategory = refined.filter(
           (item) => this.normalizeForSearch(item.product.categoria?.name || '') === referenceCategory,
         );
@@ -6636,6 +6689,11 @@ export class WhatsappService {
     return alternativesAreBulkier;
   }
 
+  private isTasteLighteningRefinement(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    return /\b(menos doce|menos enjoativ|leve no doce|mais leve no sabor)\b/.test(normalized);
+  }
+
   private buildSimplifyReferenceHoldResponse(
     referenceProduct: ProductWithStock,
     rankedProducts: RankedSalesProduct[],
@@ -6737,8 +6795,8 @@ export class WhatsappService {
     const catalogProfile = this.catalogSalesContextService.buildProfile(products, playbook);
     const verticalPack = this.salesVerticalPackService.buildPack(playbook, products);
     const rankedProducts = this.filterRankedProductsForContextAwareSales(
-      this.prioritizeLoucasFocusedProducts(
-        this.prioritizePrimarySalesProducts(
+      this.prioritizePrimarySalesProducts(
+        this.prioritizeLoucasFocusedProducts(
           this.rankProductsForSalesConversation(
             products,
             analysis,
@@ -6748,9 +6806,9 @@ export class WhatsappService {
             referenceProduct,
           ),
           analysis,
+          catalogProfile,
         ),
         analysis,
-        catalogProfile,
       ),
       conversation,
       referenceProduct,
@@ -6762,7 +6820,14 @@ export class WhatsappService {
       return null;
     }
 
-    if (mode === 'simplify' && referenceProduct && this.shouldKeepReferenceAsLeanestOption(referenceProduct, rankedProducts)) {
+    const wantsLighterTaste = mode === 'simplify' && this.isTasteLighteningRefinement(normalized);
+
+    if (
+      mode === 'simplify' &&
+      referenceProduct &&
+      !wantsLighterTaste &&
+      this.shouldKeepReferenceAsLeanestOption(referenceProduct, rankedProducts)
+    ) {
       await this.rememberConversationIntelligence(conversation, {
         last_intent: 'recommendation',
         last_product_name: referenceProduct.name,
@@ -8030,8 +8095,8 @@ export class WhatsappService {
         combinationAnalysis,
       );
       const combinationRankedProducts = this.filterRankedProductsForContextAwareSales(
-        this.prioritizeLoucasFocusedProducts(
-          this.prioritizePrimarySalesProducts(
+        this.prioritizePrimarySalesProducts(
+          this.prioritizeLoucasFocusedProducts(
             this.rankProductsForSalesConversation(
               products,
               combinationAnalysis,
@@ -8041,9 +8106,9 @@ export class WhatsappService {
               referenceProduct,
             ),
             combinationAnalysis,
+            catalogProfile,
           ),
           combinationAnalysis,
-          catalogProfile,
         ),
         conversation,
         referenceProduct,
@@ -8138,8 +8203,8 @@ export class WhatsappService {
       }
     }
 
-    let rankedProducts = this.prioritizeLoucasFocusedProducts(
-      this.prioritizePrimarySalesProducts(
+    let rankedProducts = this.prioritizePrimarySalesProducts(
+      this.prioritizeLoucasFocusedProducts(
         this.rankProductsForSalesConversation(
           products,
           effectiveAnalysis,
@@ -8149,9 +8214,9 @@ export class WhatsappService {
           referenceProduct,
         ),
         effectiveAnalysis,
+        catalogProfile,
       ),
       effectiveAnalysis,
-      catalogProfile,
     );
 
     if (
