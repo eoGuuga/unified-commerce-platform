@@ -854,7 +854,7 @@ export class NotificationsService {
               description: notification.interactiveList?.description,
               buttonText: notification.interactiveList?.buttonText,
               footerText: notification.interactiveList?.footerText || '',
-              values: (notification.interactiveList?.sections || []).map((section) => ({
+              sections: (notification.interactiveList?.sections || []).map((section) => ({
                 title: section.title,
                 rows: section.rows.map((row) => ({
                   title: row.title,
