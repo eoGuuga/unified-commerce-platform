@@ -1459,3 +1459,54 @@
   - `96d6954` `refactor(whatsapp): prefer fresh Loucas intent over stale consultative memory`
 - Producao:
   - nao foi tocada nesta rodada
+
+2026-03-29  Loucas com leitura mais humana por ocasiao de compra
+- Melhorias de inteligencia:
+  - a IA da Loucas agora reconhece melhor ocasioes mais humanas e menos literais, como:
+    - `vou receber gente no cafe da tarde`
+    - `quero uma sobremesa pra depois do almoco`
+    - `quero uma lembrancinha bonita sem exagero pra agradecer`
+  - essas conversas agora viram curadoria comercial da loja, em vez de cair em busca literal de produto
+  - a resposta final tambem ficou mais ancorada na ocasiao, com aberturas como:
+    - `Para colocar na mesa do cafe da tarde sem complicar`
+    - `Se a ideia e fechar como sobremesa da Loucas sem pesar`
+    - `Para uma lembrancinha bonita sem exagerar`
+  - a curadoria delicada da Loucas ficou mais limpa, sem deixar `Combo 3 unidades Surpresa de uva` vazar como opcao principal num presente mais fino
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/whatsapp.service.ts` ganhou reconhecimento mais forte de ocasiao para `cafe da tarde`, `sobremesa` e `lembrancinha`
+  - o mesmo arquivo passou a tratar melhor necessidades abstratas como `sobremesa pra depois do almoco`, sem confundir isso com nome de produto
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` ganhou cobertura para:
+    - recepcao de gente no cafe da tarde
+    - sobremesa depois do almoco
+    - lembrancinha delicada para agradecer
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` foi ampliado com esses cenarios novos da Loucas
+- Validacao local desta rodada:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `195/195` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok
+- Validacao em `dev/teste`:
+  - backend atualizado ate o commit `18f6f2d`
+  - `npm.cmd run test:whatsapp:evals` => `51/51` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-200817.json`
+  - smoke real `vou receber gente no cafe da tarde` respondeu com:
+    - `Para colocar na mesa do cafe da tarde sem complicar`
+    - `10 Brigadeiros tradicionais`
+    - `Banoffe ( torta de banana)`
+    - `Brownie tradicional`
+  - smoke real `quero uma sobremesa pra depois do almoco` respondeu com:
+    - `Se a ideia e fechar como sobremesa da Loucas sem pesar`
+    - `Banoffe ( torta de banana)`
+    - `Bolo gelado Prestigio`
+    - `Bolo gelado briganinho`
+  - smoke real `me indica um presente bonito pra minha mae sem exagero` respondeu com:
+    - `Brigadeiro individual mimo`
+    - `3 Brigadeiros tradicionais`
+    - `Brownie c/ ninho nutella e kinder`
+    - sem `Combo 3 unidades Surpresa de uva`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `200`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `200`
+- Commits desta sequencia:
+  - `b3db268` `refactor(whatsapp): deepen Loucas occasion-aware sales curation`
+  - `18f6f2d` `fix(whatsapp): tighten Loucas delicate gift curation`
+- Producao:
+  - nao foi tocada nesta rodada
