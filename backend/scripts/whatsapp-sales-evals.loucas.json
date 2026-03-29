@@ -835,13 +835,15 @@
         {
           "message": "quero algo pra dividir com a familia",
           "expectAny": [
+            "6 Brigadeiros",
             "10 Brigadeiros",
-            "Caixa presente",
             "kit",
-            "combo"
+            "bolo gelado",
+            "torta"
           ],
           "forbidAny": [
-            "Brigadeiro individual mimo | R$ 6,00"
+            "Brigadeiro individual mimo | R$ 6,00",
+            "Combo 3 unidades"
           ]
         }
       ]
@@ -859,6 +861,25 @@
           ],
           "forbidAny": [
             "Caixa presenteàvel 12 brigadeiros tradicionais"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "loucas_chocolate_focus_should_stay_out_of_presentear_category",
+      "steps": [
+        {
+          "message": "quero algo mais chocolatudo",
+          "expectAny": [
+            "brigadeiro",
+            "Brownie",
+            "brigaleite",
+            "Prest"
+          ],
+          "forbidAny": [
+            "| Presentear |",
+            "Brigadeiro individual mimo | R$ 6,00",
+            "Bala de brigadeiro presente"
           ]
         }
       ]

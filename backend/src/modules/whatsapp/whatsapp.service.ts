@@ -5524,7 +5524,7 @@ export class WhatsappService {
       })
       .sort((left, right) => right.score - left.score)
       .filter((item) => item.score > 0)
-      .slice(0, 4);
+      .slice(0, 8);
   }
 
   private formatSalesRecommendationLine(item: RankedSalesProduct): string {
@@ -5591,8 +5591,10 @@ export class WhatsappService {
     const wantsDocinhos = /\b(brigadeiro|beijinho|docinho|docinhos|bala|tradicional)\b/.test(
       normalized,
     );
+    const getNormalizedLoucasDocument = (item: RankedSalesProduct) =>
+      this.normalizeForSearch(this.buildProductSalesDocument(item.product));
     const filterByPattern = (pattern: RegExp) =>
-      rankedProducts.filter((item) => pattern.test(this.buildProductSalesDocument(item.product)));
+      rankedProducts.filter((item) => pattern.test(getNormalizedLoucasDocument(item)));
 
     if (wantsCreamyDessert) {
       const creamyProducts = filterByPattern(/\b(banoffe|bolo no pote|pudim|torta|sobremesa|pote)\b/);
@@ -5607,6 +5609,26 @@ export class WhatsappService {
       );
       if (giftProducts.length >= 2) {
         return [...giftProducts, ...rankedProducts.filter((item) => !giftProducts.includes(item))];
+      }
+    }
+
+    if (wantsSharing) {
+      const strongSharingProducts = rankedProducts.filter((item) => {
+        const document = getNormalizedLoucasDocument(item);
+        return (
+          /\b(6 brigadeiros|6 beijinhos|10 brigadeiros|10 beijinhos|12 brigadeiros|12 beijinhos|caixa|kit|duzia|bolo gelado|torta|bolo vulcao)\b/.test(
+            document,
+          ) &&
+          !/\b(individual|mimo|combo 3 unidades|presentear|presenteavel|bombom|bala de brigadeiro presente)\b/.test(
+            document,
+          )
+        );
+      });
+      if (strongSharingProducts.length >= 2) {
+        return [
+          ...strongSharingProducts,
+          ...rankedProducts.filter((item) => !strongSharingProducts.includes(item)),
+        ];
       }
     }
 
@@ -5627,6 +5649,23 @@ export class WhatsappService {
         return [
           ...selfTreatProducts,
           ...rankedProducts.filter((item) => !selfTreatProducts.includes(item)),
+        ];
+      }
+    }
+
+    if (wantsChocolateFocus && !wantsGift) {
+      const focusedChocolateProducts = rankedProducts.filter((item) => {
+        const document = getNormalizedLoucasDocument(item);
+        return (
+          /\b(brigadeiro|brownie|brigaleite|prestigio|chocolate|trufado)\b/.test(document) &&
+          this.normalizeForSearch(item.product.categoria?.name || '') !== 'presentear' &&
+          !/\b(presente|presentear|presenteavel|caixa|kit|mimo|lembranc)\b/.test(document)
+        );
+      });
+      if (focusedChocolateProducts.length >= 2) {
+        return [
+          ...focusedChocolateProducts,
+          ...rankedProducts.filter((item) => !focusedChocolateProducts.includes(item)),
         ];
       }
     }
