@@ -5563,7 +5563,16 @@ export class WhatsappService {
       return rankedProducts;
     }
 
-    const normalized = analysis.normalizedText;
+    const normalized = this.normalizeForSearch(
+      [
+        analysis.commercialQuery,
+        analysis.normalizedText,
+        analysis.customerGoalSummary,
+        analysis.recipientHint,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    );
     const wantsGift =
       analysis.useCaseTags.includes('gift') ||
       !!analysis.recipientHint ||
@@ -5614,15 +5623,29 @@ export class WhatsappService {
 
     if (wantsLighterTaste) {
       const lighterProducts = filterByPattern(
-        /\b(brownie tradicional|maracuja|maracujÃ¡|pao de mel|pÃ£o de mel|bolo gelado|pudim|banoffe|bolo no pote)\b/,
+        /\b(brownie tradicional|maracuja|maracujÃ¡|pao de mel|pÃ£o de mel|bolo gelado|pudim|banoffe|bolo no pote trufado de maracuja|bolo no pote trufado de maracujÃ¡)\b/,
       ).filter(
         (item) =>
-          !/\b(10 brigadeiros|12 brigadeiros|caixa presenteavel 12|combo 3 unidades)\b/.test(
+          !/\b(3 brigadeiros|6 brigadeiros|10 brigadeiros|12 brigadeiros|caixa presenteavel 12|combo 3 unidades|brigadeiro individual mimo)\b/.test(
             getNormalizedLoucasDocument(item),
           ),
       );
       if (lighterProducts.length >= 2) {
         return [...lighterProducts, ...rankedProducts.filter((item) => !lighterProducts.includes(item))];
+      }
+    }
+
+    if (wantsSafePrettyGift) {
+      const safePrettyProducts = rankedProducts.filter((item) =>
+        /\b(brigadeiro individual mimo|3 brigadeiros tradicionais|3 beijinhos de coco|caixa presenteavel com 6 brigadeiros tradicionais|kit doce presente)\b/.test(
+          getNormalizedLoucasDocument(item),
+        ),
+      );
+      if (safePrettyProducts.length >= 1) {
+        return [
+          ...safePrettyProducts,
+          ...rankedProducts.filter((item) => !safePrettyProducts.includes(item)),
+        ];
       }
     }
 
@@ -5647,11 +5670,11 @@ export class WhatsappService {
         return !/\b(individual|mimo|combo 3 unidades|bolo no pote|400 ml)\b/.test(document);
       });
       const visitProducts = visitPool.filter((item) =>
-        /\b(6 brigadeiros|10 brigadeiros|12 brigadeiros|caixa|kit|bolo gelado|torta|banoffe|brownie)\b/.test(
+        /\b(10 brigadeiros|12 brigadeiros|caixa|kit|bolo gelado|torta|banoffe|brownie tradicional|brownie c\/|brownie com)\b/.test(
           getNormalizedLoucasDocument(item),
         ),
       );
-      if (visitProducts.length >= 2) {
+      if (visitProducts.length >= 1) {
         return [...visitProducts, ...visitPool.filter((item) => !visitProducts.includes(item))];
       }
     }
