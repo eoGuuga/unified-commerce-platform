@@ -61,19 +61,53 @@ type WeightedPhraseGroup = {
 @Injectable()
 export class MessageIntelligenceService {
   private repairPotentialMojibake(value: string): string {
-    const raw = String(value || '');
-    if (!raw || !/[ÃÂâ�]/.test(raw)) {
-      return raw;
+    let current = String(value || '');
+    if (!current || !/[ÃÂâ�]/.test(current)) {
+      return current;
     }
 
-    try {
-      const repaired = Buffer.from(raw, 'latin1').toString('utf8');
-      const originalNoise = (raw.match(/[ÃÂâ�]/g) || []).length;
-      const repairedNoise = (repaired.match(/[ÃÂâ�]/g) || []).length;
-      return repairedNoise < originalNoise ? repaired : raw;
-    } catch {
-      return raw;
+    const countNoise = (text: string) => (text.match(/[ÃÂâ�]/g) || []).length;
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const repaired = Buffer.from(current, 'latin1').toString('utf8');
+        if (!repaired || repaired === current) {
+          break;
+        }
+
+        if (countNoise(repaired) < countNoise(current)) {
+          current = repaired;
+          continue;
+        }
+
+        break;
+      } catch {
+        break;
+      }
     }
+
+    const directFixes: Array<[RegExp, string]> = [
+      [/ÃƒÂ¡|Ã¡/g, 'a'],
+      [/ÃƒÂà|Ãà/gi, 'a'],
+      [/ÃƒÂ¢|Ã¢/gi, 'a'],
+      [/ÃƒÂã|Ã£/gi, 'a'],
+      [/ÃƒÂ©|Ã©|Ò©/g, 'e'],
+      [/ÃƒÂê|Ãê/gi, 'e'],
+      [/ÃƒÂí|Ãí/gi, 'i'],
+      [/ÃƒÂ³|Ã³/gi, 'o'],
+      [/ÃƒÂô|Ã´/gi, 'o'],
+      [/ÃƒÂõ|Ãõ/gi, 'o'],
+      [/ÃƒÂº|Ãº/gi, 'u'],
+      [/ÃƒÂç|Ãç/gi, 'c'],
+      [/Â/g, ''],
+      [/�/g, ''],
+    ];
+
+    for (const [pattern, replacement] of directFixes) {
+      current = current.replace(pattern, replacement);
+    }
+
+    return current;
   }
 
   private readonly lowSignalStopWords = new Set([
@@ -351,6 +385,8 @@ export class MessageIntelligenceService {
     for (const rule of this.normalizationRules) {
       normalized = normalized.replace(rule.pattern, rule.replacement);
     }
+
+    normalized = normalized.replace(/\btamb[a-z0-9ÃƒÃ‚Ã¢ï¿½]*m\b/g, 'tambem');
 
     return normalized.replace(/\s+/g, ' ').trim();
   }

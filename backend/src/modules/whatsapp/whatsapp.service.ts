@@ -532,19 +532,53 @@ export class WhatsappService {
   }
 
   private repairPotentialMojibake(input: string): string {
-    const raw = String(input || '');
-    if (!raw || !/[ÃÂâ�]/.test(raw)) {
-      return raw;
+    let current = String(input || '');
+    if (!current || !/[ÃÂâ�]/.test(current)) {
+      return current;
     }
 
-    try {
-      const repaired = Buffer.from(raw, 'latin1').toString('utf8');
-      const originalNoise = (raw.match(/[ÃÂâ�]/g) || []).length;
-      const repairedNoise = (repaired.match(/[ÃÂâ�]/g) || []).length;
-      return repairedNoise < originalNoise ? repaired : raw;
-    } catch {
-      return raw;
+    const countNoise = (text: string) => (text.match(/[ÃÂâ�]/g) || []).length;
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const repaired = Buffer.from(current, 'latin1').toString('utf8');
+        if (!repaired || repaired === current) {
+          break;
+        }
+
+        if (countNoise(repaired) < countNoise(current)) {
+          current = repaired;
+          continue;
+        }
+
+        break;
+      } catch {
+        break;
+      }
     }
+
+    const directFixes: Array<[RegExp, string]> = [
+      [/ÃƒÆ’Ã‚Â¡|ÃƒÂ¡/g, 'a'],
+      [/ÃƒÆ’Ã‚Ã |ÃƒÃ /gi, 'a'],
+      [/ÃƒÆ’Ã‚Â¢|ÃƒÂ¢/gi, 'a'],
+      [/ÃƒÆ’Ã‚Ã£|ÃƒÂ£/gi, 'a'],
+      [/ÃƒÆ’Ã‚Â©|ÃƒÂ©|Ã’Â©/g, 'e'],
+      [/ÃƒÆ’Ã‚Ãª|ÃƒÃª/gi, 'e'],
+      [/ÃƒÆ’Ã‚Ã­|ÃƒÃ­/gi, 'i'],
+      [/ÃƒÆ’Ã‚Â³|ÃƒÂ³/gi, 'o'],
+      [/ÃƒÆ’Ã‚Ã´|ÃƒÂ´/gi, 'o'],
+      [/ÃƒÆ’Ã‚Ãµ|ÃƒÃµ/gi, 'o'],
+      [/ÃƒÆ’Ã‚Âº|ÃƒÂº/gi, 'u'],
+      [/ÃƒÆ’Ã‚Ã§|ÃƒÃ§/gi, 'c'],
+      [/Ã‚/g, ''],
+      [/ï¿½/g, ''],
+    ];
+
+    for (const [pattern, replacement] of directFixes) {
+      current = current.replace(pattern, replacement);
+    }
+
+    return current;
   }
 
   private getDefaultShippingAmount(): number {
@@ -1483,6 +1517,7 @@ export class WhatsappService {
       .replace(/\b(praviagem|pra viage[mn])\b/g, 'pra viagem')
       .replace(/\b(retira|retiraa)\b/g, 'retirada')
       .replace(/\b(obgd|obrgd|obgdo)\b/g, 'obrigado')
+      .replace(/\btamb[a-z0-9ÃƒÃ‚Ã¢ï¿½]*m\b/g, 'tambem')
       .replace(/\b(vlw+|valeeu+)\b/g, 'valeu')
       .replace(/\b(blz+|belezinha)\b/g, 'beleza')
       .replace(/\b(fecho+|fexo+)\b/g, 'fechou')
