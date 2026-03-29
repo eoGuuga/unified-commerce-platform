@@ -1203,3 +1203,40 @@
   - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-134458.json`
   - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+
+2026-03-29  Foco comercial da IA 100% na Loucas por Brigadeiro
+- Melhorias de inteligencia:
+  - o motor de catalogo passou a reconhecer explicitamente a persona `loucas_brigadeiro`, mesmo quando o catalogo de teste vier sem metadata completa
+  - pedidos consultivos da Loucas agora puxam melhor:
+    - `brigadeiros e docinhos` quando a conversa pede algo mais de brigadeiro
+    - `banoffe`, `bolo no pote` e sobremesas cremosas quando a conversa pede algo mais cremoso
+  - mensagens como `Banoffe` agora geram leitura direta do item, em vez de cair em recomendacao consultiva generica
+  - comparacoes como `me compara bala de brigadeiro e banoffe` passaram a respeitar a comparacao explicita, sem ruido de autoindulgencia
+  - pedidos consultivos abstratos como `quero uma sobremesa cremosa pra agora` deixaram de ser tratados como busca literal boba por produto
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/services/catalog-sales-context.loucas.spec.ts` agora cobre:
+    - leitura da persona Loucas
+    - pergunta de qualificacao especifica da loja
+    - prioridade de sobremesas cremosas sobre docinhos genericos
+  - `backend/src/modules/whatsapp/services/sales-intelligence.service.spec.ts` agora cobre:
+    - comparacao explicita Loucas (`bala de brigadeiro` vs `banoffe`)
+    - nome isolado de produto sem virar recomendacao consultiva
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` agora cobre:
+    - ancora de `sobremesa cremosa` em `Banoffe`/`Bolo no pote`
+    - ancora de `algo bem de brigadeiro` na linha de brigadeiro
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` passou a validar tambem:
+    - `loucas_creamy_dessert_request_should_anchor_in_banoffe_or_bolo_no_pote`
+    - `loucas_brigadeiro_craving_should_anchor_in_the_brigadeiro_line`
+- Validacao local desta rodada:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/services/catalog-sales-context.loucas.spec.ts --runInBand --silent` => `5/5` ok
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/services/sales-intelligence.service.spec.ts --runInBand --silent` => `10/10` ok
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `179/179` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok
+- Validacao em `dev/teste`:
+  - backend atualizado para o commit `77902a7`
+  - `npm.cmd run test:whatsapp:evals` => `36/36` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-141530.json`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+  - o caso real `quero uma sobremesa cremosa pra agora` deixou de puxar `Canjica cremosa` por busca literal no ambiente de teste atualizado
