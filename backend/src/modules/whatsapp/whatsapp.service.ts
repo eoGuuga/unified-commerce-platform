@@ -6031,6 +6031,70 @@ export class WhatsappService {
     ]);
   }
 
+  private shouldKeepReferenceAsLeanestOption(
+    referenceProduct: ProductWithStock,
+    rankedProducts: RankedSalesProduct[],
+  ): boolean {
+    if (!rankedProducts.length) {
+      return true;
+    }
+
+    const referencePrice = Number(referenceProduct.price || 0);
+    const referenceDocument = this.buildProductSalesDocument(referenceProduct);
+    const referenceProfile = this.productOfferIntelligenceService.analyzeProduct(referenceProduct, [
+      referenceProduct,
+      ...rankedProducts.map((item) => item.product),
+    ]);
+
+    const hasCheaperOrEqualAlternative = rankedProducts.some(
+      (item) => Number(item.product.price || 0) <= referencePrice + 0.0001,
+    );
+    if (hasCheaperOrEqualAlternative) {
+      return false;
+    }
+
+    const clearlyLeanReference =
+      /(individual|mimo|simples|discreto|delicado)/.test(referenceDocument) ||
+      referenceProfile.role === 'impulse';
+    if (!clearlyLeanReference) {
+      return false;
+    }
+
+    const alternativesAreBulkier = rankedProducts.slice(0, 3).every((item) => {
+      const productPrice = Number(item.product.price || 0);
+      const searchDocument = this.buildProductSalesDocument(item.product);
+      return (
+        productPrice > referencePrice + 0.0001 &&
+        /(caixa|box|kit|combo|presenteavel|bomboniere|premium|marcante|grande)/.test(
+          searchDocument,
+        )
+      );
+    });
+
+    return alternativesAreBulkier;
+  }
+
+  private buildSimplifyReferenceHoldResponse(
+    referenceProduct: ProductWithStock,
+    rankedProducts: RankedSalesProduct[],
+    conversationPrelude: string[] = [],
+  ): string {
+    const compactPrelude = this.buildCompactSalesPrelude(conversationPrelude);
+    const nearbyLines = rankedProducts
+      .slice(0, 2)
+      .map((item) => this.formatSalesRecommendationLine(item));
+
+    return this.buildSalesResponseSections([
+      compactPrelude,
+      `Dentro dessa linha, a opcao mais leve e mais discreta continua sendo ${referenceProduct.name}.`,
+      `- ${this.formatProductHeadline(referenceProduct)} | continua sendo a leitura mais delicada e mais facil de acertar agora`,
+      nearbyLines.length
+        ? ['Se voce quiser um passo acima sem exagerar muito, eu deixaria estas como proximas da fila:', ...nearbyLines].join('\n')
+        : null,
+      `Se quiser, eu ja separo ${referenceProduct.name} ou te mostro so a proxima opcao acima sem exagerar.`,
+    ]);
+  }
+
   private async tryContextAwareSalesResponse(
     message: string,
     tenantId: string,
@@ -6128,6 +6192,32 @@ export class WhatsappService {
 
     if (!rankedProducts.length) {
       return null;
+    }
+
+    if (mode === 'simplify' && referenceProduct && this.shouldKeepReferenceAsLeanestOption(referenceProduct, rankedProducts)) {
+      await this.rememberConversationIntelligence(conversation, {
+        last_intent: 'recommendation',
+        last_product_name: referenceProduct.name,
+        last_product_names: [referenceProduct.name, ...rankedProducts.map((item) => item.product.name)],
+        last_quantity: null,
+        last_query: message,
+        last_budget_ceiling: analysis.budgetCeiling,
+        last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
+        last_customer_goal: conversationPlan.customerGoal || analysis.customerGoalSummary || null,
+      });
+
+      return this.buildSimplifyReferenceHoldResponse(
+        referenceProduct,
+        rankedProducts,
+        [
+          'Entendi: voce quer algo mais delicado e mais facil de acertar, sem eu desmontar o fio da conversa.',
+          ...this.buildSalesConversationPrelude(
+            conversationalAnalysis,
+            conversationPlan,
+            analysis,
+          ),
+        ],
+      );
     }
 
     if (mode === 'combination' && referenceProduct) {
