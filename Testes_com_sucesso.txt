@@ -1096,3 +1096,28 @@
   - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-022357.json`
   - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+
+2026-03-29  Refinamento consultivo mais delicado, memoria mais humana e bateria mais resiliente
+- Melhorias de inteligencia:
+  - o bot passou a entender refinamentos como `algo menor`, `mais delicado`, `menos chamativo` e `mais discreto` como continuidade da recomendacao anterior, sem resetar a conversa
+  - quando a opcao anterior ja e a mais leve daquela linha, ele agora fala isso com seguranca em vez de inventar um refinamento pior
+  - a memoria consultiva parou de guardar uma versao espremida demais da pergunta comercial e passou a preservar melhor a frase humana original e o objetivo percebido, o que sustenta refinamentos por contexto real
+  - em simplificacao, o bot deixou de empurrar cross-sell e ficou mais fiel a manter a mesma linha comercial antes de abrir outra categoria
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` agora cobre:
+    - refinamento para algo menor e mais delicado
+    - manutencao da opcao atual quando ela ja e a mais enxuta da linha
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` passou a validar tambem:
+    - `simplification_refinement_should_downgrade_explicit_large_gift_reference`
+    - `simplification_refinement_should_use_previous_consultative_context`
+  - a bateria conversacional foi tornada menos fragil ao estoque vivo da Loucas, trocando cenarios repetitivos de item com estoque ja consumido por um item mais estavel no catalogo real
+- Validacao local desta rodada:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `172/172` ok
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.controller.spec.ts --runInBand --silent` => `12/12` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok
+- Validacao em `dev/teste`:
+  - `npm run test:whatsapp:evals` => `29/29` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-115936.json`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
