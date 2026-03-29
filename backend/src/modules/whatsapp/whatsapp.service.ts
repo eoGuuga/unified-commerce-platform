@@ -5340,6 +5340,20 @@ export class WhatsappService {
           addReason(`tem boa leitura para presentear ${analysis.recipientHint}`);
         }
 
+        if (
+          analysis.useCaseTags.includes('gift') &&
+          (this.isSalesSafeChoiceQuery(analysis) || this.isSalesSocialProofQuery(analysis))
+        ) {
+          if (/(caixa|box|kit|presente|presenteavel|mimo)/.test(searchDocument)) {
+            score += 18;
+            addReason('fica mais redondo como presente seguro');
+          }
+
+          if (/(agua|bebida|acai)/.test(searchDocument)) {
+            score -= 16;
+          }
+        }
+
         if (analysis.decisionStage === 'closing' && available > 0) {
           score += 6;
           addReason('ja daria para fechar sem muita friccao');
@@ -5409,6 +5423,57 @@ export class WhatsappService {
           ? `${product.name} segura uma leitura mais premium dentro do catalogo.`
           : null;
     }
+  }
+
+  private isSalesSocialProofQuery(analysis: SalesConversationAnalysis): boolean {
+    return /\b(o que sai mais|mais vendido|mais procurado|o que o pessoal leva mais|o que gira mais)\b/.test(
+      analysis.normalizedText,
+    );
+  }
+
+  private isSalesSafeChoiceQuery(analysis: SalesConversationAnalysis): boolean {
+    return /\b(mais seguro|mais segura|opcao mais segura|sem erro|nao quero errar|facil de acertar|sem arriscar)\b/.test(
+      analysis.normalizedText,
+    );
+  }
+
+  private isSalesValueChoiceQuery(analysis: SalesConversationAnalysis): boolean {
+    return /\b(qual compensa mais|compensa mais|vale mais a pena|custo beneficio|custo-beneficio)\b/.test(
+      analysis.normalizedText,
+    );
+  }
+
+  private buildSalesDecisionAnchorLine(
+    analysis: SalesConversationAnalysis,
+    topProduct: ProductWithStock,
+    catalog: ProductWithStock[],
+  ): string | null {
+    const offerProfile = this.productOfferIntelligenceService.analyzeProduct(topProduct, catalog);
+    const contextualAction = analysis.useCaseTags.includes('gift')
+      ? 'presentear'
+      : analysis.useCaseTags.includes('sharing')
+        ? 'levar para dividir'
+        : analysis.useCaseTags.includes('self_treat')
+          ? 'matar a vontade'
+          : 'seguir por aqui';
+
+    if (this.isSalesSocialProofQuery(analysis)) {
+      return `Pela leitura atual do catalogo, o que hoje fica mais redondo para ${contextualAction} e ${topProduct.name}.`;
+    }
+
+    if (this.isSalesSafeChoiceQuery(analysis)) {
+      if (offerProfile.role === 'gift_ready') {
+        return `Se a sua prioridade e ir no mais seguro sem ficar sem graca, eu comecaria por ${topProduct.name}.`;
+      }
+
+      return `Se a ideia e ir no mais seguro sem inventar moda, eu comecaria por ${topProduct.name}.`;
+    }
+
+    if (this.isSalesValueChoiceQuery(analysis)) {
+      return `Se a ideia e ir no que mais compensa pelo que entrega, eu comecaria por ${topProduct.name}.`;
+    }
+
+    return null;
   }
 
   private buildSalesResponseSections(sections: Array<string | null | undefined>): string {
@@ -5548,10 +5613,15 @@ export class WhatsappService {
         analysis,
       );
     const compactPrelude = this.buildCompactSalesPrelude(conversationPrelude);
+    const decisionAnchorLine = this.buildSalesDecisionAnchorLine(
+      analysis,
+      rankedProducts[0].product,
+      rankedProducts.map((item) => item.product),
+    );
     const reasoningLine = this.buildHumanSalesReasoning(analysis, strategy, catalogProfile, {
-      skipLead: Boolean(intro || compactPrelude),
-      skipGoalSummary: Boolean(compactPrelude),
-      maxDetails: compactPrelude ? 2 : 3,
+      skipLead: Boolean(intro || compactPrelude || decisionAnchorLine),
+      skipGoalSummary: Boolean(compactPrelude || decisionAnchorLine),
+      maxDetails: compactPrelude || decisionAnchorLine ? 2 : 3,
     });
     const needLine = this.buildSalesNeedLine(strategy);
     const crossSellLine = crossSellSuggestion
@@ -5573,7 +5643,13 @@ export class WhatsappService {
 
     return this.buildSalesResponseSections([
       compactPrelude,
-      [compactPrelude ? null : intro, reasoningLine, focusedNeedLine, focusedConversationLine, offerReadingLine]
+      [
+        compactPrelude ? null : decisionAnchorLine || intro,
+        reasoningLine,
+        focusedNeedLine,
+        focusedConversationLine,
+        offerReadingLine,
+      ]
         .filter(Boolean)
         .join(' '),
       [

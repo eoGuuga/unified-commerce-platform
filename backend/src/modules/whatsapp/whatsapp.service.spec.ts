@@ -1417,6 +1417,32 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Brownie Premium');
   });
 
+  it('answers social-proof recommendation questions with a direct commercial anchor', async () => {
+    const service = createService(giftingCatalogWithAccessories) as any;
+
+    const response = await service.generateResponse(
+      'o que sai mais para presente?',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Pela leitura atual do catalogo');
+    expect(response).toContain('presentear');
+    expect(response).toContain('Brigadeiro individual mimo');
+  });
+
+  it('answers safe-choice recommendation questions with a direct safest-option anchor', async () => {
+    const service = createService(giftingCatalogWithAccessories) as any;
+
+    const response = await service.generateResponse(
+      'me da a opcao mais segura para presentear',
+      'tenant-id',
+    );
+
+    expect(response).toContain('mais seguro');
+    expect(response).toContain('Brigadeiro individual mimo');
+    expect(response).not.toContain('Pensando em presentear bem, separei algumas opcoes');
+  });
+
   it('does not stack two consultative lead-ins when an objection already has a strong commercial prelude', async () => {
     const { service } = createFixture(catalog);
 

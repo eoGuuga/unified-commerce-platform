@@ -543,6 +543,36 @@
           ]
         }
       ]
+    },
+    {
+      "name": "social_proof_recommendation_should_answer_directly",
+      "steps": [
+        {
+          "message": "o que sai mais para presente?",
+          "expectAny": [
+            "Pela leitura atual do catalogo",
+            "Brigadeiro individual mimo"
+          ],
+          "forbidAny": [
+            "Pensando em presentear bem, separei algumas opcoes"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "safe_choice_recommendation_should_answer_with_direct_anchor",
+      "steps": [
+        {
+          "message": "me da a opcao mais segura para presentear",
+          "expectAny": [
+            "mais seguro",
+            "Brigadeiro individual mimo"
+          ],
+          "forbidAny": [
+            "Pensando em presentear bem, separei algumas opcoes"
+          ]
+        }
+      ]
     }
   ]
 }
