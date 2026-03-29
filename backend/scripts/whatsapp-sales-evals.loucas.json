@@ -329,7 +329,26 @@
             "Estas sao as opcoes"
           ],
           "forbidAny": [
-            "Entendi a preocupacao com custo. Para manter a venda gostosa sem derrubar a percepcao de valor, eu seguiria por aqui: Entendi a preocupacao com preco"
+            "Entendi a preocupacao com custo. Para manter a venda gostosa sem derrubar a percepcao de valor, eu seguiria por aqui: Entendi a preocupacao com preco",
+            "Dentro do catalogo atual da loja",
+            "Aqui eu considerei principalmente"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "consultative_budget_should_stay_short_and_clear",
+      "steps": [
+        {
+          "message": "quero algo ate 12 reais",
+          "expectAny": [
+            "teto de ate R$ 12,00",
+            "Brigadeiro Gourmet"
+          ],
+          "forbidAny": [
+            "Dentro do catalogo atual da loja",
+            "Aqui eu considerei principalmente",
+            "Estas sao as opcoes que eu colocaria na sua frente agora:\n- Brownie Premium"
           ]
         }
       ]

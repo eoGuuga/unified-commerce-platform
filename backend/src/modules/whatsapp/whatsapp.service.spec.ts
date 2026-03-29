@@ -1425,6 +1425,10 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(conversationService.savePendingOrder).not.toHaveBeenCalled();
     expect(response).toContain('teto de ate R$ 12,00');
     expect(response).toContain('Brigadeiro Gourmet');
+    expect(response).not.toContain('Dentro do catalogo atual da loja');
+    expect(response).not.toContain('Aqui eu considerei principalmente');
+    expect((response.match(/\?/g) || []).length).toBeLessThanOrEqual(1);
+    expect(response.split('\n').length).toBeLessThanOrEqual(8);
   });
 
   it('compares products with a commercial recommendation', async () => {
@@ -1476,6 +1480,10 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('preocupacao com custo');
     expect(response).toContain('Brigadeiro Gourmet');
     expect(response).toContain('Brownie Premium');
+    expect(response).not.toContain('Dentro do catalogo atual da loja');
+    expect(response).not.toContain('Aqui eu considerei principalmente');
+    expect((response.match(/\?/g) || []).length).toBeLessThanOrEqual(1);
+    expect(response.split('\n').length).toBeLessThanOrEqual(8);
   });
 
   it('answers social-proof recommendation questions with a direct commercial anchor', async () => {

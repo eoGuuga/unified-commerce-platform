@@ -6332,11 +6332,11 @@ export class WhatsappService {
     const offerProfile = this.productOfferIntelligenceService.analyzeProduct(topProduct, catalog);
 
     if (analysis.intent === 'objection') {
-      return 'Ela segura melhor o valor percebido sem pesar tanto no ticket.';
+      return 'Para baixar o valor sem enfraquecer a escolha, eu iria por aqui.';
     }
 
     if (analysis.budgetCeiling !== null) {
-      return `Dentro do seu teto, ${topProduct.name} fecha melhor sem perder apresentacao.`;
+      return `Dentro do seu teto, ${topProduct.name} e a opcao mais segura para seguir agora.`;
     }
 
     if (analysis.conversationDrivers.includes('urgency')) {
@@ -6373,10 +6373,19 @@ export class WhatsappService {
   private shouldUseLeanSalesRecommendationResponse(
     analysis: SalesConversationAnalysis,
     rankedProducts: RankedSalesProduct[],
+    playbook: SalesPlaybookProfile,
     compactPrelude: string | null,
     shouldIncludeCrossSell: boolean,
   ): boolean {
-    if (compactPrelude || shouldIncludeCrossSell || !rankedProducts.length) {
+    if (shouldIncludeCrossSell || !rankedProducts.length) {
+      return false;
+    }
+
+    const prefersEnterpriseCommercialAnswer =
+      analysis.intent === 'objection' ||
+      (analysis.intent === 'budget' && playbook.segment !== 'restaurant');
+
+    if (compactPrelude && !prefersEnterpriseCommercialAnswer) {
       return false;
     }
 
@@ -6385,6 +6394,10 @@ export class WhatsappService {
       this.isSalesSafeChoiceQuery(analysis) ||
       this.isSalesValueChoiceQuery(analysis)
     ) {
+      return true;
+    }
+
+    if (prefersEnterpriseCommercialAnswer) {
       return true;
     }
 
@@ -6448,8 +6461,12 @@ export class WhatsappService {
       return `Se quiser, eu comparo com mais objetividade ou ja separo ${topProduct.name}.`;
     }
 
+    if (analysis.intent === 'objection') {
+      return `Se fizer sentido, eu ja separo ${topProduct.name} ou baixo mais o valor.`;
+    }
+
     if (analysis.budgetCeiling !== null) {
-      return `Quer que eu fique estritamente ate R$ ${this.formatCurrency(analysis.budgetCeiling)} ou ja separo ${topProduct.name}?`;
+      return `Quer que eu fique estritamente ate R$ ${this.formatCurrency(analysis.budgetCeiling)} ou te mostro a melhor opcao logo acima?`;
     }
 
     if (
@@ -6563,6 +6580,7 @@ export class WhatsappService {
     const shouldUseLeanResponse = this.shouldUseLeanSalesRecommendationResponse(
       analysis,
       rankedProducts,
+      playbook,
       compactPrelude,
       shouldIncludeCrossSell,
     );
@@ -6573,11 +6591,20 @@ export class WhatsappService {
         rankedProducts[0].product,
         rankedProducts.map((item) => item.product),
       );
-      const leanOptionCount = analysis.conversationDrivers.includes('urgency') ? 2 : 3;
+      const leanOptionCount =
+        analysis.intent === 'objection' || analysis.intent === 'budget'
+          ? 2
+          : analysis.conversationDrivers.includes('urgency')
+            ? 2
+            : 3;
+      const leanLead = compactPrelude
+        ? leanReasoning || decisionAnchorLine || intro
+        : [decisionAnchorLine || intro, leanReasoning].filter(Boolean).join(' ');
 
       return this.buildSalesResponseSections([
+        compactPrelude,
         [
-          [decisionAnchorLine || intro, leanReasoning].filter(Boolean).join(' '),
+          leanLead,
           'Estas sao as opcoes que eu colocaria na sua frente agora:',
           ...rankedProducts
             .slice(0, leanOptionCount)
@@ -6740,6 +6767,20 @@ export class WhatsappService {
       conversationFocus && !reasoningLine.includes(conversationFocus)
         ? conversationFocus
         : null;
+    const shouldUseLeanBudgetMiss =
+      analysis.intent === 'budget' || Boolean(compactPrelude);
+
+    if (shouldUseLeanBudgetMiss) {
+      return this.buildSalesResponseSections([
+        compactPrelude,
+        `Nesse teto de ate R$ ${this.formatCurrency(analysis.budgetCeiling || 0)}, eu nao achei uma opcao forte o bastante disponivel agora.`,
+        [
+          'O mais proximo que eu te mostraria agora seria:',
+          ...closestProducts.slice(0, 2).map((item) => this.formatSalesRecommendationLine(item)),
+        ].join('\n'),
+        `Quer que eu segure estritamente esse teto ou te mostro a melhor opcao logo acima?`,
+      ]);
+    }
 
     return this.buildSalesResponseSections([
       compactPrelude,
