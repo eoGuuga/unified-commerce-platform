@@ -5769,6 +5769,94 @@ export class WhatsappService {
     return rankedProducts;
   }
 
+  private applyLoucasSalesRankingOverrides(
+    baseRankedProducts: RankedSalesProduct[],
+    currentRankedProducts: RankedSalesProduct[],
+    analysis: SalesConversationAnalysis,
+    catalogProfile: CatalogSalesProfile,
+  ): RankedSalesProduct[] {
+    if (catalogProfile.storePersona !== 'loucas_brigadeiro') {
+      return currentRankedProducts;
+    }
+
+    const normalized = this.normalizeForSearch(
+      [
+        analysis.commercialQuery,
+        analysis.normalizedText,
+        analysis.customerGoalSummary,
+        analysis.recipientHint,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    );
+    const getDocument = (item: RankedSalesProduct) =>
+      this.normalizeForSearch(this.buildProductSalesDocument(item.product));
+    const mergeWithCurrent = (preferred: RankedSalesProduct[]) => {
+      if (!preferred.length) {
+        return currentRankedProducts;
+      }
+
+      const preferredIds = new Set(preferred.map((item) => String(item.product.id)));
+      return [
+        ...preferred,
+        ...currentRankedProducts.filter((item) => !preferredIds.has(String(item.product.id))),
+      ].slice(0, 4);
+    };
+
+    const wantsVisit =
+      /\b(visita|pra visita|para visita|levar pra visita|levar para visita)\b/.test(normalized);
+    if (wantsVisit) {
+      const visitProducts = baseRankedProducts.filter((item) => {
+        const document = getDocument(item);
+        return (
+          /\b(10 brigadeiros|12 brigadeiros|caixa|kit|bolo gelado|banoffe|brownie tradicional|torta)\b/.test(
+            document,
+          ) &&
+          !/\b(individual|mimo|bolo no pote|400 ml|fatia)\b/.test(document)
+        );
+      });
+
+      if (visitProducts.length) {
+        return mergeWithCurrent(visitProducts.slice(0, 4));
+      }
+    }
+
+    const wantsSafePrettyGift =
+      /\b(bonit|bonita|delicad|seguro|segura)\b/.test(normalized) &&
+      this.isSalesSafeChoiceQuery(analysis);
+    if (wantsSafePrettyGift) {
+      const safePrettyProducts = baseRankedProducts.filter((item) =>
+        /\b(brigadeiro individual mimo|3 brigadeiros tradicionais|3 beijinhos de coco|caixa presenteavel com 6 brigadeiros tradicionais|kit doce presente)\b/.test(
+          getDocument(item),
+        ),
+      );
+
+      if (safePrettyProducts.length) {
+        return mergeWithCurrent(safePrettyProducts.slice(0, 4));
+      }
+    }
+
+    if (this.isTasteLighteningRefinement(normalized)) {
+      const lighterProducts = baseRankedProducts.filter((item) => {
+        const document = getDocument(item);
+        return (
+          /\b(brownie tradicional|banoffe|pudim|maracuja|maracujá|pao de mel|pão de mel|bolo gelado|bolo no pote trufado de maracuja|bolo no pote trufado de maracujá)\b/.test(
+            document,
+          ) &&
+          !/\b(brigadeiro individual mimo|3 brigadeiros|6 brigadeiros|10 brigadeiros|12 brigadeiros|caixa presenteavel 12|combo 3 unidades)\b/.test(
+            document,
+          )
+        );
+      });
+
+      if (lighterProducts.length) {
+        return mergeWithCurrent(lighterProducts.slice(0, 4));
+      }
+    }
+
+    return currentRankedProducts;
+  }
+
   private filterLoucasCrossSellSuggestion(
     analysis: SalesConversationAnalysis,
     catalogProfile: CatalogSalesProfile,
@@ -6817,17 +6905,18 @@ export class WhatsappService {
     const strategy = this.salesSegmentStrategyService.buildStrategy(playbook, analysis);
     const catalogProfile = this.catalogSalesContextService.buildProfile(products, playbook);
     const verticalPack = this.salesVerticalPackService.buildPack(playbook, products);
+    const baseRankedProducts = this.rankProductsForSalesConversation(
+      products,
+      analysis,
+      playbook,
+      strategy,
+      catalogProfile,
+      referenceProduct,
+    );
     const rankedProducts = this.filterRankedProductsForContextAwareSales(
       this.prioritizePrimarySalesProducts(
         this.prioritizeLoucasFocusedProducts(
-          this.rankProductsForSalesConversation(
-            products,
-            analysis,
-            playbook,
-            strategy,
-            catalogProfile,
-            referenceProduct,
-          ),
+          baseRankedProducts,
           analysis,
           catalogProfile,
         ),
@@ -6838,8 +6927,14 @@ export class WhatsappService {
       mode,
       analysis,
     );
+    const effectiveRankedProducts = this.applyLoucasSalesRankingOverrides(
+      baseRankedProducts,
+      rankedProducts,
+      analysis,
+      catalogProfile,
+    );
 
-    if (!rankedProducts.length) {
+    if (!effectiveRankedProducts.length) {
       return null;
     }
 
@@ -6849,12 +6944,12 @@ export class WhatsappService {
       mode === 'simplify' &&
       referenceProduct &&
       !wantsLighterTaste &&
-      this.shouldKeepReferenceAsLeanestOption(referenceProduct, rankedProducts)
+      this.shouldKeepReferenceAsLeanestOption(referenceProduct, effectiveRankedProducts)
     ) {
       await this.rememberConversationIntelligence(conversation, {
         last_intent: 'recommendation',
         last_product_name: referenceProduct.name,
-        last_product_names: [referenceProduct.name, ...rankedProducts.map((item) => item.product.name)],
+        last_product_names: [referenceProduct.name, ...effectiveRankedProducts.map((item) => item.product.name)],
         last_quantity: null,
         last_query: message,
         last_budget_ceiling: analysis.budgetCeiling,
@@ -6864,7 +6959,7 @@ export class WhatsappService {
 
       return this.buildSimplifyReferenceHoldResponse(
         referenceProduct,
-        rankedProducts,
+        effectiveRankedProducts,
         [
           'Entendi: voce quer algo mais delicado e mais facil de acertar, sem eu desmontar o fio da conversa.',
           ...this.buildSalesConversationPrelude(
@@ -6889,8 +6984,8 @@ export class WhatsappService {
       );
       await this.rememberConversationIntelligence(conversation, {
         last_intent: 'recommendation',
-        last_product_name: rankedProducts[0].product.name,
-        last_product_names: [referenceProduct.name, ...rankedProducts.map((item) => item.product.name)],
+        last_product_name: effectiveRankedProducts[0].product.name,
+        last_product_names: [referenceProduct.name, ...effectiveRankedProducts.map((item) => item.product.name)],
         last_quantity: null,
         last_query: message,
         last_budget_ceiling: analysis.budgetCeiling,
@@ -6900,7 +6995,7 @@ export class WhatsappService {
 
       return this.buildSalesCombinationResponse(
         referenceProduct,
-        rankedProducts,
+        effectiveRankedProducts,
         crossSellSuggestion,
       );
     }
@@ -6916,8 +7011,9 @@ export class WhatsappService {
 
     await this.rememberConversationIntelligence(conversation, {
       last_intent: 'recommendation',
-      last_product_name: rankedProducts.length === 1 ? rankedProducts[0].product.name : null,
-      last_product_names: rankedProducts.map((item) => item.product.name),
+      last_product_name:
+        effectiveRankedProducts.length === 1 ? effectiveRankedProducts[0].product.name : null,
+      last_product_names: effectiveRankedProducts.map((item) => item.product.name),
       last_quantity: null,
       last_query: message,
       last_budget_ceiling: analysis.budgetCeiling,
@@ -6933,14 +7029,14 @@ export class WhatsappService {
         : this.salesVerticalPackService.findCrossSellSuggestion(
             verticalPack,
             products,
-            rankedProducts.map((item) => item.product),
+            effectiveRankedProducts.map((item) => item.product),
           ),
       'recommendation',
     );
 
     return this.buildSalesRecommendationResponse(
       analysis,
-      rankedProducts,
+      effectiveRankedProducts,
       playbook,
       strategy,
       catalogProfile,
@@ -8226,20 +8322,28 @@ export class WhatsappService {
       }
     }
 
+    const baseRankedProducts = this.rankProductsForSalesConversation(
+      products,
+      effectiveAnalysis,
+      playbook,
+      strategy,
+      catalogProfile,
+      referenceProduct,
+    );
+
     let rankedProducts = this.prioritizePrimarySalesProducts(
       this.prioritizeLoucasFocusedProducts(
-        this.rankProductsForSalesConversation(
-          products,
-          effectiveAnalysis,
-          playbook,
-          strategy,
-          catalogProfile,
-          referenceProduct,
-        ),
+        baseRankedProducts,
         effectiveAnalysis,
         catalogProfile,
       ),
       effectiveAnalysis,
+    );
+    rankedProducts = this.applyLoucasSalesRankingOverrides(
+      baseRankedProducts,
+      rankedProducts,
+      effectiveAnalysis,
+      catalogProfile,
     );
 
     if (
