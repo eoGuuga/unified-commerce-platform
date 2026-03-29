@@ -1146,3 +1146,32 @@
   - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-131145.json`
   - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+
+2026-03-29  Recuperacao premium quando o cliente diz que nao ajudou
+- Melhorias de inteligencia:
+  - mensagens como `isso nao ajudou`, `nao resolveu` e `continua sem resolver` agora entram numa trilha premium de recuperacao, em vez de abrir outra explicacao generica
+  - na primeira negativa, o bot foca o proximo passo com uma pergunta curta e especifica para o ponto travado
+  - se o cliente insistir que ainda nao resolveu, o bot sobe para `handoff_ready` com contexto pronto, sem deixar a conversa girando em circulo
+  - isso ficou separado por contexto:
+    - coleta ativa: pergunta exatamente o que travou
+    - pagamento: pergunta se o ponto e `pix`, `ja paguei` ou `dinheiro`
+    - conversa consultiva: pergunta se precisa escolher item, comparar, ajustar valor ou fechar pedido
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` agora cobre:
+    - negativa durante coleta antes de escalar
+    - negativa consultiva focada no proximo passo
+    - escalada com resumo pronto apos insistencia de que nao resolveu
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` passou a validar tambem:
+    - `consultative_negative_feedback_should_focus_the_next_step`
+    - `repeated_unresolved_feedback_should_offer_handoff_with_context`
+- Validacao local desta rodada:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `175/175` ok
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.controller.spec.ts --runInBand --silent` => `12/12` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok
+- Validacao em `dev/teste`:
+  - backend atualizado para o commit `0b5c169`
+  - `npm run test:whatsapp:evals` => `32/32` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-132101.json`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
