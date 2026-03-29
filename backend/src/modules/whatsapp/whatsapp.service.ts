@@ -5909,6 +5909,7 @@ export class WhatsappService {
 
     if (mode === 'simplify' && referenceProduct) {
       const referencePrice = Number(referenceProduct.price || 0);
+      const referenceCategory = this.normalizeForSearch(referenceProduct.categoria?.name || '');
       refined = refined
         .map((item) => {
           const productPrice = Number(item.product.price || 0);
@@ -5917,6 +5918,7 @@ export class WhatsappService {
             ...refined.map((candidate) => candidate.product),
           ]);
           const searchDocument = this.buildProductSalesDocument(item.product);
+          const normalizedCategory = this.normalizeForSearch(item.product.categoria?.name || '');
           let score = item.score;
           const reasons = [...item.reasons];
 
@@ -5942,6 +5944,26 @@ export class WhatsappService {
 
           if (/(caixa|box|kit|premium|presenteavel|marcante|grande)/.test(searchDocument)) {
             score -= 10;
+          }
+
+          if (referenceCategory && normalizedCategory === referenceCategory) {
+            score += 8;
+          }
+
+          if (
+            analysis?.useCaseTags.includes('gift') &&
+            normalizedCategory &&
+            normalizedCategory !== referenceCategory
+          ) {
+            score -= 14;
+          }
+
+          if (analysis?.useCaseTags.includes('gift') && profile.role === 'gift_ready') {
+            score += 10;
+          }
+
+          if (analysis?.useCaseTags.includes('gift') && /(presente|presenteavel|mimo|lembranc)/.test(searchDocument)) {
+            score += 8;
           }
 
           if (
@@ -6141,11 +6163,14 @@ export class WhatsappService {
       last_customer_goal: conversationPlan.customerGoal || null,
     });
 
-    const crossSellSuggestion = this.salesVerticalPackService.findCrossSellSuggestion(
-      verticalPack,
-      products,
-      rankedProducts.map((item) => item.product),
-    );
+    const crossSellSuggestion =
+      mode === 'simplify'
+        ? null
+        : this.salesVerticalPackService.findCrossSellSuggestion(
+            verticalPack,
+            products,
+            rankedProducts.map((item) => item.product),
+          );
 
     return this.buildSalesRecommendationResponse(
       analysis,
