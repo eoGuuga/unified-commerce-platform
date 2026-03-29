@@ -1528,10 +1528,12 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       'tenant-id',
     );
 
-    expect(response).toContain('Vou te comparar do jeito mais util.');
+    expect(response).toContain('Comparando direto para voce:');
     expect(response).toContain('Bala de brigadeiro');
     expect(response).toContain('Banoffe ( torta de banana)');
     expect(response).not.toContain('Bala de brigadeiro presente');
+    expect(response).not.toContain('Dentro do catalogo atual da loja');
+    expect(response).not.toContain('Vou te comparar do jeito mais util.');
   });
 
   it('anchors Loucas creamy dessert requests in banoffe or bolo no pote instead of generic docinhos', async () => {
@@ -1747,6 +1749,37 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Entendi a preocupacao com custo');
     expect(response).not.toContain('Entendi a preocupacao com custo. Para manter a venda gostosa sem derrubar a percepcao de valor, eu seguiria por aqui: Entendi a preocupacao com preco');
     expect((response.match(/Entendi a preocupacao com/gi) || []).length).toBe(1);
+  });
+
+  it('keeps Loucas price objections inside the remembered budget ceiling', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'ta caro',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_name: 'Brigadeiro individual mimo',
+            last_product_names: [
+              'Brigadeiro individual mimo',
+              '3 Brigadeiros tradicionais',
+              '10 Brigadeiros tradicionais',
+            ],
+            last_budget_ceiling: 20,
+            last_customer_goal: 'um presente ate 20 reais para a minha mae',
+            last_query: 'me indica um presente ate 20 reais pra minha mae',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Entendi a preocupacao com custo');
+    expect(response).toMatch(/Brigadeiro individual mimo|3 Brigadeiros tradicionais|Brownie tradicional/);
+    expect(response).not.toContain('10 Brigadeiros tradicionais | R$ 25,00');
+    expect(response).toContain('sem passar do seu teto');
   });
 
   it('handles recommendation requests as guided selling instead of greeting fallback', async () => {

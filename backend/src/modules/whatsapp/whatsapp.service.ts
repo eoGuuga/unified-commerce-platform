@@ -6123,6 +6123,68 @@ export class WhatsappService {
     };
   }
 
+  private enrichDirectSalesAnalysisFromConversationMemory(
+    analysis: SalesConversationAnalysis,
+    conversation: TypedConversation | undefined,
+    referenceProduct: ProductWithStock | null,
+  ): SalesConversationAnalysis {
+    if (analysis.intent !== 'objection') {
+      return analysis;
+    }
+
+    const memory = this.getConversationIntelligenceMemory(conversation);
+    const rememberedBudget = memory.last_budget_ceiling ?? null;
+
+    if (analysis.budgetCeiling !== null || rememberedBudget === null) {
+      return analysis;
+    }
+
+    const contextualBudgetAnalysis = this.buildContextAwareSalesAnalysis(
+      'budget',
+      conversation,
+      referenceProduct,
+    );
+
+    return {
+      ...analysis,
+      commercialQuery:
+        contextualBudgetAnalysis.commercialQuery || analysis.commercialQuery,
+      budgetCeiling:
+        contextualBudgetAnalysis.budgetCeiling !== null
+          ? contextualBudgetAnalysis.budgetCeiling
+          : rememberedBudget,
+      pricePreference: 'budget',
+      customerGoalSummary:
+        contextualBudgetAnalysis.customerGoalSummary || analysis.customerGoalSummary,
+      buyerConcerns:
+        contextualBudgetAnalysis.buyerConcerns.length > 0
+          ? contextualBudgetAnalysis.buyerConcerns
+          : analysis.buyerConcerns,
+      decisionStage: contextualBudgetAnalysis.decisionStage,
+      conversationDrivers:
+        contextualBudgetAnalysis.conversationDrivers.length > 0
+          ? contextualBudgetAnalysis.conversationDrivers
+          : analysis.conversationDrivers,
+      recipientHint:
+        contextualBudgetAnalysis.recipientHint || analysis.recipientHint,
+      useCaseTags:
+        contextualBudgetAnalysis.useCaseTags.length > 0
+          ? contextualBudgetAnalysis.useCaseTags
+          : analysis.useCaseTags,
+      secondaryIntents: Array.from(
+        new Set([...analysis.secondaryIntents, 'budget']),
+      ) as SalesConversationAnalysis['secondaryIntents'],
+      confidence: Math.max(analysis.confidence, contextualBudgetAnalysis.confidence),
+      objectionType: analysis.objectionType || 'price',
+      signals: {
+        ...contextualBudgetAnalysis.signals,
+        ...analysis.signals,
+        objection: true,
+        budget: true,
+      },
+    };
+  }
+
   private filterRankedProductsForContextAwareSales(
     rankedProducts: RankedSalesProduct[],
     conversation: TypedConversation | undefined,
@@ -6891,6 +6953,14 @@ export class WhatsappService {
     analysis: SalesConversationAnalysis,
     topProduct: ProductWithStock,
   ): string | null {
+    if (analysis.intent === 'objection') {
+      if (analysis.budgetCeiling !== null) {
+        return `Entendi a preocupacao com custo. Para baixar o valor sem passar do seu teto, eu iria por ${topProduct.name}.`;
+      }
+
+      return `Entendi a preocupacao com custo. Para baixar o valor sem desmontar a escolha, eu iria por ${topProduct.name}.`;
+    }
+
     if (analysis.useCaseTags.includes('gift')) {
       if (analysis.budgetCeiling !== null) {
         return `Para presentear sem exagerar e dentro do seu teto, eu comecaria por ${topProduct.name}.`;
@@ -7017,6 +7087,10 @@ export class WhatsappService {
   ): string | null {
     if (analysis.intent === 'comparison') {
       return `Se quiser, eu ja separo ${topProduct.name} ou comparo com a outra opcao sem enrolacao.`;
+    }
+
+    if (analysis.intent === 'objection' && analysis.budgetCeiling !== null) {
+      return `Se fizer sentido, eu ja separo ${topProduct.name} ou te mostro outra opcao sem passar do seu teto.`;
     }
 
     if (analysis.intent === 'objection') {
@@ -7286,6 +7360,90 @@ export class WhatsappService {
     ]);
   }
 
+  private buildLoucasComparisonAngle(
+    product: ProductWithStock,
+    comparedProducts: ProductWithStock[],
+  ): string {
+    const productDocument = this.buildProductSalesDocument(product);
+    const offerProfile = this.productOfferIntelligenceService.analyzeProduct(
+      product,
+      comparedProducts,
+    );
+
+    if (/\b(banoffe|bolo no pote|pudim|torta|sobremesa|cremosa)\b/.test(productDocument)) {
+      return 'entra melhor se voce quer uma sobremesa mais cremosa e mais indulgente.';
+    }
+
+    if (/\b(brownie|prestigio|brigaleite|chocolate intenso)\b/.test(productDocument)) {
+      return 'entra melhor se voce quer uma pegada mais intensa de chocolate.';
+    }
+
+    if (/\b(brigadeiro|beijinho|bala|bombom)\b/.test(productDocument)) {
+      return 'entra melhor se voce quer um docinho mais pratico e facil de servir.';
+    }
+
+    if (offerProfile.role === 'gift_ready') {
+      return 'entra melhor se a ideia for presentear com leitura de mimo pronto.';
+    }
+
+    if (offerProfile.role === 'sharing') {
+      return 'entra melhor se a ideia for dividir sem complicar a escolha.';
+    }
+
+    return 'entra melhor em uma proposta diferente dentro da Loucas.';
+  }
+
+  private buildLoucasComparisonWinnerLine(
+    recommended: ProductWithStock,
+    analysis: SalesConversationAnalysis,
+  ): string {
+    if (analysis.pricePreference === 'budget') {
+      return `Se a prioridade for gastar menos sem perder a graca, eu iria de ${recommended.name}.`;
+    }
+
+    if (analysis.pricePreference === 'premium') {
+      return `Se a prioridade for impacto e experiencia, eu iria de ${recommended.name}.`;
+    }
+
+    if (analysis.conversationDrivers.includes('urgency')) {
+      return `Se eu fosse te poupar tempo agora, eu iria de ${recommended.name}.`;
+    }
+
+    return `Se eu fosse te guiar agora, eu iria de ${recommended.name}.`;
+  }
+
+  private buildLoucasSalesComparisonResponse(
+    comparedProducts: ProductWithStock[],
+    analysis: SalesConversationAnalysis,
+    recommended: ProductWithStock,
+    catalogProfile: CatalogSalesProfile,
+    verticalPack: SalesVerticalPackProfile,
+    conversationPrelude: string[] = [],
+  ): string {
+    const [left, right] = comparedProducts;
+    const compactPrelude = this.buildCompactSalesPrelude(conversationPrelude);
+
+    return this.buildSalesResponseSections([
+      compactPrelude,
+      'Comparando direto para voce:',
+      [
+        `- ${this.formatProductHeadline(left)} | ${this.buildLoucasComparisonAngle(left, comparedProducts)}`,
+        `- ${this.formatProductHeadline(right)} | ${this.buildLoucasComparisonAngle(right, comparedProducts)}`,
+      ].join('\n'),
+      [
+        this.buildLoucasComparisonWinnerLine(recommended, analysis),
+        this.salesVerticalPackService.buildClosingMove(verticalPack, analysis),
+      ]
+        .filter(Boolean)
+        .join(' '),
+      this.buildSalesNextStepQuestion(
+        analysis,
+        recommended,
+        catalogProfile,
+      ),
+    ]);
+  }
+
   private buildSalesComparisonResponse(
     comparedProducts: ProductWithStock[],
     analysis: SalesConversationAnalysis,
@@ -7339,6 +7497,17 @@ export class WhatsappService {
       conversationFocus && !reasoningLine.includes(conversationFocus)
         ? conversationFocus
         : null;
+
+    if (catalogProfile.storePersona === 'loucas_brigadeiro') {
+      return this.buildLoucasSalesComparisonResponse(
+        comparedProducts,
+        analysis,
+        recommended,
+        catalogProfile,
+        verticalPack,
+        conversationPrelude,
+      );
+    }
 
     return this.buildSalesResponseSections([
       compactPrelude,
@@ -7845,7 +8014,6 @@ export class WhatsappService {
       return 'Ainda nao ha produtos publicados para eu recomendar agora.';
     }
     const playbook = this.salesPlaybookService.inferPlaybook(products);
-    const strategy = this.salesSegmentStrategyService.buildStrategy(playbook, analysis);
     const catalogProfile = this.catalogSalesContextService.buildProfile(products, playbook);
     const verticalPack = this.salesVerticalPackService.buildPack(playbook, products);
 
@@ -7916,13 +8084,28 @@ export class WhatsappService {
       }
     }
 
+    const referenceProduct = this.resolveConversationReferenceProduct(
+      products,
+      conversation,
+      referencedProducts,
+    );
+    const effectiveAnalysis = this.enrichDirectSalesAnalysisFromConversationMemory(
+      analysis,
+      conversation,
+      referenceProduct,
+    );
+    const strategy = this.salesSegmentStrategyService.buildStrategy(
+      playbook,
+      effectiveAnalysis,
+    );
+
     if (analysis.intent === 'comparison') {
       const comparisonProducts =
         referencedProducts.length >= 2
           ? referencedProducts.slice(0, 2)
           : this.rankProductsForSalesConversation(
               products,
-              analysis,
+              effectiveAnalysis,
               playbook,
               strategy,
               catalogProfile,
@@ -7937,14 +8120,15 @@ export class WhatsappService {
           last_product_names: comparisonProducts.map((product) => product.name),
           last_quantity: null,
           last_query: message,
-          last_budget_ceiling: analysis.budgetCeiling,
+          last_budget_ceiling: effectiveAnalysis.budgetCeiling,
           last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
-          last_customer_goal: conversationPlan.customerGoal || analysis.customerGoalSummary || null,
+          last_customer_goal:
+            conversationPlan.customerGoal || effectiveAnalysis.customerGoalSummary || null,
         });
 
         return this.buildSalesComparisonResponse(
           comparisonProducts,
-          analysis,
+          effectiveAnalysis,
           playbook,
           strategy,
           catalogProfile,
@@ -7954,26 +8138,38 @@ export class WhatsappService {
       }
     }
 
-    const referenceProduct = referencedProducts[0] || null;
-    const rankedProducts = this.prioritizeLoucasFocusedProducts(
+    let rankedProducts = this.prioritizeLoucasFocusedProducts(
       this.prioritizePrimarySalesProducts(
         this.rankProductsForSalesConversation(
           products,
-          analysis,
+          effectiveAnalysis,
           playbook,
           strategy,
           catalogProfile,
           referenceProduct,
         ),
-        analysis,
+        effectiveAnalysis,
       ),
-      analysis,
+      effectiveAnalysis,
       catalogProfile,
     );
 
-    const budgetCeiling = analysis.budgetCeiling;
     if (
-      analysis.intent === 'budget' &&
+      effectiveAnalysis.intent === 'objection' &&
+      effectiveAnalysis.budgetCeiling !== null
+    ) {
+      rankedProducts = this.refineContextAwareSalesCandidates(
+        rankedProducts,
+        referenceProduct,
+        'budget',
+        effectiveAnalysis,
+      );
+    }
+
+    const budgetCeiling = effectiveAnalysis.budgetCeiling;
+    if (
+      (effectiveAnalysis.intent === 'budget' ||
+        (effectiveAnalysis.intent === 'objection' && budgetCeiling !== null)) &&
       budgetCeiling !== null &&
       !rankedProducts.some((item) => Number(item.product.price || 0) <= budgetCeiling)
     ) {
@@ -7982,7 +8178,7 @@ export class WhatsappService {
       }
 
       return this.buildSalesBudgetMissResponse(
-        analysis,
+        effectiveAnalysis,
         playbook,
         strategy,
         catalogProfile,
@@ -7998,22 +8194,23 @@ export class WhatsappService {
 
     await this.rememberConversationIntelligence(conversation, {
       last_intent:
-        analysis.intent === 'budget'
+        effectiveAnalysis.intent === 'budget'
           ? 'budget'
-          : analysis.intent === 'objection'
+          : effectiveAnalysis.intent === 'objection'
             ? 'objection'
             : 'recommendation',
       last_product_name: rankedProducts.length === 1 ? rankedProducts[0].product.name : null,
       last_product_names: rankedProducts.map((item) => item.product.name),
       last_quantity: null,
       last_query: message,
-      last_budget_ceiling: analysis.budgetCeiling,
+      last_budget_ceiling: effectiveAnalysis.budgetCeiling,
       last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
-      last_customer_goal: conversationPlan.customerGoal || analysis.customerGoalSummary || null,
+      last_customer_goal:
+        conversationPlan.customerGoal || effectiveAnalysis.customerGoalSummary || null,
     });
 
     const crossSellSuggestion = this.filterLoucasCrossSellSuggestion(
-      analysis,
+      effectiveAnalysis,
       catalogProfile,
       this.salesVerticalPackService.findCrossSellSuggestion(
         verticalPack,
@@ -8023,7 +8220,7 @@ export class WhatsappService {
     );
 
     return this.buildSalesRecommendationResponse(
-      analysis,
+      effectiveAnalysis,
       rankedProducts,
       playbook,
       strategy,

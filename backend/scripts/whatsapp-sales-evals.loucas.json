@@ -278,12 +278,14 @@
         {
           "message": "me compara bala de brigadeiro e banoffe",
           "expectAny": [
-            "Vou te comparar do jeito mais util.",
+            "Comparando direto para voce:",
             "Bala de brigadeiro",
             "Banoffe ( torta de banana)"
           ],
           "forbidAny": [
-            "Bala de brigadeiro presente"
+            "Bala de brigadeiro presente",
+            "Dentro do catalogo atual da loja",
+            "Vou te comparar do jeito mais util."
           ]
         }
       ]
@@ -330,6 +332,34 @@
           ],
           "forbidAny": [
             "Entendi a preocupacao com custo. Para manter a venda gostosa sem derrubar a percepcao de valor, eu seguiria por aqui: Entendi a preocupacao com preco",
+            "Dentro do catalogo atual da loja",
+            "Aqui eu considerei principalmente",
+            "10 Brigadeiros tradicionais | R$ 25,00"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "consultative_objection_should_keep_loucas_inside_the_remembered_budget",
+      "steps": [
+        {
+          "message": "me indica um presente ate 20 reais pra minha mae",
+          "expectAny": [
+            "Brigadeiro individual mimo",
+            "Estas sao as opcoes"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "ta caro",
+          "expectAny": [
+            "Entendi a preocupacao com custo",
+            "sem passar do seu teto",
+            "Brigadeiro individual mimo",
+            "3 Brigadeiros tradicionais"
+          ],
+          "forbidAny": [
+            "10 Brigadeiros tradicionais | R$ 25,00",
             "Dentro do catalogo atual da loja",
             "Aqui eu considerei principalmente"
           ]
