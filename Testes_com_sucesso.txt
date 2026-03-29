@@ -1000,3 +1000,27 @@
   - resultado salvo em `backend/whatsapp-sales-evals-results-20260328-233343.json`
   - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+
+2026-03-29  Frase consultiva menos repetitiva e clarificacao de etapa mais humana
+- Melhorias de inteligencia:
+  - respostas consultivas deixaram de empilhar dois inicios muito parecidos quando ja existe um preambulo comercial forte
+  - objecao de preco como `ta caro` deixou de repetir a mesma ideia duas vezes seguidas no mesmo bloco
+  - clarificacao em coleta (`acho que voce nao entendeu`) deixou de abrir com duas frases quase identicas antes de explicar a etapa atual
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` agora cobre:
+    - objecao consultiva sem duas aberturas redundantes
+    - estrategia de restaurante validada pelo comportamento atual de recomendacao dentro do teto
+    - clarificacao de coleta sem duplicar o segundo intro
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` passou a validar tambem:
+    - clarificacao de etapa sem duas frases quase identicas
+    - objecao consultiva sem repetir o lead comercial
+- Validacao local desta rodada:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `162/162` ok
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.controller.spec.ts --runInBand --silent` => `12/12` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok
+- Validacao em `dev/teste`:
+  - `npm run test:whatsapp:evals` => `20/20` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-002901.json`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
