@@ -978,3 +978,20 @@
 - Validacao local desta rodada:
   - `node ./node_modules/jest/bin/jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand` => `159/159` ok
   - `npm.cmd run build` => ok
+
+2026-03-28  Comparacao consultiva e handoff comercial blindados
+- Melhorias de inteligencia:
+  - a comparacao comercial passou a limpar melhor o preambulo natural da frase, como `me compara x e y`, antes de resolver os produtos reais
+  - em mensagens de comparacao, quando dois produtos sao resolvidos com seguranca, a resposta prioriza esses dois em vez de deixar heuristicas de catalogo puxarem item parecido errado
+  - pedidos de `falar com alguem` deixaram de ser bloqueados pelo filtro transacional quando a intencao conversacional real e handoff, esclarecimento, problema ou recapitulacao
+  - as respostas consultivas ficaram menos repetitivas quando ja existe um preambulo comercial forte no contexto
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` passou a cobrir comparacao natural da Loucas com `me compara bala de brigadeiro e banoffe`
+  - a mesma suite agora cobre handoff consultivo em estado `idle`, exigindo `RESUMO PRONTO PARA ATENDIMENTO` em vez do fallback de conversa fora da loja
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` passou a validar tambem:
+    - comparacao com `e` entre dois produtos reais
+    - handoff consultivo depois de uma recomendacao de presente
+- Validacao local desta rodada:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `161/161` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok

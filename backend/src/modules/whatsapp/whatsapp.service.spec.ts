@@ -1380,6 +1380,20 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Se a prioridade for economizar');
   });
 
+  it('compares Loucas products joined with "e" instead of losing the second product', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'me compara bala de brigadeiro e banoffe',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Vou te comparar do jeito mais util.');
+    expect(response).toContain('Bala de brigadeiro');
+    expect(response).toContain('Banoffe ( torta de banana)');
+    expect(response).not.toContain('Bala de brigadeiro presente');
+  });
+
   it('answers price objections with safer alternatives from the catalog', async () => {
     const { service } = createFixture(catalog);
 
@@ -1411,7 +1425,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       'tenant-id',
     );
 
-    expect(response).toContain('presentear bem');
+    expect(response).toContain('presente');
     expect(response).toContain('Brownie Premium');
   });
 
@@ -1437,7 +1451,6 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       'tenant-id',
     );
 
-    expect(response).toContain('presentear sua mae');
     expect(response).toContain('um presente para sua mae');
     expect(response).toContain('um teto de ate R$ 14,00');
     expect(response).toContain('vontade de acertar sem erro');
@@ -2620,6 +2633,31 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Etapa atual: Revisando o pedido antes de fechar');
     expect(response).toContain('Cliente: Jordan Lincoln Vasconcelos Kzan');
     expect(response).toContain('Pedido em rascunho: 5x Bala de brigadeiro');
+  });
+
+  it('keeps consultative handoff requests out of the non-commercial nonsense fallback', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero falar com alguem',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_customer_goal: 'um presente sem erro e sem exagero',
+            last_product_names: ['Bala de brigadeiro', 'Banoffe ( torta de banana)'],
+            last_catalog_category_name: 'Delicias',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('RESUMO PRONTO PARA ATENDIMENTO');
+    expect(response).toContain('Objetivo percebido: um presente sem erro e sem exagero');
+    expect(response).toContain('Itens recentes: Bala de brigadeiro e Banoffe ( torta de banana)');
+    expect(response).not.toContain('Calma, acho que eu puxei a conversa para o lado errado');
   });
 
   it('does not expose corrupted customer names in the handoff summary', async () => {
@@ -4092,7 +4130,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     expect(response).toContain('Se eu entendi certo');
     expect(response).toContain('presente para sua mae');
-    expect(response).toContain('com um teto de ate R$ 14,00');
+    expect(response).toContain('um teto de ate R$ 14,00');
   });
 
   it('explains the commercial role of the recommended item instead of treating every product the same', async () => {

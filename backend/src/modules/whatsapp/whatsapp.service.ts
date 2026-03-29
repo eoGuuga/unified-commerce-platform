@@ -2661,6 +2661,11 @@ export class WhatsappService {
       return true;
     }
 
+    const conversationalIntent = this.conversationalIntelligenceService.analyze(normalizedMessage).intent;
+    if (['handoff', 'clarification', 'issue', 'recap'].includes(conversationalIntent)) {
+      return false;
+    }
+
     if (this.salesIntelligenceService.analyze(normalizedMessage).intent !== 'other') {
       return true;
     }
@@ -2789,11 +2794,16 @@ export class WhatsappService {
     analysis: SalesConversationAnalysis,
     strategy: SalesConversationStrategy,
     catalogProfile: CatalogSalesProfile,
+    options?: {
+      skipGoalSummary?: boolean;
+      maxDetails?: number;
+    },
   ): string {
     const detectedNeeds = strategy.detectedNeeds.slice(0, 2).map((need) => need.label);
     const focusThemes = catalogProfile.focusThemes.slice(0, 2).map((theme) => theme.label);
     const understandingLine = this.buildSalesUnderstandingLine(analysis);
     const decisionLine = this.buildSalesDecisionLine(analysis);
+    const maxDetails = Math.max(1, options?.maxDetails ?? 3);
 
     const lead =
       analysis.intent === 'budget'
@@ -2806,7 +2816,7 @@ export class WhatsappService {
 
     const details: string[] = [];
 
-    if (analysis.customerGoalSummary) {
+    if (!options?.skipGoalSummary && analysis.customerGoalSummary) {
       details.push(`Se eu entendi certo, voce quer ${analysis.customerGoalSummary}.`);
     } else if (understandingLine) {
       details.push(understandingLine);
@@ -2836,7 +2846,7 @@ export class WhatsappService {
       details.push(decisionLine);
     }
 
-    return [lead, ...details.slice(0, 3)].join(' ');
+    return [lead, ...details.slice(0, maxDetails)].join(' ');
   }
 
   private buildSalesUnderstandingLine(analysis: SalesConversationAnalysis): string | null {
@@ -5121,16 +5131,37 @@ export class WhatsappService {
       return this.dedupeProducts(exactIncludes).slice(0, 3);
     }
 
+    const comparisonLike = /\b(?:compara|comparar|comparacao|comparativo|vs|versus|ou|qual vale mais a pena|qual compensa|diferenca entre|melhor)\b/.test(
+      normalizedMessage,
+    );
+    const segmentPattern = comparisonLike
+      ? /\b(?:ou|vs|versus|e)\b|,/g
+      : /\b(?:ou|vs|versus)\b|,/g;
+
     const segments = normalizedMessage
-      .split(/\b(?:ou|vs|versus)\b|,/g)
-      .map((segment) => segment.trim())
+      .split(segmentPattern)
+      .map((segment) => this.stripSalesComparisonLead(segment))
       .filter((segment) => segment.length >= 3);
 
     const resolved = segments
       .map((segment) => this.findProductByName(products, segment).produto)
       .filter((product): product is ProductWithStock => Boolean(product));
 
+    if (comparisonLike && resolved.length >= 2) {
+      return this.dedupeProducts(resolved).slice(0, 3);
+    }
+
     return this.dedupeProducts([...exactIncludes, ...resolved]).slice(0, 3);
+  }
+
+  private stripSalesComparisonLead(segment: string): string {
+    return segment
+      .replace(
+        /^(?:me\s+)?(?:compara(?:r)?|comparacao|comparativo|qual vale mais a pena|qual compensa|diferenca entre|diferenca de|melhor entre)\s+/,
+        '',
+      )
+      .replace(/^(?:entre|de)\s+/, '')
+      .trim();
   }
 
   private rankProductsForSalesConversation(
@@ -5509,7 +5540,11 @@ export class WhatsappService {
         catalogProfile,
         analysis,
       );
-    const reasoningLine = this.buildHumanSalesReasoning(analysis, strategy, catalogProfile);
+    const compactPrelude = this.buildCompactSalesPrelude(conversationPrelude);
+    const reasoningLine = this.buildHumanSalesReasoning(analysis, strategy, catalogProfile, {
+      skipGoalSummary: Boolean(compactPrelude),
+      maxDetails: compactPrelude ? 2 : 3,
+    });
     const needLine = this.buildSalesNeedLine(strategy);
     const crossSellLine = crossSellSuggestion
       ? `${crossSellSuggestion.prompt} ${crossSellSuggestion.product.name}, porque ${crossSellSuggestion.reason}.`
@@ -5518,7 +5553,6 @@ export class WhatsappService {
       rankedProducts[0].product,
       rankedProducts.map((item) => item.product),
     );
-    const compactPrelude = this.buildCompactSalesPrelude(conversationPrelude);
     const crossSellSection = this.shouldIncludeCrossSellSuggestion(analysis, crossSellSuggestion)
       ? crossSellLine
       : null;
@@ -5531,7 +5565,7 @@ export class WhatsappService {
 
     return this.buildSalesResponseSections([
       compactPrelude,
-      [intro, reasoningLine, focusedNeedLine, focusedConversationLine, offerReadingLine]
+      [compactPrelude ? null : intro, reasoningLine, focusedNeedLine, focusedConversationLine, offerReadingLine]
         .filter(Boolean)
         .join(' '),
       [
@@ -5587,7 +5621,11 @@ export class WhatsappService {
         catalogProfile,
         analysis,
       );
-    const reasoningLine = this.buildHumanSalesReasoning(analysis, strategy, catalogProfile);
+    const compactPrelude = this.buildCompactSalesPrelude(conversationPrelude);
+    const reasoningLine = this.buildHumanSalesReasoning(analysis, strategy, catalogProfile, {
+      skipGoalSummary: Boolean(compactPrelude),
+      maxDetails: compactPrelude ? 2 : 3,
+    });
     const needLine = this.buildSalesNeedLine(strategy);
     const recommendedOfferReading = this.buildProductOfferReadingLine(
       recommended,
@@ -5601,7 +5639,7 @@ export class WhatsappService {
         : null;
 
     return this.buildSalesResponseSections([
-      this.buildCompactSalesPrelude(conversationPrelude),
+      compactPrelude,
       [
         'Vou te comparar do jeito mais util.',
         reasoningLine,
@@ -5653,7 +5691,11 @@ export class WhatsappService {
         catalogProfile,
         analysis,
       );
-    const reasoningLine = this.buildHumanSalesReasoning(analysis, strategy, catalogProfile);
+    const compactPrelude = this.buildCompactSalesPrelude(conversationPrelude);
+    const reasoningLine = this.buildHumanSalesReasoning(analysis, strategy, catalogProfile, {
+      skipGoalSummary: Boolean(compactPrelude),
+      maxDetails: compactPrelude ? 2 : 3,
+    });
     const needLine = this.buildSalesNeedLine(strategy);
     const focusedNeedLine =
       needLine && !reasoningLine.includes('Aqui eu considerei principalmente') ? needLine : null;
@@ -5663,7 +5705,7 @@ export class WhatsappService {
         : null;
 
     return this.buildSalesResponseSections([
-      this.buildCompactSalesPrelude(conversationPrelude),
+      compactPrelude,
       [
         `Com esse teto de ate R$ ${this.formatCurrency(analysis.budgetCeiling || 0)}, eu nao encontrei algo realmente forte disponivel agora.`,
         reasoningLine,
@@ -9094,6 +9136,16 @@ export class WhatsappService {
 
     const normalized = this.normalizeIntentText(message);
     if (!normalized) {
+      return false;
+    }
+
+    const conversationalAnalysis = this.conversationalIntelligenceService.analyze(normalized);
+    if (
+      conversationalAnalysis.intent === 'handoff' ||
+      conversationalAnalysis.intent === 'clarification' ||
+      conversationalAnalysis.intent === 'issue' ||
+      conversationalAnalysis.intent === 'recap'
+    ) {
       return false;
     }
 

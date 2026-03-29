@@ -250,6 +250,45 @@
       ]
     },
     {
+      "name": "comparison_with_e_should_compare_two_real_products",
+      "steps": [
+        {
+          "message": "me compara bala de brigadeiro e banoffe",
+          "expectAny": [
+            "Vou te comparar do jeito mais util.",
+            "Bala de brigadeiro",
+            "Banoffe ( torta de banana)"
+          ],
+          "forbidAny": [
+            "Bala de brigadeiro presente"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "consultative_handoff_should_not_fall_into_non_commercial_recovery",
+      "steps": [
+        {
+          "message": "me indica um presente ate 20 reais pra minha mae, sem erro",
+          "expectAny": [
+            "presente",
+            "Estas sao as opcoes",
+            "opcoes que eu colocaria na sua frente agora"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "quero falar com alguem",
+          "expectAny": [
+            "RESUMO PRONTO PARA ATENDIMENTO"
+          ],
+          "forbidAny": [
+            "Calma, acho que eu puxei a conversa para o lado errado"
+          ]
+        }
+      ]
+    },
+    {
       "name": "soft_stop_during_name_collection_should_reset_cleanly",
       "steps": [
         {
