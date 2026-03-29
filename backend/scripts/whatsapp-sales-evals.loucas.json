@@ -730,6 +730,63 @@
           ]
         }
       ]
+    },
+    {
+      "name": "consultative_negative_feedback_should_focus_the_next_step",
+      "steps": [
+        {
+          "message": "me indica um presente ate 20 reais pra minha mae",
+          "expectAny": [
+            "Brigadeiro individual mimo",
+            "Estas sao as opcoes"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "isso nao ajudou",
+          "expectAny": [
+            "Entendi. Vamos destravar isso sem te fazer repetir tudo.",
+            "Me diga so onde eu preciso te ajudar melhor: escolher item, comparar, ajustar valor ou fechar pedido."
+          ],
+          "forbidAny": [
+            "Voce pode falar naturalmente",
+            "Calma, acho que eu puxei a conversa para o lado errado"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "repeated_unresolved_feedback_should_offer_handoff_with_context",
+      "steps": [
+        {
+          "message": "quero 1 brownie tradicional",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "isso nao ajudou",
+          "expectAny": [
+            "Entendi. Vamos destravar isso sem te fazer repetir tudo.",
+            "nome, nos itens ou no recebimento"
+          ],
+          "forbidAny": [
+            "RESUMO PRONTO PARA ATENDIMENTO"
+          ]
+        },
+        {
+          "message": "nao resolveu",
+          "expectAny": [
+            "RESUMO PRONTO PARA ATENDIMENTO",
+            "ponto exato que travou agora"
+          ],
+          "forbidAny": [
+            "Voce pode falar naturalmente"
+          ]
+        }
+      ]
     }
   ]
 }

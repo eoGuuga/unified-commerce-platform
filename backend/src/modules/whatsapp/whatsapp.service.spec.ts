@@ -1905,6 +1905,43 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('telefone de contato com DDD');
   });
 
+  it('focuses unresolved collection feedback on the exact blocked step before escalating', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'isso nao ajudou',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'confirming_order',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 5,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 60,
+            discount_amount: 0,
+            shipping_amount: 10,
+            total_amount: 70,
+          },
+          customer_data: {
+            name: 'Jordan Lincoln Kzan',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Entendi. Vamos destravar isso sem te fazer repetir tudo.');
+    expect(response).toContain(
+      'Me diga so o que precisa ajustar: itens, nome, recebimento, endereco, telefone ou observacao.',
+    );
+    expect(response).not.toContain('RESUMO PRONTO PARA ATENDIMENTO');
+  });
+
   it('recaps what the bot already understood during active collection without dropping the flow', async () => {
     const service = createService(loucasCatalog) as any;
 
@@ -2816,6 +2853,73 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Objetivo percebido: um presente sem erro e sem exagero');
     expect(response).toContain('Itens recentes: Bala de brigadeiro e Banoffe ( torta de banana)');
     expect(response).not.toContain('Calma, acho que eu puxei a conversa para o lado errado');
+  });
+
+  it('focuses unresolved consultative feedback on one commercial next step before escalating', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'isso nao ajudou',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_customer_goal: 'um presente sem erro e sem exagero',
+            last_product_names: ['Bala de brigadeiro', 'Banoffe ( torta de banana)'],
+            last_catalog_category_name: 'Delicias',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Entendi. Vamos destravar isso sem te fazer repetir tudo.');
+    expect(response).toContain(
+      'Me diga so onde eu preciso te ajudar melhor: escolher item, comparar, ajustar valor ou fechar pedido.',
+    );
+    expect(response).not.toContain('Voce pode falar naturalmente');
+    expect(response).not.toContain('RESUMO PRONTO PARA ATENDIMENTO');
+  });
+
+  it('offers a handoff summary after repeated unresolved support feedback', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      'nao resolveu',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'confirming_order',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 5,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 60,
+            discount_amount: 0,
+            shipping_amount: 10,
+            total_amount: 70,
+          },
+          customer_data: {
+            name: 'Jordan Lincoln Kzan',
+          },
+          intelligence_memory: {
+            last_support_unresolved_count: 1,
+            last_customer_goal: 'corrigir esse ponto sem baguncar o pedido',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('RESUMO PRONTO PARA ATENDIMENTO');
+    expect(response).toContain('Etapa atual: Revisando o pedido antes de fechar');
+    expect(response).toContain('Pedido em rascunho: 5x Bala de brigadeiro');
+    expect(response).toContain('ponto exato que travou agora');
   });
 
   it('does not expose corrupted customer names in the handoff summary', async () => {

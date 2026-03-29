@@ -114,6 +114,7 @@ export interface ConversationIntelligenceMemory {
   last_catalog_category_name?: string | null;
   last_catalog_product_id?: string | null;
   last_handoff_summary?: string | null;
+  last_support_unresolved_count?: number | null;
 }
 
 /**

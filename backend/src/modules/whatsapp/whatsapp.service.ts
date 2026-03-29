@@ -41,7 +41,7 @@ import { TenantsService } from '../tenants/tenants.service';
 import { CanalVenda, PedidoStatus, Pedido } from '../../database/entities/Pedido.entity';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
 import { Tenant } from '../../database/entities/Tenant.entity';
-import { TypedConversation, ProductSearchResult, toTypedConversation, ConversationState, CustomerData, PendingOrder, PendingOrderItem, StockAdjustmentContext, ConversationIntelligenceMemory } from './types/whatsapp.types';
+import { TypedConversation, ProductSearchResult, toTypedConversation, ConversationState, CustomerData, PendingOrder, PendingOrderItem, StockAdjustmentContext, ConversationIntelligenceMemory, ConversationResponseMode } from './types/whatsapp.types';
 import { ProductWithStock } from '../products/types/product.types';
 import * as crypto from 'crypto';
 import { CouponsService } from '../coupons/coupons.service';
@@ -977,6 +977,133 @@ export class WhatsappService {
       '',
       guidance,
     ].join('\n');
+  }
+
+  private isConversationalUnresolvedFeedback(normalizedMessage: string): boolean {
+    if (!normalizedMessage) {
+      return false;
+    }
+
+    return [
+      'nao ajudou',
+      'isso nao ajudou',
+      'nao resolveu',
+      'isso nao resolveu',
+      'continua sem resolver',
+      'nao era bem isso',
+      'ainda nao resolveu',
+    ].some((signal) => normalizedMessage.includes(signal));
+  }
+
+  private buildUnresolvedSupportNextStep(
+    currentState?: ConversationState,
+    conversation?: TypedConversation,
+  ): string {
+    const customerData = (conversation?.context?.customer_data || {}) as CustomerData;
+    const memory = this.getConversationIntelligenceMemory(conversation);
+
+    switch (currentState) {
+      case 'collecting_name':
+        return 'Me diga so se o que travou esta no nome, nos itens ou no recebimento.';
+      case 'collecting_address':
+        return customerData?.delivery_type
+          ? 'Me diga so o que ficou errado no endereco.'
+          : 'Me diga so se travou em entrega ou retirada, ou no endereco.';
+      case 'collecting_phone':
+        return 'Me diga so se o ponto travado esta no telefone ou em alguma etapa anterior.';
+      case 'collecting_notes':
+        return 'Me diga so se quer ajustar o pedido ou seguir sem observacao.';
+      case 'collecting_cash_change':
+        return 'Me diga so se quer informar outro troco ou mudar a forma de pagamento.';
+      case 'confirming_stock_adjustment':
+        return 'Me diga so a quantidade certa que eu ajusto daqui.';
+      case 'confirming_order':
+        return 'Me diga so o que precisa ajustar: itens, nome, recebimento, endereco, telefone ou observacao.';
+      case 'waiting_payment':
+        return 'Me diga so qual ponto ficou em aberto: gerar pix, confirmar pagamento ou mudar para dinheiro.';
+      case 'order_confirmed':
+      case 'order_completed':
+        return 'Me diga so qual ponto ficou em aberto: andamento, entrega, retirada ou pagamento.';
+      default:
+        if (
+          ['recommendation', 'comparison', 'budget', 'objection', 'suggestion'].includes(
+            String(memory.last_intent || ''),
+          )
+        ) {
+          return 'Me diga so onde eu preciso te ajudar melhor: escolher item, comparar, ajustar valor ou fechar pedido.';
+        }
+
+        return 'Me diga so qual ponto ficou em aberto: produto, pedido, pagamento ou entrega.';
+    }
+  }
+
+  private buildUnresolvedSupportRetryGuidance(currentState?: ConversationState): string {
+    if (currentState === 'waiting_payment') {
+      return 'Se quiser, eu ainda tento por aqui: me diga "pix", "ja paguei" ou "dinheiro".';
+    }
+
+    if (
+      currentState &&
+      [
+        'collecting_name',
+        'collecting_address',
+        'collecting_phone',
+        'collecting_notes',
+        'collecting_cash_change',
+        'confirming_stock_adjustment',
+        'confirming_order',
+      ].includes(currentState)
+    ) {
+      return 'Se quiser, eu ainda tento por aqui: me diga so o ponto exato que travou agora.';
+    }
+
+    return 'Se quiser, eu ainda tento por aqui: me diga so o ponto que ficou em aberto.';
+  }
+
+  private buildConversationalUnresolvedSupportResponse(
+    analysis: ConversationalAnalysis,
+    plan: ConversationPlan,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): {
+    message: string;
+    responseMode: ConversationResponseMode;
+    handoffSummary: string | null;
+  } | null {
+    if (!this.isConversationalUnresolvedFeedback(analysis.normalizedText)) {
+      return null;
+    }
+
+    const memory = this.getConversationIntelligenceMemory(conversation);
+    const unresolvedCount = Number(memory.last_support_unresolved_count || 0);
+    const shouldEscalate =
+      unresolvedCount >= 1 || plan.mode === 'handoff_ready' || analysis.intent === 'handoff';
+
+    if (shouldEscalate) {
+      const summaryLines = this.buildCustomerFocusSnapshot(conversation, currentState);
+      return {
+        message: this.buildMemoryAwareHandoffMessage(
+          'Entendi. Para nao te fazer rodar mais, eu ja deixei o contexto pronto para atendimento.',
+          summaryLines.length
+            ? summaryLines
+            : ['- Contexto aberto sem um pedido travado no momento'],
+          this.buildUnresolvedSupportRetryGuidance(currentState),
+        ),
+        responseMode: 'handoff_ready',
+        handoffSummary: summaryLines.join(' | ') || null,
+      };
+    }
+
+    return {
+      message: [
+        'Entendi. Vamos destravar isso sem te fazer repetir tudo.',
+        '',
+        this.buildUnresolvedSupportNextStep(currentState, conversation),
+        'Se preferir, eu tambem deixo o contexto pronto para atendimento.',
+      ].join('\n'),
+      responseMode: plan.mode === 'none' ? 'freeform_support' : plan.mode,
+      handoffSummary: null,
+    };
   }
 
   private getCollectionCorrectionPrompt(
@@ -3375,6 +3502,25 @@ export class WhatsappService {
       return null;
     }
 
+    const unresolvedResponse = this.buildConversationalUnresolvedSupportResponse(
+      analysis,
+      plan,
+      conversation,
+      currentState,
+    );
+    if (unresolvedResponse) {
+      const unresolvedCount =
+        Number(this.getConversationIntelligenceMemory(conversation).last_support_unresolved_count || 0) +
+        1;
+      await this.rememberConversationIntelligence(conversation, {
+        last_response_mode: unresolvedResponse.responseMode,
+        last_customer_goal: plan.customerGoal,
+        last_handoff_summary: unresolvedResponse.handoffSummary,
+        last_support_unresolved_count: unresolvedCount,
+      });
+      return unresolvedResponse.message;
+    }
+
     if (
       currentState &&
       [
@@ -3400,6 +3546,7 @@ export class WhatsappService {
           plan.mode === 'handoff_ready'
             ? this.buildCustomerFocusSnapshot(conversation, currentState).join(' | ')
             : null,
+        last_support_unresolved_count: 0,
       });
       return response;
     }
@@ -3424,6 +3571,7 @@ export class WhatsappService {
             plan.mode === 'handoff_ready'
               ? this.buildCustomerFocusSnapshot(conversation, currentState).join(' | ')
               : null,
+          last_support_unresolved_count: 0,
         });
       }
       return response;
@@ -3437,6 +3585,7 @@ export class WhatsappService {
         plan.mode === 'handoff_ready'
           ? this.buildCustomerFocusSnapshot(conversation).join(' | ')
           : null,
+      last_support_unresolved_count: 0,
     });
     return response;
   }
