@@ -554,7 +554,9 @@
             "Brigadeiro individual mimo"
           ],
           "forbidAny": [
-            "Pensando em presentear bem, separei algumas opcoes"
+            "Pensando em presentear bem, separei algumas opcoes",
+            "Dentro do catalogo atual da loja",
+            "Aqui eu considerei principalmente"
           ]
         }
       ]
@@ -569,7 +571,25 @@
             "Brigadeiro individual mimo"
           ],
           "forbidAny": [
-            "Pensando em presentear bem, separei algumas opcoes"
+            "Pensando em presentear bem, separei algumas opcoes",
+            "Dentro do catalogo atual da loja",
+            "Aqui eu considerei principalmente"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "urgent_recommendation_should_stay_lean_when_the_best_path_is_clear",
+      "steps": [
+        {
+          "message": "me indica algo rapido agora porque estou com pressa",
+          "expectAny": [
+            "corto caminho com seguranca",
+            "resolver rapido"
+          ],
+          "forbidAny": [
+            "Dentro do catalogo atual da loja",
+            "Aqui eu considerei principalmente"
           ]
         }
       ]

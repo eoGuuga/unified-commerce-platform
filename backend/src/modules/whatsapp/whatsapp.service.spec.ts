@@ -1504,6 +1504,45 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).not.toContain('Pensando em presentear bem, separei algumas opcoes');
   });
 
+  it('keeps high-confidence social-proof recommendations lean', async () => {
+    const service = createService(giftingCatalogWithAccessories) as any;
+
+    const response = await service.generateResponse(
+      'o que sai mais para presente?',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Pela leitura atual do catalogo');
+    expect(response).toContain('Brigadeiro individual mimo');
+    expect(response).not.toContain('Dentro do catalogo atual da loja');
+    expect(response).not.toContain('Aqui eu considerei principalmente');
+    expect(response.split('\n').length).toBeLessThanOrEqual(8);
+  });
+
+  it('keeps urgent high-confidence recommendations lean without losing direction', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'me indica algo rapido agora porque estou com pressa',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_names: ['Brownie Premium', 'Brigadeiro Gourmet'],
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('corto caminho com seguranca');
+    expect(response).toContain('resolver rapido');
+    expect(response).not.toContain('Dentro do catalogo atual da loja');
+    expect(response).not.toContain('Aqui eu considerei principalmente');
+    expect(response.split('\n').length).toBeLessThanOrEqual(12);
+  });
+
   it('does not stack two consultative lead-ins when an objection already has a strong commercial prelude', async () => {
     const { service } = createFixture(catalog);
 

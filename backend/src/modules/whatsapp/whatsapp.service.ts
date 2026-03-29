@@ -6087,6 +6087,94 @@ export class WhatsappService {
     return compact.length ? compact.join(' ') : null;
   }
 
+  private hasClearSalesLeader(rankedProducts: RankedSalesProduct[]): boolean {
+    if (!rankedProducts.length) {
+      return false;
+    }
+
+    if (rankedProducts.length === 1) {
+      return true;
+    }
+
+    const [top, second] = rankedProducts;
+    return top.score - second.score >= 8;
+  }
+
+  private buildLeanSalesRecommendationReasoning(
+    analysis: SalesConversationAnalysis,
+    topProduct: ProductWithStock,
+    catalog: ProductWithStock[],
+  ): string | null {
+    const offerProfile = this.productOfferIntelligenceService.analyzeProduct(topProduct, catalog);
+
+    if (analysis.intent === 'objection') {
+      return 'Ela segura melhor o valor percebido sem pesar tanto no ticket.';
+    }
+
+    if (analysis.budgetCeiling !== null) {
+      return `Dentro do seu teto, ${topProduct.name} fecha melhor sem perder apresentacao.`;
+    }
+
+    if (analysis.conversationDrivers.includes('urgency')) {
+      return `E a opcao com mais chance de resolver rapido sem te fazer rodar.`;
+    }
+
+    if (this.isSalesSafeChoiceQuery(analysis)) {
+      return offerProfile.role === 'gift_ready'
+        ? 'Ela acerta facil logo na primeira impressao.'
+        : 'Ela e a rota mais segura para nao errar na escolha.';
+    }
+
+    if (this.isSalesValueChoiceQuery(analysis)) {
+      return 'Ela entrega melhor equilibrio entre o que custa e o que faz a compra parecer boa.';
+    }
+
+    if (this.isSalesSocialProofQuery(analysis)) {
+      return 'Ela e o tipo de item que costuma fechar bem sem exigir muita explicacao.';
+    }
+
+    if (analysis.useCaseTags.includes('gift')) {
+      return offerProfile.role === 'gift_ready'
+        ? 'Para presente, ela entra redonda e sem cara de escolha improvisada.'
+        : 'Para presente, ela sustenta bem a escolha sem ficar sem graca.';
+    }
+
+    if (analysis.useCaseTags.includes('self_treat')) {
+      return 'Ela resolve bem quando a ideia e matar a vontade sem complicar.';
+    }
+
+    return `Eu colocaria ${topProduct.name} na frente primeiro para encurtar a decisao com seguranca.`;
+  }
+
+  private shouldUseLeanSalesRecommendationResponse(
+    analysis: SalesConversationAnalysis,
+    rankedProducts: RankedSalesProduct[],
+    compactPrelude: string | null,
+    shouldIncludeCrossSell: boolean,
+  ): boolean {
+    if (compactPrelude || shouldIncludeCrossSell || !rankedProducts.length) {
+      return false;
+    }
+
+    if (
+      this.isSalesSocialProofQuery(analysis) ||
+      this.isSalesSafeChoiceQuery(analysis) ||
+      this.isSalesValueChoiceQuery(analysis)
+    ) {
+      return true;
+    }
+
+    if (!this.hasClearSalesLeader(rankedProducts)) {
+      return false;
+    }
+
+    return (
+      analysis.conversationDrivers.includes('urgency') ||
+        analysis.signals.reassurance ||
+        analysis.decisionStage === 'closing'
+    );
+  }
+
   private isGenericQualificationQuestion(question: string | null | undefined): boolean {
     const normalizedQuestion = (question || '').trim().toLowerCase();
     if (!normalizedQuestion) {
@@ -6229,15 +6317,48 @@ export class WhatsappService {
       rankedProducts[0].product,
       rankedProducts.map((item) => item.product),
     );
-    const crossSellSection = this.shouldIncludeCrossSellSuggestion(analysis, crossSellSuggestion)
-      ? crossSellLine
-      : null;
+    const shouldIncludeCrossSell = this.shouldIncludeCrossSellSuggestion(
+      analysis,
+      crossSellSuggestion,
+    );
+    const crossSellSection = shouldIncludeCrossSell ? crossSellLine : null;
     const focusedNeedLine =
       needLine && !reasoningLine.includes('Aqui eu considerei principalmente') ? needLine : null;
     const focusedConversationLine =
       conversationFocus && !reasoningLine.includes(conversationFocus)
         ? conversationFocus
         : null;
+    const shouldUseLeanResponse = this.shouldUseLeanSalesRecommendationResponse(
+      analysis,
+      rankedProducts,
+      compactPrelude,
+      shouldIncludeCrossSell,
+    );
+
+    if (shouldUseLeanResponse) {
+      const leanReasoning = this.buildLeanSalesRecommendationReasoning(
+        analysis,
+        rankedProducts[0].product,
+        rankedProducts.map((item) => item.product),
+      );
+      const leanOptionCount = analysis.conversationDrivers.includes('urgency') ? 2 : 3;
+
+      return this.buildSalesResponseSections([
+        [
+          [decisionAnchorLine || intro, leanReasoning].filter(Boolean).join(' '),
+          'Estas sao as opcoes que eu colocaria na sua frente agora:',
+          ...rankedProducts
+            .slice(0, leanOptionCount)
+            .map((item) => this.formatSalesRecommendationLine(item)),
+        ].join('\n'),
+        this.buildSalesNextStepQuestion(
+          analysis,
+          rankedProducts[0].product,
+          qualificationQuestion,
+          this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
+        ),
+      ]);
+    }
 
     return this.buildSalesResponseSections([
       compactPrelude,
