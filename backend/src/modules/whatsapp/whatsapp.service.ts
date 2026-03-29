@@ -5981,7 +5981,7 @@ export class WhatsappService {
         })
         .sort((left, right) => right.score - left.score);
 
-      if (analysis?.useCaseTags.includes('gift') && referenceCategory) {
+      if (referenceCategory) {
         const sameCategory = refined.filter(
           (item) => this.normalizeForSearch(item.product.categoria?.name || '') === referenceCategory,
         );
@@ -6141,10 +6141,10 @@ export class WhatsappService {
         last_product_name: rankedProducts[0].product.name,
         last_product_names: [referenceProduct.name, ...rankedProducts.map((item) => item.product.name)],
         last_quantity: null,
-        last_query: analysis.commercialQuery || message,
+        last_query: message,
         last_budget_ceiling: analysis.budgetCeiling,
         last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
-        last_customer_goal: conversationPlan.customerGoal || null,
+        last_customer_goal: conversationPlan.customerGoal || analysis.customerGoalSummary || null,
       });
 
       return this.buildSalesCombinationResponse(
@@ -6166,10 +6166,10 @@ export class WhatsappService {
       last_product_name: rankedProducts.length === 1 ? rankedProducts[0].product.name : null,
       last_product_names: rankedProducts.map((item) => item.product.name),
       last_quantity: null,
-      last_query: analysis.commercialQuery || message,
+      last_query: message,
       last_budget_ceiling: analysis.budgetCeiling,
       last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
-      last_customer_goal: conversationPlan.customerGoal || null,
+      last_customer_goal: conversationPlan.customerGoal || analysis.customerGoalSummary || null,
     });
 
     const crossSellSuggestion =
@@ -7098,10 +7098,10 @@ export class WhatsappService {
           last_product_name: null,
           last_product_names: comparisonProducts.map((product) => product.name),
           last_quantity: null,
-          last_query: analysis.commercialQuery || null,
+          last_query: message,
           last_budget_ceiling: analysis.budgetCeiling,
           last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
-          last_customer_goal: conversationPlan.customerGoal || null,
+          last_customer_goal: conversationPlan.customerGoal || analysis.customerGoalSummary || null,
         });
 
         return this.buildSalesComparisonResponse(
@@ -7164,10 +7164,10 @@ export class WhatsappService {
       last_product_name: rankedProducts.length === 1 ? rankedProducts[0].product.name : null,
       last_product_names: rankedProducts.map((item) => item.product.name),
       last_quantity: null,
-      last_query: analysis.commercialQuery || null,
+      last_query: message,
       last_budget_ceiling: analysis.budgetCeiling,
       last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
-      last_customer_goal: conversationPlan.customerGoal || null,
+      last_customer_goal: conversationPlan.customerGoal || analysis.customerGoalSummary || null,
     });
 
     const crossSellSuggestion = this.salesVerticalPackService.findCrossSellSuggestion(
