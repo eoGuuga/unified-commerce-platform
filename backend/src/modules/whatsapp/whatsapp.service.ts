@@ -114,7 +114,7 @@ type RankedSalesProduct = {
   reasons: string[];
 };
 
-type ContextAwareSalesMode = 'combination' | 'upgrade' | 'recovery';
+type ContextAwareSalesMode = 'combination' | 'upgrade' | 'recovery' | 'simplify';
 
 @Injectable()
 export class WhatsappService {
@@ -5526,6 +5526,42 @@ export class WhatsappService {
     ]);
   }
 
+  private isSalesSimplificationRefinementQuery(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    if (
+      /\b(menor|mais delicad|mais discret|menos chamativ|menos exagerad|mais simples|mais leve|mais sutil)\b/.test(
+        normalized,
+      ) &&
+      /\b(esse|essa|isso)\b/.test(normalized)
+    ) {
+      return true;
+    }
+
+    return this.hasAnyNormalizedPhrase(normalized, [
+      'algo menor que esse',
+      'algo menor que essa',
+      'algo menor e mais delicado',
+      'algo menor e menos chamativo',
+      'algo mais delicado',
+      'algo mais discreto',
+      'algo mais simples que esse',
+      'algo mais simples que essa',
+      'mais delicado que esse',
+      'mais delicado que essa',
+      'mais discreto que esse',
+      'mais discreto que essa',
+      'menos chamativo que esse',
+      'menos chamativo que essa',
+      'mais leve que esse',
+      'mais leve que essa',
+      'isso ficou muito grande',
+      'ficou muito grande',
+      'ficou chamativo demais',
+      'nao queria algo tao chamativo',
+      'nao queria algo tao grande',
+    ]);
+  }
+
   private isSalesRejectionRecoveryQuery(message: string): boolean {
     const normalized = this.normalizeIntentText(message);
     return this.hasAnyNormalizedPhrase(normalized, [
@@ -5622,6 +5658,13 @@ export class WhatsappService {
         ? `me indica algo mais premium e mais marcante do que ${referenceProduct.name}`
         : 'me indica algo mais premium e mais marcante';
       return rememberedContext ? `${rememberedContext}. Agora ${upgradeBase}` : upgradeBase;
+    }
+
+    if (mode === 'simplify') {
+      const simplifyBase = referenceProduct
+        ? `me indica algo menor, mais delicado, discreto e sem exagero do que ${referenceProduct.name}`
+        : 'me indica algo menor, mais delicado, discreto e sem exagero';
+      return rememberedContext ? `${rememberedContext}. Agora ${simplifyBase}` : simplifyBase;
     }
 
     const recoveryBase = 'me indica outra opcao que faca mais sentido agora';
@@ -5864,6 +5907,59 @@ export class WhatsappService {
         .sort((left, right) => right.score - left.score);
     }
 
+    if (mode === 'simplify' && referenceProduct) {
+      const referencePrice = Number(referenceProduct.price || 0);
+      refined = refined
+        .map((item) => {
+          const productPrice = Number(item.product.price || 0);
+          const profile = this.productOfferIntelligenceService.analyzeProduct(item.product, [
+            referenceProduct,
+            ...refined.map((candidate) => candidate.product),
+          ]);
+          const searchDocument = this.buildProductSalesDocument(item.product);
+          let score = item.score;
+          const reasons = [...item.reasons];
+
+          if (referencePrice > 0 && productPrice <= referencePrice + 0.0001) {
+            score += 8;
+          }
+
+          if (referencePrice > 0 && productPrice < referencePrice - 0.0001) {
+            score += 10;
+          }
+
+          if (profile.role === 'accessory') {
+            score -= 18;
+          }
+
+          if (profile.tier === 'premium') {
+            score -= 8;
+          }
+
+          if (/(individual|mimo|simples|tradicional|delicado|discreto)/.test(searchDocument)) {
+            score += 10;
+          }
+
+          if (/(caixa|box|kit|premium|presenteavel|marcante|grande)/.test(searchDocument)) {
+            score -= 10;
+          }
+
+          if (
+            productPrice <= referencePrice + 0.0001 &&
+            !reasons.includes(`fica mais leve e mais discreto que ${referenceProduct.name}`)
+          ) {
+            reasons.unshift(`fica mais leve e mais discreto que ${referenceProduct.name}`);
+          }
+
+          return {
+            product: item.product,
+            score,
+            reasons: reasons.slice(0, 3),
+          };
+        })
+        .sort((left, right) => right.score - left.score);
+    }
+
     return refined.slice(0, 4);
   }
 
@@ -5927,6 +6023,8 @@ export class WhatsappService {
       ? 'combination'
       : this.isSalesUpgradeRefinementQuery(normalized)
         ? 'upgrade'
+        : this.isSalesSimplificationRefinementQuery(normalized)
+          ? 'simplify'
         : this.isSalesRejectionRecoveryQuery(normalized)
           ? 'recovery'
           : null;
@@ -6028,6 +6126,8 @@ export class WhatsappService {
     const customPrelude =
       mode === 'upgrade'
         ? ['Entendi: voce quer subir o nivel sem eu te jogar qualquer coisa aleatoria.']
+        : mode === 'simplify'
+          ? ['Entendi: voce quer algo mais delicado e mais facil de acertar, sem eu desmontar o fio da conversa.']
         : ['Sem problema, eu nao vou insistir no que nao te pegou.'];
 
     await this.rememberConversationIntelligence(conversation, {

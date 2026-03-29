@@ -671,6 +671,46 @@
           ]
         }
       ]
+    },
+    {
+      "name": "simplification_refinement_should_downgrade_explicit_large_gift_reference",
+      "steps": [
+        {
+          "message": "quero algo menor e mais delicado que caixa presenteavel com 6 brigadeiros tradicionais",
+          "expectAny": [
+            "Brigadeiro individual mimo",
+            "mais leve e mais discreto"
+          ],
+          "forbidAny": [
+            "Nao encontrei um item exatamente",
+            "Caixa presenteavel com 12 brigadeiros tradicionais"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "simplification_refinement_should_use_previous_consultative_context",
+      "steps": [
+        {
+          "message": "me indica um presente bonito pra minha mae sem exagero",
+          "expectAny": [
+            "Estas sao as opcoes",
+            "Brigadeiro individual mimo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "agora quero algo menor e menos chamativo",
+          "expectAny": [
+            "Brigadeiro individual mimo",
+            "mais leve e mais discreto"
+          ],
+          "forbidAny": [
+            "Nao encontrei um item exatamente",
+            "Calma, acho que eu puxei a conversa para o lado errado"
+          ]
+        }
+      ]
     }
   ]
 }

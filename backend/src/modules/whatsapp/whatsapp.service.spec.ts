@@ -4702,6 +4702,33 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).not.toContain('Nao encontrei um item exatamente como');
   });
 
+  it('refines the last recommendation when the customer wants something smaller and more delicate', async () => {
+    const service = createService(richerGiftingCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero algo menor e mais delicado que esse',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_name: 'Kit Doce presente',
+            last_product_names: ['Kit Doce presente', 'Caixa presenteavel com 6 brigadeiros tradicionais'],
+            last_customer_goal: 'um presente bonito para a minha mae, sem exagero',
+            last_query: 'me indica um presente bonito para a minha mae sem exagero',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('mais delicado');
+    expect(response).toContain('Brigadeiro individual mimo');
+    expect(response).not.toContain('Caixa presenteavel com 6 brigadeiros tradicionais');
+    expect(response).not.toContain('Nao encontrei um item exatamente como');
+    expect(response).not.toContain('Calma, acho que eu puxei a conversa para o lado errado');
+  });
+
   it('answers complement questions without turning the suggestion into a disproportionate upsell', async () => {
     const service = createService(combinationBalanceCatalog) as any;
 
