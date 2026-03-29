@@ -219,6 +219,81 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     },
   ];
 
+  const loucasConsultativeCatalog = [
+    {
+      id: 'lc1',
+      name: 'Bala de brigadeiro',
+      price: 12,
+      available_stock: 40,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Delicias' },
+    },
+    {
+      id: 'lc2',
+      name: '3 Brigadeiros tradicionais',
+      price: 12,
+      available_stock: 35,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Docinhos' },
+    },
+    {
+      id: 'lc3',
+      name: '10 Brigadeiros tradicionais',
+      price: 25,
+      available_stock: 28,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Docinhos' },
+    },
+    {
+      id: 'lc4',
+      name: 'Banoffe ( torta de banana)',
+      price: 18,
+      available_stock: 24,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Delicias' },
+    },
+    {
+      id: 'lc5',
+      name: 'Bolo no pote trufado de maracuja',
+      price: 16,
+      available_stock: 18,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Bolo no Pote 220 ml' },
+    },
+    {
+      id: 'lc6',
+      name: 'Pudim de leite condensado',
+      price: 14,
+      available_stock: 22,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Delicias' },
+    },
+    {
+      id: 'lc7',
+      name: 'Brigadeiro individual mimo',
+      price: 6,
+      available_stock: 30,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Presentear' },
+    },
+    {
+      id: 'lc8',
+      name: 'Caixa presenteavel 12 brigadeiros tradicionais',
+      price: 48,
+      available_stock: 12,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Presentear' },
+    },
+    {
+      id: 'lc9',
+      name: 'Brownie tradicional',
+      price: 10,
+      available_stock: 26,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Delicias' },
+    },
+  ];
+
   const combinationBalanceCatalog = [
     {
       id: 'cb1',
@@ -1483,6 +1558,67 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Bala de brigadeiro');
     expect(response).not.toContain('Banoffe ( torta de banana) entra melhor');
     expect(response).not.toContain('Calma, acho que eu puxei a conversa para o lado errado');
+  });
+
+  it('keeps Loucas self-treat recommendations away from large brigadeiro packs when the customer wants something now', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero algo pra matar vontade agora',
+      'tenant-id',
+    );
+
+    expect(response).toMatch(/Banoffe \( torta de banana\)|Bolo no pote trufado de maracuja|Brigadeiro individual mimo|3 Brigadeiros tradicionais/);
+    expect(response).not.toContain('10 Brigadeiros tradicionais | R$ 25,00');
+  });
+
+  it('keeps Loucas sharing recommendations on products that look better for dividing', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero algo pra dividir com a familia',
+      'tenant-id',
+    );
+
+    expect(response).toMatch(/10 Brigadeiros tradicionais|Caixa presenteavel 12 brigadeiros tradicionais/);
+    expect(response).not.toContain('Brigadeiro individual mimo | R$ 6,00');
+  });
+
+  it('keeps Loucas chocolate-focus recommendations away from the presentear line when no gift was asked', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero algo mais chocolatudo',
+      'tenant-id',
+    );
+
+    expect(response).toMatch(/Bala de brigadeiro|3 Brigadeiros tradicionais|10 Brigadeiros tradicionais|Brownie tradicional/);
+    expect(response).not.toContain('Caixa presenteavel 12 brigadeiros tradicionais');
+  });
+
+  it('suggests a more complementary Loucas contrast when the customer asks what combines with banoffe', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+    const conversation = createConversation({
+      context: {
+        state: 'idle',
+        intelligence_memory: {
+          last_intent: 'recommendation',
+          last_product_name: 'Banoffe ( torta de banana)',
+          last_product_names: ['Banoffe ( torta de banana)'],
+          last_query: 'Banoffe ( torta de banana)',
+        },
+      },
+    });
+
+    const response = await service.generateResponse(
+      'o que combina com banoffe?',
+      'tenant-id',
+      conversation,
+    );
+
+    expect(response).toContain('Banoffe ( torta de banana)');
+    expect(response).toMatch(/Bala de brigadeiro|3 Brigadeiros tradicionais|Brownie tradicional/);
+    expect(response).not.toContain('Caixa presenteavel 12 brigadeiros tradicionais');
   });
 
   it('answers price objections with safer alternatives from the catalog', async () => {

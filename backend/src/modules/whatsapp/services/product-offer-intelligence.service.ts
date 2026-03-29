@@ -105,15 +105,24 @@ export class ProductOfferIntelligenceService {
     const sharing = this.matchesAny(document, this.sharingPatterns);
     const impulse = this.matchesAny(document, this.impulsePatterns);
     const premium = this.matchesAny(document, this.premiumPatterns);
+    const packQuantity = this.extractPackQuantity(document);
+    const creamyDessert = /\b(banoffe|bolo no pote|pudim|canjica|torta|sobremesa|pote)\b/.test(
+      document,
+    );
+    const singleTreat = /\b(bala|bombom|brigadeiro|beijinho|brownie|mimo|individual)\b/.test(
+      document,
+    );
+    const largePack = packQuantity !== null && packQuantity >= 6;
+    const smallPack = packQuantity !== null && packQuantity <= 3;
 
     let role: ProductOfferRole = 'primary';
     if (accessory) {
       role = 'accessory';
     } else if (giftReady) {
       role = 'gift_ready';
-    } else if (sharing) {
+    } else if (sharing || largePack) {
       role = 'sharing';
-    } else if (impulse) {
+    } else if (impulse || creamyDessert || singleTreat || smallPack) {
       role = 'impulse';
     }
 
@@ -184,6 +193,14 @@ export class ProductOfferIntelligenceService {
     if (profile.role === 'impulse' && analysis.useCaseTags.includes('self_treat')) {
       score += 12;
       addReason('combina mais com um mimo rapido');
+    }
+
+    if (profile.role === 'sharing' && analysis.useCaseTags.includes('self_treat')) {
+      score -= 10;
+    }
+
+    if (profile.role === 'impulse' && analysis.useCaseTags.includes('sharing')) {
+      score -= 8;
     }
 
     if (profile.tier === 'premium' && analysis.useCaseTags.includes('premium')) {
@@ -324,5 +341,22 @@ export class ProductOfferIntelligenceService {
     return patterns.some((pattern) =>
       document.includes(this.messageIntelligenceService.normalizeText(pattern)),
     );
+  }
+
+  private extractPackQuantity(document: string): number | null {
+    const digitMatch = document.match(/\b(\d{1,3})\b/);
+    if (digitMatch) {
+      return Number(digitMatch[1]);
+    }
+
+    if (document.includes('meia duzia')) {
+      return 6;
+    }
+
+    if (document.includes('uma duzia')) {
+      return 12;
+    }
+
+    return null;
   }
 }

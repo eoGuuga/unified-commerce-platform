@@ -813,6 +813,81 @@
       ]
     },
     {
+      "name": "loucas_self_treat_now_should_not_lead_with_large_pack_of_docinhos",
+      "steps": [
+        {
+          "message": "quero algo pra matar vontade agora",
+          "expectAny": [
+            "Banoffe",
+            "Bolo no pote",
+            "3 Brigadeiros",
+            "Brigadeiro individual mimo"
+          ],
+          "forbidAny": [
+            "10 Brigadeiros tradicionais | R$ 25,00"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "loucas_sharing_request_should_stay_on_dividing_products",
+      "steps": [
+        {
+          "message": "quero algo pra dividir com a familia",
+          "expectAny": [
+            "10 Brigadeiros",
+            "Caixa presente",
+            "kit",
+            "combo"
+          ],
+          "forbidAny": [
+            "Brigadeiro individual mimo | R$ 6,00"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "loucas_chocolate_focus_should_not_default_to_gift_line",
+      "steps": [
+        {
+          "message": "quero algo mais chocolatudo",
+          "expectAny": [
+            "brigadeiro",
+            "Brownie",
+            "brigaleite",
+            "Prestígio"
+          ],
+          "forbidAny": [
+            "Caixa presenteàvel 12 brigadeiros tradicionais"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "loucas_banoffe_combination_should_pull_a_more_complementary_pairing",
+      "steps": [
+        {
+          "message": "Banoffe",
+          "expectAny": [
+            "Banoffe"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "o que combina com banoffe?",
+          "expectAny": [
+            "Banoffe",
+            "Bala de brigadeiro",
+            "3 Brigadeiros",
+            "Brownie"
+          ],
+          "forbidAny": [
+            "Caixa presenteàvel 12 brigadeiros tradicionais"
+          ]
+        }
+      ]
+    },
+    {
       "name": "consultative_negative_feedback_should_focus_the_next_step",
       "steps": [
         {

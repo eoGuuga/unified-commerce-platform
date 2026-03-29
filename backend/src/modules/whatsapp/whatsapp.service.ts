@@ -5555,6 +5555,27 @@ export class WhatsappService {
     }
 
     const normalized = analysis.normalizedText;
+    const wantsGift =
+      analysis.useCaseTags.includes('gift') ||
+      !!analysis.recipientHint ||
+      /\b(presente|presentear|lembranc|mimo|mae|mãe|pai|namorad|amiga|amigo|esposa|marido)\b/.test(
+        normalized,
+      );
+    const wantsSharing =
+      analysis.useCaseTags.includes('sharing') ||
+      /\b(dividir|compartilhar|familia|família|mesa|galera|todo mundo|mais gente)\b/.test(
+        normalized,
+      );
+    const wantsSelfTreat =
+      analysis.useCaseTags.includes('self_treat') ||
+      /\b(pra agora|para agora|matar a vontade|vontade|so pra mim|só pra mim|pra mim)\b/.test(
+        normalized,
+      );
+    const wantsChocolateFocus =
+      analysis.useCaseTags.includes('chocolate_focus') ||
+      /\b(chocolatudo|mais chocolate|chocolate forte|brigadeiro|brownie|brigaleite|prestigio|prestígio)\b/.test(
+        normalized,
+      );
     const wantsCreamyDessert = /\b(banoffe|bolo no pote|pudim|torta|sobremesa|cremosa|de colher)\b/.test(
       normalized,
     );
@@ -5571,6 +5592,36 @@ export class WhatsappService {
       }
     }
 
+    if (wantsGift) {
+      const giftProducts = filterByPattern(
+        /\b(presente|presentear|presenteavel|caixa|kit|mimo|lembranc|combo 3 unidades)\b/,
+      );
+      if (giftProducts.length >= 2) {
+        return [...giftProducts, ...rankedProducts.filter((item) => !giftProducts.includes(item))];
+      }
+    }
+
+    if (wantsSharing) {
+      const sharingProducts = filterByPattern(
+        /\b(10 brigadeiros|10 beijinhos|12 brigadeiros|12 beijinhos|caixa|combo|kit|bolo vulcao|bolo vulcão|torta|duzia)\b/,
+      );
+      if (sharingProducts.length >= 2) {
+        return [...sharingProducts, ...rankedProducts.filter((item) => !sharingProducts.includes(item))];
+      }
+    }
+
+    if (wantsSelfTreat) {
+      const selfTreatProducts = filterByPattern(
+        /\b(3 brigadeiros|3 beijinhos|individual|mimo|banoffe|bolo no pote|pudim|bombom|bala|brownie|bolo gelado)\b/,
+      );
+      if (selfTreatProducts.length >= 2) {
+        return [
+          ...selfTreatProducts,
+          ...rankedProducts.filter((item) => !selfTreatProducts.includes(item)),
+        ];
+      }
+    }
+
     if (wantsDocinhos) {
       const docinhoProducts = filterByPattern(/\b(brigadeiro|beijinho|docinho|bala)\b/);
       if (docinhoProducts.length >= 2) {
@@ -5578,7 +5629,40 @@ export class WhatsappService {
       }
     }
 
+    if (wantsChocolateFocus && !wantsGift) {
+      const chocolateProducts = filterByPattern(
+        /\b(brigadeiro|brownie|brigaleite|prestigio|prestígio|chocolate|trufado)\b/,
+      ).filter(
+        (item) =>
+          !/\b(presente|presentear|presenteavel|caixa|kit)\b/.test(
+            this.buildProductSalesDocument(item.product),
+          ),
+      );
+      if (chocolateProducts.length >= 2) {
+        return [
+          ...chocolateProducts,
+          ...rankedProducts.filter((item) => !chocolateProducts.includes(item)),
+        ];
+      }
+    }
+
     return rankedProducts;
+  }
+
+  private filterLoucasCrossSellSuggestion(
+    analysis: SalesConversationAnalysis,
+    catalogProfile: CatalogSalesProfile,
+    crossSellSuggestion: SalesVerticalCrossSellSuggestion | null,
+  ): SalesVerticalCrossSellSuggestion | null {
+    if (!crossSellSuggestion) {
+      return null;
+    }
+
+    if (catalogProfile.storePersona !== 'loucas_brigadeiro') {
+      return crossSellSuggestion;
+    }
+
+    return analysis.useCaseTags.includes('gift') ? crossSellSuggestion : null;
   }
 
   private buildSalesNeedLine(strategy: SalesConversationStrategy): string | null {
@@ -5974,14 +6058,22 @@ export class WhatsappService {
       }
 
       const referencePrice = Number(referenceProduct.price || 0);
+      const referenceDocument = this.buildProductSalesDocument(referenceProduct);
       const referenceProfile = this.productOfferIntelligenceService.analyzeProduct(
         referenceProduct,
         [referenceProduct, ...withoutReference.map((item) => item.product)],
+      );
+      const referenceIsCreamyDessert = /\b(banoffe|bolo no pote|pudim|canjica|torta|sobremesa|pote)\b/.test(
+        referenceDocument,
+      );
+      const referenceIsDocinho = /\b(brigadeiro|beijinho|bala|bombom|brownie)\b/.test(
+        referenceDocument,
       );
 
       const rebalanced = (withoutReference.length ? withoutReference : rankedProducts)
         .map((item) => {
           const productPrice = Number(item.product.price || 0);
+          const productDocument = this.buildProductSalesDocument(item.product);
           const profile = this.productOfferIntelligenceService.analyzeProduct(item.product, [
             referenceProduct,
             ...withoutReference.map((candidate) => candidate.product),
@@ -6025,6 +6117,35 @@ export class WhatsappService {
             !reasons.includes('fecha melhor como complemento para esse item')
           ) {
             reasons.unshift('fecha melhor como complemento para esse item');
+          }
+
+          if (
+            referenceIsCreamyDessert &&
+            /\b(brigadeiro|beijinho|bala|bombom|brownie)\b/.test(productDocument) &&
+            profile.role !== 'gift_ready' &&
+            profile.role !== 'accessory'
+          ) {
+            score += 16;
+            if (!reasons.includes('cria um contraste gostoso com essa sobremesa')) {
+              reasons.unshift('cria um contraste gostoso com essa sobremesa');
+            }
+          }
+
+          if (
+            referenceIsCreamyDessert &&
+            /\b(banoffe|bolo no pote|pudim|canjica|torta|sobremesa|pote)\b/.test(productDocument)
+          ) {
+            score -= 8;
+          }
+
+          if (
+            referenceIsDocinho &&
+            /\b(banoffe|bolo no pote|pudim|canjica|torta|sobremesa|pote)\b/.test(productDocument)
+          ) {
+            score += 12;
+            if (!reasons.includes('deixa a compra mais redonda com uma sobremesa mais cremosa')) {
+              reasons.unshift('deixa a compra mais redonda com uma sobremesa mais cremosa');
+            }
           }
 
           return {
@@ -6514,10 +6635,14 @@ export class WhatsappService {
     }
 
     if (mode === 'combination' && referenceProduct) {
-      const crossSellSuggestion = this.salesVerticalPackService.findCrossSellSuggestion(
-        verticalPack,
-        products,
-        [referenceProduct],
+      const crossSellSuggestion = this.filterLoucasCrossSellSuggestion(
+        analysis,
+        catalogProfile,
+        this.salesVerticalPackService.findCrossSellSuggestion(
+          verticalPack,
+          products,
+          [referenceProduct],
+        ),
       );
       await this.rememberConversationIntelligence(conversation, {
         last_intent: 'recommendation',
@@ -6557,14 +6682,17 @@ export class WhatsappService {
       last_customer_goal: conversationPlan.customerGoal || analysis.customerGoalSummary || null,
     });
 
-    const crossSellSuggestion =
+    const crossSellSuggestion = this.filterLoucasCrossSellSuggestion(
+      analysis,
+      catalogProfile,
       mode === 'simplify' || mode === 'budget'
         ? null
         : this.salesVerticalPackService.findCrossSellSuggestion(
             verticalPack,
             products,
             rankedProducts.map((item) => item.product),
-          );
+          ),
+    );
 
     return this.buildSalesRecommendationResponse(
       analysis,
@@ -6669,6 +6797,7 @@ export class WhatsappService {
     analysis: SalesConversationAnalysis,
     rankedProducts: RankedSalesProduct[],
     playbook: SalesPlaybookProfile,
+    catalogProfile: CatalogSalesProfile,
     compactPrelude: string | null,
     shouldIncludeCrossSell: boolean,
   ): boolean {
@@ -6693,6 +6822,21 @@ export class WhatsappService {
     }
 
     if (prefersEnterpriseCommercialAnswer) {
+      return true;
+    }
+
+    if (
+      catalogProfile.storePersona === 'loucas_brigadeiro' &&
+      (
+        analysis.useCaseTags.includes('gift') ||
+        analysis.useCaseTags.includes('self_treat') ||
+        analysis.useCaseTags.includes('sharing') ||
+        analysis.useCaseTags.includes('chocolate_focus') ||
+        /\b(banoffe|bolo no pote|pudim|sobremesa|cremosa|brigadeiro|docinho)\b/.test(
+          analysis.normalizedText,
+        )
+      )
+    ) {
       return true;
     }
 
@@ -6876,6 +7020,7 @@ export class WhatsappService {
       analysis,
       rankedProducts,
       playbook,
+      catalogProfile,
       compactPrelude,
       shouldIncludeCrossSell,
     );
@@ -7600,10 +7745,14 @@ export class WhatsappService {
       last_customer_goal: conversationPlan.customerGoal || analysis.customerGoalSummary || null,
     });
 
-    const crossSellSuggestion = this.salesVerticalPackService.findCrossSellSuggestion(
-      verticalPack,
-      products,
-      rankedProducts.map((item) => item.product),
+    const crossSellSuggestion = this.filterLoucasCrossSellSuggestion(
+      analysis,
+      catalogProfile,
+      this.salesVerticalPackService.findCrossSellSuggestion(
+        verticalPack,
+        products,
+        rankedProducts.map((item) => item.product),
+      ),
     );
 
     return this.buildSalesRecommendationResponse(
