@@ -1316,6 +1316,35 @@
 - Producao:
   - nao foi tocada nesta rodada
 
+2026-03-29  Loucas com objeção e comparação mais premium
+- Melhorias de inteligencia:
+  - `ta caro` na Loucas agora herda o teto da conversa anterior e nao escapa mais para item acima do orçamento lembrado
+  - comparacao direta como `me compara bala de brigadeiro e banoffe` ficou mais curta, mais comercial e menos palestra de motor
+  - o CTA da objeção da Loucas agora respeita o teto lembrado com fechamento como `sem passar do seu teto`
+  - a memoria da conversa passou a ajudar a resposta de objeção de preço sem desmontar o contexto comercial anterior
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` agora valida comparacao enxuta da Loucas e objeção com teto lembrado
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` passou a cobrar comparacao curta e objeção sem vazar `10 Brigadeiros tradicionais | R$ 25,00`
+- Validacao local desta rodada:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `186/186` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok
+- Validacao em `dev/teste`:
+  - backend atualizado ate o commit `bfab6b9`
+  - `npm.cmd run test:whatsapp:evals` => `42/42` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-184715.json`
+  - smoke real `me indica um presente ate 20 reais pra minha mae` -> `ta caro` respondeu com:
+    - `Entendi a preocupacao com custo. Para baixar o valor sem passar do seu teto, eu iria por Brigadeiro individual mimo.`
+    - sem vazar `10 Brigadeiros tradicionais | R$ 25,00`
+  - smoke real `me compara bala de brigadeiro e banoffe` respondeu com:
+    - `Comparando direto para voce:`
+    - `Bala de brigadeiro | R$ 12,00 | Delícias | entra melhor se voce quer um docinho mais pratico e facil de servir.`
+    - `Banoffe ( torta de banana) | R$ 18,00 | Delícias | entra melhor se voce quer uma sobremesa mais cremosa e mais indulgente.`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+- Producao:
+  - nao foi tocada nesta rodada
+
 2026-03-29  CTA consultivo da Loucas mais premium
 - Melhorias de inteligencia:
   - o fechamento da resposta consultiva da Loucas ficou mais curto e mais acionavel
