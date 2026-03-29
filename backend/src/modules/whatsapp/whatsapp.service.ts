@@ -5524,7 +5524,7 @@ export class WhatsappService {
       })
       .sort((left, right) => right.score - left.score)
       .filter((item) => item.score > 0)
-      .slice(0, 8);
+      .slice(0, 20);
   }
 
   private formatSalesRecommendationLine(item: RankedSalesProduct): string {
