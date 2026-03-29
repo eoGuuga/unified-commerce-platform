@@ -5104,6 +5104,20 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).not.toContain('Calma, acho que eu puxei a conversa para o lado errado');
   });
 
+  it('keeps Loucas gift recommendations focused and without first-touch cross-sell noise', async () => {
+    const service = createService(richerGiftingCatalog) as any;
+
+    const response = await service.generateResponse(
+      'me indica um presente bonito pra minha mae sem exagero',
+      'tenant-id',
+      createConversation(),
+    );
+
+    expect(response).toContain('Brigadeiro individual mimo');
+    expect(response).not.toContain('Combo 3 unidades Surpresa de uva');
+    expect(response).not.toContain('eu ainda combinaria com Caixa presenteavel 12 brigadeiros tradicionais');
+  });
+
   it('answers complement questions without turning the suggestion into a disproportionate upsell', async () => {
     const service = createService(combinationBalanceCatalog) as any;
 

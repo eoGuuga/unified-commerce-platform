@@ -716,7 +716,10 @@
             "Estas sao as opcoes",
             "Brigadeiro individual mimo"
           ],
-          "forbidAny": []
+          "forbidAny": [
+            "Combo 3 unidades Surpresa de uva",
+            "eu ainda combinaria com Caixa presente"
+          ]
         },
         {
           "message": "agora quero algo menor e menos chamativo",

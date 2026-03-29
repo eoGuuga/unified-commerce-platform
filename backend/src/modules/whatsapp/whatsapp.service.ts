@@ -5604,11 +5604,17 @@ export class WhatsappService {
     }
 
     if (wantsGift) {
-      const giftProducts = filterByPattern(
-        /\b(presente|presentear|presenteavel|caixa|kit|mimo|lembranc|combo 3 unidades)\b/,
+      const safeGiftPool = rankedProducts.filter((item) => {
+        const document = getNormalizedLoucasDocument(item);
+        return !/\b(combo 3 unidades|cartao|cartao recadinho|sacola|embalagem)\b/.test(document);
+      });
+      const giftProducts = safeGiftPool.filter((item) =>
+        /\b(presente|presentear|presenteavel|caixa|kit|mimo|lembranc)\b/.test(
+          getNormalizedLoucasDocument(item),
+        ),
       );
       if (giftProducts.length >= 2) {
-        return [...giftProducts, ...rankedProducts.filter((item) => !giftProducts.includes(item))];
+        return [...giftProducts, ...safeGiftPool.filter((item) => !giftProducts.includes(item))];
       }
     }
 
@@ -5706,6 +5712,7 @@ export class WhatsappService {
     analysis: SalesConversationAnalysis,
     catalogProfile: CatalogSalesProfile,
     crossSellSuggestion: SalesVerticalCrossSellSuggestion | null,
+    context: 'recommendation' | 'combination' = 'recommendation',
   ): SalesVerticalCrossSellSuggestion | null {
     if (!crossSellSuggestion) {
       return null;
@@ -5715,7 +5722,11 @@ export class WhatsappService {
       return crossSellSuggestion;
     }
 
-    return analysis.useCaseTags.includes('gift') ? crossSellSuggestion : null;
+    if (analysis.useCaseTags.includes('gift')) {
+      return context === 'combination' ? crossSellSuggestion : null;
+    }
+
+    return null;
   }
 
   private buildSalesNeedLine(strategy: SalesConversationStrategy): string | null {
@@ -6724,6 +6735,7 @@ export class WhatsappService {
           products,
           [referenceProduct],
         ),
+        'combination',
       );
       await this.rememberConversationIntelligence(conversation, {
         last_intent: 'recommendation',
@@ -6773,6 +6785,7 @@ export class WhatsappService {
             products,
             rankedProducts.map((item) => item.product),
           ),
+      'recommendation',
     );
 
     return this.buildSalesRecommendationResponse(
