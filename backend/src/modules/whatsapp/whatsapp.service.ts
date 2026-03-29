@@ -5924,6 +5924,56 @@ export class WhatsappService {
     return currentRankedProducts;
   }
 
+  private buildLoucasExplicitCuratedCandidates(
+    products: ProductWithStock[],
+    preferredPatterns: RegExp[],
+    excludedPatterns: RegExp[],
+    secondaryReason: string,
+  ): RankedSalesProduct[] {
+    return products
+      .filter(
+        (product) =>
+          product.is_active !== false &&
+          Number(product.available_stock || 0) > 0 &&
+          !this.isSupportAccessoryProduct(product),
+      )
+      .map((product, index) => {
+        const document = this.normalizeForSearch(this.buildProductSalesDocument(product));
+        if (excludedPatterns.some((pattern) => pattern.test(document))) {
+          return null;
+        }
+
+        const priority = preferredPatterns.findIndex((pattern) => pattern.test(document));
+        if (priority === -1) {
+          return null;
+        }
+
+        const reasons = ['pronto para venda agora', secondaryReason];
+        return {
+          product,
+          score: 300 - priority * 20 + Math.min(Number(product.available_stock || 0), 10),
+          reasons,
+          index,
+        };
+      })
+      .filter(
+        (
+          item,
+        ): item is RankedSalesProduct & {
+          index: number;
+        } => Boolean(item),
+      )
+      .sort((left, right) => {
+        if (left.score !== right.score) {
+          return right.score - left.score;
+        }
+
+        return left.index - right.index;
+      })
+      .slice(0, 4)
+      .map(({ product, score, reasons }) => ({ product, score, reasons }));
+  }
+
   private filterLoucasCrossSellSuggestion(
     analysis: SalesConversationAnalysis,
     catalogProfile: CatalogSalesProfile,
@@ -6994,18 +7044,44 @@ export class WhatsappService {
       mode,
       analysis,
     );
-    const effectiveRankedProducts = this.applyLoucasSalesRankingOverrides(
+    let effectiveRankedProducts = this.applyLoucasSalesRankingOverrides(
       baseRankedProducts,
       rankedProducts,
       analysis,
       catalogProfile,
     );
+    const wantsLighterTaste = mode === 'simplify' && this.isTasteLighteningRefinement(normalized);
+
+    if (wantsLighterTaste && catalogProfile.storePersona === 'loucas_brigadeiro') {
+      const loucasLessSweetCandidates = this.buildLoucasExplicitCuratedCandidates(
+        products,
+        [
+          /\bbrownie tradicional\b/,
+          /\bbanoffe\b/,
+          /\bpudim de leite condensado\b/,
+          /\bbolo no pote trufado de maracuja\b/,
+          /\bbolo gelado prestigio\b/,
+          /\bbolo gelado doce de leite com coco\b/,
+        ],
+        [
+          /\bbrigadeiro\b/,
+          /\bninho\b/,
+          /\bcombo 3 unidades\b/,
+          /\bbrownie no copo\b/,
+          /\bindividual mimo\b/,
+          /\bcaixa presenteavel\b/,
+        ],
+        'segue uma linha menos doce sem fugir da cara da Loucas',
+      );
+
+      if (loucasLessSweetCandidates.length) {
+        effectiveRankedProducts = loucasLessSweetCandidates;
+      }
+    }
 
     if (!effectiveRankedProducts.length) {
       return null;
     }
-
-    const wantsLighterTaste = mode === 'simplify' && this.isTasteLighteningRefinement(normalized);
 
     if (
       mode === 'simplify' &&
