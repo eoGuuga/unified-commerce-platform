@@ -1282,3 +1282,36 @@
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
 - Producao:
   - nao foi tocada nesta sequencia
+
+2026-03-29  Resposta consultiva da Loucas mais curta e mais humana
+- Melhorias de inteligencia:
+  - a recomendacao enxuta da Loucas ganhou uma abertura propria, menos com cara de motor e mais com cara de vendedora
+  - presente bonito para a mae sem exagero agora abre direto em `Para presentear sem exagerar, eu comecaria por Brigadeiro individual mimo.`
+  - a camada enxuta passou a adaptar melhor a fala para:
+    - presente
+    - divisao/compartilhamento
+    - autoindulgencia
+    - foco em chocolate
+    - sobremesa cremosa
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` agora trava que a recomendacao inicial da Loucas:
+    - nao volte para `Pensando em presentear sua mae sem errar a leitura`
+    - continue sem `Combo 3 unidades Surpresa de uva`
+    - continue sem cross-sell barulhento na primeira resposta
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` agora tambem proibe essa abertura longa no caso de presente delicado
+- Validacao local desta rodada:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `185/185` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok
+- Validacao em `dev/teste`:
+  - backend atualizado ate o commit `774abdb`
+  - `npm.cmd run test:whatsapp:evals` => `41/41` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-153805.json`
+  - smoke real `me indica um presente bonito pra minha mae sem exagero` respondeu com:
+    - `Para presentear sem exagerar, eu comecaria por Brigadeiro individual mimo.`
+    - `Brigadeiro individual mimo`
+    - `3 Brigadeiros tradicionais`
+    - `Brownie c/ ninho nutella e kinder`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+- Producao:
+  - nao foi tocada nesta rodada
