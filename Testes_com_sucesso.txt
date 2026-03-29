@@ -1374,3 +1374,46 @@
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
 - Producao:
   - nao foi tocada nesta rodada
+
+2026-03-29  Curadoria Loucas fechada para visita e menos doce
+- Melhorias de inteligencia:
+  - a IA da Loucas agora fecha `quero algo pra levar pra visita` com uma curadoria comercial clara:
+    - `10 Brigadeiros tradicionais`
+    - `Banoffe ( torta de banana)`
+    - `Brownie tradicional`
+  - a janela de candidatos do ranking consultivo foi ampliada para a curadoria final nao ficar presa num topo estreito demais
+  - o refinamento `quero algo menos doce` ganhou override explicito em cima do catalogo real da Loucas, puxando a linha correta em vez de cair de volta em docinhos tradicionais
+  - a curadoria menos doce agora prioriza:
+    - `Brownie tradicional`
+    - `Banoffe ( torta de banana)`
+    - `Pudim de leite condensado`
+    - e so depois outras opcoes mais leves do catalogo
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/whatsapp.service.ts` passou a ordenar a curadoria Loucas por preferencia explicita em `visita`
+  - o mesmo arquivo ganhou uma camada de candidatos explicitos para `menos doce` em cima do catalogo vivo
+  - a bateria `backend/scripts/whatsapp-sales-evals.loucas.json` finalmente ficou toda verde nesses dois cenarios mais sensiveis
+- Validacao local desta rodada:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `190/190` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok
+- Validacao em `dev/teste`:
+  - backend atualizado ate o commit `def6ead`
+  - `npm.cmd run test:whatsapp:evals` => `46/46` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-193224.json`
+  - smoke real `quero algo pra levar pra visita` respondeu com:
+    - `Para dividir bem sem inventar moda, eu comecaria por 10 Brigadeiros tradicionais.`
+    - `10 Brigadeiros tradicionais`
+    - `Banoffe ( torta de banana)`
+    - `Brownie tradicional`
+  - smoke real `me indica um presente bonito pra minha mae` -> `quero algo menos doce` respondeu com:
+    - `Brownie tradicional`
+    - `Banoffe ( torta de banana)`
+    - `Pudim de leite condensado`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+- Commits desta sequencia:
+  - `38dfe00` `refactor(whatsapp): lock Loucas consultative curation order`
+  - `4f3ad9f` `refactor(whatsapp): widen Loucas consultative candidate pool`
+  - `def6ead` `refactor(whatsapp): force Loucas less-sweet live curation`
+- Producao:
+  - nao foi tocada nesta rodada
