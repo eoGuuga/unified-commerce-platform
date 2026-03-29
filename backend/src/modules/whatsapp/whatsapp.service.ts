@@ -5309,7 +5309,16 @@ export class WhatsappService {
       return this.dedupeProducts(resolved).slice(0, 3);
     }
 
-    return this.dedupeProducts([...exactIncludes, ...resolved]).slice(0, 3);
+    const directReferenceQuery = this.extractSalesDirectReferenceQuery(message);
+    const directReferenceProduct = directReferenceQuery
+      ? this.findProductByName(products, directReferenceQuery).produto
+      : null;
+
+    return this.dedupeProducts([
+      ...exactIncludes,
+      ...resolved,
+      ...(directReferenceProduct ? [directReferenceProduct] : []),
+    ]).slice(0, 3);
   }
 
   private stripSalesComparisonLead(segment: string): string {
@@ -5603,7 +5612,7 @@ export class WhatsappService {
 
     if (wantsSharing) {
       const sharingProducts = filterByPattern(
-        /\b(10 brigadeiros|10 beijinhos|12 brigadeiros|12 beijinhos|caixa|combo|kit|bolo vulcao|bolo vulcão|torta|duzia)\b/,
+        /\b(6 brigadeiros|6 beijinhos|10 brigadeiros|10 beijinhos|12 brigadeiros|12 beijinhos|caixa|kit|bolo vulcao|bolo vulcão|torta|duzia|bolo gelado)\b/,
       );
       if (sharingProducts.length >= 2) {
         return [...sharingProducts, ...rankedProducts.filter((item) => !sharingProducts.includes(item))];
@@ -5634,6 +5643,7 @@ export class WhatsappService {
         /\b(brigadeiro|brownie|brigaleite|prestigio|prestígio|chocolate|trufado)\b/,
       ).filter(
         (item) =>
+          this.normalizeForSearch(item.product.categoria?.name || '') !== 'presentear' &&
           !/\b(presente|presentear|presenteavel|caixa|kit)\b/.test(
             this.buildProductSalesDocument(item.product),
           ),
@@ -5762,6 +5772,24 @@ export class WhatsappService {
       'complementa',
       'complementar',
     ]);
+  }
+
+  private extractSalesDirectReferenceQuery(message: string): string | null {
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return null;
+    }
+
+    const stripped = normalized
+      .replace(
+        /^.*?\b(?:combina com|combina bem com|vai bem com|vai junto com|pra ir junto com|para ir junto com|pra acompanhar|para acompanhar|acompanha bem|complementa|complementar)\b\s*/,
+        '',
+      )
+      .replace(/^(?:o|a|os|as|um|uma)\s+/, '')
+      .replace(/[?.!,;:]+$/g, '')
+      .trim();
+
+    return stripped.length >= 3 ? stripped : null;
   }
 
   private isSalesUpgradeRefinementQuery(message: string): boolean {
@@ -7619,7 +7647,8 @@ export class WhatsappService {
     conversation?: TypedConversation,
   ): Promise<string | null> {
     const analysis = this.salesIntelligenceService.analyze(message);
-    if (analysis.intent === 'other') {
+    const allowDirectCombination = this.isSalesCombinationQuery(message);
+    if (analysis.intent === 'other' && !allowDirectCombination) {
       return null;
     }
 
@@ -7648,6 +7677,71 @@ export class WhatsappService {
     const verticalPack = this.salesVerticalPackService.buildPack(playbook, products);
 
     const referencedProducts = this.findMentionedSalesProducts(products, message);
+    if (this.isSalesCombinationQuery(message) && referencedProducts.length >= 1) {
+      const referenceProduct = referencedProducts[0];
+      const combinationAnalysis = this.buildContextAwareSalesAnalysis(
+        'combination',
+        conversation,
+        referenceProduct,
+      );
+      const combinationStrategy = this.salesSegmentStrategyService.buildStrategy(
+        playbook,
+        combinationAnalysis,
+      );
+      const combinationRankedProducts = this.filterRankedProductsForContextAwareSales(
+        this.prioritizeLoucasFocusedProducts(
+          this.prioritizePrimarySalesProducts(
+            this.rankProductsForSalesConversation(
+              products,
+              combinationAnalysis,
+              playbook,
+              combinationStrategy,
+              catalogProfile,
+              referenceProduct,
+            ),
+            combinationAnalysis,
+          ),
+          combinationAnalysis,
+          catalogProfile,
+        ),
+        conversation,
+        referenceProduct,
+        'combination',
+        combinationAnalysis,
+      );
+
+      if (combinationRankedProducts.length) {
+        const crossSellSuggestion = this.filterLoucasCrossSellSuggestion(
+          combinationAnalysis,
+          catalogProfile,
+          this.salesVerticalPackService.findCrossSellSuggestion(verticalPack, products, [
+            referenceProduct,
+          ]),
+        );
+
+        await this.rememberConversationIntelligence(conversation, {
+          last_intent: 'recommendation',
+          last_product_name: combinationRankedProducts[0].product.name,
+          last_product_names: [
+            referenceProduct.name,
+            ...combinationRankedProducts.map((item) => item.product.name),
+          ],
+          last_quantity: null,
+          last_query: message,
+          last_budget_ceiling: combinationAnalysis.budgetCeiling,
+          last_customer_goal:
+            combinationAnalysis.customerGoalSummary ||
+            analysis.customerGoalSummary ||
+            null,
+        });
+
+        return this.buildSalesCombinationResponse(
+          referenceProduct,
+          combinationRankedProducts,
+          crossSellSuggestion,
+        );
+      }
+    }
 
     if (analysis.intent === 'comparison') {
       const comparisonProducts =

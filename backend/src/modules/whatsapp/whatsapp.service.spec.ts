@@ -1621,6 +1621,19 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).not.toContain('Caixa presenteavel 12 brigadeiros tradicionais');
   });
 
+  it('handles a direct Loucas combination question without needing previous conversation context', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'o que combina com banoffe?',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Banoffe ( torta de banana)');
+    expect(response).toMatch(/Bala de brigadeiro|3 Brigadeiros tradicionais|Brownie tradicional/);
+    expect(response).not.toContain('Caixa presenteavel 12 brigadeiros tradicionais');
+  });
+
   it('answers price objections with safer alternatives from the catalog', async () => {
     const { service } = createFixture(catalog);
 
