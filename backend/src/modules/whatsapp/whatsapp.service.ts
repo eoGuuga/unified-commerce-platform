@@ -6254,6 +6254,14 @@ export class WhatsappService {
       return false;
     }
 
+    if (
+      this.isSalesSocialProofQuery(analysis) ||
+      this.isSalesSafeChoiceQuery(analysis) ||
+      this.isSalesValueChoiceQuery(analysis)
+    ) {
+      return false;
+    }
+
     if (analysis.intent === 'budget' || analysis.intent === 'objection') {
       return false;
     }
