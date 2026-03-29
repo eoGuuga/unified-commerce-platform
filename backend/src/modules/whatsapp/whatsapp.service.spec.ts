@@ -5116,6 +5116,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Brigadeiro individual mimo');
     expect(response).not.toContain('Combo 3 unidades Surpresa de uva');
     expect(response).not.toContain('eu ainda combinaria com Caixa presenteavel 12 brigadeiros tradicionais');
+    expect(response).not.toContain('Pensando em presentear sua mae sem errar a leitura');
   });
 
   it('answers complement questions without turning the suggestion into a disproportionate upsell', async () => {

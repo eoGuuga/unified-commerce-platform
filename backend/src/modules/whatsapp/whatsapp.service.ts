@@ -6887,6 +6887,37 @@ export class WhatsappService {
     return `Eu colocaria ${topProduct.name} na frente primeiro para encurtar a decisao com seguranca.`;
   }
 
+  private buildLoucasLeanRecommendationLead(
+    analysis: SalesConversationAnalysis,
+    topProduct: ProductWithStock,
+  ): string | null {
+    if (analysis.useCaseTags.includes('gift')) {
+      if (analysis.budgetCeiling !== null) {
+        return `Para presentear sem exagerar e dentro do seu teto, eu comecaria por ${topProduct.name}.`;
+      }
+
+      return `Para presentear sem exagerar, eu comecaria por ${topProduct.name}.`;
+    }
+
+    if (analysis.useCaseTags.includes('sharing')) {
+      return `Para dividir bem sem inventar moda, eu comecaria por ${topProduct.name}.`;
+    }
+
+    if (analysis.useCaseTags.includes('self_treat')) {
+      return `Para matar a vontade sem complicar, eu comecaria por ${topProduct.name}.`;
+    }
+
+    if (analysis.useCaseTags.includes('chocolate_focus')) {
+      return `Se a ideia e ir no mais chocolatudo, eu comecaria por ${topProduct.name}.`;
+    }
+
+    if (/\b(banoffe|bolo no pote|pudim|torta|sobremesa|cremosa)\b/.test(analysis.normalizedText)) {
+      return `Se a ideia e ir numa sobremesa mais cremosa, eu comecaria por ${topProduct.name}.`;
+    }
+
+    return null;
+  }
+
   private shouldUseLeanSalesRecommendationResponse(
     analysis: SalesConversationAnalysis,
     rankedProducts: RankedSalesProduct[],
@@ -7125,6 +7156,10 @@ export class WhatsappService {
         rankedProducts[0].product,
         rankedProducts.map((item) => item.product),
       );
+      const loucasLeanLead =
+        catalogProfile.storePersona === 'loucas_brigadeiro'
+          ? this.buildLoucasLeanRecommendationLead(analysis, rankedProducts[0].product)
+          : null;
       const leanOptionCount =
         analysis.intent === 'objection' || analysis.intent === 'budget'
           ? 2
@@ -7132,8 +7167,10 @@ export class WhatsappService {
             ? 2
             : 3;
       const leanLead = compactPrelude
-        ? leanReasoning || decisionAnchorLine || intro
-        : [decisionAnchorLine || intro, leanReasoning].filter(Boolean).join(' ');
+        ? loucasLeanLead || leanReasoning || decisionAnchorLine || intro
+        : [loucasLeanLead || decisionAnchorLine || intro, loucasLeanLead ? null : leanReasoning]
+            .filter(Boolean)
+            .join(' ');
 
       return this.buildSalesResponseSections([
         compactPrelude,
