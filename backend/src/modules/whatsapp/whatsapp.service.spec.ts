@@ -4814,6 +4814,64 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).not.toContain('Nao encontrei um item exatamente como');
   });
 
+  it('continues the consultative thread when the customer asks for another option', async () => {
+    const service = createService(richerGiftingCatalog) as any;
+
+    const response = await service.generateResponse(
+      'me mostra outra opcao',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_name: 'Brigadeiro individual mimo',
+            last_product_names: ['Brigadeiro individual mimo'],
+            last_customer_goal: 'um presente bonito para a minha mae sem exagero',
+            last_query: 'me indica um presente bonito para a minha mae sem exagero',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Sem problema, eu nao vou insistir no que nao te pegou.');
+    expect(response).toContain('Estas sao as opcoes que eu colocaria na sua frente agora');
+    expect(response).toMatch(
+      /Caixa presenteavel com 3 brigadeiros|Kit Doce presente|Caixa presenteavel com 6 brigadeiros tradicionais/,
+    );
+    expect(response).not.toContain('Calma, acho que eu puxei a conversa para o lado errado');
+    expect(response).not.toContain('Nao encontrei um item exatamente como');
+  });
+
+  it('lowers the ticket when the customer asks for another cheaper option', async () => {
+    const service = createService(richerGiftingCatalog) as any;
+
+    const response = await service.generateResponse(
+      'me mostra outra mais em conta',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_name: 'Caixa presenteavel com 6 brigadeiros tradicionais',
+            last_product_names: ['Caixa presenteavel com 6 brigadeiros tradicionais'],
+            last_customer_goal: 'um presente bonito para a minha mae',
+            last_query: 'me indica um presente bonito para a minha mae',
+            last_budget_ceiling: 20,
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Sem problema, eu baixo o valor sem desmontar o que voce quer.');
+    expect(response).toContain('Estas sao as opcoes que eu colocaria na sua frente agora');
+    expect(response).toMatch(/Brigadeiro individual mimo|Caixa presenteavel com 3 brigadeiros|Kit Doce presente/);
+    expect(response).not.toContain('eu ainda combinaria');
+    expect(response).not.toContain('Calma, acho que eu puxei a conversa para o lado errado');
+    expect(response).not.toContain('Nao encontrei um item exatamente como');
+  });
+
   it('refines the last recommendation when the customer wants something smaller and more delicate', async () => {
     const service = createService(richerGiftingCatalog) as any;
 

@@ -114,7 +114,7 @@ type RankedSalesProduct = {
   reasons: string[];
 };
 
-type ContextAwareSalesMode = 'combination' | 'upgrade' | 'recovery' | 'simplify';
+type ContextAwareSalesMode = 'combination' | 'upgrade' | 'recovery' | 'simplify' | 'budget';
 
 @Injectable()
 export class WhatsappService {
@@ -5724,11 +5724,45 @@ export class WhatsappService {
       'nao curti nenhum',
       'me salva',
       'me salva ai',
+      'outra opcao',
+      'outra opção',
+      'me mostra outra',
+      'me mostra outra opcao',
+      'me mostra outra opção',
+      'tem outra',
+      'quero ver outra',
+      'me da outra',
+      'me de outra',
+      'outra sugestao',
+      'outra sugestão',
       'outra linha',
       'outra pegada',
       'algo diferente',
       'nenhuma dessas',
       'nenhum desses',
+    ]);
+  }
+
+  private isSalesBudgetRefinementQuery(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+
+    if (
+      /\b(mais em conta|mais barato|mais barata|abaixa o valor|baixar o valor|segura o valor|baratinh|economi)\b/.test(
+        normalized,
+      )
+    ) {
+      return true;
+    }
+
+    return this.hasAnyNormalizedPhrase(normalized, [
+      'me mostra outra mais em conta',
+      'me mostra outra mais barata',
+      'tem outra mais em conta',
+      'tem outra mais barata',
+      'outra mais em conta',
+      'outra mais barata',
+      'algo mais em conta',
+      'algo mais barato',
     ]);
   }
 
@@ -5816,6 +5850,13 @@ export class WhatsappService {
       return rememberedContext ? `${rememberedContext}. Agora ${simplifyBase}` : simplifyBase;
     }
 
+    if (mode === 'budget') {
+      const budgetBase = referenceProduct
+        ? `me indica algo mais em conta do que ${referenceProduct.name}, sem desmontar o sentido dessa compra`
+        : 'me indica algo mais em conta, sem desmontar o sentido dessa compra';
+      return rememberedContext ? `${rememberedContext}. Agora ${budgetBase}` : budgetBase;
+    }
+
     const recoveryBase = 'me indica outra opcao que faca mais sentido agora';
     return rememberedContext ? `${rememberedContext}. Agora ${recoveryBase}` : recoveryBase;
   }
@@ -5838,6 +5879,16 @@ export class WhatsappService {
         };
       }
 
+      if (mode === 'budget') {
+        return {
+          ...analyzed,
+          intent: 'budget',
+          pricePreference: 'budget',
+          budgetCeiling:
+            analyzed.budgetCeiling !== null ? analyzed.budgetCeiling : rememberedBudget ?? null,
+        };
+      }
+
       return {
         ...analyzed,
         budgetCeiling:
@@ -5848,7 +5899,7 @@ export class WhatsappService {
     const memory = this.getConversationIntelligenceMemory(conversation);
     return {
       ...analyzed,
-      intent: 'recommendation',
+      intent: mode === 'budget' ? 'budget' : 'recommendation',
       confidence: Math.max(analyzed.confidence, 0.72),
       commercialQuery: syntheticQuery,
       customerGoalSummary:
@@ -5857,7 +5908,12 @@ export class WhatsappService {
         'uma opcao melhor alinhada ao que voce quer agora',
       decisionStage: 'refining',
       budgetCeiling: memory.last_budget_ceiling ?? analyzed.budgetCeiling,
-      pricePreference: mode === 'upgrade' ? 'premium' : analyzed.pricePreference,
+      pricePreference:
+        mode === 'upgrade'
+          ? 'premium'
+          : mode === 'budget'
+            ? 'budget'
+            : analyzed.pricePreference,
       conversationDrivers:
         analyzed.conversationDrivers.length > 0
           ? analyzed.conversationDrivers
@@ -6140,6 +6196,52 @@ export class WhatsappService {
       }
     }
 
+    if (mode === 'budget' && referenceProduct) {
+      const referencePrice = Number(referenceProduct.price || 0);
+      const referenceCategory = this.normalizeForSearch(referenceProduct.categoria?.name || '');
+      refined = refined
+        .map((item) => {
+          const productPrice = Number(item.product.price || 0);
+          const normalizedCategory = this.normalizeForSearch(item.product.categoria?.name || '');
+          let score = item.score;
+          const reasons = [...item.reasons];
+
+          if (referencePrice > 0 && productPrice < referencePrice - 0.0001) {
+            score += 16;
+          } else if (referencePrice > 0 && productPrice <= referencePrice + 0.0001) {
+            score += 6;
+          } else if (referencePrice > 0 && productPrice > referencePrice + 0.0001) {
+            score -= 14;
+          }
+
+          if (referenceCategory && normalizedCategory === referenceCategory) {
+            score += 8;
+          }
+
+          if (
+            referencePrice > 0 &&
+            productPrice < referencePrice - 0.0001 &&
+            !reasons.includes(`baixa o valor em relacao a ${referenceProduct.name}`)
+          ) {
+            reasons.unshift(`baixa o valor em relacao a ${referenceProduct.name}`);
+          }
+
+          return {
+            product: item.product,
+            score,
+            reasons: reasons.slice(0, 3),
+          };
+        })
+        .sort((left, right) => right.score - left.score);
+
+      const cheaperOrEqual = refined.filter(
+        (item) => referencePrice <= 0 || Number(item.product.price || 0) <= referencePrice + 0.0001,
+      );
+      if (cheaperOrEqual.length) {
+        refined = cheaperOrEqual;
+      }
+    }
+
     return refined.slice(0, 4);
   }
 
@@ -6265,6 +6367,8 @@ export class WhatsappService {
 
     const mode: ContextAwareSalesMode | null = this.isSalesCombinationQuery(normalized)
       ? 'combination'
+      : this.isSalesBudgetRefinementQuery(normalized)
+        ? 'budget'
       : this.isSalesUpgradeRefinementQuery(normalized)
         ? 'upgrade'
         : this.isSalesSimplificationRefinementQuery(normalized)
@@ -6396,6 +6500,8 @@ export class WhatsappService {
     const customPrelude =
       mode === 'upgrade'
         ? ['Entendi: voce quer subir o nivel sem eu te jogar qualquer coisa aleatoria.']
+        : mode === 'budget'
+          ? ['Sem problema, eu baixo o valor sem desmontar o que voce quer.']
         : mode === 'simplify'
           ? ['Entendi: voce quer algo mais delicado e mais facil de acertar, sem eu desmontar o fio da conversa.']
         : ['Sem problema, eu nao vou insistir no que nao te pegou.'];
@@ -6412,7 +6518,7 @@ export class WhatsappService {
     });
 
     const crossSellSuggestion =
-      mode === 'simplify'
+      mode === 'simplify' || mode === 'budget'
         ? null
         : this.salesVerticalPackService.findCrossSellSuggestion(
             verticalPack,

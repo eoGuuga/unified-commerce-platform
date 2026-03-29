@@ -732,6 +732,55 @@
       ]
     },
     {
+      "name": "recovery_refinement_should_offer_another_option_from_the_same_consultative_thread",
+      "steps": [
+        {
+          "message": "me indica um presente bonito pra minha mae sem exagero",
+          "expectAny": [
+            "Estas sao as opcoes",
+            "Brigadeiro individual mimo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "me mostra outra opcao",
+          "expectAny": [
+            "Sem problema, eu nao vou insistir no que nao te pegou.",
+            "Estas sao as opcoes"
+          ],
+          "forbidAny": [
+            "Nao encontrei um item exatamente",
+            "Calma, acho que eu puxei a conversa para o lado errado"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "budget_refinement_should_lower_ticket_without_restarting_the_consultative_flow",
+      "steps": [
+        {
+          "message": "me indica um presente bonito pra minha mae",
+          "expectAny": [
+            "Estas sao as opcoes",
+            "Caixa presente"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "me mostra outra mais em conta",
+          "expectAny": [
+            "Sem problema, eu baixo o valor sem desmontar o que voce quer.",
+            "Estas sao as opcoes"
+          ],
+          "forbidAny": [
+            "eu ainda combinaria",
+            "Nao encontrei um item exatamente",
+            "Calma, acho que eu puxei a conversa para o lado errado"
+          ]
+        }
+      ]
+    },
+    {
       "name": "consultative_negative_feedback_should_focus_the_next_step",
       "steps": [
         {
