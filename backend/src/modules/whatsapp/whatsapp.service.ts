@@ -5655,7 +5655,7 @@ export class WhatsappService {
     if (wantsSimpleGift) {
       const simpleGiftPool = rankedProducts.filter((item) => {
         const document = getNormalizedLoucasDocument(item);
-        return !/\b(cartao|cartao recadinho|sacola|embalagem|10 brigadeiros|10 beijinhos|12 brigadeiros|12 beijinhos|caixa presenteavel 12|bolo no pote|400 ml)\b/.test(
+        return !/\b(cartao|cartao recadinho|sacola|embalagem|combo 3 unidades|10 brigadeiros|10 beijinhos|12 brigadeiros|12 beijinhos|caixa presenteavel 12|bolo no pote|400 ml)\b/.test(
           document,
         );
       });
@@ -5977,7 +5977,7 @@ export class WhatsappService {
             /\b(brigadeiro individual mimo|3 brigadeiros tradicionais|3 beijinhos de coco|bala de brigadeiro presente)\b/.test(
               document,
             ) &&
-            !/\b(cartao|cartao recadinho|sacola|embalagem|10 brigadeiros|12 brigadeiros|bolo no pote|400 ml)\b/.test(
+            !/\b(cartao|cartao recadinho|sacola|embalagem|combo 3 unidades|10 brigadeiros|12 brigadeiros|bolo no pote|400 ml)\b/.test(
               document,
             )
           );
