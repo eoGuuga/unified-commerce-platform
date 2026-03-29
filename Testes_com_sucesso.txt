@@ -1315,3 +1315,33 @@
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
 - Producao:
   - nao foi tocada nesta rodada
+
+2026-03-29  CTA consultivo da Loucas mais premium
+- Melhorias de inteligencia:
+  - o fechamento da resposta consultiva da Loucas ficou mais curto e mais acionavel
+  - em vez de perguntas genericas demais, a IA agora fecha com convites como:
+    - `Se quiser, eu ja separo Brigadeiro individual mimo ou te mostro a proxima opcao acima sem exagerar.`
+    - `Se quiser, eu ja separo X ou te mostro uma opcao mais em conta.`
+    - `Se quiser, eu ja separo X ou te mostro uma opcao maior para dividir.`
+    - `Se quiser, eu ja separo X ou te mostro outra opcao da mesma linha.`
+  - a mudanca ficou focalizada na Loucas por Brigadeiro, sem abrir efeito colateral no restante do motor
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` agora valida melhor o CTA da Loucas em recomendacao consultiva e em teto de valor
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` passou a exigir `Se quiser, eu ja separo` no caso de presente delicado
+- Validacao local desta rodada:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `185/185` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok
+- Validacao em `dev/teste`:
+  - backend atualizado ate o commit `b9c7633`
+  - `npm.cmd run test:whatsapp:evals` => `41/41` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-161619.json`
+  - smoke real `me indica um presente bonito pra minha mae sem exagero` respondeu com:
+    - `Para presentear sem exagerar, eu comecaria por Brigadeiro individual mimo.`
+    - `Brigadeiro individual mimo`
+    - `3 Brigadeiros tradicionais`
+    - `Brownie c/ ninho nutella e kinder`
+    - `Se quiser, eu ja separo Brigadeiro individual mimo ou te mostro a proxima opcao acima sem exagerar.`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+- Producao:
+  - nao foi tocada nesta rodada
