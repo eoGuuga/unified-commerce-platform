@@ -114,6 +114,8 @@ type RankedSalesProduct = {
   reasons: string[];
 };
 
+type ContextAwareSalesMode = 'combination' | 'upgrade' | 'recovery';
+
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
@@ -5476,6 +5478,413 @@ export class WhatsappService {
     return null;
   }
 
+  private isSalesCombinationQuery(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    return this.hasAnyNormalizedPhrase(normalized, [
+      'combina com',
+      'combina bem com',
+      'vai bem com',
+      'vai junto com',
+      'pra ir junto com',
+      'para ir junto com',
+      'pra acompanhar',
+      'para acompanhar',
+      'acompanha bem',
+      'complementa',
+      'complementar',
+    ]);
+  }
+
+  private isSalesUpgradeRefinementQuery(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    if (
+      /\b(impressione mais|mais impressionante|mais marcante|mais premium|mais caprichado|mais forte)\b/.test(
+        normalized,
+      ) &&
+      /\b(esse|essa)\b/.test(normalized)
+    ) {
+      return true;
+    }
+
+    return this.hasAnyNormalizedPhrase(normalized, [
+      'algo melhor que esse',
+      'algo melhor que essa',
+      'mais premium que esse',
+      'mais premium que essa',
+      'mais marcante que esse',
+      'mais marcante que essa',
+      'mais forte que esse',
+      'mais forte que essa',
+      'algo acima',
+      'uma acima',
+      'subir o nivel',
+      'mais impressionante',
+      'impressione mais que esse',
+      'impressione mais que essa',
+      'mais caprichado que esse',
+      'mais caprichado que essa',
+    ]);
+  }
+
+  private isSalesRejectionRecoveryQuery(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    return this.hasAnyNormalizedPhrase(normalized, [
+      'nao gostei de nenhuma',
+      'nao gostei de nenhum',
+      'nao gostei dessas',
+      'nao gostei desses',
+      'nenhuma me pegou',
+      'nenhum me pegou',
+      'nao curti nenhuma',
+      'nao curti nenhum',
+      'me salva',
+      'me salva ai',
+      'outra linha',
+      'outra pegada',
+      'algo diferente',
+      'nenhuma dessas',
+      'nenhum desses',
+    ]);
+  }
+
+  private resolveConversationReferenceProduct(
+    products: ProductWithStock[],
+    conversation?: TypedConversation,
+    mentionedProducts: ProductWithStock[] = [],
+  ): ProductWithStock | null {
+    if (mentionedProducts.length) {
+      return mentionedProducts[0];
+    }
+
+    const memory = this.getConversationIntelligenceMemory(conversation);
+    if (memory.last_catalog_product_id) {
+      const byId = products.find(
+        (product) => String(product.id) === String(memory.last_catalog_product_id),
+      );
+      if (byId) {
+        return byId;
+      }
+    }
+
+    const rememberedNames = this.buildUniqueProductNames([
+      memory.last_product_name,
+      ...(memory.last_product_names || []),
+    ]);
+
+    for (const name of rememberedNames) {
+      const normalizedRemembered = this.normalizeForSearch(name);
+      const match = products.find((product) => {
+        const normalizedProduct = this.normalizeForSearch(product.name);
+        return (
+          normalizedProduct === normalizedRemembered ||
+          normalizedProduct.includes(normalizedRemembered) ||
+          normalizedRemembered.includes(normalizedProduct)
+        );
+      });
+
+      if (match) {
+        return match;
+      }
+    }
+
+    return null;
+  }
+
+  private buildContextAwareSalesQuery(
+    mode: ContextAwareSalesMode,
+    conversation: TypedConversation | undefined,
+    referenceProduct?: ProductWithStock | null,
+  ): string {
+    const memory = this.getConversationIntelligenceMemory(conversation);
+    const rememberedGoal = (memory.last_customer_goal || memory.last_query || '').trim();
+
+    if (mode === 'combination' && referenceProduct) {
+      return rememberedGoal
+        ? `me indica algo que combina com ${referenceProduct.name} para ${rememberedGoal}`
+        : `me indica algo que combina com ${referenceProduct.name}`;
+    }
+
+    if (mode === 'upgrade') {
+      const upgradeBase = referenceProduct
+        ? `me indica algo mais premium e mais marcante do que ${referenceProduct.name}`
+        : 'me indica algo mais premium e mais marcante';
+      return rememberedGoal ? `${upgradeBase} para ${rememberedGoal}` : upgradeBase;
+    }
+
+    const recoveryBase = 'me indica outra opcao que faca mais sentido agora';
+    return rememberedGoal ? `${recoveryBase} para ${rememberedGoal}` : recoveryBase;
+  }
+
+  private buildContextAwareSalesAnalysis(
+    mode: ContextAwareSalesMode,
+    conversation: TypedConversation | undefined,
+    referenceProduct?: ProductWithStock | null,
+  ): SalesConversationAnalysis {
+    const syntheticQuery = this.buildContextAwareSalesQuery(mode, conversation, referenceProduct);
+    const analyzed = this.salesIntelligenceService.analyze(syntheticQuery);
+    if (analyzed.intent !== 'other') {
+      if (mode === 'upgrade' && analyzed.pricePreference === null) {
+        return {
+          ...analyzed,
+          pricePreference: 'premium',
+        };
+      }
+
+      return analyzed;
+    }
+
+    const memory = this.getConversationIntelligenceMemory(conversation);
+    return {
+      ...analyzed,
+      intent: 'recommendation',
+      confidence: Math.max(analyzed.confidence, 0.72),
+      commercialQuery: syntheticQuery,
+      customerGoalSummary:
+        analyzed.customerGoalSummary ||
+        memory.last_customer_goal ||
+        'uma opcao melhor alinhada ao que voce quer agora',
+      decisionStage: 'refining',
+      pricePreference: mode === 'upgrade' ? 'premium' : analyzed.pricePreference,
+      conversationDrivers:
+        analyzed.conversationDrivers.length > 0
+          ? analyzed.conversationDrivers
+          : (['exploration'] as SalesConversationAnalysis['conversationDrivers']),
+    };
+  }
+
+  private filterRankedProductsForContextAwareSales(
+    rankedProducts: RankedSalesProduct[],
+    conversation: TypedConversation | undefined,
+    referenceProduct: ProductWithStock | null,
+    mode: ContextAwareSalesMode,
+  ): RankedSalesProduct[] {
+    const withoutReference = rankedProducts.filter(
+      (item) => !referenceProduct || String(item.product.id) !== String(referenceProduct.id),
+    );
+
+    if (mode === 'combination') {
+      return withoutReference.length ? withoutReference : rankedProducts;
+    }
+
+    const memory = this.getConversationIntelligenceMemory(conversation);
+    const recentNames = new Set(
+      this.buildUniqueProductNames(memory.last_product_names || []).map((name) =>
+        this.normalizeForSearch(name),
+      ),
+    );
+
+    if (!recentNames.size) {
+      return withoutReference.length ? withoutReference : rankedProducts;
+    }
+
+    const withoutRecent = withoutReference.filter(
+      (item) => !recentNames.has(this.normalizeForSearch(item.product.name)),
+    );
+
+    if (withoutRecent.length) {
+      return withoutRecent;
+    }
+
+    return withoutReference.length ? withoutReference : rankedProducts;
+  }
+
+  private buildSalesCombinationResponse(
+    referenceProduct: ProductWithStock,
+    rankedProducts: RankedSalesProduct[],
+    crossSellSuggestion: SalesVerticalCrossSellSuggestion | null,
+  ): string {
+    const primaryMatch =
+      (crossSellSuggestion &&
+        rankedProducts.find(
+          (item) => String(item.product.id) === String(crossSellSuggestion.product.id),
+        )) ||
+      rankedProducts[0];
+    const fallbackReason =
+      primaryMatch?.reasons.slice(0, 2).join(' e ') ||
+      'ajuda a deixar a compra mais redonda sem embolar a escolha';
+    const primaryReason =
+      crossSellSuggestion &&
+      primaryMatch &&
+      String(primaryMatch.product.id) === String(crossSellSuggestion.product.id)
+        ? crossSellSuggestion.reason
+        : fallbackReason;
+
+    const secondaryLines = rankedProducts
+      .filter((item) => !primaryMatch || String(item.product.id) !== String(primaryMatch.product.id))
+      .slice(0, 2)
+      .map((item) => this.formatSalesRecommendationLine(item));
+
+    return this.buildSalesResponseSections([
+      `Se a ideia e complementar ${referenceProduct.name} sem embolar a compra, eu comecaria por ${primaryMatch.product.name}.`,
+      [
+        `${referenceProduct.name} entra como base, e estas seriam as combinacoes mais redondas agora:`,
+        `- ${this.formatProductHeadline(primaryMatch.product)} | ${primaryReason}`,
+        ...secondaryLines,
+      ].join('\n'),
+      `Se quiser, eu ja separo ${referenceProduct.name} com ${primaryMatch.product.name} ou comparo com uma combinacao mais premium.`,
+    ]);
+  }
+
+  private async tryContextAwareSalesResponse(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): Promise<string | null> {
+    if (!conversation) {
+      return null;
+    }
+
+    if (currentState && !['idle', 'order_confirmed', 'order_completed'].includes(currentState)) {
+      return null;
+    }
+
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return null;
+    }
+
+    const mode: ContextAwareSalesMode | null = this.isSalesCombinationQuery(normalized)
+      ? 'combination'
+      : this.isSalesUpgradeRefinementQuery(normalized)
+        ? 'upgrade'
+        : this.isSalesRejectionRecoveryQuery(normalized)
+          ? 'recovery'
+          : null;
+
+    if (!mode) {
+      return null;
+    }
+
+    const products = await this.getCatalogProducts(tenantId);
+    if (!products.length) {
+      return null;
+    }
+
+    const rememberedIntent = String(this.getConversationIntelligenceMemory(conversation).last_intent || '');
+    const referencedProducts = this.findMentionedSalesProducts(products, message);
+    const referenceProduct = this.resolveConversationReferenceProduct(
+      products,
+      conversation,
+      referencedProducts,
+    );
+
+    if (mode === 'combination' && !referenceProduct) {
+      return null;
+    }
+
+    if (!referenceProduct && mode !== 'combination' && !this.hasConsultativeMemory(conversation)) {
+      return null;
+    }
+
+    if (
+      mode !== 'combination' &&
+      rememberedIntent &&
+      !['recommendation', 'comparison', 'budget', 'objection', 'suggestion'].includes(
+        rememberedIntent,
+      )
+    ) {
+      return null;
+    }
+
+    const analysis = this.buildContextAwareSalesAnalysis(mode, conversation, referenceProduct);
+    const conversationalAnalysis = this.conversationalIntelligenceService.analyze(message);
+    const conversationPlan = this.conversationPlannerService.buildPlan({
+      message,
+      conversationalAnalysis,
+      salesAnalysis: analysis,
+      currentState,
+      memory: this.getConversationIntelligenceMemory(conversation),
+    });
+    const playbook = this.salesPlaybookService.inferPlaybook(products);
+    const strategy = this.salesSegmentStrategyService.buildStrategy(playbook, analysis);
+    const catalogProfile = this.catalogSalesContextService.buildProfile(products, playbook);
+    const verticalPack = this.salesVerticalPackService.buildPack(playbook, products);
+    const rankedProducts = this.filterRankedProductsForContextAwareSales(
+      this.prioritizePrimarySalesProducts(
+        this.rankProductsForSalesConversation(
+          products,
+          analysis,
+          playbook,
+          strategy,
+          catalogProfile,
+          referenceProduct,
+        ),
+        analysis,
+      ),
+      conversation,
+      referenceProduct,
+      mode,
+    );
+
+    if (!rankedProducts.length) {
+      return null;
+    }
+
+    if (mode === 'combination' && referenceProduct) {
+      const crossSellSuggestion = this.salesVerticalPackService.findCrossSellSuggestion(
+        verticalPack,
+        products,
+        [referenceProduct],
+      );
+      await this.rememberConversationIntelligence(conversation, {
+        last_intent: 'recommendation',
+        last_product_name: rankedProducts[0].product.name,
+        last_product_names: [referenceProduct.name, ...rankedProducts.map((item) => item.product.name)],
+        last_quantity: null,
+        last_query: analysis.commercialQuery || message,
+        last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
+        last_customer_goal: conversationPlan.customerGoal || null,
+      });
+
+      return this.buildSalesCombinationResponse(
+        referenceProduct,
+        rankedProducts,
+        crossSellSuggestion,
+      );
+    }
+
+    const customPrelude =
+      mode === 'upgrade'
+        ? ['Entendi: voce quer subir o nivel sem eu te jogar qualquer coisa aleatoria.']
+        : ['Sem problema, eu nao vou insistir no que nao te pegou.'];
+
+    await this.rememberConversationIntelligence(conversation, {
+      last_intent: 'recommendation',
+      last_product_name: rankedProducts.length === 1 ? rankedProducts[0].product.name : null,
+      last_product_names: rankedProducts.map((item) => item.product.name),
+      last_quantity: null,
+      last_query: analysis.commercialQuery || message,
+      last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
+      last_customer_goal: conversationPlan.customerGoal || null,
+    });
+
+    const crossSellSuggestion = this.salesVerticalPackService.findCrossSellSuggestion(
+      verticalPack,
+      products,
+      rankedProducts.map((item) => item.product),
+    );
+
+    return this.buildSalesRecommendationResponse(
+      analysis,
+      rankedProducts,
+      playbook,
+      strategy,
+      catalogProfile,
+      verticalPack,
+      crossSellSuggestion,
+      [
+        ...customPrelude,
+        ...this.buildSalesConversationPrelude(
+          conversationalAnalysis,
+          conversationPlan,
+          analysis,
+        ),
+      ],
+      referenceProduct,
+    );
+  }
+
   private buildSalesResponseSections(sections: Array<string | null | undefined>): string {
     return sections
       .map((section) => (section || '').trim())
@@ -8529,6 +8938,16 @@ export class WhatsappService {
       return this.getPremiumOrderNudgeMessage();
     }
 
+    const earlyContextAwareSalesResponse = await this.tryContextAwareSalesResponse(
+      message,
+      tenantId,
+      conversation,
+      currentState,
+    );
+    if (earlyContextAwareSalesResponse) {
+      return earlyContextAwareSalesResponse;
+    }
+
     if (this.shouldUseNonCommercialRecovery(message, conversation, currentState)) {
       return this.getPremiumNonCommercialRecoveryMessage();
     }
@@ -8648,6 +9067,14 @@ export class WhatsappService {
 
     const salesAnalysis = this.salesIntelligenceService.analyze(message);
     if (salesAnalysis.intent !== 'other') {
+      return null;
+    }
+
+    if (
+      this.isSalesCombinationQuery(message) ||
+      this.isSalesUpgradeRefinementQuery(message) ||
+      this.isSalesRejectionRecoveryQuery(message)
+    ) {
       return null;
     }
 

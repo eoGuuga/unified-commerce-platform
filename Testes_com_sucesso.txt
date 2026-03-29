@@ -1049,3 +1049,23 @@
     - `me da a opcao mais segura para presentear` => ancora direta com `Brigadeiro individual mimo`
   - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+
+2026-03-29  Recuperacao consultiva com memoria de contexto e combinacao de produtos
+- Melhorias de inteligencia:
+  - quando o cliente rejeita opcoes anteriores com frases como `nao gostei de nenhuma, me salva ai`, o bot agora abre uma nova direcao consultiva em vez de cair em busca de item ou fallback generico
+  - refinamentos como `quero algo que impressione mais que esse` passaram a usar a memoria do ultimo item e do ultimo objetivo comercial para sugerir uma opcao mais forte sem sequestrar a conversa para pedido direto
+  - perguntas como `o que combina com brigadeiro individual mimo?` agora respondem com complemento real de venda, em vez de tratar a mensagem como produto solto
+  - a resolucao contextual deixou de roubar essas mensagens consultivas para o fluxo de pedido, que era a causa raiz de respostas burras e sem contexto
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` agora cobre:
+    - recuperacao consultiva apos rejeicao de sugestoes
+    - refinamento de recomendacao com `mais impressionante`
+    - resposta direta de combinacao/complemento entre produtos
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` passou a validar tambem:
+    - `consultative_rejection_should_offer_new_direction`
+    - `upgrade_refinement_should_use_previous_context`
+    - `combination_question_should_answer_as_complement`
+- Validacao local desta rodada:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `167/167` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok

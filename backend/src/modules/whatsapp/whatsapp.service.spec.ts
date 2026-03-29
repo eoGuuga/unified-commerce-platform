@@ -197,6 +197,28 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     },
   ];
 
+  const richerGiftingCatalog = [
+    ...giftingCatalogWithAccessories,
+    {
+      id: 'g5',
+      name: 'Kit Doce presente',
+      description: 'Kit mais completo para quem quer subir o nivel do presente.',
+      price: 18,
+      available_stock: 12,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Presentear' },
+    },
+    {
+      id: 'g6',
+      name: 'Caixa presenteavel com 6 brigadeiros tradicionais',
+      description: 'Caixa pronta com mais impacto visual para presente.',
+      price: 26,
+      available_stock: 10,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Presentear' },
+    },
+  ];
+
   const fashionCatalog = [
     {
       id: 'f1',
@@ -4524,5 +4546,83 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('opcoes mais proximas');
     expect(response).toContain('Bolo no pote trufado de maracuja');
     expect(response).not.toContain('PEDIDO PREPARADO');
+  });
+
+  it('recovers consultatively when the customer rejects the previous options', async () => {
+    const service = createService(richerGiftingCatalog) as any;
+
+    const response = await service.generateResponse(
+      'nao gostei de nenhuma, me salva ai',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_name: 'Brigadeiro individual mimo',
+            last_product_names: [
+              'Brigadeiro individual mimo',
+              'Caixa presenteavel com 3 brigadeiros',
+            ],
+            last_customer_goal: 'um presente sem erro para a minha mae',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Sem problema, eu nao vou insistir no que nao te pegou.');
+    expect(response).toContain('Estas sao as opcoes que eu colocaria na sua frente agora');
+    expect(response).toContain('Kit Doce presente');
+    expect(response).not.toContain('Nao encontrei um item exatamente como');
+  });
+
+  it('refines the last recommendation when the customer wants something more impressive', async () => {
+    const service = createService(richerGiftingCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero algo que impressione mais que esse',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_name: 'Brigadeiro individual mimo',
+            last_product_names: ['Brigadeiro individual mimo'],
+            last_customer_goal: 'um presente sem erro para a minha mae',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('subir o nivel');
+    expect(response).toContain('Estas sao as opcoes que eu colocaria na sua frente agora');
+    expect(response).toContain('Kit Doce presente');
+    expect(response).not.toContain('Calma, acho que eu puxei a conversa para o lado errado');
+    expect(response).not.toContain('Nao encontrei um item exatamente como');
+  });
+
+  it('answers complement questions with a direct combination suggestion', async () => {
+    const service = createService(richerGiftingCatalog) as any;
+
+    const response = await service.generateResponse(
+      'o que combina com brigadeiro individual mimo?',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_name: 'Brigadeiro individual mimo',
+            last_product_names: ['Brigadeiro individual mimo'],
+            last_customer_goal: 'um presente rapido e bonito',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Se a ideia e complementar Brigadeiro individual mimo');
+    expect(response).toContain('estas seriam as combinacoes mais redondas agora');
+    expect(response).not.toContain('Nao encontrei um item exatamente como');
   });
 });

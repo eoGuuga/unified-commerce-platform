@@ -573,6 +573,69 @@
           ]
         }
       ]
+    },
+    {
+      "name": "consultative_rejection_should_offer_new_direction",
+      "steps": [
+        {
+          "message": "me indica um presente ate 20 reais pra minha mae",
+          "expectAny": [
+            "Brigadeiro individual mimo",
+            "Estas sao as opcoes"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "nao gostei de nenhuma, me salva ai",
+          "expectAny": [
+            "Sem problema",
+            "Estas sao as opcoes"
+          ],
+          "forbidAny": [
+            "Nao encontrei um item exatamente",
+            "Calma, acho que eu puxei a conversa para o lado errado"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "upgrade_refinement_should_use_previous_context",
+      "steps": [
+        {
+          "message": "me indica um presente ate 20 reais pra minha mae",
+          "expectAny": [
+            "Brigadeiro individual mimo",
+            "Estas sao as opcoes"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "quero algo que impressione mais que esse",
+          "expectAny": [
+            "subir o nivel",
+            "Estas sao as opcoes"
+          ],
+          "forbidAny": [
+            "Nao encontrei um item exatamente",
+            "Calma, acho que eu puxei a conversa para o lado errado"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "combination_question_should_answer_as_complement",
+      "steps": [
+        {
+          "message": "o que combina com brigadeiro individual mimo?",
+          "expectAny": [
+            "Se a ideia e complementar Brigadeiro individual mimo",
+            "combinacoes mais redondas"
+          ],
+          "forbidAny": [
+            "Nao encontrei um item exatamente"
+          ]
+        }
+      ]
     }
   ]
 }
