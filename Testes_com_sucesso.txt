@@ -995,3 +995,8 @@
   - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `161/161` ok
   - `npm.cmd run build` => ok
   - `npm.cmd run lint` => ok
+- Validacao em `dev/teste`:
+  - `npm run test:whatsapp:evals` => `18/18` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260328-233343.json`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
