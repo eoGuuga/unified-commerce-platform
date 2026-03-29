@@ -106,6 +106,7 @@ export interface ConversationIntelligenceMemory {
   last_product_names?: string[] | null;
   last_quantity?: number | null;
   last_query?: string | null;
+  last_budget_ceiling?: number | null;
   last_reference_at?: string | null;
   last_response_mode?: ConversationResponseMode | null;
   last_customer_goal?: string | null;

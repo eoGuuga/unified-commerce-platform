@@ -5636,14 +5636,21 @@ export class WhatsappService {
     const syntheticQuery = this.buildContextAwareSalesQuery(mode, conversation, referenceProduct);
     const analyzed = this.salesIntelligenceService.analyze(syntheticQuery);
     if (analyzed.intent !== 'other') {
+      const rememberedBudget = this.getConversationIntelligenceMemory(conversation).last_budget_ceiling;
       if (mode === 'upgrade' && analyzed.pricePreference === null) {
         return {
           ...analyzed,
           pricePreference: 'premium',
+          budgetCeiling:
+            analyzed.budgetCeiling !== null ? analyzed.budgetCeiling : rememberedBudget ?? null,
         };
       }
 
-      return analyzed;
+      return {
+        ...analyzed,
+        budgetCeiling:
+          analyzed.budgetCeiling !== null ? analyzed.budgetCeiling : rememberedBudget ?? null,
+      };
     }
 
     const memory = this.getConversationIntelligenceMemory(conversation);
@@ -5657,6 +5664,7 @@ export class WhatsappService {
         memory.last_customer_goal ||
         'uma opcao melhor alinhada ao que voce quer agora',
       decisionStage: 'refining',
+      budgetCeiling: memory.last_budget_ceiling ?? analyzed.budgetCeiling,
       pricePreference: mode === 'upgrade' ? 'premium' : analyzed.pricePreference,
       conversationDrivers:
         analyzed.conversationDrivers.length > 0
@@ -6005,6 +6013,7 @@ export class WhatsappService {
         last_product_names: [referenceProduct.name, ...rankedProducts.map((item) => item.product.name)],
         last_quantity: null,
         last_query: analysis.commercialQuery || message,
+        last_budget_ceiling: analysis.budgetCeiling,
         last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
         last_customer_goal: conversationPlan.customerGoal || null,
       });
@@ -6027,6 +6036,7 @@ export class WhatsappService {
       last_product_names: rankedProducts.map((item) => item.product.name),
       last_quantity: null,
       last_query: analysis.commercialQuery || message,
+      last_budget_ceiling: analysis.budgetCeiling,
       last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
       last_customer_goal: conversationPlan.customerGoal || null,
     });
@@ -6819,6 +6829,7 @@ export class WhatsappService {
           last_product_names: comparisonProducts.map((product) => product.name),
           last_quantity: null,
           last_query: analysis.commercialQuery || null,
+          last_budget_ceiling: analysis.budgetCeiling,
           last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
           last_customer_goal: conversationPlan.customerGoal || null,
         });
@@ -6884,6 +6895,7 @@ export class WhatsappService {
       last_product_names: rankedProducts.map((item) => item.product.name),
       last_quantity: null,
       last_query: analysis.commercialQuery || null,
+      last_budget_ceiling: analysis.budgetCeiling,
       last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
       last_customer_goal: conversationPlan.customerGoal || null,
     });
