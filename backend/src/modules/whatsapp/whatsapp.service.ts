@@ -5613,7 +5613,7 @@ export class WhatsappService {
           getNormalizedLoucasDocument(item),
         ),
       );
-      if (giftProducts.length >= 2) {
+      if (giftProducts.length >= 1 && safeGiftPool.length >= 2) {
         return [...giftProducts, ...safeGiftPool.filter((item) => !giftProducts.includes(item))];
       }
     }
