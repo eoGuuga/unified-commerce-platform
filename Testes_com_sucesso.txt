@@ -1073,3 +1073,26 @@
   - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `168/168` ok
   - `npm.cmd run build` => ok
   - `npm.cmd run lint` => ok
+
+2026-03-29  Respostas consultivas mais enxutas nas ancoras de venda
+- Melhorias de inteligencia:
+  - perguntas de ancora direta como `o que sai mais para presente?`, `me da a opcao mais segura para presentear` e `qual compensa mais?` agora respondem de forma mais curta e menos corporativa
+  - quando a recomendacao ja esta muito clara, o bot entra em um modo enxuto e para de repetir leitura de catalogo, necessidade e offer reading em bloco
+  - o modo enxuto tambem passou a segurar melhor contexto de urgencia, com menos opcoes na mesa e menos texto inutil
+  - cross-sell deixou de contaminar essas respostas de ancora direta, o que antes impedia o formato mais limpo no catalogo real da Loucas
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` agora cobre:
+    - ancora social-proof mais enxuta
+    - recomendacao urgente com menos verborragia
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` passou a validar tambem:
+    - `urgent_recommendation_should_stay_lean_when_the_best_path_is_clear`
+    - ausencia de `Dentro do catalogo atual da loja` e `Aqui eu considerei principalmente` nas respostas de ancora direta
+- Validacao local desta rodada:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `170/170` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok
+- Validacao em `dev/teste`:
+  - `npm run test:whatsapp:evals` => `27/27` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-022357.json`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
