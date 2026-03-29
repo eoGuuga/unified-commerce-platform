@@ -5802,19 +5802,56 @@ export class WhatsappService {
         ...currentRankedProducts.filter((item) => !preferredIds.has(String(item.product.id))),
       ].slice(0, 4);
     };
+    const sortByPreferredPatterns = (
+      items: RankedSalesProduct[],
+      patterns: RegExp[],
+    ): RankedSalesProduct[] =>
+      items
+        .map((item, index) => {
+          const document = getDocument(item);
+          const priority = patterns.findIndex((pattern) => pattern.test(document));
+          return {
+            item,
+            index,
+            priority: priority === -1 ? Number.MAX_SAFE_INTEGER : priority,
+          };
+        })
+        .sort((left, right) => {
+          if (left.priority !== right.priority) {
+            return left.priority - right.priority;
+          }
+
+          return left.index - right.index;
+        })
+        .map(({ item }) => item);
 
     const wantsVisit =
       /\b(visita|pra visita|para visita|levar pra visita|levar para visita)\b/.test(normalized);
     if (wantsVisit) {
-      const visitProducts = baseRankedProducts.filter((item) => {
-        const document = getDocument(item);
-        return (
-          /\b(10 brigadeiros|12 brigadeiros|caixa|kit|bolo gelado|banoffe|brownie tradicional|torta)\b/.test(
-            document,
-          ) &&
-          !/\b(individual|mimo|bolo no pote|400 ml|fatia)\b/.test(document)
-        );
-      });
+      const visitProducts = sortByPreferredPatterns(
+        baseRankedProducts.filter((item) => {
+          const document = getDocument(item);
+          return (
+            /\b(10 brigadeiros|12 brigadeiros|caixa|kit|bolo gelado|banoffe|brownie tradicional|torta)\b/.test(
+              document,
+            ) &&
+            !/\b(individual|mimo|bolo no pote|400 ml|fatia)\b/.test(document)
+          );
+        }),
+        [
+          /\b10 brigadeiros tradicionais\b/,
+          /\bbanoffe\b/,
+          /\bbrownie tradicional\b/,
+          /\b6 brigadeiros tradicionais\b/,
+          /\bbolo gelado prestigio\b/,
+          /\bbolo gelado briganinho\b/,
+          /\bbolo gelado doce de leite com coco\b/,
+          /\btorta supreme de morango\b/,
+          /\b12 brigadeiros\b/,
+          /\bcaixa\b/,
+          /\bkit\b/,
+        ],
+      );
 
       if (visitProducts.length) {
         return mergeWithCurrent(visitProducts.slice(0, 4));
@@ -5833,6 +5870,36 @@ export class WhatsappService {
 
       if (safePrettyProducts.length) {
         return mergeWithCurrent(safePrettyProducts.slice(0, 4));
+      }
+    }
+
+    if (this.isTasteLighteningRefinement(normalized)) {
+      const preferredLighterProducts = sortByPreferredPatterns(
+        baseRankedProducts.filter((item) => {
+          const document = getDocument(item);
+          return (
+            /\b(brownie tradicional|banoffe|pudim|maracuja|maracuj|pao de mel|bolo gelado|bolo no pote trufado de maracuja)\b/.test(
+              document,
+            ) &&
+            !/\b(brigadeiro individual mimo|3 brigadeiros|6 brigadeiros|10 brigadeiros|12 brigadeiros|caixa presenteavel 12|combo 3 unidades|ninho nutella|ninho e nutella|brownie no copo)\b/.test(
+              document,
+            )
+          );
+        }),
+        [
+          /\bbrownie tradicional\b/,
+          /\bbanoffe\b/,
+          /\bpudim de leite condensado\b/,
+          /\bbolo no pote trufado de maracuja\b/,
+          /\bbolo gelado prestigio\b/,
+          /\bbolo gelado doce de leite com coco\b/,
+          /\bbolo gelado briganinho\b/,
+          /\bpao de mel\b/,
+        ],
+      );
+
+      if (preferredLighterProducts.length) {
+        return mergeWithCurrent(preferredLighterProducts.slice(0, 4));
       }
     }
 
