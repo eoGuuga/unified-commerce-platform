@@ -5613,21 +5613,21 @@ export class WhatsappService {
     }
 
     if (wantsSharing) {
-      const strongSharingProducts = rankedProducts.filter((item) => {
-        const document = getNormalizedLoucasDocument(item);
-        return (
-          /\b(6 brigadeiros|6 beijinhos|10 brigadeiros|10 beijinhos|12 brigadeiros|12 beijinhos|caixa|kit|duzia|bolo gelado|torta|bolo vulcao)\b/.test(
-            document,
-          ) &&
+      const safeSharingPool = rankedProducts.filter(
+        (item) =>
           !/\b(individual|mimo|combo 3 unidades|presentear|presenteavel|bombom|bala de brigadeiro presente)\b/.test(
-            document,
-          )
-        );
-      });
+            getNormalizedLoucasDocument(item),
+          ),
+      );
+      const strongSharingProducts = safeSharingPool.filter((item) =>
+        /\b(6 brigadeiros|6 beijinhos|10 brigadeiros|10 beijinhos|12 brigadeiros|12 beijinhos|caixa|kit|duzia|bolo gelado|torta|bolo vulcao)\b/.test(
+          getNormalizedLoucasDocument(item),
+        ),
+      );
       if (strongSharingProducts.length >= 2) {
         return [
           ...strongSharingProducts,
-          ...rankedProducts.filter((item) => !strongSharingProducts.includes(item)),
+          ...safeSharingPool.filter((item) => !strongSharingProducts.includes(item)),
         ];
       }
     }
@@ -5654,18 +5654,22 @@ export class WhatsappService {
     }
 
     if (wantsChocolateFocus && !wantsGift) {
-      const focusedChocolateProducts = rankedProducts.filter((item) => {
+      const safeChocolatePool = rankedProducts.filter((item) => {
         const document = getNormalizedLoucasDocument(item);
         return (
-          /\b(brigadeiro|brownie|brigaleite|prestigio|chocolate|trufado)\b/.test(document) &&
           this.normalizeForSearch(item.product.categoria?.name || '') !== 'presentear' &&
           !/\b(presente|presentear|presenteavel|caixa|kit|mimo|lembranc)\b/.test(document)
         );
       });
+      const focusedChocolateProducts = safeChocolatePool.filter((item) =>
+        /\b(brigadeiro|brownie|brigaleite|prestigio|chocolate|trufado)\b/.test(
+          getNormalizedLoucasDocument(item),
+        ),
+      );
       if (focusedChocolateProducts.length >= 2) {
         return [
           ...focusedChocolateProducts,
-          ...rankedProducts.filter((item) => !focusedChocolateProducts.includes(item)),
+          ...safeChocolatePool.filter((item) => !focusedChocolateProducts.includes(item)),
         ];
       }
     }
