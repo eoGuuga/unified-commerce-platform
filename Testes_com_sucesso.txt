@@ -1121,3 +1121,28 @@
   - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-115936.json`
   - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+
+2026-03-29  Resposta comercial mais curta, firme e padrao empresa grande
+- Melhorias de inteligencia:
+  - objeções como `ta caro` passaram a cair em uma resposta comercial mais curta, com menos texto de catalogo e uma unica proxima acao clara
+  - consultas de orcamento em confeitaria ficaram mais enxutas, sem perder a opcao principal nem abrir aquela leitura generica demais do catalogo
+  - o modo curto nao foi aplicado cegamente em restaurante, para nao empobrecer contexto de refeicao e ticket
+  - o fechamento consultivo de objeção agora prioriza ate `2` opcoes fortes e reduz cross-sell e verborragia
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` agora cobre:
+    - objeção de preco curta e sem leitura generica de catalogo
+    - resposta de orcamento curta e com no maximo uma pergunta de proximo passo
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` passou a validar tambem:
+    - `consultative_budget_should_stay_short_and_clear`
+    - ausencia de `Dentro do catalogo atual da loja` e `Aqui eu considerei principalmente` em objeção/orcamento curtos
+- Validacao local desta rodada:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `172/172` ok
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.controller.spec.ts --runInBand --silent` => `12/12` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok
+- Validacao em `dev/teste`:
+  - backend atualizado para o commit `2b84ee6`
+  - `npm run test:whatsapp:evals` => `30/30` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-131145.json`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
