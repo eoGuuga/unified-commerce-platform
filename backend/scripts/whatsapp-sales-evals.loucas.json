@@ -918,6 +918,57 @@
       ]
     },
     {
+      "name": "loucas_coffee_hosting_phrase_should_stay_on_table_sharing_products",
+      "steps": [
+        {
+          "message": "vou receber gente no cafe da tarde",
+          "expectAny": [
+            "10 Brigadeiros tradicionais",
+            "Banoffe",
+            "Brownie tradicional"
+          ],
+          "forbidAny": [
+            "Bolo no pote trufado de maracujÃ¡",
+            "Brigadeiro individual mimo | R$ 6,00"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "loucas_after_lunch_dessert_should_stay_on_real_desserts",
+      "steps": [
+        {
+          "message": "quero uma sobremesa pra depois do almoco",
+          "expectAny": [
+            "Banoffe",
+            "Pudim de leite condensado",
+            "Bolo no pote"
+          ],
+          "forbidAny": [
+            "Brigadeiro individual mimo | R$ 6,00",
+            "10 Brigadeiros tradicionais | R$ 25,00"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "loucas_thank_you_keepsake_should_stay_delicate",
+      "steps": [
+        {
+          "message": "quero uma lembrancinha bonita sem exagero pra agradecer",
+          "expectAny": [
+            "Brigadeiro individual mimo",
+            "3 Brigadeiros tradicionais",
+            "3 Beijinhos de coco"
+          ],
+          "forbidAny": [
+            "10 Brigadeiros tradicionais | R$ 25,00",
+            "Caixa presenteavel 12 brigadeiros tradicionais"
+          ]
+        }
+      ]
+    },
+    {
       "name": "loucas_chocolate_focus_should_not_default_to_gift_line",
       "steps": [
         {

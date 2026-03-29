@@ -1612,6 +1612,45 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).not.toContain('Brigadeiro individual mimo | R$ 6,00');
   });
 
+  it('treats natural Loucas coffee-hosting phrasing as a table-sharing recommendation', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'vou receber gente no cafe da tarde',
+      'tenant-id',
+    );
+
+    expect(response).toMatch(/10 Brigadeiros tradicionais|Banoffe \( torta de banana\)|Brownie tradicional/);
+    expect(response).not.toContain('Bolo no pote trufado de maracuja');
+    expect(response).not.toContain('Brigadeiro individual mimo | R$ 6,00');
+  });
+
+  it('treats Loucas after-lunch dessert requests as real dessert curation', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero uma sobremesa pra depois do almoco',
+      'tenant-id',
+    );
+
+    expect(response).toMatch(/Banoffe \( torta de banana\)|Pudim de leite condensado|Bolo no pote trufado de maracuja/);
+    expect(response).not.toContain('Brigadeiro individual mimo | R$ 6,00');
+    expect(response).not.toContain('10 Brigadeiros tradicionais | R$ 25,00');
+  });
+
+  it('treats Loucas simple thank-you gift requests as delicate keepsake curation', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero uma lembrancinha bonita sem exagero pra agradecer',
+      'tenant-id',
+    );
+
+    expect(response).toMatch(/Brigadeiro individual mimo|3 Brigadeiros tradicionais|3 Beijinhos de coco/);
+    expect(response).not.toContain('10 Brigadeiros tradicionais | R$ 25,00');
+    expect(response).not.toContain('Caixa presenteavel 12 brigadeiros tradicionais');
+  });
+
   it('keeps Loucas chocolate-focus recommendations away from the presentear line when no gift was asked', async () => {
     const service = createService(loucasConsultativeCatalog) as any;
 

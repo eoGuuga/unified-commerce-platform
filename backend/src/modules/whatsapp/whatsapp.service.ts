@@ -5582,10 +5582,8 @@ export class WhatsappService {
     const wantsSafePrettyGift =
       this.isSalesSafeChoiceQuery(analysis) &&
       /\b(bonit|bonita|delicad|seguro|segura)\b/.test(normalized);
-    const wantsVisit =
-      /\b(visita|pra visita|para visita|levar pra visita|levar para visita)\b/.test(
-        normalized,
-      );
+    const wantsVisit = this.isLoucasVisitOccasion(normalized);
+    const wantsCoffeeSharing = this.isLoucasCoffeeSharingOccasion(normalized);
     const wantsSharing =
       analysis.useCaseTags.includes('sharing') ||
       /\b(dividir|compartilhar|familia|família|mesa|galera|todo mundo|mais gente|cafe da tarde|cafe da manha|cha da tarde)\b/.test(
@@ -5603,6 +5601,8 @@ export class WhatsappService {
       /\b(chocolatudo|mais chocolate|chocolate forte|brigadeiro|brownie|brigaleite|prestigio|prestígio)\b/.test(
         normalized,
       );
+    const wantsDessertOccasion = this.isLoucasDessertOccasion(normalized);
+    const wantsSimpleGift = this.isLoucasSimpleGiftOccasion(normalized);
     const wantsCreamyDessert = /\b(banoffe|bolo no pote|pudim|torta|sobremesa|cremosa|de colher)\b/.test(
       normalized,
     );
@@ -5635,6 +5635,43 @@ export class WhatsappService {
       }
     }
 
+    if (wantsDessertOccasion) {
+      const dessertPool = rankedProducts.filter((item) => {
+        const document = getNormalizedLoucasDocument(item);
+        return !/\b(individual|mimo|3 brigadeiros|3 beijinhos|6 brigadeiros|6 beijinhos|10 brigadeiros|10 beijinhos|12 brigadeiros|12 beijinhos|caixa presenteavel|kit doce presente|400 ml)\b/.test(
+          document,
+        );
+      });
+      const dessertProducts = dessertPool.filter((item) =>
+        /\b(banoffe|pudim|bolo no pote|bolo gelado|torta|sobremesa)\b/.test(
+          getNormalizedLoucasDocument(item),
+        ),
+      );
+      if (dessertProducts.length >= 2) {
+        return [...dessertProducts, ...dessertPool.filter((item) => !dessertProducts.includes(item))];
+      }
+    }
+
+    if (wantsSimpleGift) {
+      const simpleGiftPool = rankedProducts.filter((item) => {
+        const document = getNormalizedLoucasDocument(item);
+        return !/\b(cartao|cartao recadinho|sacola|embalagem|10 brigadeiros|10 beijinhos|12 brigadeiros|12 beijinhos|caixa presenteavel 12|bolo no pote|400 ml)\b/.test(
+          document,
+        );
+      });
+      const simpleGiftProducts = simpleGiftPool.filter((item) =>
+        /\b(brigadeiro individual mimo|3 brigadeiros tradicionais|3 beijinhos de coco|bala de brigadeiro presente)\b/.test(
+          getNormalizedLoucasDocument(item),
+        ),
+      );
+      if (simpleGiftProducts.length >= 1) {
+        return [
+          ...simpleGiftProducts,
+          ...simpleGiftPool.filter((item) => !simpleGiftProducts.includes(item)),
+        ];
+      }
+    }
+
     if (wantsSafePrettyGift) {
       const safePrettyProducts = rankedProducts.filter((item) =>
         /\b(brigadeiro individual mimo|3 brigadeiros tradicionais|3 beijinhos de coco|caixa presenteavel com 6 brigadeiros tradicionais|kit doce presente)\b/.test(
@@ -5661,6 +5698,23 @@ export class WhatsappService {
       );
       if (giftProducts.length >= 1 && safeGiftPool.length >= 2) {
         return [...giftProducts, ...safeGiftPool.filter((item) => !giftProducts.includes(item))];
+      }
+    }
+
+    if (wantsCoffeeSharing) {
+      const coffeePool = rankedProducts.filter((item) => {
+        const document = getNormalizedLoucasDocument(item);
+        return !/\b(individual|mimo|combo 3 unidades|bolo no pote|400 ml|presentear|presenteavel)\b/.test(
+          document,
+        );
+      });
+      const coffeeProducts = coffeePool.filter((item) =>
+        /\b(10 brigadeiros|10 beijinhos|banoffe|brownie tradicional|pudim|bolo gelado|6 brigadeiros|6 beijinhos|torta)\b/.test(
+          getNormalizedLoucasDocument(item),
+        ),
+      );
+      if (coffeeProducts.length >= 2) {
+        return [...coffeeProducts, ...coffeePool.filter((item) => !coffeeProducts.includes(item))];
       }
     }
 
@@ -5825,8 +5879,10 @@ export class WhatsappService {
         })
         .map(({ item }) => item);
 
-    const wantsVisit =
-      /\b(visita|pra visita|para visita|levar pra visita|levar para visita)\b/.test(normalized);
+    const wantsVisit = this.isLoucasVisitOccasion(normalized);
+    const wantsCoffeeSharing = this.isLoucasCoffeeSharingOccasion(normalized);
+    const wantsDessertOccasion = this.isLoucasDessertOccasion(normalized);
+    const wantsSimpleGift = this.isLoucasSimpleGiftOccasion(normalized);
     if (wantsVisit) {
       const visitProducts = sortByPreferredPatterns(
         baseRankedProducts.filter((item) => {
@@ -5855,6 +5911,87 @@ export class WhatsappService {
 
       if (visitProducts.length) {
         return mergeWithCurrent(visitProducts.slice(0, 4));
+      }
+    }
+
+    if (wantsCoffeeSharing) {
+      const coffeeProducts = sortByPreferredPatterns(
+        baseRankedProducts.filter((item) => {
+          const document = getDocument(item);
+          return (
+            /\b(10 brigadeiros|10 beijinhos|banoffe|brownie tradicional|pudim de leite condensado|bolo gelado|6 brigadeiros|6 beijinhos|torta)\b/.test(
+              document,
+            ) &&
+            !/\b(individual|mimo|bolo no pote|400 ml|presentear|presenteavel)\b/.test(document)
+          );
+        }),
+        [
+          /\b10 brigadeiros tradicionais\b/,
+          /\bbanoffe\b/,
+          /\bbrownie tradicional\b/,
+          /\bpudim de leite condensado\b/,
+          /\b6 brigadeiros tradicionais\b/,
+          /\bbolo gelado prestigio\b/,
+          /\bbolo gelado briganinho\b/,
+          /\btorta supreme de morango\b/,
+        ],
+      );
+
+      if (coffeeProducts.length) {
+        return mergeWithCurrent(coffeeProducts.slice(0, 4));
+      }
+    }
+
+    if (wantsDessertOccasion) {
+      const dessertProducts = sortByPreferredPatterns(
+        baseRankedProducts.filter((item) => {
+          const document = getDocument(item);
+          return (
+            /\b(banoffe|pudim de leite condensado|bolo no pote|bolo gelado|torta)\b/.test(document) &&
+            !/\b(individual|mimo|3 brigadeiros|3 beijinhos|6 brigadeiros|10 brigadeiros|12 brigadeiros|caixa presenteavel|kit doce presente|400 ml)\b/.test(
+              document,
+            )
+          );
+        }),
+        [
+          /\bbanoffe\b/,
+          /\bpudim de leite condensado\b/,
+          /\bbolo no pote trufado de maracuja\b/,
+          /\bbrownie tradicional\b/,
+          /\bbolo gelado prestigio\b/,
+          /\bbolo gelado briganinho\b/,
+          /\btorta supreme de morango\b/,
+        ],
+      );
+
+      if (dessertProducts.length) {
+        return mergeWithCurrent(dessertProducts.slice(0, 4));
+      }
+    }
+
+    if (wantsSimpleGift) {
+      const simpleGiftProducts = sortByPreferredPatterns(
+        baseRankedProducts.filter((item) => {
+          const document = getDocument(item);
+          return (
+            /\b(brigadeiro individual mimo|3 brigadeiros tradicionais|3 beijinhos de coco|bala de brigadeiro presente)\b/.test(
+              document,
+            ) &&
+            !/\b(cartao|cartao recadinho|sacola|embalagem|10 brigadeiros|12 brigadeiros|bolo no pote|400 ml)\b/.test(
+              document,
+            )
+          );
+        }),
+        [
+          /\bbrigadeiro individual mimo\b/,
+          /\b3 brigadeiros tradicionais\b/,
+          /\b3 beijinhos de coco\b/,
+          /\bbala de brigadeiro presente\b/,
+        ],
+      );
+
+      if (simpleGiftProducts.length) {
+        return mergeWithCurrent(simpleGiftProducts.slice(0, 4));
       }
     }
 
@@ -6967,6 +7104,40 @@ export class WhatsappService {
     return /\b(menos doce|menos enjoativ|leve no doce|mais leve no sabor)\b/.test(normalized);
   }
 
+  private isLoucasVisitOccasion(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    return /\b(visita|pra visita|para visita|levar pra visita|levar para visita|receber visita)\b/.test(
+      normalized,
+    );
+  }
+
+  private isLoucasCoffeeSharingOccasion(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    return /\b(cafe da tarde|cafe da manha|cha da tarde|cafezinho|mesa do cafe|mesa de cafe|receber gente no cafe)\b/.test(
+      normalized,
+    );
+  }
+
+  private isLoucasDessertOccasion(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    return /\b(sobremesa|pra sobremesa|para sobremesa|depois do almoco|pos almoco|apos almoco|depois do jantar)\b/.test(
+      normalized,
+    );
+  }
+
+  private isLoucasSimpleGiftOccasion(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    if (this.isSalesCombinationQuery(normalized)) {
+      return false;
+    }
+
+    return (
+      /\b(lembranc|agradecer|agradecimento)\b/.test(normalized) ||
+      (/\b(simples|sem exagero|mais em conta|bonitinha|bonitinho)\b/.test(normalized) &&
+        /\b(presente|presentear|pra dar|para dar)\b/.test(normalized))
+    );
+  }
+
   private buildSimplifyReferenceHoldResponse(
     referenceProduct: ProductWithStock,
     rankedProducts: RankedSalesProduct[],
@@ -7330,6 +7501,10 @@ export class WhatsappService {
     analysis: SalesConversationAnalysis,
     topProduct: ProductWithStock,
   ): string | null {
+    if (this.isLoucasSimpleGiftOccasion(analysis.normalizedText)) {
+      return `Para uma lembrancinha bonita sem exagerar, eu comecaria por ${topProduct.name}.`;
+    }
+
     if (analysis.intent === 'objection') {
       if (analysis.budgetCeiling !== null) {
         return `Entendi a preocupacao com custo. Para baixar o valor sem passar do seu teto, eu iria por ${topProduct.name}.`;
@@ -7344,6 +7519,18 @@ export class WhatsappService {
       }
 
       return `Para presentear sem exagerar, eu comecaria por ${topProduct.name}.`;
+    }
+
+    if (this.isLoucasVisitOccasion(analysis.normalizedText)) {
+      return `Para levar numa visita sem parecer compra improvisada, eu comecaria por ${topProduct.name}.`;
+    }
+
+    if (this.isLoucasCoffeeSharingOccasion(analysis.normalizedText)) {
+      return `Para colocar na mesa do cafe da tarde sem complicar, eu comecaria por ${topProduct.name}.`;
+    }
+
+    if (this.isLoucasDessertOccasion(analysis.normalizedText)) {
+      return `Se a ideia e fechar como sobremesa da Loucas sem pesar, eu comecaria por ${topProduct.name}.`;
     }
 
     if (analysis.useCaseTags.includes('sharing')) {
@@ -7485,6 +7672,10 @@ export class WhatsappService {
       return `Se quiser, eu ja separo ${topProduct.name} para te poupar tempo.`;
     }
 
+    if (this.isLoucasSimpleGiftOccasion(analysis.normalizedText)) {
+      return `Se quiser, eu ja separo ${topProduct.name} ou te mostro outra lembrancinha delicada sem subir muito o valor.`;
+    }
+
     if (analysis.useCaseTags.includes('gift')) {
       if (
         analysis.pricePreference === 'premium' ||
@@ -7494,6 +7685,18 @@ export class WhatsappService {
       }
 
       return `Se quiser, eu ja separo ${topProduct.name} ou te mostro a proxima opcao acima sem exagerar.`;
+    }
+
+    if (this.isLoucasVisitOccasion(analysis.normalizedText)) {
+      return `Se quiser, eu ja separo ${topProduct.name} ou te mostro uma opcao que fica ainda melhor para levar.`;
+    }
+
+    if (this.isLoucasCoffeeSharingOccasion(analysis.normalizedText)) {
+      return `Se quiser, eu ja separo ${topProduct.name} ou te mostro uma opcao que rende melhor na mesa.`;
+    }
+
+    if (this.isLoucasDessertOccasion(analysis.normalizedText)) {
+      return `Se quiser, eu ja separo ${topProduct.name} ou te mostro outra sobremesa cremosa na mesma linha.`;
     }
 
     if (analysis.useCaseTags.includes('sharing')) {
@@ -11800,6 +12003,20 @@ export class WhatsappService {
       'lembrancinha',
       'chocolate',
       'chocolatudo',
+      'depois',
+      'do',
+      'da',
+      'pra',
+      'para',
+      'almoco',
+      'jantar',
+      'cafe',
+      'tarde',
+      'manha',
+      'visita',
+      'familia',
+      'gente',
+      'agradecer',
     ]);
     const specificTokens = new Set([
       'banoffe',
@@ -11903,10 +12120,6 @@ export class WhatsappService {
     salesAnalysis: SalesConversationAnalysis,
     extractedProductName: string,
   ): boolean {
-    if (salesAnalysis.intent === 'other') {
-      return false;
-    }
-
     const consultativeLead =
       salesAnalysis.budgetCeiling !== null ||
       salesAnalysis.recipientHint !== null ||
@@ -11939,6 +12152,10 @@ export class WhatsappService {
 
     if (!consultativeLead) {
       return false;
+    }
+
+    if (salesAnalysis.intent === 'other') {
+      return !this.hasSpecificProductOrderShape(normalizedMessage, extractedProductName);
     }
 
     return !this.hasSpecificProductOrderShape(normalizedMessage, extractedProductName);
