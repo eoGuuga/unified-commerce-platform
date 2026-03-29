@@ -6539,14 +6539,24 @@ export class WhatsappService {
       return false;
     }
 
+    const referenceIsGiftSized =
+      /(individual|mimo|presenteavel|presente|lembranc)/.test(referenceDocument) ||
+      referenceProfile.role === 'gift_ready';
+
     const alternativesAreBulkier = rankedProducts.slice(0, 3).every((item) => {
       const productPrice = Number(item.product.price || 0);
       const searchDocument = this.buildProductSalesDocument(item.product);
+      const quantityLooksBigger =
+        referenceIsGiftSized &&
+        /\b(3 brigadeiros|3 beijinhos|6 brigadeiros|6 beijinhos|10 brigadeiros|10 beijinhos|12 brigadeiros|12 beijinhos|combo|brownie|bolo|torta)\b/.test(
+          searchDocument,
+        );
       return (
         productPrice > referencePrice + 0.0001 &&
-        /(caixa|box|kit|combo|presenteavel|bomboniere|premium|marcante|grande)/.test(
+        (/(caixa|box|kit|combo|presenteavel|bomboniere|premium|marcante|grande)/.test(
           searchDocument,
-        )
+        ) ||
+          quantityLooksBigger)
       );
     });
 
