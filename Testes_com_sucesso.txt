@@ -1237,6 +1237,48 @@
   - backend atualizado para o commit `77902a7`
   - `npm.cmd run test:whatsapp:evals` => `36/36` cenarios ok
   - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-141530.json`
+ - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+ - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+ - o caso real `quero uma sobremesa cremosa pra agora` deixou de puxar `Canjica cremosa` por busca literal no ambiente de teste atualizado
+
+2026-03-29  Lapidacao consultiva da Loucas no WhatsApp
+- Melhorias de inteligencia:
+  - perguntas diretas como `o que combina com banoffe?` passaram a usar referencia direta do item, sem depender de memoria previa da conversa
+  - pedidos como `quero algo pra dividir com a familia` agora ficam presos em prateleira coerente de compartilhamento, sem vazar `Combo 3 unidades` ou mimo individual
+  - pedidos como `quero algo mais chocolatudo` agora ficam presos na linha forte de chocolate da Loucas, sem cair em `Presentear`
+  - refinamentos como `agora quero algo menor e menos chamativo` mantem a leitura delicada anterior e seguram `Brigadeiro individual mimo` quando ele ja e a opcao mais leve
+  - recomendacao inicial de presente para a Loucas ficou mais limpa: sem `Combo 3 unidades Surpresa de uva` e sem cross-sell exagerado na primeira resposta
+- Commits desta lapidacao:
+  - `ae18785` `feat(whatsapp): unlock Loucas direct combination flow`
+  - `86c387e` `feat(whatsapp): sharpen Loucas chocolate and sharing cues`
+  - `2817878` `fix(whatsapp): keep Loucas recommendation shelves coherent`
+  - `78e6b65` `fix(whatsapp): hold Loucas delicate gift suggestions`
+  - `2498361` `fix(whatsapp): clean up Loucas gift recommendations`
+  - `c649870` `fix(whatsapp): lock Loucas gift shelf before fallbacks`
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` passou a cobrir:
+    - leitura direta de combinacao na Loucas
+    - vitrine de presente sem `Combo 3 unidades`
+    - ausencia de cross-sell barulhento na primeira recomendacao de presente
+    - preservacao da opcao mais delicada no refinamento consultivo
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` passou a validar:
+    - prateleira de compartilhamento coerente
+    - prateleira de chocolate fora de `Presentear`
+    - combinacao direta de `Banoffe`
+    - presente bonito para a mae sem exagero, sem `Combo 3 unidades` e sem cross-sell exagerado
+- Validacao local desta sequencia:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `185/185` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok
+- Validacao em `dev/teste`:
+  - backend atualizado ate o commit `c649870`
+  - `npm.cmd run test:whatsapp:evals` => `41/41` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-145708.json`
+  - smoke real `me indica um presente bonito pra minha mae sem exagero` respondeu com:
+    - `Brigadeiro individual mimo`
+    - `3 Brigadeiros tradicionais`
+    - `Brownie c/ ninho nutella e kinder`
   - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
-  - o caso real `quero uma sobremesa cremosa pra agora` deixou de puxar `Canjica cremosa` por busca literal no ambiente de teste atualizado
+- Producao:
+  - nao foi tocada nesta sequencia
