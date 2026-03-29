@@ -1517,7 +1517,7 @@ export class WhatsappService {
       .replace(/\b(praviagem|pra viage[mn])\b/g, 'pra viagem')
       .replace(/\b(retira|retiraa)\b/g, 'retirada')
       .replace(/\b(obgd|obrgd|obgdo)\b/g, 'obrigado')
-      .replace(/\btamb[a-z0-9ÃƒÃ‚Ã¢ï¿½]*m\b/g, 'tambem')
+      .replace(/\btamb(?:[^\s]){0,8}m\b/g, 'tambem')
       .replace(/\b(vlw+|valeeu+)\b/g, 'valeu')
       .replace(/\b(blz+|belezinha)\b/g, 'beleza')
       .replace(/\b(fecho+|fexo+)\b/g, 'fechou')

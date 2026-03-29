@@ -386,7 +386,7 @@ export class MessageIntelligenceService {
       normalized = normalized.replace(rule.pattern, rule.replacement);
     }
 
-    normalized = normalized.replace(/\btamb[a-z0-9ÃƒÃ‚Ã¢ï¿½]*m\b/g, 'tambem');
+    normalized = normalized.replace(/\btamb(?:[^\s]){0,8}m\b/g, 'tambem');
 
     return normalized.replace(/\s+/g, ' ').trim();
   }

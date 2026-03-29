@@ -970,3 +970,11 @@
 - Validacao local desta rodada:
   - `node ./node_modules/jest/bin/jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand` => `158/158` ok
   - `npm.cmd run build` => ok
+
+2026-03-28  Fechamento do alias quebrado no ambiente real da Loucas
+- Refinamento final desta rodada:
+  - o reparo semantico passou a aceitar tambem a palavra-chave `tambem` quando ela chega ainda mais quebrada no ambiente real, como `tambf©m`
+  - isso fecha o ajuste de pedido com alias torto sem cair no fallback ambiguo
+- Validacao local desta rodada:
+  - `node ./node_modules/jest/bin/jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand` => `159/159` ok
+  - `npm.cmd run build` => ok
