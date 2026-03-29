@@ -1175,3 +1175,31 @@
   - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-132101.json`
   - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+
+2026-03-29  Refinamento curto com memoria comercial para "outra opcao" e "mais em conta"
+- Melhorias de inteligencia:
+  - mensagens como `me mostra outra opcao` agora continuam a trilha consultiva anterior, em vez de soar como conversa nova ou cair em recuperacao generica
+  - mensagens como `me mostra outra mais em conta` agora baixam o ticket sem desmontar o objetivo comercial ja entendido
+  - o refinamento por valor passou a:
+    - preservar o contexto do item anterior
+    - priorizar alternativas mais baratas ou no mesmo teto
+    - evitar cross-sell nessa resposta para nao parecer upsell cego
+  - o motor contextual ganhou um modo `budget` para refinamento curto com memoria da conversa
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` agora cobre:
+    - continuidade da conversa em `me mostra outra opcao`
+    - queda de ticket em `me mostra outra mais em conta`
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` passou a validar tambem:
+    - `recovery_refinement_should_offer_another_option_from_the_same_consultative_thread`
+    - `budget_refinement_should_lower_ticket_without_restarting_the_consultative_flow`
+- Validacao local desta rodada:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `177/177` ok
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.controller.spec.ts --runInBand --silent` => `12/12` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok
+- Validacao em `dev/teste`:
+  - backend atualizado para o commit `48865cf`
+  - `npm.cmd run test:whatsapp:evals` => `34/34` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-134458.json`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
