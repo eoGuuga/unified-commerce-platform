@@ -4583,7 +4583,8 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       }),
     );
 
-    expect(response).toContain('Quer que eu fique estritamente ate R$ 20,00');
+    expect(response).toContain('Se quiser, eu ja separo Caixa presenteavel com 3 brigadeiros');
+    expect(response).toContain('sem sair muito do seu teto');
     expect(response).not.toContain('Se voce quiser elevar a percepcao da compra, eu ainda combinaria');
     expect(response).not.toContain('Caixa presenteavel com 6 brigadeiros tradicionais');
   });

@@ -7010,9 +7010,63 @@ export class WhatsappService {
     return catalogQuestion || verticalQuestion || null;
   }
 
+  private buildLoucasNextStepQuestion(
+    analysis: SalesConversationAnalysis,
+    topProduct: ProductWithStock,
+    preferredStructuredQuestion?: string | null,
+  ): string | null {
+    if (analysis.intent === 'comparison') {
+      return `Se quiser, eu ja separo ${topProduct.name} ou comparo com a outra opcao sem enrolacao.`;
+    }
+
+    if (analysis.intent === 'objection') {
+      return `Se fizer sentido, eu ja separo ${topProduct.name} ou te mostro uma opcao mais em conta.`;
+    }
+
+    if (analysis.budgetCeiling !== null) {
+      return `Se quiser, eu ja separo ${topProduct.name} ou te mostro a proxima opcao sem sair muito do seu teto.`;
+    }
+
+    if (
+      analysis.conversationDrivers.includes('urgency') &&
+      (!preferredStructuredQuestion || this.isGenericQualificationQuestion(preferredStructuredQuestion))
+    ) {
+      return `Se quiser, eu ja separo ${topProduct.name} para te poupar tempo.`;
+    }
+
+    if (analysis.useCaseTags.includes('gift')) {
+      if (
+        analysis.pricePreference === 'premium' ||
+        /\b(premium|caprichad|marcante|caixa)\b/.test(analysis.normalizedText)
+      ) {
+        return `Se quiser, eu ja separo ${topProduct.name} ou te mostro uma opcao mais marcante na caixa.`;
+      }
+
+      return `Se quiser, eu ja separo ${topProduct.name} ou te mostro a proxima opcao acima sem exagerar.`;
+    }
+
+    if (analysis.useCaseTags.includes('sharing')) {
+      return `Se quiser, eu ja separo ${topProduct.name} ou te mostro uma opcao maior para dividir.`;
+    }
+
+    if (analysis.useCaseTags.includes('self_treat')) {
+      return `Se quiser, eu ja separo ${topProduct.name} ou te mostro uma opcao um pouco mais intensa.`;
+    }
+
+    if (
+      analysis.useCaseTags.includes('chocolate_focus') ||
+      /\b(banoffe|bolo no pote|pudim|torta|sobremesa|cremosa)\b/.test(analysis.normalizedText)
+    ) {
+      return `Se quiser, eu ja separo ${topProduct.name} ou te mostro outra opcao da mesma linha.`;
+    }
+
+    return null;
+  }
+
   private buildSalesNextStepQuestion(
     analysis: SalesConversationAnalysis,
     topProduct: ProductWithStock,
+    catalogProfile: CatalogSalesProfile,
     catalogQualificationQuestion?: string | null,
     verticalQualificationQuestion?: string | null,
   ): string {
@@ -7020,6 +7074,18 @@ export class WhatsappService {
       catalogQualificationQuestion,
       verticalQualificationQuestion,
     );
+
+    if (catalogProfile.storePersona === 'loucas_brigadeiro') {
+      const loucasQuestion = this.buildLoucasNextStepQuestion(
+        analysis,
+        topProduct,
+        preferredStructuredQuestion,
+      );
+
+      if (loucasQuestion) {
+        return loucasQuestion;
+      }
+    }
 
     if (analysis.intent === 'comparison') {
       return `Se quiser, eu comparo com mais objetividade ou ja separo ${topProduct.name}.`;
@@ -7184,6 +7250,7 @@ export class WhatsappService {
         this.buildSalesNextStepQuestion(
           analysis,
           rankedProducts[0].product,
+          catalogProfile,
           qualificationQuestion,
           this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
         ),
@@ -7212,6 +7279,7 @@ export class WhatsappService {
       this.buildSalesNextStepQuestion(
         analysis,
         rankedProducts[0].product,
+        catalogProfile,
         qualificationQuestion,
         this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
       ),
@@ -7301,6 +7369,7 @@ export class WhatsappService {
       this.buildSalesNextStepQuestion(
         analysis,
         recommended,
+        catalogProfile,
         qualificationQuestion,
         this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
       ),
@@ -7376,6 +7445,7 @@ export class WhatsappService {
       this.buildSalesNextStepQuestion(
         analysis,
         closestProducts[0].product,
+        catalogProfile,
         qualificationQuestion,
         this.salesVerticalPackService.buildQualificationQuestion(verticalPack, strategy),
       ),

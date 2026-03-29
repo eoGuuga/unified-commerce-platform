@@ -714,7 +714,8 @@
           "message": "me indica um presente bonito pra minha mae sem exagero",
           "expectAny": [
             "Estas sao as opcoes",
-            "Brigadeiro individual mimo"
+            "Brigadeiro individual mimo",
+            "Se quiser, eu ja separo"
           ],
           "forbidAny": [
             "Combo 3 unidades Surpresa de uva",
