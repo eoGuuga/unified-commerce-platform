@@ -5596,11 +5596,24 @@ export class WhatsappService {
     referenceProduct?: ProductWithStock | null,
   ): string {
     const memory = this.getConversationIntelligenceMemory(conversation);
-    const rememberedGoal = (memory.last_customer_goal || memory.last_query || '').trim();
+    const rememberedQuery = String(memory.last_query || '').trim();
+    const rememberedGoal = String(memory.last_customer_goal || '').trim();
+    const normalizedRememberedQuery = this.normalizeIntentText(rememberedQuery);
+    const rememberedQueryAnalysis = rememberedQuery
+      ? this.salesIntelligenceService.analyze(rememberedQuery)
+      : null;
+    const rememberedContext =
+      rememberedQuery &&
+      (rememberedQueryAnalysis?.intent !== 'other' ||
+        /\b(ate|até|reais|real|rs|r\$|pix|presente|presentear|mae|mãe|pai|namorada|namorado|amiga|aniversario|aniversário|seguro|sem erro|sem exagero|rapido|rápido|urgencia|urgência)\b/.test(
+          normalizedRememberedQuery,
+        ))
+        ? rememberedQuery
+        : rememberedGoal || rememberedQuery;
 
     if (mode === 'combination' && referenceProduct) {
-      return rememberedGoal
-        ? `me indica algo que combina com ${referenceProduct.name} para ${rememberedGoal}`
+      return rememberedContext
+        ? `${rememberedContext}. Agora me indica algo que combina com ${referenceProduct.name}`
         : `me indica algo que combina com ${referenceProduct.name}`;
     }
 
@@ -5608,11 +5621,11 @@ export class WhatsappService {
       const upgradeBase = referenceProduct
         ? `me indica algo mais premium e mais marcante do que ${referenceProduct.name}`
         : 'me indica algo mais premium e mais marcante';
-      return rememberedGoal ? `${upgradeBase} para ${rememberedGoal}` : upgradeBase;
+      return rememberedContext ? `${rememberedContext}. Agora ${upgradeBase}` : upgradeBase;
     }
 
     const recoveryBase = 'me indica outra opcao que faca mais sentido agora';
-    return rememberedGoal ? `${recoveryBase} para ${rememberedGoal}` : recoveryBase;
+    return rememberedContext ? `${rememberedContext}. Agora ${recoveryBase}` : recoveryBase;
   }
 
   private buildContextAwareSalesAnalysis(
@@ -5657,13 +5670,93 @@ export class WhatsappService {
     conversation: TypedConversation | undefined,
     referenceProduct: ProductWithStock | null,
     mode: ContextAwareSalesMode,
+    analysis?: SalesConversationAnalysis,
   ): RankedSalesProduct[] {
     const withoutReference = rankedProducts.filter(
       (item) => !referenceProduct || String(item.product.id) !== String(referenceProduct.id),
     );
 
     if (mode === 'combination') {
-      return withoutReference.length ? withoutReference : rankedProducts;
+      if (!referenceProduct) {
+        return withoutReference.length ? withoutReference : rankedProducts;
+      }
+
+      const referencePrice = Number(referenceProduct.price || 0);
+      const referenceProfile = this.productOfferIntelligenceService.analyzeProduct(
+        referenceProduct,
+        [referenceProduct, ...withoutReference.map((item) => item.product)],
+      );
+
+      const rebalanced = (withoutReference.length ? withoutReference : rankedProducts)
+        .map((item) => {
+          const productPrice = Number(item.product.price || 0);
+          const profile = this.productOfferIntelligenceService.analyzeProduct(item.product, [
+            referenceProduct,
+            ...withoutReference.map((candidate) => candidate.product),
+          ]);
+          let score = item.score;
+          const reasons = [...item.reasons];
+
+          if (profile.role === 'accessory') {
+            score += 14;
+          }
+
+          if (profile.role === 'gift_ready' && referenceProfile.role === 'impulse') {
+            score += 9;
+          }
+
+          if (
+            referenceProduct.categoria?.name &&
+            item.product.categoria?.name &&
+            referenceProduct.categoria.name === item.product.categoria.name
+          ) {
+            score += 4;
+          }
+
+          if (referencePrice > 0) {
+            const priceRatio = productPrice / referencePrice;
+            if (priceRatio <= 3) {
+              score += 10;
+            } else if (priceRatio <= 4.5) {
+              score += 3;
+            } else {
+              score -= 18;
+            }
+
+            if (priceRatio >= 7) {
+              score -= 14;
+            }
+          }
+
+          if (
+            (profile.role === 'gift_ready' || profile.role === 'accessory') &&
+            !reasons.includes('fecha melhor como complemento para esse item')
+          ) {
+            reasons.unshift('fecha melhor como complemento para esse item');
+          }
+
+          return {
+            product: item.product,
+            score,
+            reasons: reasons.slice(0, 3),
+          };
+        })
+        .sort((left, right) => right.score - left.score);
+
+      const safeSized = rebalanced.filter((item) => {
+        if (referencePrice <= 0) {
+          return true;
+        }
+
+        const productPrice = Number(item.product.price || 0);
+        return productPrice / referencePrice <= 4.5;
+      });
+
+      if (safeSized.length) {
+        return safeSized.slice(0, 4);
+      }
+
+      return rebalanced.slice(0, 4);
     }
 
     const memory = this.getConversationIntelligenceMemory(conversation);
@@ -5674,7 +5767,13 @@ export class WhatsappService {
     );
 
     if (!recentNames.size) {
-      return withoutReference.length ? withoutReference : rankedProducts;
+      const initialCandidates = withoutReference.length ? withoutReference : rankedProducts;
+      return this.refineContextAwareSalesCandidates(
+        initialCandidates,
+        referenceProduct,
+        mode,
+        analysis,
+      );
     }
 
     const withoutRecent = withoutReference.filter(
@@ -5682,10 +5781,82 @@ export class WhatsappService {
     );
 
     if (withoutRecent.length) {
-      return withoutRecent;
+      return this.refineContextAwareSalesCandidates(
+        withoutRecent,
+        referenceProduct,
+        mode,
+        analysis,
+      );
     }
 
-    return withoutReference.length ? withoutReference : rankedProducts;
+    return this.refineContextAwareSalesCandidates(
+      withoutReference.length ? withoutReference : rankedProducts,
+      referenceProduct,
+      mode,
+      analysis,
+    );
+  }
+
+  private refineContextAwareSalesCandidates(
+    candidates: RankedSalesProduct[],
+    referenceProduct: ProductWithStock | null,
+    mode: ContextAwareSalesMode,
+    analysis?: SalesConversationAnalysis,
+  ): RankedSalesProduct[] {
+    let refined = [...candidates];
+
+    const budgetCeiling = analysis?.budgetCeiling ?? null;
+
+    if (budgetCeiling !== null) {
+      const inBudget = refined.filter(
+        (item) => Number(item.product.price || 0) <= budgetCeiling + 0.0001,
+      );
+      if (inBudget.length >= 2 || (inBudget.length >= 1 && mode !== 'upgrade')) {
+        refined = inBudget;
+      }
+    }
+
+    if (mode === 'upgrade' && referenceProduct) {
+      const referencePrice = Number(referenceProduct.price || 0);
+      refined = refined
+        .map((item) => {
+          const productPrice = Number(item.product.price || 0);
+          const profile = this.productOfferIntelligenceService.analyzeProduct(item.product, [
+            referenceProduct,
+            ...refined.map((candidate) => candidate.product),
+          ]);
+          let score = item.score;
+          const reasons = [...item.reasons];
+
+          if (productPrice > referencePrice) {
+            score += 10;
+          }
+
+          if (profile.tier === 'premium') {
+            score += 6;
+          }
+
+          if (budgetCeiling !== null && productPrice <= budgetCeiling + 0.0001 && productPrice >= referencePrice) {
+            score += 5;
+          }
+
+          if (
+            productPrice > referencePrice &&
+            !reasons.includes(`representa um passo acima de ${referenceProduct.name}`)
+          ) {
+            reasons.unshift(`representa um passo acima de ${referenceProduct.name}`);
+          }
+
+          return {
+            product: item.product,
+            score,
+            reasons: reasons.slice(0, 3),
+          };
+        })
+        .sort((left, right) => right.score - left.score);
+    }
+
+    return refined.slice(0, 4);
   }
 
   private buildSalesCombinationResponse(
@@ -5815,6 +5986,7 @@ export class WhatsappService {
       conversation,
       referenceProduct,
       mode,
+      analysis,
     );
 
     if (!rankedProducts.length) {

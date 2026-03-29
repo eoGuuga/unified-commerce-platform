@@ -1056,6 +1056,8 @@
   - refinamentos como `quero algo que impressione mais que esse` passaram a usar a memoria do ultimo item e do ultimo objetivo comercial para sugerir uma opcao mais forte sem sequestrar a conversa para pedido direto
   - perguntas como `o que combina com brigadeiro individual mimo?` agora respondem com complemento real de venda, em vez de tratar a mensagem como produto solto
   - a resolucao contextual deixou de roubar essas mensagens consultivas para o fluxo de pedido, que era a causa raiz de respostas burras e sem contexto
+  - a memoria consultiva passou a preservar melhor o contexto anterior de orcamento, entao recuperacoes e refinamentos deixam de abrir sugestoes fora do teto quando ja existe faixa de preco recente na conversa
+  - combinacoes agora evitam upsell desproporcional por padrao, privilegiando complemento mais coerente com o item-base em vez de saltar direto para um pacote muito maior
 - Qualidade automatizada expandida:
   - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` agora cobre:
     - recuperacao consultiva apos rejeicao de sugestoes

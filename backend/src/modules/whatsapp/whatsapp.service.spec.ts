@@ -219,6 +219,45 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     },
   ];
 
+  const combinationBalanceCatalog = [
+    {
+      id: 'cb1',
+      name: 'Brigadeiro individual mimo',
+      description: 'Doce individual com boa leitura para presente rapido.',
+      price: 6,
+      available_stock: 20,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Presentear' },
+    },
+    {
+      id: 'cb2',
+      name: 'Bala de brigadeiro presenteavel',
+      description: 'Complemento bonito para deixar o presente mais redondo.',
+      price: 15,
+      available_stock: 18,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Presentear' },
+    },
+    {
+      id: 'cb3',
+      name: 'Caixa presenteavel 12 brigadeiros tradicionais',
+      description: 'Caixa grande e mais cara para presente.',
+      price: 48,
+      available_stock: 9,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Presentear' },
+    },
+    {
+      id: 'cb4',
+      name: 'Cartao recadinho',
+      description: 'Complemento simples para acompanhar o presente.',
+      price: 2.5,
+      available_stock: 30,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Presentear' },
+    },
+  ];
+
   const fashionCatalog = [
     {
       id: 'f1',
@@ -4565,6 +4604,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
               'Caixa presenteavel com 3 brigadeiros',
             ],
             last_customer_goal: 'um presente sem erro para a minha mae',
+            last_query: 'me indica um presente ate 20 reais pra minha mae',
           },
         },
       }),
@@ -4573,6 +4613,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Sem problema, eu nao vou insistir no que nao te pegou.');
     expect(response).toContain('Estas sao as opcoes que eu colocaria na sua frente agora');
     expect(response).toContain('Kit Doce presente');
+    expect(response).not.toContain('Caixa presenteavel com 6 brigadeiros tradicionais');
     expect(response).not.toContain('Nao encontrei um item exatamente como');
   });
 
@@ -4590,6 +4631,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
             last_product_name: 'Brigadeiro individual mimo',
             last_product_names: ['Brigadeiro individual mimo'],
             last_customer_goal: 'um presente sem erro para a minha mae',
+            last_query: 'me indica um presente ate 20 reais pra minha mae',
           },
         },
       }),
@@ -4598,12 +4640,13 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('subir o nivel');
     expect(response).toContain('Estas sao as opcoes que eu colocaria na sua frente agora');
     expect(response).toContain('Kit Doce presente');
+    expect(response).not.toContain('Caixa presenteavel com 6 brigadeiros tradicionais');
     expect(response).not.toContain('Calma, acho que eu puxei a conversa para o lado errado');
     expect(response).not.toContain('Nao encontrei um item exatamente como');
   });
 
-  it('answers complement questions with a direct combination suggestion', async () => {
-    const service = createService(richerGiftingCatalog) as any;
+  it('answers complement questions without turning the suggestion into a disproportionate upsell', async () => {
+    const service = createService(combinationBalanceCatalog) as any;
 
     const response = await service.generateResponse(
       'o que combina com brigadeiro individual mimo?',
@@ -4622,7 +4665,9 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     );
 
     expect(response).toContain('Se a ideia e complementar Brigadeiro individual mimo');
+    expect(response).toContain('eu comecaria por Bala de brigadeiro presenteavel');
     expect(response).toContain('estas seriam as combinacoes mais redondas agora');
+    expect(response).not.toContain('eu comecaria por Caixa presenteavel 12 brigadeiros tradicionais');
     expect(response).not.toContain('Nao encontrei um item exatamente como');
   });
 });
