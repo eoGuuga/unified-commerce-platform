@@ -178,6 +178,29 @@
       ]
     },
     {
+      "name": "collection_clarification_should_not_repeat_two_near_identical_intros",
+      "steps": [
+        {
+          "message": "quero 1 bala de brigadeiro",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "acho que voce nao entendeu",
+          "expectAny": [
+            "Vou te explicar em uma etapa por vez para ficar bem claro.",
+            "nome completo"
+          ],
+          "forbidAny": [
+            "Vou separar isso em uma etapa por vez para ficar claro."
+          ]
+        }
+      ]
+    },
+    {
       "name": "discount_question_during_name_should_not_break_flow",
       "steps": [
         {
@@ -284,6 +307,29 @@
           ],
           "forbidAny": [
             "Calma, acho que eu puxei a conversa para o lado errado"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "consultative_objection_should_not_repeat_two_leads",
+      "steps": [
+        {
+          "message": "me indica um presente bonito ate 20 reais pra minha mae",
+          "expectAny": [
+            "presente",
+            "Estas sao as opcoes"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "ta caro",
+          "expectAny": [
+            "Entendi a preocupacao com custo",
+            "Estas sao as opcoes"
+          ],
+          "forbidAny": [
+            "Entendi a preocupacao com custo. Para manter a venda gostosa sem derrubar a percepcao de valor, eu seguiria por aqui: Entendi a preocupacao com preco"
           ]
         }
       ]

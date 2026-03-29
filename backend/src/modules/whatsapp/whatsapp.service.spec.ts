@@ -1417,6 +1417,29 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Brownie Premium');
   });
 
+  it('does not stack two consultative lead-ins when an objection already has a strong commercial prelude', async () => {
+    const { service } = createFixture(catalog);
+
+    const response = await service.generateResponse(
+      'ta caro',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_names: ['Brownie Premium', 'Brigadeiro Gourmet'],
+            last_customer_goal: 'um presente para sua mae com boa apresentacao',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Entendi a preocupacao com custo');
+    expect(response).not.toContain('Entendi a preocupacao com custo. Para manter a venda gostosa sem derrubar a percepcao de valor, eu seguiria por aqui: Entendi a preocupacao com preco');
+    expect((response.match(/Entendi a preocupacao com/gi) || []).length).toBe(1);
+  });
+
   it('handles recommendation requests as guided selling instead of greeting fallback', async () => {
     const { service } = createFixture(catalog);
 
@@ -1612,7 +1635,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       'tenant-id',
     );
 
-    expect(response).toContain('Pelo valor que voce me passou');
+    expect(response).toContain('dentro do teto de ate R$ 30,00');
     expect(response).toContain('almoco ou refeicao principal');
     expect(response).toContain('Combo Executivo');
     expect(response).toContain('Estas sao as opcoes que eu colocaria na sua frente agora:');
@@ -1720,6 +1743,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     );
 
     expect(response).toContain('Vou te explicar em uma etapa por vez para ficar bem claro.');
+    expect(response).not.toContain('Vou separar isso em uma etapa por vez para ficar claro.');
     expect(response).toContain('Neste momento eu so preciso do telefone');
     expect(response).toContain('TELEFONE DE CONTATO');
   });

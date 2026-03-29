@@ -2746,6 +2746,10 @@ export class WhatsappService {
       return 'Eu vou organizar a decisao com criterio e sem te empurrar item so para girar venda.';
     }
 
+    if (plan?.mode === 'step_guidance' && analysis.posture === 'confused') {
+      return 'Eu nao vou te fazer repetir o que ja esta certo.';
+    }
+
     switch (analysis.posture) {
       case 'frustrated':
         return plan?.mode === 'issue_recovery' || plan?.mode === 'post_order_support'
@@ -2795,6 +2799,7 @@ export class WhatsappService {
     strategy: SalesConversationStrategy,
     catalogProfile: CatalogSalesProfile,
     options?: {
+      skipLead?: boolean;
       skipGoalSummary?: boolean;
       maxDetails?: number;
     },
@@ -2846,7 +2851,9 @@ export class WhatsappService {
       details.push(decisionLine);
     }
 
-    return [lead, ...details.slice(0, maxDetails)].join(' ');
+    return [options?.skipLead ? null : lead, ...details.slice(0, maxDetails)]
+      .filter(Boolean)
+      .join(' ');
   }
 
   private buildSalesUnderstandingLine(analysis: SalesConversationAnalysis): string | null {
@@ -5542,6 +5549,7 @@ export class WhatsappService {
       );
     const compactPrelude = this.buildCompactSalesPrelude(conversationPrelude);
     const reasoningLine = this.buildHumanSalesReasoning(analysis, strategy, catalogProfile, {
+      skipLead: Boolean(intro || compactPrelude),
       skipGoalSummary: Boolean(compactPrelude),
       maxDetails: compactPrelude ? 2 : 3,
     });
@@ -5623,6 +5631,7 @@ export class WhatsappService {
       );
     const compactPrelude = this.buildCompactSalesPrelude(conversationPrelude);
     const reasoningLine = this.buildHumanSalesReasoning(analysis, strategy, catalogProfile, {
+      skipLead: true,
       skipGoalSummary: Boolean(compactPrelude),
       maxDetails: compactPrelude ? 2 : 3,
     });
@@ -5693,6 +5702,7 @@ export class WhatsappService {
       );
     const compactPrelude = this.buildCompactSalesPrelude(conversationPrelude);
     const reasoningLine = this.buildHumanSalesReasoning(analysis, strategy, catalogProfile, {
+      skipLead: Boolean(compactPrelude),
       skipGoalSummary: Boolean(compactPrelude),
       maxDetails: compactPrelude ? 2 : 3,
     });
