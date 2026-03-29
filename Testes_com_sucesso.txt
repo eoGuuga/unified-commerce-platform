@@ -1510,3 +1510,15 @@
   - `18f6f2d` `fix(whatsapp): tighten Loucas delicate gift curation`
 - Producao:
   - nao foi tocada nesta rodada
+
+## 2026-03-29 20:48 BRT - Correcao do cardapio interativo na Evolution
+
+- Problema corrigido:
+  - o bot montava o `cardapio` corretamente, mas a Evolution rejeitava o envio da lista interativa no fluxo real do WhatsApp com erro `instance requires property "sections"`
+- Ajuste aplicado:
+  - `backend/src/modules/notifications/notifications.service.ts` passou a enviar listas interativas para a Evolution usando `sections`, em vez de `values`
+  - criado teste dedicado em `backend/src/modules/notifications/notifications.service.spec.ts` para impedir regressao no payload do `sendList`
+- Validacao local desta rodada:
+  - `npm.cmd run test -- notifications.service.spec.ts whatsapp.controller.spec.ts whatsapp.service.spec.ts` => `208/208` ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
