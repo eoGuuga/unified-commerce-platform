@@ -1019,6 +1019,47 @@
       ]
     },
     {
+      "name": "loucas_fresh_less_sweet_gift_request_should_override_stale_memory",
+      "steps": [
+        {
+          "message": "quero algo pra dividir com a familia e bem chocolatudo",
+          "expectAny": [
+            "6 Brigadeiros tradicionais",
+            "10 Brigadeiros tradicionais",
+            "Bolo gelado Prestígio"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "me indica algo bonito e seguro pra presente, mas menos doce",
+          "expectAny": [
+            "Brownie tradicional",
+            "Banoffe",
+            "Pudim de leite condensado"
+          ],
+          "forbidAny": [
+            "Para dividir bem sem inventar moda",
+            "6 Brigadeiros tradicionais | R$ 18,00"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "loucas_combination_with_lightness_qualifier_should_keep_explicit_base_product",
+      "steps": [
+        {
+          "message": "o que combina com banoffe sem ficar pesado?",
+          "expectAny": [
+            "Banoffe ( torta de banana) entra como base",
+            "Se a ideia e complementar Banoffe"
+          ],
+          "forbidAny": [
+            "Brownie tradicional entra como base"
+          ]
+        }
+      ]
+    },
+    {
       "name": "consultative_negative_feedback_should_focus_the_next_step",
       "steps": [
         {

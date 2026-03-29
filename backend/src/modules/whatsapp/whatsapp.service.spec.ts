@@ -1662,6 +1662,29 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).not.toContain('Caixa presenteavel 12 brigadeiros tradicionais');
   });
 
+  it('keeps the explicitly named Loucas product as the base in combination queries with lightness qualifiers', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'o que combina com banoffe sem ficar pesado?',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_name: 'Brownie tradicional',
+            last_product_names: ['Brownie tradicional', 'Brigadeiro individual mimo'],
+            last_query: 'quero algo menos doce',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Banoffe ( torta de banana) entra como base');
+    expect(response).not.toContain('Brownie tradicional entra como base');
+  });
+
   it('answers price objections with safer alternatives from the catalog', async () => {
     const { service } = createFixture(catalog);
 
@@ -5089,6 +5112,33 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toMatch(/Brownie tradicional|Banoffe \( torta de banana\)|Bolo no pote trufado de maracuja|Pudim de leite condensado/);
     expect(response).not.toContain('Nao fechei "algo menos doce"');
     expect(response).not.toContain('Calma, acho que eu puxei a conversa para o lado errado');
+  });
+
+  it('treats a fresh Loucas gift request with less-sweet cues as a new recommendation instead of stale memory', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'me indica algo bonito e seguro pra presente, mas menos doce',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_product_name: '6 Brigadeiros tradicionais',
+            last_product_names: ['6 Brigadeiros tradicionais', 'Bolo gelado Prestígio'],
+            last_customer_goal: 'algo pra dividir com a familia e bem chocolatudo',
+            last_query: 'quero algo pra dividir com a familia e bem chocolatudo',
+          },
+        },
+      }),
+    );
+
+    expect(response).toMatch(
+      /Brownie tradicional|Banoffe \( torta de banana\)|Pudim de leite condensado/,
+    );
+    expect(response).not.toContain('Para dividir bem sem inventar moda');
+    expect(response).not.toContain('6 Brigadeiros tradicionais');
   });
 
   it('continues the consultative thread when the customer asks for another option', async () => {

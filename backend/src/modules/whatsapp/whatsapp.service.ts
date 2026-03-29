@@ -6105,6 +6105,10 @@ export class WhatsappService {
         /^.*?\b(?:combina com|combina bem com|vai bem com|vai junto com|pra ir junto com|para ir junto com|pra acompanhar|para acompanhar|acompanha bem|complementa|complementar)\b\s*/,
         '',
       )
+      .replace(
+        /\b(?:sem ficar pesado|sem pesar|menos doce|mais leve|leve|sem exagero|mais em conta|sem ficar enjoativo)\b.*$/,
+        '',
+      )
       .replace(/^(?:o|a|os|as|um|uma)\s+/, '')
       .replace(/[?.!,;:]+$/g, '')
       .trim();
@@ -6286,11 +6290,45 @@ export class WhatsappService {
     return null;
   }
 
+  private shouldUseCurrentMessageAsContextAwareBase(
+    message: string,
+    mode: ContextAwareSalesMode,
+    referenceProduct?: ProductWithStock | null,
+  ): boolean {
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return false;
+    }
+
+    if (mode === 'combination') {
+      return Boolean(referenceProduct) && this.isSalesCombinationQuery(message);
+    }
+
+    if (/\b(esse|essa|isso|desse|dessa|daquele|daquela|dele|dela)\b/.test(normalized)) {
+      return false;
+    }
+
+    const directAnalysis = this.salesIntelligenceService.analyze(message);
+    return (
+      directAnalysis.intent !== 'other' &&
+      (directAnalysis.useCaseTags.length > 0 ||
+        !!directAnalysis.recipientHint ||
+        directAnalysis.budgetCeiling !== null ||
+        /\b(me indica|me mostra|me sugere|quero|preciso|procuro|algo)\b/.test(normalized))
+    );
+  }
+
   private buildContextAwareSalesQuery(
     mode: ContextAwareSalesMode,
     conversation: TypedConversation | undefined,
     referenceProduct?: ProductWithStock | null,
+    currentMessage?: string,
   ): string {
+    const trimmedCurrentMessage = String(currentMessage || '').trim();
+    if (this.shouldUseCurrentMessageAsContextAwareBase(trimmedCurrentMessage, mode, referenceProduct)) {
+      return trimmedCurrentMessage;
+    }
+
     const memory = this.getConversationIntelligenceMemory(conversation);
     const rememberedQuery = String(memory.last_query || '').trim();
     const rememberedGoal = String(memory.last_customer_goal || '').trim();
@@ -6342,8 +6380,14 @@ export class WhatsappService {
     mode: ContextAwareSalesMode,
     conversation: TypedConversation | undefined,
     referenceProduct?: ProductWithStock | null,
+    currentMessage?: string,
   ): SalesConversationAnalysis {
-    const syntheticQuery = this.buildContextAwareSalesQuery(mode, conversation, referenceProduct);
+    const syntheticQuery = this.buildContextAwareSalesQuery(
+      mode,
+      conversation,
+      referenceProduct,
+      currentMessage,
+    );
     const analyzed = this.salesIntelligenceService.analyze(syntheticQuery);
     if (analyzed.intent !== 'other') {
       const rememberedBudget = this.getConversationIntelligenceMemory(conversation).last_budget_ceiling;
@@ -6418,6 +6462,7 @@ export class WhatsappService {
       'budget',
       conversation,
       referenceProduct,
+      analysis.commercialQuery || undefined,
     );
 
     return {
@@ -7009,7 +7054,12 @@ export class WhatsappService {
       return null;
     }
 
-    const analysis = this.buildContextAwareSalesAnalysis(mode, conversation, referenceProduct);
+    const analysis = this.buildContextAwareSalesAnalysis(
+      mode,
+      conversation,
+      referenceProduct,
+      message,
+    );
     const conversationalAnalysis = this.conversationalIntelligenceService.analyze(message);
     const conversationPlan = this.conversationPlannerService.buildPlan({
       message,
@@ -8351,6 +8401,7 @@ export class WhatsappService {
         'combination',
         conversation,
         referenceProduct,
+        message,
       );
       const combinationStrategy = this.salesSegmentStrategyService.buildStrategy(
         playbook,
