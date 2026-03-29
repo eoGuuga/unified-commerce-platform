@@ -6174,6 +6174,13 @@ export class WhatsappService {
       return false;
     }
 
+    if (
+      analysis.budgetCeiling !== null &&
+      Number(crossSellSuggestion.product.price || 0) > analysis.budgetCeiling + 0.0001
+    ) {
+      return false;
+    }
+
     return true;
   }
 

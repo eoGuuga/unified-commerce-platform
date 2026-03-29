@@ -4244,6 +4244,24 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('um teto de ate R$ 14,00');
   });
 
+  it('does not inject a cross-sell above the budget ceiling in the initial consultative recommendation', async () => {
+    const service = createService(richerGiftingCatalog) as any;
+
+    const response = await service.generateResponse(
+      'me indica um presente ate 20 reais pra minha mae',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+        },
+      }),
+    );
+
+    expect(response).toContain('Quer que eu fique estritamente ate R$ 20,00');
+    expect(response).not.toContain('Se voce quiser elevar a percepcao da compra, eu ainda combinaria');
+    expect(response).not.toContain('Caixa presenteavel com 6 brigadeiros tradicionais');
+  });
+
   it('explains the commercial role of the recommended item instead of treating every product the same', async () => {
     const { service } = createFixture(giftingCatalogWithAccessories);
 

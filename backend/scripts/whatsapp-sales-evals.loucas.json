@@ -636,6 +636,21 @@
           ]
         }
       ]
+    },
+    {
+      "name": "budget_gift_recommendation_should_not_pitch_cross_sell_above_ceiling",
+      "steps": [
+        {
+          "message": "me indica um presente ate 20 reais pra minha mae",
+          "expectAny": [
+            "Quer que eu fique estritamente ate R$ 20,00",
+            "Estas sao as opcoes"
+          ],
+          "forbidAny": [
+            "eu ainda combinaria com Caixa presenteàvel 12 brigadeiros tradicionais"
+          ]
+        }
+      ]
     }
   ]
 }
