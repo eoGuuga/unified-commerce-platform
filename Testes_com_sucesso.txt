@@ -1417,3 +1417,45 @@
   - `def6ead` `refactor(whatsapp): force Loucas less-sweet live curation`
 - Producao:
   - nao foi tocada nesta rodada
+
+2026-03-29  Mensagem atual da Loucas vence memoria consultiva antiga
+- Melhorias de inteligencia:
+  - a IA da Loucas agora deixa a mensagem atual mandar mais do que memoria consultiva velha quando o cliente ja fala uma nova intencao completa
+  - isso evita contaminacao entre contextos como:
+    - `quero algo pra dividir com a familia e bem chocolatudo`
+    - `me indica algo bonito e seguro pra presente, mas menos doce`
+  - consultas de combinacao com produto explicito e qualificador agora preservam o item base certo
+  - exemplo corrigido:
+    - `o que combina com banoffe sem ficar pesado?`
+    - agora mantem `Banoffe ( torta de banana)` como base, em vez de puxar um item lembrado da conversa anterior
+- Qualidade automatizada expandida:
+  - `backend/src/modules/whatsapp/whatsapp.service.ts` passou a preferir o texto atual quando ele ja traz intencao comercial suficiente para montar a resposta contextual
+  - o mesmo arquivo ganhou limpeza melhor de consultas como `combina com banoffe sem ficar pesado`
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` agora cobre memoria velha contaminando presente e combinacao com produto explicito
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` ganhou cenarios para:
+    - presente menos doce depois de memoria chocolatuda
+    - combinacao com `Banoffe` sem deixar a base escorregar
+- Validacao local desta rodada:
+  - `node .\\node_modules\\jest\\bin\\jest.js src/modules/whatsapp/whatsapp.service.spec.ts --runInBand --silent` => `192/192` ok
+  - `npm.cmd run build` => ok
+  - `npm.cmd run lint` => ok
+- Validacao em `dev/teste`:
+  - backend atualizado ate o commit `96d6954`
+  - `npm.cmd run test:whatsapp:evals` => `48/48` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-194540.json`
+  - smoke real com memoria antiga:
+    - `quero algo pra dividir com a familia e bem chocolatudo`
+    - depois `me indica algo bonito e seguro pra presente, mas menos doce`
+    - a segunda resposta deixou de citar contexto de dividir e respondeu com:
+      - `Brownie tradicional`
+      - `Banoffe ( torta de banana)`
+      - `Pudim de leite condensado`
+  - smoke real `o que combina com banoffe sem ficar pesado?` respondeu com:
+    - `Banoffe ( torta de banana) entra como base`
+    - sem puxar `Brownie tradicional` como base
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+- Commits desta sequencia:
+  - `96d6954` `refactor(whatsapp): prefer fresh Loucas intent over stale consultative memory`
+- Producao:
+  - nao foi tocada nesta rodada
