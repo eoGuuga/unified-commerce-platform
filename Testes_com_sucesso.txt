@@ -1597,3 +1597,28 @@
   - `333ca7c` `refactor(whatsapp): deepen Loucas product-line understanding`
 - Producao:
   - nao foi tocada nesta rodada
+
+## 2026-03-29 22:08 BRT - Preparacao Loucas-first para IA local sem custo recorrente
+
+- Objetivo desta rodada:
+  - preparar o bot da Loucas para um salto real de inteligencia quando a camada de modelo local for ativada, sem quebrar o motor seguro atual de pedido
+- Ajuste aplicado:
+  - `backend/src/modules/whatsapp/services/openai.service.ts` passou a receber contexto comercial explicito da loja:
+    - nome da loja
+    - persona da Loucas
+    - leitura atual do catalogo
+    - pergunta consultiva preferida
+    - focos comerciais
+    - meios de pagamento validos no WhatsApp
+    - regras operacionais do canal
+  - o prompt sistemico do assistente conversacional agora diferencia quando a loja e a `Loucas por Brigadeiro`, em vez de tratar tudo como um chat generico
+  - `backend/src/modules/whatsapp/whatsapp.service.ts` passou a montar esse contexto Loucas-first antes de chamar a camada LLM e tambem passou a registrar melhor o objetivo detectado e produto mencionado pela IA
+  - criadas regressões em:
+    - `backend/src/modules/whatsapp/services/openai.service.spec.ts`
+    - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+- Validacao local desta rodada:
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run test -- src/modules/whatsapp/services/openai.service.spec.ts src/modules/whatsapp/whatsapp.service.spec.ts` => `208/208` ok
+  - `npm.cmd run build` => ok
+- Observacao operacional:
+  - esta rodada prepara o cerebro Loucas-first, mas nao liga custo nem modelo por padrao; a flag continua podendo ficar desligada ate existir uma maquina local forte o suficiente
