@@ -1702,12 +1702,14 @@
     - detectar respostas curtas de preferencia como `para presentear` e `mais delicado` como continuacao consultiva real, em vez de cair em fallback
     - fazer elicitação progressiva na Loucas quando o pedido e aberto demais, com pergunta unica de ocasião ou estilo antes da recomendacao
     - evitar que `para presentear` seja lido como comando de parar a conversa
+    - priorizar a memoria consultiva sobre a leitura direta de item, para `para presentear` nao ser sequestrado por um produto com nome parecido no catalogo
   - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` ganhou regressao para:
     - pergunta unica de ocasião em descoberta ampla
     - funil progressivo `me indica alguma coisa -> para presentear -> mais delicado`
+    - protecao para resposta curta consultiva nao cair em `item insight`
   - `backend/scripts/whatsapp-sales-evals.loucas.json` ganhou cenarios de elicitação progressiva da Loucas
 - Validacao local desta rodada:
-  - `npm.cmd run test -- src/modules/whatsapp/whatsapp.service.spec.ts` => `210/210` ok
+  - `npm.cmd run test -- src/modules/whatsapp/whatsapp.service.spec.ts` => `211/211` ok
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
 - Observacao operacional:
