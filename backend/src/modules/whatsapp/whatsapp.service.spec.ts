@@ -5499,6 +5499,29 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(thirdResponse).not.toContain('Quero te entender sem adivinhar coisa errada');
   });
 
+  it('keeps consultative preference replies above bare product insight when memory is active', async () => {
+    const service = createService(richerGiftingCatalog) as any;
+
+    const response = await service.generateResponse(
+      'para presentear',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            last_intent: 'recommendation',
+            last_query: 'me indica alguma coisa',
+            last_response_mode: 'sales_consultative',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('voce quer algo mais delicado e seguro ou mais marcante?');
+    expect(response).not.toContain('Aqui esta a leitura mais clara deste item.');
+    expect(response).not.toContain('Kit Doce presente');
+  });
+
   it('blocks AI routing from turning a vague message into a fake price query', async () => {
     const service = createService(loucasCatalog) as any;
     service.openAIService.processMessage.mockResolvedValue({

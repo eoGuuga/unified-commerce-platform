@@ -12115,14 +12115,20 @@ export class WhatsappService {
     }
 
     // Resposta padrão
-    const exactProductInsight = await this.tryBareExactProductInsight(
-      message,
-      tenantId,
-      conversation,
-      currentState,
-    );
-    if (exactProductInsight) {
-      return exactProductInsight;
+    const shouldPreferConsultativeMemoryOverBareInsight =
+      this.hasConsultativeMemory(conversation) &&
+      this.isSalesPreferenceOnlyReply(message);
+
+    if (!shouldPreferConsultativeMemoryOverBareInsight) {
+      const exactProductInsight = await this.tryBareExactProductInsight(
+        message,
+        tenantId,
+        conversation,
+        currentState,
+      );
+      if (exactProductInsight) {
+        return exactProductInsight;
+      }
     }
 
     const conciergeResponse = await this.trySmartConciergeResponse(message, tenantId, conversation);
