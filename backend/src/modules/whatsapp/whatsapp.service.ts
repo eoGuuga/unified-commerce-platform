@@ -11373,7 +11373,68 @@ export class WhatsappService {
       return { valid: false, error: 'Preciso do nome da pessoa, nao de um comando' };
     }
 
+    if (
+      /\b(pix|credito|debito|dinheiro|entrega|retirada|pedido|cardapio|menu|status|preco|valor|estoque|telefone|numero|celular|whatsapp|rua|avenida|bairro|cep|endereco)\b/.test(
+        normalized,
+      )
+    ) {
+      return { valid: false, error: 'Preciso do nome da pessoa, nao de um dado de pedido' };
+    }
+
+    if (
+      /\b(brigadeiro|beijinho|bala|bombom|banoffe|brownie|bolo|pudim|torta|pao de mel|acai|kit|caixa presenteavel)\b/.test(
+        normalized,
+      )
+    ) {
+      return { valid: false, error: 'Isso parece nome de produto, nao nome da pessoa' };
+    }
+
     return { valid: true };
+  }
+
+  private getAddressEvidence(address: string): {
+    score: number;
+    hasStreetLike: boolean;
+    hasNumber: boolean;
+    hasZip: boolean;
+    hasState: boolean;
+    segmentCount: number;
+  } {
+    const candidate = this.normalizeAddressCandidate(address);
+    const segments = candidate
+      .split(',')
+      .map((segment) => segment.trim())
+      .filter(Boolean);
+    const hasStreetLike = this.hasAddressKeyword(candidate);
+    const hasZip = /\b\d{5}-?\d{3}\b/.test(candidate);
+    const hasState = this.containsStateReference(candidate);
+    const hasNumber = /\b\d{1,6}[A-Za-z]?\b/.test(candidate);
+
+    let score = 0;
+    if (hasStreetLike) {
+      score += 2;
+    }
+    if (hasZip) {
+      score += 2;
+    }
+    if (hasState) {
+      score += 1;
+    }
+    if (hasNumber) {
+      score += 1;
+    }
+    if (segments.length >= 3) {
+      score += 1;
+    }
+
+    return {
+      score,
+      hasStreetLike,
+      hasNumber,
+      hasZip,
+      hasState,
+      segmentCount: segments.length,
+    };
   }
 
   /**
@@ -11390,6 +11451,30 @@ export class WhatsappService {
       return { valid: false, error: `Endereco deve ter no maximo ${this.MAX_ADDRESS_LENGTH} caracteres` };
     }
 
+    const normalized = this.normalizeIntentText(sanitized);
+    if (
+      /\b(nao sei|depois eu vejo|depois vejo|me ajuda|explica|como funciona|quero|preciso|pedido|pix|status)\b/.test(
+        normalized,
+      )
+    ) {
+      return { valid: false, error: 'Endereco precisa vir como endereco real, nao como conversa solta' };
+    }
+
+    const evidence = this.getAddressEvidence(sanitized);
+    if (evidence.score < 3) {
+      return {
+        valid: false,
+        error: 'Endereco precisa ter dados reais como rua, numero, bairro, cidade, estado ou CEP',
+      };
+    }
+
+    if (!evidence.hasNumber && !evidence.hasZip) {
+      return {
+        valid: false,
+        error: 'Endereco precisa ter pelo menos numero ou CEP para eu nao guardar algo incompleto',
+      };
+    }
+
     return { valid: true };
   }
 
@@ -11401,6 +11486,19 @@ export class WhatsappService {
 
     if (digitsOnly.length < 10 || digitsOnly.length > 11) {
       return { valid: false, error: 'Telefone deve ter 10 ou 11 digitos (com DDD)' };
+    }
+
+    if (!/^[1-9]\d/.test(digitsOnly)) {
+      return { valid: false, error: 'Telefone precisa comecar com um DDD valido' };
+    }
+
+    const subscriber = digitsOnly.slice(2);
+    if (/^(\d)\1+$/.test(subscriber)) {
+      return { valid: false, error: 'Telefone parece incompleto ou artificial demais para salvar com seguranca' };
+    }
+
+    if (digitsOnly.length === 11 && subscriber[0] !== '9') {
+      return { valid: false, error: 'Celular com 11 digitos precisa ter o 9 apos o DDD' };
     }
 
     return { valid: true };

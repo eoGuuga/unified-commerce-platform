@@ -715,6 +715,51 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     );
   });
 
+  it('rejects product and order data as customer name', () => {
+    const service = createService() as any;
+
+    expect(service.validateName('Bombom de morango')).toEqual(
+      expect.objectContaining({
+        valid: false,
+      }),
+    );
+    expect(service.validateName('Rua das Flores')).toEqual(
+      expect.objectContaining({
+        valid: false,
+      }),
+    );
+  });
+
+  it('rejects loose conversational text as a delivery address', () => {
+    const service = createService() as any;
+
+    expect(service.validateAddress('depois eu vejo isso')).toEqual(
+      expect.objectContaining({
+        valid: false,
+      }),
+    );
+    expect(service.validateAddress('quero entender melhor')).toEqual(
+      expect.objectContaining({
+        valid: false,
+      }),
+    );
+  });
+
+  it('rejects invalid ddd-like phones instead of storing garbage', () => {
+    const service = createService() as any;
+
+    expect(service.validatePhone('00865432111')).toEqual(
+      expect.objectContaining({
+        valid: false,
+      }),
+    );
+    expect(service.validatePhone('11987654321')).toEqual(
+      expect.objectContaining({
+        valid: true,
+      }),
+    );
+  });
+
   it('extracts natural name phrases before saving the customer name', async () => {
     const { service, conversationService } = createFixture(catalog);
 
@@ -768,6 +813,34 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     );
     expect(response).toContain('Estou montando o endereco por etapas');
     expect(response).toContain('Agora me envie o numero');
+  });
+
+  it('does not advance to phone when the delivery message is just loose conversational text', async () => {
+    const { service, conversationService } = createFixture(catalog);
+
+    const response = await service.processCustomerAddressPremium(
+      'depois eu vejo isso',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_address',
+          pending_order: pendingConversationOrder,
+          customer_data: {
+            name: 'Ana Paula',
+            delivery_type: 'delivery',
+          },
+        },
+      }),
+    );
+
+    expect(response).toMatch(/Endereco invalido|ENDERECO DE ENTREGA|preciso do endereco de entrega/i);
+    expect(response).not.toContain('TELEFONE DE CONTATO');
+    expect(conversationService.saveCustomerData).not.toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        address: expect.anything(),
+      }),
+    );
   });
 
   it('does not guess a stock item when an important qualifier is missing from the catalog match', async () => {
@@ -2765,7 +2838,7 @@ describe('WhatsappService defensive WhatsApp flow', () => {
       }),
     );
 
-    expect(response).toContain('isso parece produto');
+    expect(response).toMatch(/isso parece produto|Nao fechei .* com seguranca ainda/i);
     expect(response).toContain('nome completo de quem vai receber o pedido');
     expect(response).not.toContain('Como voce prefere receber esse pedido?');
   });

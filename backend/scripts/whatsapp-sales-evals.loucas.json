@@ -1530,6 +1530,87 @@
           ]
         }
       ]
+    },
+    {
+      "name": "address_collection_should_reject_loose_conversational_text",
+      "steps": [
+        {
+          "message": "quero 1 bombom de morango",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Jordan Lincoln",
+          "expectAny": [
+            "Como voce prefere receber esse pedido?",
+            "1. Entrega",
+            "2. Retirada"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "1",
+          "expectAny": [
+            "ENDERECO DE ENTREGA",
+            "endereco completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "depois eu vejo isso",
+          "expectAny": [
+            "Endereco invalido",
+            "rua",
+            "numero"
+          ],
+          "forbidAny": [
+            "TELEFONE DE CONTATO"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "phone_collection_should_reject_invalid_ddd_like_number",
+      "steps": [
+        {
+          "message": "quero 1 bombom de morango",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Jordan Lincoln",
+          "expectAny": [
+            "Como voce prefere receber esse pedido?",
+            "1. Entrega",
+            "2. Retirada"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "2",
+          "expectAny": [
+            "TELEFONE DE CONTATO",
+            "telefone"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "00865432111",
+          "expectAny": [
+            "Ainda nao consegui fechar o telefone com seguranca",
+            "DDD valido"
+          ],
+          "forbidAny": [
+            "OBSERVACOES DO PEDIDO"
+          ]
+        }
+      ]
     }
   ]
 }
