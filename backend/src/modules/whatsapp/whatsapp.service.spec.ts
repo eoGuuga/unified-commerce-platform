@@ -953,6 +953,74 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('nome completo');
   });
 
+  it('uses a more human bridge when the customer mentions a product during name collection', async () => {
+    const service = createService(loucasTranscriptCatalog) as any;
+
+    const response = await service.generateResponse(
+      'Pao de mel doce de leite',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_name',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'lt1',
+                produto_name: 'Bombom de morango',
+                quantity: 5,
+                unit_price: 18,
+              },
+            ],
+            subtotal: 90,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 90,
+          },
+          customer_data: {},
+        },
+      }),
+    );
+
+    expect(response).toContain('Consigo te ajudar com *Pao de mel doce de leite* sim.');
+    expect(response).toContain('eu volto nesse item com voce');
+    expect(response).toContain('nome completo');
+  });
+
+  it('shows Loucas family options during name collection instead of sounding like a cold ambiguity warning', async () => {
+    const service = createService(loucasTranscriptCatalog) as any;
+
+    const response = await service.generateResponse(
+      'brigadeiros tradicionais',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_name',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'lt1',
+                produto_name: 'Bombom de morango',
+                quantity: 5,
+                unit_price: 18,
+              },
+            ],
+            subtotal: 90,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 90,
+          },
+          customer_data: {},
+        },
+      }),
+    );
+
+    expect(response).toContain('Entendi a linha que voce quer');
+    expect(response).toContain('3 Brigadeiros tradicionais');
+    expect(response).toContain('6 Brigadeiros tradicionais');
+    expect(response).toContain('volto nessa linha com voce');
+    expect(response).toContain('nome completo');
+  });
+
   it('realigns the flow when an address is sent during phone collection', async () => {
     const service = createService(catalog) as any;
 
@@ -1308,6 +1376,22 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     const result = service.findProductByName(loucasCatalog, 'banoffes');
 
     expect(result.produto?.name.toLowerCase()).toContain('banoffe');
+  });
+
+  it('surfaces Loucas family options when the customer asks for a specific line without quantity', async () => {
+    const service = createService(loucasTranscriptCatalog) as any;
+
+    const response = await service.generateResponse(
+      'quero brigadeiros tradicionais',
+      'tenant-id',
+      createConversation(),
+    );
+
+    expect(response).toContain('Entendi a linha que voce quer');
+    expect(response).toContain('3 Brigadeiros tradicionais');
+    expect(response).toContain('6 Brigadeiros tradicionais');
+    expect(response).toContain('10 Brigadeiros tradicionais');
+    expect(response).not.toContain('Quantos *brigadeiros tradicionais*');
   });
 
   it('returns similar suggestions when the typo is still ambiguous', () => {

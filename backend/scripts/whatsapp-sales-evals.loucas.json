@@ -1111,6 +1111,72 @@
       ]
     },
     {
+      "name": "loucas_family_line_without_quantity_should_show_real_pack_options",
+      "steps": [
+        {
+          "message": "quero brigadeiros tradicionais",
+          "expectAny": [
+            "Entendi a linha que voce quer",
+            "3 Brigadeiros tradicionais",
+            "6 Brigadeiros tradicionais",
+            "10 Brigadeiros tradicionais"
+          ],
+          "forbidAny": [
+            "Quantos *brigadeiros tradicionais* voce gostaria?"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "name_collection_product_detour_should_sound_human_and_keep_context",
+      "steps": [
+        {
+          "message": "quero 5 bombom de morango",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "pao de mel doce de leite",
+          "expectAny": [
+            "Consigo te ajudar com *Pao de mel doce de leite* sim.",
+            "eu volto nesse item com voce",
+            "nome completo"
+          ],
+          "forbidAny": [
+            "Eu continuo com esse item em mente para nao me perder."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "name_collection_family_detour_should_show_loucas_line_options",
+      "steps": [
+        {
+          "message": "quero 5 bombom de morango",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "brigadeiros tradicionais",
+          "expectAny": [
+            "Entendi a linha que voce quer",
+            "3 Brigadeiros tradicionais",
+            "6 Brigadeiros tradicionais",
+            "volto nessa linha com voce"
+          ],
+          "forbidAny": [
+            "Nao fechei \"brigadeiros tradicionais\" com seguranca ainda."
+          ]
+        }
+      ]
+    },
+    {
       "name": "consultative_negative_feedback_should_focus_the_next_step",
       "steps": [
         {

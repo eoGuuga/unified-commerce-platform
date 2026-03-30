@@ -5133,6 +5133,279 @@ export class WhatsappService {
     ].join('\n');
   }
 
+  private singularizeCatalogToken(value: string): string {
+    const normalizedValue = this.normalizeCatalogSearchText(value || '');
+    if (normalizedValue.endsWith('es') && normalizedValue.length > 5) {
+      return normalizedValue.slice(0, -2);
+    }
+    if (normalizedValue.endsWith('s') && normalizedValue.length > 4) {
+      return normalizedValue.slice(0, -1);
+    }
+    return normalizedValue;
+  }
+
+  private tokenizeProductFamilyReference(value: string): string[] {
+    const stopWords = new Set([
+      'de',
+      'do',
+      'da',
+      'dos',
+      'das',
+      'com',
+      'sem',
+      'para',
+      'pra',
+      'pro',
+      'um',
+      'uma',
+      'uns',
+      'umas',
+      'o',
+      'a',
+      'os',
+      'as',
+      'quero',
+      'queria',
+      'preciso',
+      'gostaria',
+      'pedido',
+      'pedir',
+      'comprar',
+      'mais',
+      'tambem',
+      'tb',
+      'tbm',
+      'item',
+      'itens',
+      'produto',
+      'produtos',
+    ]);
+    const packagingWords = new Set([
+      'caixa',
+      'kit',
+      'combo',
+      'cestinha',
+      'bandeja',
+      'presenteavel',
+      'presente',
+      'presentear',
+      'mimo',
+      'individual',
+      'docinhos',
+      'delicias',
+      'bebidas',
+    ]);
+
+    return this.normalizeCatalogSearchText(value || '')
+      .replace(/^\d+\s+/g, '')
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter(
+        (token) =>
+          token.length >= 2 && !stopWords.has(token) && !packagingWords.has(token),
+      )
+      .map((token) => this.singularizeCatalogToken(token));
+  }
+
+  private getProductLeadingQuantity(productName: string): number | null {
+    const normalized = this.normalizeCatalogSearchText(productName || '');
+    const match = normalized.match(/^(\d+)\b/);
+    return match ? Number(match[1]) : null;
+  }
+
+  private findProductFamilyOptions(
+    products: ProductWithStock[],
+    query: string,
+  ): ProductWithStock[] {
+    const normalizedQuery = this.normalizeCatalogSearchText(query || '').trim();
+    if (!normalizedQuery) {
+      return [];
+    }
+
+    const queryTokens = this.tokenizeProductFamilyReference(normalizedQuery);
+    if (queryTokens.length < 2) {
+      return [];
+    }
+
+    const wantsGiftPresentation = /\b(caixa|presente|presenteavel|kit|mimo)\b/.test(
+      normalizedQuery,
+    );
+
+    const familyMatches = products.filter((product) => {
+      const productTokens = this.tokenizeProductFamilyReference(product.name || '');
+      if (productTokens.length < 2) {
+        return false;
+      }
+
+      const matchedTokenCount = queryTokens.filter((queryToken) =>
+        productTokens.some(
+          (productToken) =>
+            productToken === queryToken ||
+            productToken.includes(queryToken) ||
+            queryToken.includes(productToken),
+        ),
+      ).length;
+
+      if (matchedTokenCount < queryTokens.length) {
+        return false;
+      }
+
+      const normalizedCategory = this.normalizeCatalogSearchText(product.categoria?.name || '');
+      const looksGiftProduct =
+        normalizedCategory.includes('presentear') ||
+        /\b(caixa|presenteavel|kit)\b/.test(this.normalizeCatalogSearchText(product.name || ''));
+
+      if (!wantsGiftPresentation && looksGiftProduct && !this.getProductLeadingQuantity(product.name || '')) {
+        return false;
+      }
+
+      return true;
+    });
+
+    if (familyMatches.length < 2) {
+      return [];
+    }
+
+    return this.dedupeProducts(familyMatches).sort((left, right) => {
+      const leftQty = this.getProductLeadingQuantity(left.name || '');
+      const rightQty = this.getProductLeadingQuantity(right.name || '');
+      const leftHasQty = typeof leftQty === 'number';
+      const rightHasQty = typeof rightQty === 'number';
+
+      if (leftHasQty !== rightHasQty) {
+        return leftHasQty ? -1 : 1;
+      }
+
+      if (leftHasQty && rightHasQty && leftQty !== rightQty) {
+        return (leftQty as number) - (rightQty as number);
+      }
+
+      const leftStock = Number(left.available_stock || 0);
+      const rightStock = Number(right.available_stock || 0);
+      if (leftStock !== rightStock) {
+        return rightStock - leftStock;
+      }
+
+      return String(left.name || '').localeCompare(String(right.name || ''));
+    });
+  }
+
+  private buildProductFamilyOptionsMessage(
+    query: string,
+    options: ProductWithStock[],
+  ): string {
+    const displayQuery = String(query || '').trim();
+    return [
+      `Entendi a linha que voce quer: *${displayQuery}*.`,
+      '',
+      'Hoje eu tenho estas opcoes da Loucas nessa linha:',
+      ...options.slice(0, 4).map((product) => `- ${this.formatProductHeadline(product)}`),
+      '',
+      `Se quiser, me diga qual opcao faz mais sentido ou envie: "quero 1 ${options[0].name}".`,
+    ].join('\n');
+  }
+
+  private getCollectionStageHumanAnchor(
+    currentState: ConversationState,
+    conversation?: TypedConversation,
+  ): string {
+    const customerData = conversation?.context?.customer_data as CustomerData | undefined;
+
+    switch (currentState) {
+      case 'collecting_name':
+        return 'o nome';
+      case 'collecting_address':
+        return customerData?.delivery_type === 'delivery' ? 'o endereco' : 'entrega ou retirada';
+      case 'collecting_phone':
+        return 'o telefone';
+      default:
+        return 'essa etapa';
+    }
+  }
+
+  private buildCollectionStageCatalogBridgeLine(
+    currentState: ConversationState,
+    conversation?: TypedConversation,
+    scope: 'item' | 'line' = 'item',
+  ): string {
+    return `Eu seguro isso aqui e, assim que eu fechar ${this.getCollectionStageHumanAnchor(
+      currentState,
+      conversation,
+    )}, eu volto ${scope === 'line' ? 'nessa linha' : 'nesse item'} com voce.`;
+  }
+
+  private async tryProductFamilyAssist(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): Promise<string | null> {
+    const sanitized = this.sanitizeInput((message || '').trim());
+    if (!sanitized) {
+      return null;
+    }
+
+    const normalized = this.normalizeIntentText(sanitized);
+    if (
+      !normalized ||
+      this.looksLikeMultiItemOrder(sanitized) ||
+      this.isDirectCatalogRequest(sanitized) ||
+      this.isDirectPriceQuestion(sanitized) ||
+      this.isDirectStockQuestion(sanitized) ||
+      this.isDirectScheduleQuestion(sanitized) ||
+      this.isDirectHelpRequest(sanitized) ||
+      this.isDirectGreeting(sanitized) ||
+      this.isPaymentMethodSelection(sanitized) ||
+      this.isCancelIntent(normalized, conversation, currentState) ||
+      this.looksLikeOrderStatusQuery(normalized, conversation) ||
+      this.isReopenIntent(normalized) ||
+      this.isRepeatOrderIntent(normalized)
+    ) {
+      return null;
+    }
+
+    const orderInfo = this.extractOrderInfo(sanitized);
+    if (orderInfo.quantity !== null || !orderInfo.productName) {
+      return null;
+    }
+
+    const products = await this.getCatalogProducts(tenantId);
+    if (!products.length) {
+      return null;
+    }
+
+    const familyOptions = this.findProductFamilyOptions(products, orderInfo.productName);
+    if (familyOptions.length < 2) {
+      return null;
+    }
+
+    await this.rememberConversationIntelligence(conversation, {
+      last_intent: 'suggestion',
+      last_product_name: null,
+      last_product_names: familyOptions.map((product) => product.name),
+      last_query: orderInfo.productName,
+    });
+
+    if (
+      conversation &&
+      currentState &&
+      ['collecting_name', 'collecting_address', 'collecting_phone'].includes(currentState)
+    ) {
+      return this.buildCollectionStageDetourMessage(
+        `Entendi a linha que voce quer: *${orderInfo.productName}*.`,
+        currentState,
+        conversation,
+        [
+          'Hoje eu tenho estas opcoes nessa linha:',
+          ...familyOptions.slice(0, 4).map((product) => `- ${this.formatProductHeadline(product)}`),
+          this.buildCollectionStageCatalogBridgeLine(currentState, conversation, 'line'),
+        ],
+      );
+    }
+
+    return this.buildProductFamilyOptionsMessage(orderInfo.productName, familyOptions);
+  }
+
   private async tryHandleCollectionStageDetour(
     message: string,
     tenantId: string,
@@ -5297,6 +5570,11 @@ export class WhatsappService {
       }
     }
 
+    const familyOptions =
+      resolvedDetourQuery || likelyProductQuery
+        ? this.findProductFamilyOptions(produtos, resolvedDetourQuery || likelyProductQuery || '')
+        : [];
+
     if (!likelyProductQuery && !searchResult.produto && !(searchResult.sugestoes?.length)) {
       if (validNameCandidate) {
         return null;
@@ -5307,13 +5585,33 @@ export class WhatsappService {
         conversation,
       );
     }
+    if (familyOptions.length >= 2) {
+      await this.rememberConversationIntelligence(conversation, {
+        last_intent: 'suggestion',
+        last_product_name: null,
+        last_product_names: familyOptions.map((product) => product.name),
+        last_query: resolvedDetourQuery || likelyProductQuery || null,
+      });
+
+      return this.buildCollectionStageDetourMessage(
+        `Entendi a linha que voce quer: *${resolvedDetourQuery || likelyProductQuery}*.`,
+        currentState,
+        conversation,
+        [
+          'Hoje eu tenho estas opcoes nessa linha:',
+          ...familyOptions.slice(0, 4).map((product) => `- ${this.formatProductHeadline(product)}`),
+          this.buildCollectionStageCatalogBridgeLine(currentState, conversation, 'line'),
+        ],
+      );
+    }
+
     if (searchResult.produto) {
       if (validNameCandidate) {
         return this.buildCollectionStageDetourMessage(
-          `Entendi que voce quis falar de *${searchResult.produto.name}*.`,
+          `Consigo te ajudar com *${searchResult.produto.name}* sim.`,
           currentState,
           conversation,
-          ['Eu deixo esse item em mente para a gente voltar nele sem perder contexto.'],
+          [this.buildCollectionStageCatalogBridgeLine(currentState, conversation, 'item')],
         );
       }
 
@@ -5324,10 +5622,10 @@ export class WhatsappService {
       });
 
       return this.buildCollectionStageDetourMessage(
-        `Entendi que voce quis falar de *${searchResult.produto.name}*.`,
+        `Consigo te ajudar com *${searchResult.produto.name}* sim.`,
         currentState,
         conversation,
-        ['Eu continuo com esse item em mente para nao me perder.'],
+        [this.buildCollectionStageCatalogBridgeLine(currentState, conversation, 'item')],
       );
     }
 
@@ -5359,6 +5657,7 @@ export class WhatsappService {
         [
           'Acho que voce pode estar falando de algo nesta linha:',
           ...suggestions.map((product) => `- ${product.name}`),
+          this.buildCollectionStageCatalogBridgeLine(currentState, conversation, 'line'),
         ],
       );
     }
@@ -10962,6 +11261,16 @@ export class WhatsappService {
       return await this.handleRepeatOrderIntent(tenantId, conversation);
     }
 
+    const familyAssist = await this.tryProductFamilyAssist(
+      message,
+      tenantId,
+      conversation,
+      currentState,
+    );
+    if (familyAssist) {
+      return familyAssist;
+    }
+
     const pendingOrderAdjustment = await this.tryAdjustPendingOrder(
       message,
       tenantId,
@@ -12014,6 +12323,17 @@ export class WhatsappService {
     }
 
     const result = this.findProductByName(products, query);
+    const familyOptions = this.findProductFamilyOptions(products, query);
+    if (familyOptions.length >= 2) {
+      await this.rememberConversationIntelligence(conversation, {
+        last_intent: 'suggestion',
+        last_product_name: null,
+        last_product_names: familyOptions.map((product) => product.name),
+        last_query: query,
+      });
+      return this.buildProductFamilyOptionsMessage(query, familyOptions);
+    }
+
     if (result.produto) {
       await this.rememberConversationIntelligence(conversation, {
         last_intent: 'suggestion',
@@ -12607,6 +12927,23 @@ export class WhatsappService {
         const produtosSemQuantidade = Array.isArray(produtosSemQuantidadeResult)
           ? produtosSemQuantidadeResult
           : produtosSemQuantidadeResult.data;
+        const familyOptions = this.findProductFamilyOptions(
+          produtosSemQuantidade,
+          orderInfo.productName as string,
+        );
+        if (familyOptions.length >= 2) {
+          await this.rememberConversationIntelligence(conversation, {
+            last_intent: 'suggestion',
+            last_product_name: null,
+            last_product_names: familyOptions.map((product) => product.name),
+            last_query: orderInfo.productName,
+          });
+          return this.buildProductFamilyOptionsMessage(
+            orderInfo.productName as string,
+            familyOptions,
+          );
+        }
+
         const resultadoBuscaSemQuantidade = this.findProductByName(
           produtosSemQuantidade,
           orderInfo.productName as string,
