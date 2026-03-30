@@ -1934,6 +1934,11 @@ export class WhatsappService {
     );
   }
 
+  private isNumericOnlyAddressFragment(text: string): boolean {
+    const candidate = this.normalizeAddressCandidate(text);
+    return /^\d{1,8}[A-Za-z]?$/.test(candidate) && !this.hasAddressKeyword(candidate);
+  }
+
   private parseLooseAddress(addressText: string): {
     street: string;
     number: string;
@@ -2308,6 +2313,95 @@ export class WhatsappService {
     ].join('\n');
   }
 
+  private isFreshOrderBeforePaymentIntent(
+    lowerMessage: string,
+    currentState?: ConversationState,
+  ): boolean {
+    const normalized = this.normalizeIntentText(lowerMessage);
+    if (!normalized || currentState !== 'waiting_payment') {
+      return false;
+    }
+
+    if (
+      this.isPaymentMethodSelection(normalized) ||
+      this.isPaymentProofIntent(normalized) ||
+      this.isCancelIntent(normalized, undefined, currentState) ||
+      this.looksLikeOrderStatusQuery(normalized)
+    ) {
+      return false;
+    }
+
+    if (
+      this.hasAnyNormalizedPhrase(normalized, [
+        'quero fazer outro',
+        'quero outro pedido',
+        'quero fazer outro pedido',
+        'quero fazer um novo pedido',
+        'quero montar outro pedido',
+        'quero pedir outra coisa',
+        'novo pedido',
+        'pedido novo',
+      ])
+    ) {
+      return true;
+    }
+
+    return (
+      this.hasAnyNormalizedPhrase(normalized, ['outro', 'novo']) &&
+      this.hasAnyNormalizedPhrase(normalized, ['pedido', 'quero', 'fazer', 'montar', 'pedir']) &&
+      this.hasAnyNormalizedPhrase(normalized, ['pagar', 'pagamento', 'esse', 'antes de pagar'])
+    );
+  }
+
+  private buildFreshOrderBeforePaymentMessage(pedido: Pedido): string {
+    return [
+      this.getGreetingLine(pedido.customer_name),
+      '',
+      `Pedido: *${pedido.order_no}*`,
+      `Status atual: *${this.getStatusLabel(pedido.status)}*`,
+      'Eu consigo te ajudar com outro pedido, mas aqui eu preciso evitar misturar cobranca, estoque e cadastro.',
+      'Se voce quiser abrir outro agora, me diga uma destas opcoes:',
+      '- "cancelar esse pedido" para eu encerrar o atual e montar o novo do zero',
+      '- "falar com a loja" se voce quiser manter esse pendente e pedir apoio humano para abrir outro em paralelo',
+      '',
+      `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+    ].join('\n');
+  }
+
+  private isWaitingPaymentDeferIntent(
+    lowerMessage: string,
+    currentState?: ConversationState,
+  ): boolean {
+    const normalized = this.normalizeIntentText(lowerMessage);
+    if (!normalized || currentState !== 'waiting_payment') {
+      return false;
+    }
+
+    return new Set([
+      'pula',
+      'depois',
+      'mais tarde',
+      'deixa assim',
+      'deixa esse',
+      'deixa esse ai',
+      'ignora isso',
+      'ignora esse',
+    ]).has(normalized);
+  }
+
+  private buildWaitingPaymentDeferMessage(pedido: Pedido): string {
+    return [
+      'Sem problema.',
+      `Eu deixo o pedido *${pedido.order_no}* aguardando pagamento sem mexer em nada agora.`,
+      '',
+      'Se voce quiser abrir outro pedido sem misturar os dois, me diga:',
+      '- "cancelar esse pedido"',
+      '- ou "falar com a loja"',
+      '',
+      `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
+    ].join('\n');
+  }
+
   private buildPostOrderStatusAndChangeGuardMessage(
     pedido: Pedido,
     currentState?: ConversationState,
@@ -2467,6 +2561,65 @@ export class WhatsappService {
       this.looksLikeMultiItemOrder(normalized) ||
       this.isOrderIntent(normalized)
     );
+  }
+
+  private productNameStartsWithRequestedQuantity(
+    productName: string,
+    requestedQuantity: number,
+  ): boolean {
+    const normalizedName = this.normalizeCatalogSearchText(productName || '').trim();
+    return new RegExp(`^${requestedQuantity}\\b`).test(normalizedName);
+  }
+
+  private resolveProductForOrder(
+    produtos: ProductWithStock[],
+    productName: string,
+    requestedQuantity: number,
+  ): {
+    produto: ProductWithStock | null;
+    sugestoes?: ProductWithStock[];
+    effectiveQuantity: number;
+    matchedPack: boolean;
+  } {
+    const directResult = this.findProductByName(produtos, productName);
+
+    if (Number.isInteger(requestedQuantity) && requestedQuantity > 0) {
+      const packResult = this.findProductByName(
+        produtos,
+        `${requestedQuantity} ${productName}`.trim(),
+      );
+
+      if (
+        packResult.produto &&
+        this.productNameStartsWithRequestedQuantity(packResult.produto.name, requestedQuantity)
+      ) {
+        return {
+          produto: packResult.produto,
+          sugestoes: packResult.sugestoes,
+          effectiveQuantity: 1,
+          matchedPack: true,
+        };
+      }
+
+      const packSuggestion = (packResult.sugestoes || []).find((product) =>
+        this.productNameStartsWithRequestedQuantity(product.name, requestedQuantity),
+      );
+      if (!directResult.produto && packSuggestion) {
+        return {
+          produto: packSuggestion,
+          sugestoes: [packSuggestion],
+          effectiveQuantity: 1,
+          matchedPack: true,
+        };
+      }
+    }
+
+    return {
+      produto: directResult.produto,
+      sugestoes: directResult.sugestoes,
+      effectiveQuantity: requestedQuantity,
+      matchedPack: false,
+    };
   }
 
   private isMixedStatusAndMutationIntent(
@@ -4847,7 +5000,16 @@ export class WhatsappService {
         return quantityValidation.error || 'Quantidade invalida.';
       }
 
-      const resultadoBusca = this.findProductByName(produtos, part.productName);
+      const resolvedProduct = this.resolveProductForOrder(
+        produtos,
+        part.productName,
+        part.quantity,
+      );
+      const resultadoBusca = {
+        produto: resolvedProduct.produto,
+        sugestoes: resolvedProduct.sugestoes,
+      };
+      const effectiveQuantity = resolvedProduct.effectiveQuantity;
       if (!resultadoBusca.produto) {
         if (resultadoBusca.sugestoes?.length) {
           return this.buildSuggestionMessage(
@@ -4863,7 +5025,7 @@ export class WhatsappService {
       newItems.push({
         produto_id: resultadoBusca.produto.id,
         produto_name: resultadoBusca.produto.name,
-        quantity: part.quantity,
+        quantity: effectiveQuantity,
         unit_price: Number(resultadoBusca.produto.price || 0),
       });
     }
@@ -8996,10 +9158,12 @@ export class WhatsappService {
     }
 
     if (choosingDeliveryType) {
+      const numericOnlyFragment = this.isNumericOnlyAddressFragment(sanitizedMessage);
       const looksLikeDirectAddress =
         this.isAddressLikelyComplete(sanitizedMessage) ||
         this.hasAddressKeyword(sanitizedMessage) ||
-        this.isAddressDraftWorthy(this.normalizeAddressCandidate(sanitizedMessage));
+        (!numericOnlyFragment &&
+          this.isAddressDraftWorthy(this.normalizeAddressCandidate(sanitizedMessage)));
 
       if (
         lowerMessage !== '1' &&
@@ -9266,7 +9430,27 @@ export class WhatsappService {
     const lowerMessage = sanitizedMessage.toLowerCase().trim();
     const wantsImmediatePayment = this.isPaymentMethodSelection(sanitizedMessage);
 
+    const adjustmentDuringConfirmation = await this.tryAdjustPendingOrder(
+      message,
+      tenantId,
+      conversation,
+      'confirming_order',
+    );
+    if (adjustmentDuringConfirmation) {
+      return adjustmentDuringConfirmation;
+    }
+
     if (this.isOrderIntent(lowerMessage)) {
+      const forcedAdjustment = await this.tryAdjustPendingOrder(
+        `adiciona ${sanitizedMessage}`,
+        tenantId,
+        conversation,
+        'confirming_order',
+      );
+      if (forcedAdjustment) {
+        return forcedAdjustment;
+      }
+
       await this.conversationService.clearPendingOrder(conversation.id);
       await this.conversationService.clearPedido(conversation.id);
       await this.conversationService.clearCustomerData(conversation.id);
@@ -9276,16 +9460,6 @@ export class WhatsappService {
         state: 'idle',
       };
       return await this.processOrder(message, tenantId, conversation);
-    }
-
-    const adjustmentDuringConfirmation = await this.tryAdjustPendingOrder(
-      message,
-      tenantId,
-      conversation,
-      'confirming_order',
-    );
-    if (adjustmentDuringConfirmation) {
-      return adjustmentDuringConfirmation;
     }
 
     if (
@@ -10960,6 +11134,14 @@ export class WhatsappService {
       ? await this.resolveRelevantOrder(tenantId, conversation, orderNo)
       : null;
 
+    if (postFlowOrder && this.isFreshOrderBeforePaymentIntent(lowerMessage, currentState)) {
+      return this.buildFreshOrderBeforePaymentMessage(postFlowOrder);
+    }
+
+    if (postFlowOrder && this.isWaitingPaymentDeferIntent(lowerMessage, currentState)) {
+      return this.buildWaitingPaymentDeferMessage(postFlowOrder);
+    }
+
     if (postFlowOrder && this.isPaymentProofIntent(lowerMessage)) {
       return this.buildPaymentProofGuidanceMessage(postFlowOrder);
     }
@@ -12260,7 +12442,16 @@ export class WhatsappService {
         return `❌ ${quantityValidation.error}`;
       }
 
-      const resultadoBusca = this.findProductByName(produtos, part.productName);
+      const resolvedProduct = this.resolveProductForOrder(
+        produtos,
+        part.productName,
+        part.quantity,
+      );
+      const resultadoBusca = {
+        produto: resolvedProduct.produto,
+        sugestoes: resolvedProduct.sugestoes,
+      };
+      const effectiveQuantity = resolvedProduct.effectiveQuantity;
 
       if (!resultadoBusca.produto && resultadoBusca.sugestoes?.length) {
         let msgSug = `Nao encontrei exatamente "${part.productName}" com seguranca. Talvez seja:\n\n`;
@@ -12295,10 +12486,10 @@ export class WhatsappService {
         return '❌ Erro no preço do produto. Por favor, tente novamente.';
       }
 
-      if (produto.available_stock < part.quantity) {
+      if (produto.available_stock < effectiveQuantity) {
         return `❌ Estoque insuficiente!\n\n` +
           `*${produto.name}*\n` +
-          `Solicitado: ${part.quantity} unidades\n` +
+          `Solicitado: ${effectiveQuantity} unidades\n` +
           `Disponível: ${produto.available_stock} unidades\n\n` +
           `💬 Ajuste a quantidade e tente novamente.`;
       }
@@ -12306,7 +12497,7 @@ export class WhatsappService {
       items.push({
         produto_id: produto.id,
         produto_name: produto.name,
-        quantity: part.quantity,
+        quantity: effectiveQuantity,
         unit_price: unitPrice,
       });
     }
@@ -12469,7 +12660,12 @@ export class WhatsappService {
       // Buscar produto (sem paginação para WhatsApp - retorna array)
       const produtosResult = await this.productsService.findAll(tenantId);
       const produtos = Array.isArray(produtosResult) ? produtosResult : produtosResult.data;
-      const resultadoBusca = this.findProductByName(produtos, productName);
+      const resolvedProduct = this.resolveProductForOrder(produtos, productName, quantity);
+      const resultadoBusca = {
+        produto: resolvedProduct.produto,
+        sugestoes: resolvedProduct.sugestoes,
+      };
+      const effectiveQuantity = resolvedProduct.effectiveQuantity;
       
       this.logger.debug(`Product search: found=${!!resultadoBusca.produto}, searched="${productName}", suggestions=${resultadoBusca.sugestoes?.length || 0}`);
 
@@ -12478,7 +12674,7 @@ export class WhatsappService {
           last_intent: 'suggestion',
           last_product_name: null,
           last_product_names: resultadoBusca.sugestoes.map((product) => product.name),
-          last_quantity: quantity,
+          last_quantity: effectiveQuantity,
           last_query: productName,
         });
         return this.buildSuggestionMessage(
@@ -12503,7 +12699,7 @@ export class WhatsappService {
             last_intent: 'suggestion',
             last_product_name: null,
             last_product_names: resultadoBusca.sugestoes.map((product) => product.name),
-            last_quantity: quantity,
+            last_quantity: effectiveQuantity,
             last_query: productName,
           });
           resultadoBusca.sugestoes.forEach((p, index) => {
@@ -12525,7 +12721,7 @@ export class WhatsappService {
             last_intent: 'suggestion',
             last_product_name: null,
             last_product_names: produtosSimilares.map((product) => product.name),
-            last_quantity: quantity,
+            last_quantity: effectiveQuantity,
             last_query: productName,
           });
           produtosSimilares.slice(0, 5).forEach((p, index) => {
@@ -12542,7 +12738,7 @@ export class WhatsappService {
 
       const produto = resultadoBusca.produto;
 
-      return await this.createOrderWithProduct(produto, quantity, tenantId, conversation);
+      return await this.createOrderWithProduct(produto, effectiveQuantity, tenantId, conversation);
     } catch (error) {
       this.logger.error('Error processing WhatsApp order', {
         error: error instanceof Error ? error.message : String(error),

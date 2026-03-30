@@ -294,6 +294,49 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     },
   ];
 
+  const loucasTranscriptCatalog = [
+    {
+      id: 'lt1',
+      name: 'Bombom de morango',
+      price: 18,
+      available_stock: 40,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Delicias' },
+    },
+    {
+      id: 'lt2',
+      name: '3 Brigadeiros tradicionais',
+      price: 12,
+      available_stock: 35,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Docinhos' },
+    },
+    {
+      id: 'lt3',
+      name: '6 Brigadeiros tradicionais',
+      price: 18,
+      available_stock: 30,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Docinhos' },
+    },
+    {
+      id: 'lt4',
+      name: '10 Brigadeiros tradicionais',
+      price: 25,
+      available_stock: 28,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Docinhos' },
+    },
+    {
+      id: 'lt5',
+      name: 'Pao de mel doce de leite',
+      price: 13,
+      available_stock: 20,
+      created_at: '2026-03-22T00:00:00.000Z',
+      categoria: { name: 'Delicias' },
+    },
+  ];
+
   const combinationBalanceCatalog = [
     {
       id: 'cb1',
@@ -2429,6 +2472,40 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).not.toContain('Rascunho atual: 0');
   });
 
+  it('does not treat larger invalid delivery choice numbers as address fragments either', async () => {
+    const service = createService(loucasCatalog) as any;
+
+    const response = await service.generateResponse(
+      '10',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_address',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'l1',
+                produto_name: 'Bala de brigadeiro',
+                quantity: 1,
+                unit_price: 12,
+              },
+            ],
+            subtotal: 12,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 12,
+          },
+          customer_data: {
+            name: 'Jordan Lincoln Kzan',
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('preciso alinhar se vai ser entrega ou retirada');
+    expect(response).not.toContain('Rascunho atual: 10');
+  });
+
   it('stops the active collection flow cleanly when the customer says they do not want to continue', async () => {
     const service = createService(loucasCatalog) as any;
 
@@ -4465,6 +4542,57 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('/pedido?order=PED-20260315-CACE');
   });
 
+  it('offers a safe fork when the customer wants another order before paying the current one', async () => {
+    const { service, paymentsService } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue(pendingOrder),
+      },
+    });
+
+    const response = await service.generateResponse(
+      'quero fazer outro antes de pagar esse',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'waiting_payment',
+          waiting_payment: true,
+          pedido_id: 'ord-1',
+        },
+      }),
+    );
+
+    expect(paymentsService.createPayment).not.toHaveBeenCalled();
+    expect(response).toContain('consigo te ajudar com outro pedido');
+    expect(response).toContain('cancelar esse pedido');
+    expect(response).toContain('falar com a loja');
+  });
+
+  it('keeps waiting-payment skip slang on a safe path instead of falling into generic recovery', async () => {
+    const { service } = createFixture([], {
+      orders: {
+        findOne: jest.fn().mockResolvedValue(pendingOrder),
+      },
+    });
+
+    const response = await service.generateResponse(
+      'pula',
+      'tenant-id',
+      createConversation({
+        pedido_id: 'ord-1',
+        context: {
+          state: 'waiting_payment',
+          waiting_payment: true,
+          pedido_id: 'ord-1',
+        },
+      }),
+    );
+
+    expect(response).toContain('aguardando pagamento');
+    expect(response).toContain('cancelar esse pedido');
+    expect(response).not.toContain('Me diga em uma frase');
+  });
+
   it('keeps payment-proof guidance even when the customer complains in the same message', async () => {
     const { service, paymentsService } = createFixture([], {
       orders: {
@@ -4568,6 +4696,124 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     expect(paymentsService.createPayment).not.toHaveBeenCalled();
     expect(response).toContain('valor para troco ficou alto demais');
+  });
+
+  it('treats a new quantity+product message during final review as an adjustment instead of restarting the order', async () => {
+    const { service, conversationService } = createFixture(loucasTranscriptCatalog);
+
+    const response = await service.generateResponse(
+      'quero 2 pao de mel doce de leite',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'confirming_order',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'lt1',
+                produto_name: 'Bombom de morango',
+                quantity: 5,
+                unit_price: 18,
+              },
+            ],
+            subtotal: 90,
+            discount_amount: 0,
+            shipping_amount: 10,
+            total_amount: 100,
+          },
+          customer_data: {
+            name: 'Jordan Lincoln',
+            phone: '+5511987654321',
+            delivery_type: 'delivery',
+            address: {
+              street: 'Rua das Flores',
+              number: '123',
+              neighborhood: 'Centro',
+              city: 'Sao Paulo',
+              state: 'SP',
+              zipCode: '01234-567',
+            },
+            notes: 'sem',
+          },
+        },
+      }),
+    );
+
+    expect(conversationService.clearPendingOrder).not.toHaveBeenCalled();
+    expect(conversationService.savePendingOrder).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            produto_name: 'Bombom de morango',
+            quantity: 5,
+          }),
+          expect.objectContaining({
+            produto_name: 'Pao de mel doce de leite',
+            quantity: 2,
+          }),
+        ]),
+      }),
+    );
+    expect(response).toContain('Pedido ajustado com seguranca.');
+    expect(response).toContain('REVISAO FINAL DO PEDIDO');
+  });
+
+  it('maps "3 brigadeiros tradicionais" to the 3-pack product during adjustment instead of treating it as ambiguous loose units', async () => {
+    const { service, conversationService } = createFixture(loucasTranscriptCatalog);
+
+    const response = await service.generateResponse(
+      'quero mais 3 brigadeiros tradiconais',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_name',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'lt1',
+                produto_name: 'Bombom de morango',
+                quantity: 5,
+                unit_price: 18,
+              },
+            ],
+            subtotal: 90,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 90,
+          },
+          customer_data: {},
+        },
+      }),
+    );
+
+    expect(conversationService.savePendingOrder).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            produto_name: '3 Brigadeiros tradicionais',
+            quantity: 1,
+          }),
+        ]),
+      }),
+    );
+    expect(response).toContain('Pedido ajustado com seguranca.');
+    expect(response).not.toContain('ainda ficou ambigua');
+  });
+
+  it('splits mixed order text so the ambiguous part is isolated instead of collapsing the whole phrase into one product', async () => {
+    const { service } = createFixture(loucasTranscriptCatalog);
+
+    const response = await service.generateResponse(
+      'Bombom de morango 2 e 2 brigadeiros tradicionais',
+      'tenant-id',
+      createConversation(),
+    );
+
+    expect(response).toContain('Bombom de morango');
+    expect(response).toContain('3 Brigadeiros tradicionais');
+    expect(response).not.toContain('bombom morango e brigadeiros tradicionais');
   });
 
   it('responds with contextual courtesy after confirmation', async () => {
