@@ -11493,9 +11493,6 @@ export class WhatsappService {
     }
 
     const subscriber = digitsOnly.slice(2);
-    if (/^(\d)\1+$/.test(subscriber)) {
-      return { valid: false, error: 'Telefone parece incompleto ou artificial demais para salvar com seguranca' };
-    }
 
     if (digitsOnly.length === 11 && subscriber[0] !== '9') {
       return { valid: false, error: 'Celular com 11 digitos precisa ter o 9 apos o DDD' };
