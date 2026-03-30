@@ -4868,6 +4868,49 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('valor para troco ficou alto demais');
   });
 
+  it('treats note-like freeform messages during notes collection as observations instead of product adjustments', async () => {
+    const { service, conversationService } = createFixture(loucasTranscriptCatalog);
+
+    const response = await service.generateResponse(
+      'mandar 100 de brinde',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'collecting_notes',
+          pending_order: {
+            items: [
+              {
+                produto_id: 'lt1',
+                produto_name: 'Bombom de morango',
+                quantity: 1,
+                unit_price: 18,
+              },
+            ],
+            subtotal: 18,
+            discount_amount: 0,
+            shipping_amount: 0,
+            total_amount: 18,
+          },
+          customer_data: {
+            name: 'Jordan Lincoln',
+            phone: '+5511987654321',
+            delivery_type: 'pickup',
+          },
+        },
+      }),
+    );
+
+    expect(conversationService.saveCustomerData).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        notes: 'mandar 100 de brinde',
+      }),
+    );
+    expect(conversationService.updateState).toHaveBeenCalledWith('conv-1', 'confirming_order');
+    expect(response).toContain('REVISAO FINAL DO PEDIDO');
+    expect(response).not.toContain('Ainda nao consegui identificar');
+  });
+
   it('treats a new quantity+product message during final review as an adjustment instead of restarting the order', async () => {
     const { service, conversationService } = createFixture(loucasTranscriptCatalog);
 

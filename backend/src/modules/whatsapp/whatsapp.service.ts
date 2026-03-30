@@ -5162,6 +5162,50 @@ export class WhatsappService {
       .trim();
   }
 
+  private isLikelyFreeformOrderNoteMessage(
+    message: string,
+    currentState?: ConversationState,
+  ): boolean {
+    if (currentState !== 'collecting_notes') {
+      return false;
+    }
+
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return false;
+    }
+
+    if (
+      this.isPaymentMethodSelection(normalized) ||
+      this.isCancelIntent(normalized) ||
+      this.isReopenIntent(normalized)
+    ) {
+      return false;
+    }
+
+    if (['sem', 'nao', 'não', 'nenhuma', 'nenhum', 'sim', 'ok'].includes(normalized)) {
+      return true;
+    }
+
+    return this.hasAnyNormalizedPhrase(normalized, [
+      'brinde',
+      'embalagem',
+      'capricha na embalagem',
+      'caprichar na embalagem',
+      'portaria',
+      'entrada',
+      'interfone',
+      'campainha',
+      'observacao',
+      'obs',
+      'sem acucar',
+      'sem embalagem',
+      'deixar na',
+      'deixa na',
+      'cuidado com',
+    ]);
+  }
+
   private isPendingOrderAdjustmentIntent(
     message: string,
     conversation?: TypedConversation,
@@ -5179,6 +5223,11 @@ export class WhatsappService {
     if (!normalized) {
       return false;
     }
+
+    if (this.isLikelyFreeformOrderNoteMessage(message, currentState)) {
+      return false;
+    }
+
     const normalizedAdjustment = this.normalizePendingOrderAdjustmentMessage(message);
     const startsWithBareMore = /^mais\s+/.test(normalized);
     const startsWithExplicitAddOnLead = /^(?:quero\s+(?:tambem|tbm|mais)|tambem\s+|tbm\s+|mais\s+|adiciona|adicionar|inclui|incluir|acrescenta|acrescentar|coloca\s+mais|bota\s+mais)\b/.test(normalized);
@@ -5747,6 +5796,7 @@ export class WhatsappService {
     const normalized = this.normalizeIntentText(sanitized);
     if (
       !normalized ||
+      this.isLikelyFreeformOrderNoteMessage(sanitized, currentState) ||
       this.looksLikeMultiItemOrder(sanitized) ||
       this.isDirectCatalogRequest(sanitized) ||
       this.isDirectPriceQuestion(sanitized) ||
