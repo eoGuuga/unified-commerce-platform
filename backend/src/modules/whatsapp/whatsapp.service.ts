@@ -2769,6 +2769,106 @@ export class WhatsappService {
     );
   }
 
+  private hasLoucasCatalogCue(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    return /\b(brigadeiro|docinho|docinhos|beijinho|bala de brigadeiro|bombom|banoffe|brownie|bolo no pote|bolo gelado|bolo|pudim|torta|pao de mel|acai|kit|caixa presenteavel)\b/.test(
+      normalized,
+    );
+  }
+
+  private isSalesPreferenceOnlyReply(message: string): boolean {
+    const normalized = this.normalizeIntentText(message);
+    if (!normalized) {
+      return false;
+    }
+
+    if (
+      this.hasLoucasCatalogCue(normalized) &&
+      !/\b(mais de|linha de|pra|para|mais marcante|mais delicad|menos doce|cremos)\b/.test(
+        normalized,
+      )
+    ) {
+      return false;
+    }
+
+    return (
+      this.isLoucasVisitOccasion(normalized) ||
+      this.isLoucasCoffeeSharingOccasion(normalized) ||
+      this.isLoucasDessertOccasion(normalized) ||
+      this.isLoucasSimpleGiftOccasion(normalized) ||
+      /\b(presente|presentear|pra presentear|para presentear|pra dividir|para dividir|dividir|familia|pra mim|para mim|so pra mim|matar a vontade)\b/.test(
+        normalized,
+      ) ||
+      /\b(mais delicad|mais discreta|mais discreto|menos chamativ|sem exagero|mais seguro|sem erro|mais marcante|mais caprichad|mais bonito|mais premium|mais simples)\b/.test(
+        normalized,
+      ) ||
+      this.isTasteLighteningRefinement(normalized) ||
+      /\b(sobremesa cremosa|mais cremosa|mais cremoso|mais de sobremesa|mais de brigadeiro|mais de docinho|mais chocolatudo|mais chocolate)\b/.test(
+        normalized,
+      ) ||
+      /\b(mae|pai|namorada|namorado|amiga|amigo|esposa|marido|filho|filha)\b/.test(
+        normalized,
+      )
+    );
+  }
+
+  private buildPreferenceReplySalesAnalysis(
+    message: string,
+    conversation?: TypedConversation,
+  ): SalesConversationAnalysis | null {
+    if (!conversation || !this.hasConsultativeMemory(conversation)) {
+      return null;
+    }
+
+    if (!this.isSalesPreferenceOnlyReply(message)) {
+      return null;
+    }
+
+    const memory = this.getConversationIntelligenceMemory(conversation);
+    const messageAnalysis = this.salesIntelligenceService.analyze(message);
+    const updatedProfile = this.deriveSalesPreferenceProfile(
+      messageAnalysis,
+      memory.sales_preference_profile || null,
+    );
+
+    if (!updatedProfile) {
+      return null;
+    }
+
+    const rememberedBase = String(memory.last_query || memory.last_customer_goal || '').trim();
+    const preferenceContext = this.buildSalesPreferenceProfileContext(updatedProfile);
+    const syntheticQuery = [rememberedBase, preferenceContext].filter(Boolean).join('. ');
+
+    if (!syntheticQuery) {
+      return null;
+    }
+
+    const analyzed = this.salesIntelligenceService.analyze(syntheticQuery);
+
+    return this.applySalesPreferenceProfileToAnalysis(
+      {
+        ...analyzed,
+        intent: 'recommendation',
+        confidence: Math.max(analyzed.confidence, 0.76),
+        commercialQuery: syntheticQuery,
+        customerGoalSummary:
+          analyzed.customerGoalSummary &&
+          analyzed.customerGoalSummary !== 'uma opcao melhor alinhada ao que voce quer agora'
+            ? analyzed.customerGoalSummary
+            : this.buildSalesPreferenceProfileGoal(updatedProfile) ||
+              memory.last_customer_goal ||
+              analyzed.customerGoalSummary,
+        decisionStage: 'refining',
+        budgetCeiling: memory.last_budget_ceiling ?? analyzed.budgetCeiling,
+        conversationDrivers:
+          analyzed.conversationDrivers.length > 0
+            ? analyzed.conversationDrivers
+            : (['exploration'] as SalesConversationAnalysis['conversationDrivers']),
+      },
+      updatedProfile,
+    );
+  }
+
   private isAmbiguousChoiceOrderIntent(lowerMessage: string): boolean {
     const normalized = this.normalizeIntentText(lowerMessage);
     if (!normalized) {
@@ -7911,6 +8011,71 @@ export class WhatsappService {
     );
   }
 
+  private isLoucasBroadDiscoveryRecommendation(analysis: SalesConversationAnalysis): boolean {
+    if (analysis.intent !== 'recommendation' || analysis.budgetCeiling !== null) {
+      return false;
+    }
+
+    const wordCount = analysis.normalizedText.split(/\s+/).filter(Boolean).length;
+
+    if (
+      analysis.useCaseTags.length > 0 ||
+      analysis.recipientHint ||
+      analysis.signals.reassurance ||
+      analysis.pricePreference !== null ||
+      /\b(bonit|segur|sem erro|delicad|discret|marcante|premium|caprichad)\b/.test(
+        analysis.normalizedText,
+      )
+    ) {
+      return false;
+    }
+
+    if (this.hasLoucasCatalogCue(analysis.normalizedText)) {
+      return false;
+    }
+
+    return (
+      wordCount <= 4 &&
+      /\b(me indica|quero|preciso)\b/.test(analysis.normalizedText) &&
+      /\b(algo|alguma coisa)\b/.test(analysis.normalizedText)
+    );
+  }
+
+  private buildLoucasSalesElicitationQuestion(
+    analysis: SalesConversationAnalysis,
+    rankedProducts: RankedSalesProduct[],
+    conversation?: TypedConversation,
+  ): string | null {
+    const profile = this.buildUpdatedSalesPreferenceProfile(analysis, conversation);
+
+    if (
+      !profile?.occasion &&
+      this.isLoucasBroadDiscoveryRecommendation(analysis)
+    ) {
+      return 'Consigo. Para eu afinar certo na Loucas sem te empurrar qualquer coisa: voce quer mais para presentear, para dividir ou so para matar vontade agora?';
+    }
+
+    if (
+      profile?.occasion === 'gift' &&
+      analysis.budgetCeiling === null &&
+      analysis.pricePreference === null &&
+      !analysis.signals.reassurance &&
+      !profile.style &&
+      !this.hasLoucasCatalogCue(analysis.normalizedText) &&
+      !/\b(delicad|discret|sem exagero|segur|sem erro|marcante|premium|caprichad)\b/.test(
+        analysis.normalizedText,
+      )
+    ) {
+      if (analysis.recipientHint) {
+        return `Perfeito. Para presentear ${analysis.recipientHint}, voce quer algo mais delicado e seguro ou mais marcante?`;
+      }
+
+      return 'Perfeito. Para presentear, voce quer algo mais delicado e seguro ou mais marcante?';
+    }
+
+    return null;
+  }
+
   private buildSimplifyReferenceHoldResponse(
     referenceProduct: ProductWithStock,
     rankedProducts: RankedSalesProduct[],
@@ -9344,10 +9509,19 @@ export class WhatsappService {
     tenantId: string,
     conversation?: TypedConversation,
   ): Promise<string | null> {
-    const analysis = this.salesIntelligenceService.analyze(message);
+    let analysis = this.salesIntelligenceService.analyze(message);
     const allowDirectCombination = this.isSalesCombinationQuery(message);
     if (analysis.intent === 'other' && !allowDirectCombination) {
-      return null;
+      const preferenceReplyAnalysis = this.buildPreferenceReplySalesAnalysis(
+        message,
+        conversation,
+      );
+
+      if (!preferenceReplyAnalysis) {
+        return null;
+      }
+
+      analysis = preferenceReplyAnalysis;
     }
 
     const conversationalAnalysis = this.conversationalIntelligenceService.analyze(message);
@@ -9563,6 +9737,39 @@ export class WhatsappService {
 
     if (!rankedProducts.length) {
       return 'Nao encontrei uma recomendacao forte com esse contexto, mas posso te mostrar o catalogo se voce enviar "cardapio".';
+    }
+
+    if (catalogProfile.storePersona === 'loucas_brigadeiro') {
+      const elicitationQuestion = this.buildLoucasSalesElicitationQuestion(
+        effectiveAnalysis,
+        rankedProducts,
+        conversation,
+      );
+
+      if (elicitationQuestion) {
+        await this.rememberConversationIntelligence(conversation, {
+          last_intent: 'recommendation',
+          last_product_name: null,
+          last_product_names: null,
+          last_quantity: null,
+          last_query: message,
+          last_budget_ceiling: effectiveAnalysis.budgetCeiling,
+          last_response_mode: 'sales_consultative',
+          last_customer_goal:
+            conversationPlan.customerGoal ||
+            effectiveAnalysis.customerGoalSummary ||
+            this.buildSalesPreferenceProfileGoal(
+              this.buildUpdatedSalesPreferenceProfile(effectiveAnalysis, conversation),
+            ) ||
+            null,
+          sales_preference_profile: this.buildUpdatedSalesPreferenceProfile(
+            effectiveAnalysis,
+            conversation,
+          ),
+        });
+
+        return elicitationQuestion;
+      }
     }
 
     await this.rememberConversationIntelligence(conversation, {
@@ -12592,7 +12799,17 @@ export class WhatsappService {
       return true;
     }
 
-    return /^(para|pare|chega)\b/.test(normalized);
+    if (/^(para|pare|chega)\b/.test(normalized)) {
+      if (
+        /\b(presente|presentear|dividir|visita|sobremesa|matar a vontade)\b/.test(normalized)
+      ) {
+        return false;
+      }
+
+      return normalized.split(/\s+/).length <= 2;
+    }
+
+    return false;
   }
 
   private shouldUseNonCommercialRecovery(

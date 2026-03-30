@@ -5453,6 +5453,52 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).not.toContain('Nao encontrei um item exatamente como');
   });
 
+  it('asks one smart Loucas occasion question instead of dumping options on a broad discovery ask', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'me indica alguma coisa',
+      'tenant-id',
+      createConversation(),
+    );
+
+    expect(response).toContain('voce quer mais para presentear, para dividir ou so para matar vontade agora?');
+    expect(response).not.toContain('Estas sao as opcoes que eu colocaria na sua frente agora');
+    expect(response).not.toContain('Brigadeiro individual mimo');
+  });
+
+  it('progressively narrows a broad Loucas ask through occasion and style before recommending', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+    const conversation = createConversation();
+
+    const firstResponse = await service.generateResponse(
+      'me indica alguma coisa',
+      'tenant-id',
+      conversation,
+    );
+    expect(firstResponse).toContain('voce quer mais para presentear, para dividir ou so para matar vontade agora?');
+
+    const secondResponse = await service.generateResponse(
+      'para presentear',
+      'tenant-id',
+      conversation,
+    );
+    expect(secondResponse).toContain('voce quer algo mais delicado e seguro ou mais marcante?');
+    expect(secondResponse).not.toContain('Quero te entender sem adivinhar coisa errada');
+    expect(secondResponse).not.toContain('Estas sao as opcoes que eu colocaria na sua frente agora');
+
+    const thirdResponse = await service.generateResponse(
+      'mais delicado',
+      'tenant-id',
+      conversation,
+    );
+    expect(thirdResponse).toContain('Estas sao as opcoes que eu colocaria na sua frente agora');
+    expect(thirdResponse).toMatch(
+      /Brigadeiro individual mimo|3 Brigadeiros tradicionais|Banoffe \( torta de banana\)/,
+    );
+    expect(thirdResponse).not.toContain('Quero te entender sem adivinhar coisa errada');
+  });
+
   it('blocks AI routing from turning a vague message into a fake price query', async () => {
     const service = createService(loucasCatalog) as any;
     service.openAIService.processMessage.mockResolvedValue({

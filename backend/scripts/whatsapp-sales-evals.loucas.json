@@ -1482,6 +1482,54 @@
           ]
         }
       ]
+    },
+    {
+      "name": "broad_loucas_discovery_should_elicit_occasion_before_recommending",
+      "steps": [
+        {
+          "message": "me indica alguma coisa",
+          "expectAny": [
+            "voce quer mais para presentear, para dividir ou so para matar vontade agora?"
+          ],
+          "forbidAny": [
+            "Estas sao as opcoes que eu colocaria na sua frente agora"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "broad_loucas_discovery_should_progressively_elicit_before_recommending",
+      "steps": [
+        {
+          "message": "me indica alguma coisa",
+          "expectAny": [
+            "voce quer mais para presentear, para dividir ou so para matar vontade agora?"
+          ],
+          "forbidAny": [
+            "Estas sao as opcoes que eu colocaria na sua frente agora"
+          ]
+        },
+        {
+          "message": "para presentear",
+          "expectAny": [
+            "voce quer algo mais delicado e seguro ou mais marcante?"
+          ],
+          "forbidAny": [
+            "Quero te entender sem adivinhar coisa errada",
+            "Estas sao as opcoes que eu colocaria na sua frente agora"
+          ]
+        },
+        {
+          "message": "mais delicado",
+          "expectAny": [
+            "Estas sao as opcoes que eu colocaria na sua frente agora",
+            "Brigadeiro individual mimo"
+          ],
+          "forbidAny": [
+            "Quero te entender sem adivinhar coisa errada"
+          ]
+        }
+      ]
     }
   ]
 }
