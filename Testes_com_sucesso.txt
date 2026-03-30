@@ -1729,5 +1729,9 @@
   - `npm.cmd run test -- src/modules/whatsapp/whatsapp.service.spec.ts` => `212/212` ok
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
-- Observacao operacional:
-  - o proximo passo desta rodada e publicar no `dev/teste` e rerrodar a bateria da Loucas no ambiente real
+- Validacao em `dev/teste`:
+  - backend publicado no commit `9d2c24a`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+  - `npm.cmd run test:whatsapp:evals` => `61/61` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260330-004657.json`
