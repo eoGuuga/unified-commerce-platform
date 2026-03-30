@@ -5396,6 +5396,63 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     );
   });
 
+  it('stores heuristic Loucas sales preference memory during a consultative recommendation', async () => {
+    const conversation = createConversation();
+    const fixture = createFixture(loucasConsultativeCatalog, {
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(conversation),
+      },
+    });
+
+    await fixture.service.generateResponse(
+      'me indica um presente bonito pra minha mae sem exagero',
+      'tenant-id',
+      conversation,
+    );
+
+    expect(fixture.conversationService.updateContext).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        intelligence_memory: expect.objectContaining({
+          sales_preference_profile: expect.objectContaining({
+            occasion: 'gift',
+            style: 'delicate',
+            recipientHint: 'mae',
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('uses remembered Loucas sales preference memory when the customer asks for another option without a strong last query', async () => {
+    const service = createService(richerGiftingCatalog) as any;
+
+    const response = await service.generateResponse(
+      'me mostra outra opcao',
+      'tenant-id',
+      createConversation({
+        context: {
+          state: 'idle',
+          intelligence_memory: {
+            sales_preference_profile: {
+              occasion: 'gift',
+              style: 'delicate',
+              taste: null,
+              recipientHint: 'mae',
+            },
+          },
+        },
+      }),
+    );
+
+    expect(response).toContain('Estas sao as opcoes que eu colocaria na sua frente agora');
+    expect(response).toMatch(
+      /Brigadeiro individual mimo|Caixa presenteavel com 3 brigadeiros|Kit Doce presente/,
+    );
+    expect(response).not.toContain('Calma, acho que eu puxei a conversa para o lado errado');
+    expect(response).not.toContain('Nao encontrei um item exatamente como');
+  });
+
   it('blocks AI routing from turning a vague message into a fake price query', async () => {
     const service = createService(loucasCatalog) as any;
     service.openAIService.processMessage.mockResolvedValue({

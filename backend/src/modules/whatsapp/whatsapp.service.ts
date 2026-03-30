@@ -41,7 +41,7 @@ import { TenantsService } from '../tenants/tenants.service';
 import { CanalVenda, PedidoStatus, Pedido } from '../../database/entities/Pedido.entity';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
 import { Tenant } from '../../database/entities/Tenant.entity';
-import { TypedConversation, ProductSearchResult, toTypedConversation, ConversationState, CustomerData, PendingOrder, PendingOrderItem, StockAdjustmentContext, ConversationIntelligenceMemory, ConversationResponseMode } from './types/whatsapp.types';
+import { TypedConversation, ProductSearchResult, toTypedConversation, ConversationState, CustomerData, PendingOrder, PendingOrderItem, StockAdjustmentContext, ConversationIntelligenceMemory, ConversationResponseMode, ConversationSalesPreferenceProfile } from './types/whatsapp.types';
 import { ProductWithStock } from '../products/types/product.types';
 import * as crypto from 'crypto';
 import { CouponsService } from '../coupons/coupons.service';
@@ -740,6 +740,10 @@ export class WhatsappService {
     const nextMemory: ConversationIntelligenceMemory = {
       ...currentMemory,
       ...updates,
+      sales_preference_profile: this.mergeSalesPreferenceProfile(
+        currentMemory.sales_preference_profile || null,
+        updates.sales_preference_profile,
+      ),
       last_reference_at: new Date().toISOString(),
     };
 
@@ -2466,7 +2470,302 @@ export class WhatsappService {
       ) ||
       !!memory.last_customer_goal ||
       !!memory.last_product_name ||
-      Boolean(memory.last_product_names?.length)
+      Boolean(memory.last_product_names?.length) ||
+      Boolean(memory.sales_preference_profile)
+    );
+  }
+
+  private mergeSalesPreferenceProfile(
+    currentProfile?: ConversationSalesPreferenceProfile | null,
+    incomingProfile?: ConversationSalesPreferenceProfile | null,
+  ): ConversationSalesPreferenceProfile | null {
+    const current = currentProfile || null;
+    const incoming = incomingProfile || null;
+
+    if (!current && !incoming) {
+      return null;
+    }
+
+    const merged: ConversationSalesPreferenceProfile = {
+      occasion: incoming?.occasion ?? current?.occasion ?? null,
+      style: incoming?.style ?? current?.style ?? null,
+      taste: incoming?.taste ?? current?.taste ?? null,
+      recipientHint: incoming?.recipientHint ?? current?.recipientHint ?? null,
+    };
+
+    if (!merged.occasion && !merged.style && !merged.taste && !merged.recipientHint) {
+      return null;
+    }
+
+    return merged;
+  }
+
+  private normalizeSalesPreferenceRecipientHint(recipientHint?: string | null): string | null {
+    const normalized = this.normalizeIntentText(recipientHint || '')
+      .replace(/\b(sua|seu|minha|meu|uma|um|pra|para|de|do|da)\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return normalized || null;
+  }
+
+  private deriveSalesPreferenceProfile(
+    analysis: SalesConversationAnalysis,
+    currentProfile?: ConversationSalesPreferenceProfile | null,
+  ): ConversationSalesPreferenceProfile | null {
+    const normalized = this.normalizeIntentText(
+      [
+        analysis.normalizedText,
+        analysis.commercialQuery,
+        analysis.customerGoalSummary,
+        analysis.recipientHint,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    );
+
+    let occasion: ConversationSalesPreferenceProfile['occasion'] = null;
+    if (analysis.useCaseTags.includes('gift') || analysis.recipientHint) {
+      occasion = 'gift';
+    } else if (this.isLoucasVisitOccasion(normalized)) {
+      occasion = 'visit';
+    } else if (this.isLoucasCoffeeSharingOccasion(normalized)) {
+      occasion = 'coffee';
+    } else if (this.isLoucasDessertOccasion(normalized)) {
+      occasion = 'dessert';
+    } else if (analysis.useCaseTags.includes('sharing')) {
+      occasion = 'sharing';
+    } else if (analysis.useCaseTags.includes('self_treat')) {
+      occasion = 'self_treat';
+    } else if (analysis.useCaseTags.includes('chocolate_focus')) {
+      occasion = 'chocolate_focus';
+    }
+
+    let style: ConversationSalesPreferenceProfile['style'] = null;
+    if (
+      /\b(delicad|discret|sem exagero|lembranc|bonitinh|bonito sem exagero)\b/.test(normalized) ||
+      this.isLoucasSimpleGiftOccasion(normalized)
+    ) {
+      style = 'delicate';
+    } else if (this.isSalesSafeChoiceQuery(analysis) || /\b(sem erro|segur|acertar)\b/.test(normalized)) {
+      style = 'safe';
+    } else if (
+      analysis.pricePreference === 'premium' ||
+      /\b(premium|marcante|caprichad|sofisticad|impression)\b/.test(normalized)
+    ) {
+      style = 'premium';
+    } else if (/\b(simples|pratic|sem inventar|facil de acertar|sem firula)\b/.test(normalized)) {
+      style = 'simple';
+    }
+
+    let taste: ConversationSalesPreferenceProfile['taste'] = null;
+    if (this.isTasteLighteningRefinement(normalized)) {
+      taste = 'less_sweet';
+    } else if (analysis.useCaseTags.includes('chocolate_focus')) {
+      taste = 'chocolate_focus';
+    } else if (/\b(cremosa|cremoso|banoffe|bolo no pote|pudim|torta|de colher|sobremesa)\b/.test(normalized)) {
+      taste = 'creamy';
+    }
+
+    const derivedProfile: ConversationSalesPreferenceProfile = {
+      occasion,
+      style,
+      taste,
+      recipientHint: this.normalizeSalesPreferenceRecipientHint(analysis.recipientHint),
+    };
+
+    return this.mergeSalesPreferenceProfile(currentProfile, derivedProfile);
+  }
+
+  private buildSalesPreferenceProfileContext(
+    profile?: ConversationSalesPreferenceProfile | null,
+  ): string | null {
+    if (!profile) {
+      return null;
+    }
+
+    const parts: string[] = [];
+
+    switch (profile.occasion) {
+      case 'gift':
+        parts.push('um presente');
+        break;
+      case 'visit':
+        parts.push('algo para levar para visita');
+        break;
+      case 'coffee':
+        parts.push('algo para cafe da tarde');
+        break;
+      case 'dessert':
+        parts.push('uma sobremesa');
+        break;
+      case 'sharing':
+        parts.push('algo para dividir');
+        break;
+      case 'self_treat':
+        parts.push('algo so para mim');
+        break;
+      case 'chocolate_focus':
+        parts.push('algo mais chocolatudo');
+        break;
+      default:
+        break;
+    }
+
+    switch (profile.style) {
+      case 'delicate':
+        parts.push('delicado');
+        break;
+      case 'safe':
+        parts.push('seguro');
+        break;
+      case 'premium':
+        parts.push('mais marcante');
+        break;
+      case 'simple':
+        parts.push('simples');
+        break;
+      default:
+        break;
+    }
+
+    switch (profile.taste) {
+      case 'less_sweet':
+        parts.push('menos doce');
+        break;
+      case 'creamy':
+        parts.push('mais cremoso');
+        break;
+      case 'chocolate_focus':
+        parts.push('mais chocolatudo');
+        break;
+      default:
+        break;
+    }
+
+    if (profile.recipientHint) {
+      parts.push(`para ${profile.recipientHint}`);
+    }
+
+    return parts.length ? `quero ${parts.join(' ')}` : null;
+  }
+
+  private buildSalesPreferenceProfileGoal(
+    profile?: ConversationSalesPreferenceProfile | null,
+  ): string | null {
+    if (!profile) {
+      return null;
+    }
+
+    const context = this.buildSalesPreferenceProfileContext(profile);
+    if (!context) {
+      return null;
+    }
+
+    return context.replace(/^quero\s+/i, '');
+  }
+
+  private applySalesPreferenceProfileToAnalysis(
+    analysis: SalesConversationAnalysis,
+    profile?: ConversationSalesPreferenceProfile | null,
+  ): SalesConversationAnalysis {
+    if (!profile) {
+      return analysis;
+    }
+
+    const useCaseTags = new Set(analysis.useCaseTags);
+    const conversationDrivers = new Set(analysis.conversationDrivers);
+    const secondaryIntents = new Set(analysis.secondaryIntents);
+
+    switch (profile.occasion) {
+      case 'gift':
+        useCaseTags.add('gift');
+        conversationDrivers.add('recipient_context');
+        break;
+      case 'visit':
+      case 'coffee':
+      case 'sharing':
+        useCaseTags.add('sharing');
+        break;
+      case 'dessert':
+        useCaseTags.add('dessert');
+        break;
+      case 'self_treat':
+        useCaseTags.add('self_treat');
+        break;
+      case 'chocolate_focus':
+        useCaseTags.add('chocolate_focus');
+        break;
+      default:
+        break;
+    }
+
+    switch (profile.style) {
+      case 'delicate':
+      case 'simple':
+        conversationDrivers.add('simplicity');
+        break;
+      case 'safe':
+        conversationDrivers.add('reassurance');
+        break;
+      case 'premium':
+        secondaryIntents.add('recommendation');
+        break;
+      default:
+        break;
+    }
+
+    switch (profile.taste) {
+      case 'less_sweet':
+        useCaseTags.add('lighter_taste');
+        conversationDrivers.add('simplicity');
+        break;
+      case 'creamy':
+        useCaseTags.add('dessert');
+        break;
+      case 'chocolate_focus':
+        useCaseTags.add('chocolate_focus');
+        break;
+      default:
+        break;
+    }
+
+    const profileGoal = this.buildSalesPreferenceProfileGoal(profile);
+    const queryParts = [analysis.commercialQuery, profileGoal].filter(Boolean);
+
+    return {
+      ...analysis,
+      commercialQuery: queryParts.length ? queryParts.join('. ') : analysis.commercialQuery,
+      customerGoalSummary:
+        analysis.customerGoalSummary && analysis.customerGoalSummary !== 'uma opcao melhor alinhada ao que voce quer agora'
+          ? analysis.customerGoalSummary
+          : profileGoal || analysis.customerGoalSummary,
+      recipientHint:
+        analysis.recipientHint || (profile.recipientHint ? `sua ${profile.recipientHint}` : null),
+      useCaseTags: Array.from(useCaseTags),
+      conversationDrivers: Array.from(conversationDrivers) as SalesConversationAnalysis['conversationDrivers'],
+      secondaryIntents: Array.from(secondaryIntents) as SalesConversationAnalysis['secondaryIntents'],
+      signals: {
+        ...analysis.signals,
+        recipientContext:
+          analysis.signals.recipientContext || profile.occasion === 'gift' || Boolean(profile.recipientHint),
+        reassurance: analysis.signals.reassurance || profile.style === 'safe',
+        simplicity:
+          analysis.signals.simplicity ||
+          profile.style === 'delicate' ||
+          profile.style === 'simple' ||
+          profile.taste === 'less_sweet',
+      },
+    };
+  }
+
+  private buildUpdatedSalesPreferenceProfile(
+    analysis: SalesConversationAnalysis,
+    conversation?: TypedConversation,
+  ): ConversationSalesPreferenceProfile | null {
+    return this.deriveSalesPreferenceProfile(
+      analysis,
+      this.getConversationIntelligenceMemory(conversation).sales_preference_profile || null,
     );
   }
 
@@ -6930,18 +7229,25 @@ export class WhatsappService {
     const memory = this.getConversationIntelligenceMemory(conversation);
     const rememberedQuery = String(memory.last_query || '').trim();
     const rememberedGoal = String(memory.last_customer_goal || '').trim();
+    const rememberedPreferenceContext = this.buildSalesPreferenceProfileContext(
+      memory.sales_preference_profile,
+    );
     const normalizedRememberedQuery = this.normalizeIntentText(rememberedQuery);
     const rememberedQueryAnalysis = rememberedQuery
       ? this.salesIntelligenceService.analyze(rememberedQuery)
       : null;
-    const rememberedContext =
+    const rememberedContextBase =
       rememberedQuery &&
       (rememberedQueryAnalysis?.intent !== 'other' ||
         /\b(ate|até|reais|real|rs|r\$|pix|presente|presentear|mae|mãe|pai|namorada|namorado|amiga|aniversario|aniversário|seguro|sem erro|sem exagero|rapido|rápido|urgencia|urgência)\b/.test(
           normalizedRememberedQuery,
         ))
         ? rememberedQuery
-        : rememberedGoal || rememberedQuery;
+        : rememberedGoal || rememberedQuery || rememberedPreferenceContext;
+    const rememberedContext =
+      rememberedContextBase && rememberedPreferenceContext
+        ? `${rememberedContextBase}. ${rememberedPreferenceContext}`
+        : rememberedContextBase || rememberedPreferenceContext;
 
     if (mode === 'combination' && referenceProduct) {
       return rememberedContext
@@ -6980,6 +7286,7 @@ export class WhatsappService {
     referenceProduct?: ProductWithStock | null,
     currentMessage?: string,
   ): SalesConversationAnalysis {
+    const memory = this.getConversationIntelligenceMemory(conversation);
     const syntheticQuery = this.buildContextAwareSalesQuery(
       mode,
       conversation,
@@ -6988,35 +7295,38 @@ export class WhatsappService {
     );
     const analyzed = this.salesIntelligenceService.analyze(syntheticQuery);
     if (analyzed.intent !== 'other') {
-      const rememberedBudget = this.getConversationIntelligenceMemory(conversation).last_budget_ceiling;
+      const rememberedBudget = memory.last_budget_ceiling;
+      const withProfile = this.applySalesPreferenceProfileToAnalysis(
+        analyzed,
+        memory.sales_preference_profile,
+      );
       if (mode === 'upgrade' && analyzed.pricePreference === null) {
         return {
-          ...analyzed,
+          ...withProfile,
           pricePreference: 'premium',
           budgetCeiling:
-            analyzed.budgetCeiling !== null ? analyzed.budgetCeiling : rememberedBudget ?? null,
+            withProfile.budgetCeiling !== null ? withProfile.budgetCeiling : rememberedBudget ?? null,
         };
       }
 
       if (mode === 'budget') {
         return {
-          ...analyzed,
+          ...withProfile,
           intent: 'budget',
           pricePreference: 'budget',
           budgetCeiling:
-            analyzed.budgetCeiling !== null ? analyzed.budgetCeiling : rememberedBudget ?? null,
+            withProfile.budgetCeiling !== null ? withProfile.budgetCeiling : rememberedBudget ?? null,
         };
       }
 
       return {
-        ...analyzed,
+        ...withProfile,
         budgetCeiling:
-          analyzed.budgetCeiling !== null ? analyzed.budgetCeiling : rememberedBudget ?? null,
+          withProfile.budgetCeiling !== null ? withProfile.budgetCeiling : rememberedBudget ?? null,
       };
     }
 
-    const memory = this.getConversationIntelligenceMemory(conversation);
-    return {
+    return this.applySalesPreferenceProfileToAnalysis({
       ...analyzed,
       intent: mode === 'budget' ? 'budget' : 'recommendation',
       confidence: Math.max(analyzed.confidence, 0.72),
@@ -7037,7 +7347,7 @@ export class WhatsappService {
         analyzed.conversationDrivers.length > 0
           ? analyzed.conversationDrivers
           : (['exploration'] as SalesConversationAnalysis['conversationDrivers']),
-    };
+    }, memory.sales_preference_profile);
   }
 
   private enrichDirectSalesAnalysisFromConversationMemory(
@@ -7045,15 +7355,17 @@ export class WhatsappService {
     conversation: TypedConversation | undefined,
     referenceProduct: ProductWithStock | null,
   ): SalesConversationAnalysis {
+    const memory = this.getConversationIntelligenceMemory(conversation);
+    const profile = memory.sales_preference_profile;
+
     if (analysis.intent !== 'objection') {
-      return analysis;
+      return this.applySalesPreferenceProfileToAnalysis(analysis, profile);
     }
 
-    const memory = this.getConversationIntelligenceMemory(conversation);
     const rememberedBudget = memory.last_budget_ceiling ?? null;
 
     if (analysis.budgetCeiling !== null || rememberedBudget === null) {
-      return analysis;
+      return this.applySalesPreferenceProfileToAnalysis(analysis, profile);
     }
 
     const contextualBudgetAnalysis = this.buildContextAwareSalesAnalysis(
@@ -7063,7 +7375,7 @@ export class WhatsappService {
       analysis.commercialQuery || undefined,
     );
 
-    return {
+    return this.applySalesPreferenceProfileToAnalysis({
       ...analysis,
       commercialQuery:
         contextualBudgetAnalysis.commercialQuery || analysis.commercialQuery,
@@ -7100,7 +7412,7 @@ export class WhatsappService {
         objection: true,
         budget: true,
       },
-    };
+    }, profile);
   }
 
   private filterRankedProductsForContextAwareSales(
@@ -7780,6 +8092,7 @@ export class WhatsappService {
         last_budget_ceiling: analysis.budgetCeiling,
         last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
         last_customer_goal: conversationPlan.customerGoal || analysis.customerGoalSummary || null,
+        sales_preference_profile: this.buildUpdatedSalesPreferenceProfile(analysis, conversation),
       });
 
       return this.buildSimplifyReferenceHoldResponse(
@@ -7816,6 +8129,7 @@ export class WhatsappService {
         last_budget_ceiling: analysis.budgetCeiling,
         last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
         last_customer_goal: conversationPlan.customerGoal || analysis.customerGoalSummary || null,
+        sales_preference_profile: this.buildUpdatedSalesPreferenceProfile(analysis, conversation),
       });
 
       return this.buildSalesCombinationResponse(
@@ -7844,6 +8158,7 @@ export class WhatsappService {
       last_budget_ceiling: analysis.budgetCeiling,
       last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
       last_customer_goal: conversationPlan.customerGoal || analysis.customerGoalSummary || null,
+      sales_preference_profile: this.buildUpdatedSalesPreferenceProfile(analysis, conversation),
     });
 
     const crossSellSuggestion = this.filterLoucasCrossSellSuggestion(
@@ -9116,6 +9431,10 @@ export class WhatsappService {
             combinationAnalysis.customerGoalSummary ||
             analysis.customerGoalSummary ||
             null,
+          sales_preference_profile: this.buildUpdatedSalesPreferenceProfile(
+            combinationAnalysis,
+            conversation,
+          ),
         });
 
         return this.buildSalesCombinationResponse(
@@ -9166,6 +9485,10 @@ export class WhatsappService {
           last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
           last_customer_goal:
             conversationPlan.customerGoal || effectiveAnalysis.customerGoalSummary || null,
+          sales_preference_profile: this.buildUpdatedSalesPreferenceProfile(
+            effectiveAnalysis,
+            conversation,
+          ),
         });
 
         return this.buildSalesComparisonResponse(
@@ -9257,6 +9580,10 @@ export class WhatsappService {
       last_response_mode: conversationPlan.mode === 'none' ? null : conversationPlan.mode,
       last_customer_goal:
         conversationPlan.customerGoal || effectiveAnalysis.customerGoalSummary || null,
+      sales_preference_profile: this.buildUpdatedSalesPreferenceProfile(
+        effectiveAnalysis,
+        conversation,
+      ),
     });
 
     const crossSellSuggestion = this.filterLoucasCrossSellSuggestion(
