@@ -73,6 +73,13 @@ describe('OpenAIService', () => {
                 detectedEmotion: 'confused',
                 shouldStayInCurrentStage: false,
                 mentionsProduct: null,
+                responseMode: 'freeform_support',
+                salesPreferenceProfile: {
+                  occasion: 'gift',
+                  style: 'safe',
+                  taste: null,
+                  recipientHint: 'mae',
+                },
               }),
             },
           },
@@ -100,6 +107,13 @@ describe('OpenAIService', () => {
       detectedEmotion: 'confused',
       shouldStayInCurrentStage: false,
       mentionsProduct: undefined,
+      responseMode: 'freeform_support',
+      salesPreferenceProfile: {
+        occasion: 'gift',
+        style: 'safe',
+        taste: null,
+        recipientHint: 'mae',
+      },
     });
     expect(fetchMock).toHaveBeenCalled();
   });
@@ -118,6 +132,13 @@ describe('OpenAIService', () => {
                 detectedEmotion: 'hesitant',
                 shouldStayInCurrentStage: false,
                 mentionsProduct: 'Banoffe ( torta de banana)',
+                responseMode: 'sales_consultative',
+                salesPreferenceProfile: {
+                  occasion: 'gift',
+                  style: 'delicate',
+                  taste: 'less_sweet',
+                  recipientHint: 'mae',
+                },
               }),
             },
           },
@@ -134,6 +155,12 @@ describe('OpenAIService', () => {
       catalogSummary: ['Brigadeiro individual mimo (Presentear) - R$ 6,00'],
       memory: {
         lastIntent: 'suggestion',
+        salesPreferenceProfile: {
+          occasion: 'gift',
+          style: 'safe',
+          taste: null,
+          recipientHint: 'mae',
+        },
       },
       storeContext: {
         storeName: 'Loucas por Brigadeiro',
@@ -155,5 +182,6 @@ describe('OpenAIService', () => {
     expect(payload.messages[1].content).toContain('leitura_catalogo_loja');
     expect(payload.messages[1].content).toContain('meios_pagamento_disponiveis_no_whatsapp: pix, dinheiro');
     expect(payload.messages[1].content).toContain('pergunta_consultiva_preferida');
+    expect(payload.messages[1].content).toContain('preferencia_ocasião: gift');
   });
 });

@@ -12016,6 +12016,7 @@ export class WhatsappService {
           lastProductName: memory?.last_product_name || null,
           lastProductNames: memory?.last_product_names || null,
           lastCustomerGoal: memory?.last_customer_goal || null,
+          salesPreferenceProfile: memory?.sales_preference_profile || null,
         },
         storeContext,
       });
@@ -12026,6 +12027,9 @@ export class WhatsappService {
 
       await this.rememberConversationIntelligence(conversation, {
         last_customer_goal: assist.detectedGoal || memory?.last_customer_goal || null,
+        last_response_mode: assist.responseMode || memory?.last_response_mode || null,
+        sales_preference_profile:
+          assist.salesPreferenceProfile || memory?.sales_preference_profile || null,
         ...(assist.mentionsProduct
           ? {
               last_product_name: assist.mentionsProduct,

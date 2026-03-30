@@ -100,6 +100,33 @@ export type ConversationResponseMode =
   | 'trust_reassurance'
   | 'freeform_support';
 
+export type ConversationSalesPreferenceOccasion =
+  | 'gift'
+  | 'visit'
+  | 'coffee'
+  | 'dessert'
+  | 'sharing'
+  | 'self_treat'
+  | 'chocolate_focus';
+
+export type ConversationSalesPreferenceStyle =
+  | 'delicate'
+  | 'safe'
+  | 'premium'
+  | 'simple';
+
+export type ConversationSalesPreferenceTaste =
+  | 'less_sweet'
+  | 'creamy'
+  | 'chocolate_focus';
+
+export interface ConversationSalesPreferenceProfile {
+  occasion?: ConversationSalesPreferenceOccasion | null;
+  style?: ConversationSalesPreferenceStyle | null;
+  taste?: ConversationSalesPreferenceTaste | null;
+  recipientHint?: string | null;
+}
+
 export interface ConversationIntelligenceMemory {
   last_intent?: ConversationIntelligenceIntent | null;
   last_product_name?: string | null;
@@ -115,6 +142,7 @@ export interface ConversationIntelligenceMemory {
   last_catalog_product_id?: string | null;
   last_handoff_summary?: string | null;
   last_support_unresolved_count?: number | null;
+  sales_preference_profile?: ConversationSalesPreferenceProfile | null;
 }
 
 /**

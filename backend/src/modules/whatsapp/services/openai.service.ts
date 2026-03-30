@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MessageIntelligenceService } from './message-intelligence.service';
+import {
+  ConversationResponseMode,
+  ConversationSalesPreferenceProfile,
+} from '../types/whatsapp.types';
 
 export interface MessageIntent {
   intent: 'consultar' | 'fazer_pedido' | 'cancelar' | 'outro';
@@ -19,6 +23,7 @@ export interface ConversationalAssistInput {
     lastProductName?: string | null;
     lastProductNames?: string[] | null;
     lastCustomerGoal?: string | null;
+    salesPreferenceProfile?: ConversationSalesPreferenceProfile | null;
   } | null;
   storeContext?: {
     storeName?: string | null;
@@ -39,6 +44,8 @@ export interface ConversationalAssistResult {
   detectedEmotion: 'neutral' | 'confused' | 'frustrated' | 'hesitant' | 'urgent';
   shouldStayInCurrentStage: boolean;
   mentionsProduct?: string;
+  responseMode?: ConversationResponseMode;
+  salesPreferenceProfile?: ConversationSalesPreferenceProfile | null;
 }
 
 @Injectable()
@@ -162,6 +169,43 @@ export class OpenAIService {
           },
           shouldStayInCurrentStage: { type: 'boolean' },
           mentionsProduct: { type: ['string', 'null'] },
+          responseMode: {
+            type: ['string', 'null'],
+            enum: [
+              'step_guidance',
+              'issue_recovery',
+              'context_recap',
+              'post_order_support',
+              'handoff_ready',
+              'sales_consultative',
+              'decision_coaching',
+              'trust_reassurance',
+              'freeform_support',
+              null,
+            ],
+          },
+          salesPreferenceProfile: {
+            type: ['object', 'null'],
+            additionalProperties: false,
+            properties: {
+              occasion: {
+                type: ['string', 'null'],
+                enum: ['gift', 'visit', 'coffee', 'dessert', 'sharing', 'self_treat', 'chocolate_focus', null],
+              },
+              style: {
+                type: ['string', 'null'],
+                enum: ['delicate', 'safe', 'premium', 'simple', null],
+              },
+              taste: {
+                type: ['string', 'null'],
+                enum: ['less_sweet', 'creamy', 'chocolate_focus', null],
+              },
+              recipientHint: {
+                type: ['string', 'null'],
+              },
+            },
+            required: ['occasion', 'style', 'taste', 'recipientHint'],
+          },
         },
         required: [
           'safeReply',
@@ -170,6 +214,8 @@ export class OpenAIService {
           'detectedEmotion',
           'shouldStayInCurrentStage',
           'mentionsProduct',
+          'responseMode',
+          'salesPreferenceProfile',
         ],
       } as const;
 
@@ -191,6 +237,18 @@ export class OpenAIService {
           ? `- ultimos_produtos: ${memory.lastProductNames.join(', ')}`
           : null,
         memory?.lastCustomerGoal ? `- ultimo_objetivo: ${memory.lastCustomerGoal}` : null,
+        memory?.salesPreferenceProfile?.occasion
+          ? `- preferencia_ocasião: ${memory.salesPreferenceProfile.occasion}`
+          : null,
+        memory?.salesPreferenceProfile?.style
+          ? `- preferencia_estilo: ${memory.salesPreferenceProfile.style}`
+          : null,
+        memory?.salesPreferenceProfile?.taste
+          ? `- preferencia_sabor: ${memory.salesPreferenceProfile.taste}`
+          : null,
+        memory?.salesPreferenceProfile?.recipientHint
+          ? `- referencia_destinatario: ${memory.salesPreferenceProfile.recipientHint}`
+          : null,
       ]
         .filter(Boolean)
         .join('\n');
@@ -286,6 +344,12 @@ export class OpenAIService {
         | 'frustrated'
         | 'hesitant'
         | 'urgent';
+      const responseMode = parsed.responseMode
+        ? (String(parsed.responseMode) as ConversationResponseMode)
+        : undefined;
+      const salesPreferenceProfile = this.sanitizeSalesPreferenceProfile(
+        parsed.salesPreferenceProfile,
+      );
 
       if (!safeReply || !detectedGoal || Number.isNaN(confidence)) {
         return null;
@@ -298,6 +362,8 @@ export class OpenAIService {
         detectedEmotion,
         shouldStayInCurrentStage: Boolean(parsed.shouldStayInCurrentStage),
         mentionsProduct: parsed.mentionsProduct ? String(parsed.mentionsProduct) : undefined,
+        responseMode,
+        salesPreferenceProfile,
       };
     } catch (error) {
       this.logger.warn('Conversational assist request failed, keeping deterministic fallback', {
@@ -413,5 +479,47 @@ export class OpenAIService {
       .replace(/\n{3,}/g, '\n\n')
       .trim()
       .slice(0, 600);
+  }
+
+  private sanitizeSalesPreferenceProfile(
+    value: unknown,
+  ): ConversationSalesPreferenceProfile | null {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+
+    const profile = value as Record<string, unknown>;
+    const occasion = this.pickAllowedString(profile.occasion, [
+      'gift',
+      'visit',
+      'coffee',
+      'dessert',
+      'sharing',
+      'self_treat',
+      'chocolate_focus',
+    ]);
+    const style = this.pickAllowedString(profile.style, ['delicate', 'safe', 'premium', 'simple']);
+    const taste = this.pickAllowedString(profile.taste, [
+      'less_sweet',
+      'creamy',
+      'chocolate_focus',
+    ]);
+    const recipientHint = String(profile.recipientHint || '').trim() || null;
+
+    if (!occasion && !style && !taste && !recipientHint) {
+      return null;
+    }
+
+    return {
+      occasion,
+      style,
+      taste,
+      recipientHint,
+    };
+  }
+
+  private pickAllowedString<T extends string>(value: unknown, allowed: T[]): T | null {
+    const normalized = String(value || '').trim();
+    return (allowed.includes(normalized as T) ? (normalized as T) : null);
   }
 }

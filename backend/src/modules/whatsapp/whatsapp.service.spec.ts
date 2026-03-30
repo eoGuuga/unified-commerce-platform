@@ -5342,6 +5342,60 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(input.storeContext.qualificationQuestion).toContain('brigadeiro');
   });
 
+  it('stores LLM-derived Loucas sales preference memory for future consultative turns', async () => {
+    const conversation = createConversation();
+    const fixture = createFixture(loucasCatalog, {
+      config: {
+        get: jest.fn((key: string) => {
+          if (key === 'FRONTEND_URL') return 'https://gtsofthub.com.br';
+          if (key === 'WHATSAPP_LLM_ASSIST_ENABLED') return 'true';
+          if (key === 'WHATSAPP_LLM_ASSIST_MAX_PRODUCTS') return '4';
+          return undefined;
+        }),
+      },
+      openAIService: {
+        generateConversationalAssist: jest.fn().mockResolvedValue({
+          safeReply:
+            'Entendi. Se voce quiser algo bonito para sua mae sem exagero, eu consigo afinar por uma linha mais delicada da Loucas.',
+          confidence: 0.93,
+          detectedGoal: 'encontrar um presente delicado para sua mae',
+          detectedEmotion: 'hesitant',
+          shouldStayInCurrentStage: false,
+          mentionsProduct: 'Brigadeiro individual mimo',
+          responseMode: 'sales_consultative',
+          salesPreferenceProfile: {
+            occasion: 'gift',
+            style: 'delicate',
+            taste: 'less_sweet',
+            recipientHint: 'mae',
+          },
+        }),
+      },
+      conversation: {
+        getOrCreateConversation: jest.fn().mockResolvedValue(conversation),
+      },
+    });
+
+    await fixture.service.generateResponse('asd qwe negocio', 'tenant-id', conversation);
+
+    expect(fixture.conversationService.updateContext).toHaveBeenCalledWith(
+      'conv-1',
+      expect.objectContaining({
+        intelligence_memory: expect.objectContaining({
+          last_customer_goal: 'encontrar um presente delicado para sua mae',
+          last_response_mode: 'sales_consultative',
+          last_product_name: 'Brigadeiro individual mimo',
+          sales_preference_profile: expect.objectContaining({
+            occasion: 'gift',
+            style: 'delicate',
+            taste: 'less_sweet',
+            recipientHint: 'mae',
+          }),
+        }),
+      }),
+    );
+  });
+
   it('blocks AI routing from turning a vague message into a fake price query', async () => {
     const service = createService(loucasCatalog) as any;
     service.openAIService.processMessage.mockResolvedValue({
