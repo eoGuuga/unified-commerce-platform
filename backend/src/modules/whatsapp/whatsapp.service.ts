@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OpenAIService } from './services/openai.service';
+import { OpenAIService, ConversationalAssistInput } from './services/openai.service';
 import { MessageIntelligenceService } from './services/message-intelligence.service';
 import {
   ConversationalAnalysis,
@@ -12002,6 +12002,7 @@ export class WhatsappService {
     try {
       const products = await this.getCatalogProducts(tenantId);
       const memory = this.getConversationIntelligenceMemory(conversation);
+      const storeContext = this.buildLLMStoreContext(products);
       const assist = await this.openAIService.generateConversationalAssist({
         message,
         currentState: currentState || 'idle',
@@ -12016,11 +12017,21 @@ export class WhatsappService {
           lastProductNames: memory?.last_product_names || null,
           lastCustomerGoal: memory?.last_customer_goal || null,
         },
+        storeContext,
       });
 
       if (!assist || assist.confidence < 0.55 || !assist.safeReply) {
         return null;
       }
+
+      await this.rememberConversationIntelligence(conversation, {
+        last_customer_goal: assist.detectedGoal || memory?.last_customer_goal || null,
+        ...(assist.mentionsProduct
+          ? {
+              last_product_name: assist.mentionsProduct,
+            }
+          : {}),
+      });
 
       return assist.safeReply;
     } catch (error) {
@@ -12030,6 +12041,34 @@ export class WhatsappService {
       });
       return null;
     }
+  }
+
+  private buildLLMStoreContext(
+    products: ProductWithStock[],
+  ): ConversationalAssistInput['storeContext'] {
+    if (!products.length) {
+      return null;
+    }
+
+    const playbook = this.salesPlaybookService.inferPlaybook(products);
+    const catalogProfile = this.catalogSalesContextService.buildProfile(products, playbook);
+    const isLoucas = catalogProfile.storePersona === 'loucas_brigadeiro';
+
+    return {
+      storeName: isLoucas ? 'Loucas por Brigadeiro' : 'Loja',
+      storePersona: catalogProfile.storePersona || null,
+      storeLabel: catalogProfile.storeLabel,
+      catalogReading: catalogProfile.catalogReading,
+      qualificationQuestion: catalogProfile.qualificationQuestion,
+      focusThemes: catalogProfile.focusThemes.map((theme) => theme.label),
+      paymentMethods: ['pix', 'dinheiro'],
+      operationRules: [
+        'nao inventar produto fora do catalogo real',
+        'nao prometer alterar pedido, endereco ou recebimento sem fluxo seguro',
+        'nao oferecer pagamento em cartao dentro do WhatsApp quando o canal seguro atual for pix ou dinheiro',
+        'se houver etapa ativa, explicar com naturalidade o que falta antes de puxar outro assunto',
+      ],
+    };
   }
 
   private buildCompactCatalogSummary(

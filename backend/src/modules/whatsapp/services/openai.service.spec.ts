@@ -103,4 +103,57 @@ describe('OpenAIService', () => {
     });
     expect(fetchMock).toHaveBeenCalled();
   });
+
+  it('injects Loucas-specific store context into the conversational assist prompt', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                safeReply: 'Entendi. Posso te ajudar a decidir sem sair da cara da Loucas.',
+                confidence: 0.9,
+                detectedGoal: 'escolher melhor dentro da Loucas',
+                detectedEmotion: 'hesitant',
+                shouldStayInCurrentStage: false,
+                mentionsProduct: 'Banoffe ( torta de banana)',
+              }),
+            },
+          },
+        ],
+      }),
+    });
+    global.fetch = fetchMock as any;
+
+    const service = createService();
+    await service.generateConversationalAssist({
+      message: 'quero algo bonito pra presente',
+      currentState: 'idle',
+      stageLabel: null,
+      catalogSummary: ['Brigadeiro individual mimo (Presentear) - R$ 6,00'],
+      memory: {
+        lastIntent: 'suggestion',
+      },
+      storeContext: {
+        storeName: 'Loucas por Brigadeiro',
+        storePersona: 'loucas_brigadeiro',
+        storeLabel: 'brigadeiros, sobremesas cremosas e presentes',
+        catalogReading:
+          'hoje a Loucas gira em brigadeiros, sobremesas cremosas e presentes.',
+        qualificationQuestion:
+          'Voce quer ir mais para brigadeiro e docinho, para sobremesa cremosa ou para algo de presentear?',
+        focusThemes: ['presente', 'brigadeiro', 'sobremesa cremosa'],
+        paymentMethods: ['pix', 'dinheiro'],
+        operationRules: ['nao inventar produto fora do catalogo real'],
+      },
+    });
+
+    const payload = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(payload.messages[0].content).toContain('Loucas por Brigadeiro');
+    expect(payload.messages[1].content).toContain('loja: Loucas por Brigadeiro');
+    expect(payload.messages[1].content).toContain('leitura_catalogo_loja');
+    expect(payload.messages[1].content).toContain('meios_pagamento_disponiveis_no_whatsapp: pix, dinheiro');
+    expect(payload.messages[1].content).toContain('pergunta_consultiva_preferida');
+  });
 });

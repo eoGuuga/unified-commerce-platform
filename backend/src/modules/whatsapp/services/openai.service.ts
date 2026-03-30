@@ -20,6 +20,16 @@ export interface ConversationalAssistInput {
     lastProductNames?: string[] | null;
     lastCustomerGoal?: string | null;
   } | null;
+  storeContext?: {
+    storeName?: string | null;
+    storePersona?: string | null;
+    storeLabel?: string | null;
+    catalogReading?: string | null;
+    qualificationQuestion?: string | null;
+    focusThemes?: string[] | null;
+    paymentMethods?: string[] | null;
+    operationRules?: string[] | null;
+  } | null;
 }
 
 export interface ConversationalAssistResult {
@@ -167,6 +177,13 @@ export class OpenAIService {
         .map((line) => `- ${line}`)
         .join('\n');
       const memory = input.memory || null;
+      const storeContext = input.storeContext || null;
+      const isLoucasStore =
+        String(storeContext?.storePersona || '').trim().toLowerCase() === 'loucas_brigadeiro' ||
+        String(storeContext?.storeName || '')
+          .trim()
+          .toLowerCase()
+          .includes('loucas por brigadeiro');
       const memoryLines = [
         memory?.lastIntent ? `- ultima_intencao: ${memory.lastIntent}` : null,
         memory?.lastProductName ? `- ultimo_produto: ${memory.lastProductName}` : null,
@@ -174,6 +191,27 @@ export class OpenAIService {
           ? `- ultimos_produtos: ${memory.lastProductNames.join(', ')}`
           : null,
         memory?.lastCustomerGoal ? `- ultimo_objetivo: ${memory.lastCustomerGoal}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n');
+      const storeContextLines = [
+        storeContext?.storeName ? `loja: ${storeContext.storeName}` : null,
+        storeContext?.storeLabel ? `linha_comercial_da_loja: ${storeContext.storeLabel}` : null,
+        storeContext?.catalogReading
+          ? `leitura_catalogo_loja: ${storeContext.catalogReading}`
+          : null,
+        storeContext?.qualificationQuestion
+          ? `pergunta_consultiva_preferida: ${storeContext.qualificationQuestion}`
+          : null,
+        storeContext?.focusThemes?.length
+          ? `focos_comerciais: ${storeContext.focusThemes.join(', ')}`
+          : null,
+        storeContext?.paymentMethods?.length
+          ? `meios_pagamento_disponiveis_no_whatsapp: ${storeContext.paymentMethods.join(', ')}`
+          : null,
+        storeContext?.operationRules?.length
+          ? `regras_operacionais:\n${storeContext.operationRules.map((rule) => `- ${rule}`).join('\n')}`
+          : null,
       ]
         .filter(Boolean)
         .join('\n');
@@ -200,6 +238,15 @@ export class OpenAIService {
                 'Voce e uma vendedora de WhatsApp em portugues do Brasil, humana, calma, consultiva e objetiva.',
                 'Sua funcao aqui NAO e executar pedido, pagamento ou estoque. Sua funcao e entender melhor a mensagem e gerar a resposta mais segura e natural possivel.',
                 'Nunca invente produtos, precos, politicas, formas de pagamento, entrega ou estoque.',
+                isLoucasStore
+                  ? 'Voce atende exclusivamente a Loucas por Brigadeiro. Seu universo e vender os produtos reais da Loucas, especialmente brigadeiros, sobremesas cremosas, presentes e combinacoes desse catalogo.'
+                  : 'Voce atende exclusivamente a loja enviada no contexto, sempre se limitando ao catalogo real fornecido.',
+                isLoucasStore
+                  ? 'Quando a pessoa falar uma linha da loja, como brigadeiros tradicionais, pense primeiro na familia real de opcoes da Loucas antes de colapsar tudo em um SKU aleatorio.'
+                  : 'Quando houver ambiguidade de produto, nao chute SKU especifico sem base suficiente.',
+                isLoucasStore
+                  ? 'Soe como uma vendedora forte da Loucas por Brigadeiro: acolhedora, segura, comercial e muito focada no que combina melhor com a situacao do cliente.'
+                  : 'Soe como uma vendedora forte da loja, humana e segura.',
                 'Se houver etapa transacional ativa, preserve a etapa e explique com naturalidade o que falta.',
                 'Se a mensagem for fora de contexto, emocional ou estranha, responda com humanidade e traga a conversa de volta sem soar como menu.',
                 'Responda em no maximo 4 linhas curtas. Nada de markdown, JSON ou listas grandes no campo safeReply.',
@@ -211,6 +258,9 @@ export class OpenAIService {
                 `mensagem_cliente: ${input.message}`,
                 `etapa_atual: ${input.currentState || 'idle'}`,
                 `rotulo_etapa: ${input.stageLabel || 'nenhum'}`,
+                storeContextLines
+                  ? `contexto_loja:\n${storeContextLines}`
+                  : 'contexto_loja: sem contexto adicional da loja',
                 memoryLines ? `memoria_recente:\n${memoryLines}` : 'memoria_recente: sem memoria relevante',
                 catalogSummary
                   ? `catalogo_real_resumido:\n${catalogSummary}`

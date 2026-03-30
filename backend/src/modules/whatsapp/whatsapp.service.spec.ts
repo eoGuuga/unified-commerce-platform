@@ -5309,6 +5309,39 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(fixture.openAIService.generateConversationalAssist).toHaveBeenCalled();
   });
 
+  it('passes Loucas-specific store context to the LLM assist layer', async () => {
+    const fixture = createFixture(loucasCatalog, {
+      config: {
+        get: jest.fn((key: string) => {
+          if (key === 'FRONTEND_URL') return 'https://gtsofthub.com.br';
+          if (key === 'WHATSAPP_LLM_ASSIST_ENABLED') return 'true';
+          if (key === 'WHATSAPP_LLM_ASSIST_MAX_PRODUCTS') return '4';
+          return undefined;
+        }),
+      },
+      openAIService: {
+        generateConversationalAssist: jest.fn().mockResolvedValue({
+          safeReply:
+            'Entendi. Posso te ajudar a decidir dentro da Loucas sem te fazer repetir tudo.',
+          confidence: 0.91,
+          detectedGoal: 'escolher melhor dentro da Loucas',
+          detectedEmotion: 'hesitant',
+          shouldStayInCurrentStage: false,
+          mentionsProduct: 'Banoffe ( torta de banana)',
+        }),
+      },
+    });
+
+    await fixture.service.generateResponse('asd qwe negocio', 'tenant-id');
+
+    const input = fixture.openAIService.generateConversationalAssist.mock.calls[0][0];
+    expect(input.storeContext.storeName).toBe('Loucas por Brigadeiro');
+    expect(input.storeContext.storePersona).toBe('loucas_brigadeiro');
+    expect(input.storeContext.catalogReading).toContain('hoje a Loucas gira');
+    expect(input.storeContext.paymentMethods).toEqual(['pix', 'dinheiro']);
+    expect(input.storeContext.qualificationQuestion).toContain('brigadeiro');
+  });
+
   it('blocks AI routing from turning a vague message into a fake price query', async () => {
     const service = createService(loucasCatalog) as any;
     service.openAIService.processMessage.mockResolvedValue({
