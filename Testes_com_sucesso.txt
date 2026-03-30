@@ -1543,3 +1543,14 @@
 - Validacao local desta rodada:
   - `npm.cmd run test -- whatsapp.service.spec.ts` => `201/201` ok
   - `npm.cmd run build` => ok
+- Validacao em `dev/teste`:
+  - backend atualizado ate o commit `d249402`
+  - `npm.cmd run test:whatsapp:evals` => `56/56` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-211748.json`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+- Commits desta sequencia:
+  - `d249402` `fix(whatsapp): harden Loucas transcript edge cases`
+  - `d6fa7c2` `test(whatsapp): expand Loucas transcript eval coverage`
+- Producao:
+  - nao foi tocada nesta rodada
