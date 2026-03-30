@@ -1554,3 +1554,46 @@
   - `d6fa7c2` `test(whatsapp): expand Loucas transcript eval coverage`
 - Producao:
   - nao foi tocada nesta rodada
+
+## 2026-03-29 21:48 BRT - Loucas mais semantica em linha de produto e desvio humano
+
+- Problemas corrigidos:
+  - `quero brigadeiros tradicionais` deixava o bot cair num comportamento pobre de quantidade solta ou SKU unico, em vez de entender a linha real da Loucas
+  - durante a coleta de nome, um desvio como `brigadeiros tradicionais` soava frio e ambiguo demais
+  - durante a coleta de nome, um desvio como `pao de mel doce de leite` ainda parecia memoria mecanica demais
+- Ajuste aplicado:
+  - `backend/src/modules/whatsapp/whatsapp.service.ts` ganhou:
+    - leitura semantica de `linha de produto` da Loucas, agrupando familias reais como `3`, `6` e `10 Brigadeiros tradicionais`
+    - resposta dedicada para `linha de produto` em idle state, sem fechar cedo num SKU unico
+    - resposta mais humana de desvio durante coleta, com ponte tipo `Consigo te ajudar com ... sim`
+    - ponte contextual para voltar `nesse item` ou `nessa linha` depois de fechar a etapa atual
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` recebeu regressao para:
+    - `quero brigadeiros tradicionais`
+    - `brigadeiros tradicionais` durante `collecting_name`
+    - `pao de mel doce de leite` durante `collecting_name`
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` foi ampliado com esses cenarios reais da Loucas
+- Validacao local desta rodada:
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run test -- whatsapp.service.spec.ts` => `204/204` ok
+  - `npm.cmd run build` => ok
+- Validacao em `dev/teste`:
+  - backend atualizado ate o commit `333ca7c`
+  - `npm.cmd run test:whatsapp:evals` => `59/59` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-214704.json`
+  - smoke real `quero brigadeiros tradicionais` respondeu com:
+    - `Entendi a linha que voce quer`
+    - `3 Brigadeiros tradicionais`
+    - `6 Brigadeiros tradicionais`
+    - `10 Brigadeiros tradicionais`
+  - smoke real `quero 5 bombom de morango` seguido de `brigadeiros tradicionais` respondeu com:
+    - `Hoje eu tenho estas opcoes nessa linha`
+    - `Eu seguro isso aqui e, assim que eu fechar o nome, eu volto nessa linha com voce`
+  - smoke real `quero 5 bombom de morango` seguido de `pao de mel doce de leite` respondeu com:
+    - `Consigo te ajudar com *Pao de mel doce de leite* sim.`
+    - `Eu seguro isso aqui e, assim que eu fechar o nome, eu volto nesse item com voce.`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+- Commit desta sequencia:
+  - `333ca7c` `refactor(whatsapp): deepen Loucas product-line understanding`
+- Producao:
+  - nao foi tocada nesta rodada
