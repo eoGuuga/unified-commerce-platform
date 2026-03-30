@@ -1735,3 +1735,31 @@
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
   - `npm.cmd run test:whatsapp:evals` => `61/61` cenarios ok
   - resultado salvo em `backend/whatsapp-sales-evals-results-20260330-004657.json`
+
+## 2026-03-30 01:10 BRT - Captura semantica de dados e observacoes ficou mais inteligente
+
+- Objetivo desta rodada:
+  - endurecer o que o bot guarda de cliente e impedir que texto humano livre seja salvo no campo errado
+  - especialmente: nome, endereco, telefone e observacao final da Loucas
+- Ajuste aplicado:
+  - `backend/src/modules/whatsapp/whatsapp.service.ts` passou a:
+    - rejeitar nome que parece produto, comando operacional ou dado de pedido
+    - exigir evidencia semantica minima para endereco, em vez de salvar qualquer frase frouxa
+    - rejeitar telefone com DDD claramente invalido, sem quebrar os numeros de teste legitimos usados na bateria
+    - tratar observacoes livres como `mandar 100 de brinde` como observacao humana da equipe, em vez de tentar transformar isso em ajuste de item
+    - impedir que o motor de linha/produto sequestre a etapa de observacoes finais quando a mensagem claramente parece nota operacional
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` ganhou regressao para:
+    - rejeicao de nome-produto
+    - rejeicao de endereco frouxo
+    - rejeicao de telefone com DDD invalido
+    - observacao livre numerica durante `collecting_notes`
+- Validacao local desta rodada:
+  - `npm.cmd run test -- src/modules/whatsapp/whatsapp.service.spec.ts` => `217/217` ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+- Validacao em `dev/teste`:
+  - runtime publicado nos commits `ddfc164` e `4908f36`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+  - `npm.cmd run test:whatsapp:evals` => `63/63` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260330-010921.json`
