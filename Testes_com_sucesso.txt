@@ -1622,3 +1622,31 @@
   - `npm.cmd run build` => ok
 - Observacao operacional:
   - esta rodada prepara o cerebro Loucas-first, mas nao liga custo nem modelo por padrao; a flag continua podendo ficar desligada ate existir uma maquina local forte o suficiente
+
+## 2026-03-29 22:26 BRT - Memoria comercial estruturada para a IA local da Loucas
+
+- Objetivo desta rodada:
+  - deixar a futura camada de IA local da Loucas menos generica e mais capaz de manter contexto comercial real entre mensagens
+- Ajuste aplicado:
+  - `backend/src/modules/whatsapp/types/whatsapp.types.ts` passou a expor memoria comercial estruturada:
+    - `occasion`
+    - `style`
+    - `taste`
+    - `recipientHint`
+  - `backend/src/modules/whatsapp/services/openai.service.ts` passou a:
+    - enviar essas preferencias para o prompt da IA local
+    - aceitar `responseMode` estruturado
+    - aceitar `salesPreferenceProfile` estruturado
+    - sanitizar esses campos com enum seguro
+  - `backend/src/modules/whatsapp/whatsapp.service.ts` passou a:
+    - enviar a memoria comercial atual para a camada de IA local
+    - persistir o perfil retornado pela IA junto de `last_customer_goal`, `last_response_mode` e `last_product_name`
+  - regressao adicionada em:
+    - `backend/src/modules/whatsapp/services/openai.service.spec.ts`
+    - `backend/src/modules/whatsapp/whatsapp.service.spec.ts`
+- Validacao local desta rodada:
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run test -- src/modules/whatsapp/services/openai.service.spec.ts src/modules/whatsapp/whatsapp.service.spec.ts` => `209/209` ok
+  - `npm.cmd run build` => ok
+- Observacao operacional:
+  - esta rodada ainda nao liga um modelo local pesado por padrao; ela deixa a IA da Loucas pronta para lembrar contexto como `presente delicado para mae`, `algo menos doce` ou `algo seguro`, sem custo recorrente e sem quebrar o fluxo seguro atual
