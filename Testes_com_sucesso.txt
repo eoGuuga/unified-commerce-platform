@@ -1677,3 +1677,18 @@
   - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
 - Observacao operacional:
   - o runner automatico do `package.json` nao roda direto no VPS porque la nao existe binario `powershell`; a bateria foi executada daqui contra o `dev/teste`, validando o ambiente real publicado
+
+## 2026-03-29 23:52 BRT - Runner de QA conversacional da Loucas agora roda em qualquer ambiente
+
+- Objetivo desta rodada:
+  - aumentar nossa certeza antes do QA humano, deixando a bateria da Loucas executavel tanto localmente quanto no VPS, sem depender de PowerShell
+- Ajuste aplicado:
+  - `backend/scripts/run-whatsapp-sales-evals.js` criado como runner Node cross-platform para a bateria conversacional
+  - `backend/package.json` atualizado para `npm run test:whatsapp:evals` usar o runner Node
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` ajustado para reduzir falsos negativos por estoque vivo em cenarios que medem fluxo e nao disponibilidade
+  - o matcher do runner Node foi alinhado ao comportamento case-insensitive que o runner antigo em PowerShell ja tinha
+- Validacao desta rodada:
+  - `npm.cmd run test:whatsapp:evals` => `59/59` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-235247.json`
+- Observacao operacional:
+  - esta rodada nao muda o runtime do bot; ela fortalece a nossa malha automatica de certeza antes do seu teste humano

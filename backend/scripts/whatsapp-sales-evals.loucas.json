@@ -74,7 +74,7 @@
       "name": "bare_more_adjustment_during_name_collection",
       "steps": [
         {
-          "message": "quero 5 brownie tradicional",
+          "message": "quero 2 bombom de morango",
           "expectAny": [
             "PEDIDO PREPARADO",
             "nome completo"
@@ -82,10 +82,10 @@
           "forbidAny": []
         },
         {
-          "message": "Mais 5 brownie tradicional",
+          "message": "Mais 2 bombom de morango",
           "expectAny": [
             "Pedido ajustado com seguranca.",
-            "Quantidade: 10 unidade(s)"
+            "Quantidade: 4 unidade(s)"
           ],
           "forbidAny": [
             "Antes disso, preciso do nome completo sem ajustar"
@@ -97,7 +97,7 @@
       "name": "decimal_adjustment_must_be_rejected",
       "steps": [
         {
-          "message": "quero 5 brownie tradicional",
+          "message": "quero 2 bombom de morango",
           "expectAny": [
             "PEDIDO PREPARADO",
             "nome completo"
@@ -105,7 +105,7 @@
           "forbidAny": []
         },
         {
-          "message": "Adiciona mais 1,5 brownie tradicional",
+          "message": "Adiciona mais 1,5 bombom de morango",
           "expectAny": [
             "Quantidade deve ser um numero inteiro."
           ],
@@ -119,7 +119,7 @@
       "name": "duplicate_protection_must_not_loop_recursively",
       "steps": [
         {
-          "message": "quero 5 brownie tradicional",
+          "message": "quero 2 bombom de morango",
           "expectAny": [
             "PEDIDO PREPARADO",
             "nome completo"
@@ -127,14 +127,14 @@
           "forbidAny": []
         },
         {
-          "message": "Adiciona mais 5 brownie tradicional",
+          "message": "Adiciona mais 2 bombom de morango",
           "expectAny": [
             "Pedido ajustado com seguranca.",
-            "Quantidade: 10 unidade(s)"
+            "Quantidade: 4 unidade(s)"
           ]
         },
         {
-          "message": "Adiciona mais 5 brownie tradicional",
+          "message": "Adiciona mais 2 bombom de morango",
           "expectAny": [
             "Ja recebi essa mesma mensagem ha instantes"
           ],
@@ -143,7 +143,7 @@
           ]
         },
         {
-          "message": "Adiciona mais 5 brownie tradicional",
+          "message": "Adiciona mais 2 bombom de morango",
           "expectAny": [
             "Ja recebi essa mesma mensagem ha instantes"
           ],
@@ -157,7 +157,7 @@
       "name": "random_question_during_name_should_stay_on_step",
       "steps": [
         {
-          "message": "quero 1 brownie tradicional",
+          "message": "quero 1 bombom de morango",
           "expectAny": [
             "PEDIDO PREPARADO",
             "nome completo"
@@ -181,7 +181,7 @@
       "name": "collection_clarification_should_not_repeat_two_near_identical_intros",
       "steps": [
         {
-          "message": "quero 1 brownie tradicional",
+          "message": "quero 1 bombom de morango",
           "expectAny": [
             "PEDIDO PREPARADO",
             "nome completo"
@@ -204,7 +204,7 @@
       "name": "discount_question_during_name_should_not_break_flow",
       "steps": [
         {
-          "message": "quero 1 brownie tradicional",
+          "message": "quero 1 bombom de morango",
           "expectAny": [
             "PEDIDO PREPARADO",
             "nome completo"
@@ -228,7 +228,7 @@
       "name": "pluralized_alias_adjustment_should_work_during_collection",
       "steps": [
         {
-          "message": "quero 1 brownie tradicional",
+          "message": "quero 1 bombom de morango",
           "expectAny": [
             "PEDIDO PREPARADO",
             "nome completo"
@@ -252,7 +252,7 @@
       "name": "mojibake_alias_adjustment_should_still_work",
       "steps": [
         {
-          "message": "quero 1 brownie tradicional",
+          "message": "quero 1 bombom de morango",
           "expectAny": [
             "PEDIDO PREPARADO",
             "nome completo"
@@ -387,7 +387,7 @@
       "name": "soft_stop_during_name_collection_should_reset_cleanly",
       "steps": [
         {
-          "message": "quero 1 brownie tradicional",
+          "message": "quero 1 bombom de morango",
           "expectAny": [
             "PEDIDO PREPARADO",
             "nome completo"
@@ -421,7 +421,7 @@
       "name": "new_order_after_cancel_should_start_clean",
       "steps": [
         {
-          "message": "quero 1 brownie tradicional",
+          "message": "quero 1 bombom de morango",
           "expectAny": [
             "PEDIDO PREPARADO",
             "nome completo"
@@ -481,7 +481,7 @@
       "name": "unsupported_payment_message_should_recenter_to_supported_methods",
       "steps": [
         {
-          "message": "quero 1 brownie tradicional",
+          "message": "quero 1 bombom de morango",
           "expectAny": [
             "PEDIDO PREPARADO",
             "nome completo"
@@ -557,7 +557,7 @@
       "name": "product_detour_during_name_should_not_duplicate_requirement_prompt",
       "steps": [
         {
-          "message": "quero 1 brownie tradicional",
+          "message": "quero 1 bombom de morango",
           "expectAny": [
             "PEDIDO PREPARADO",
             "nome completo"
@@ -1204,7 +1204,7 @@
       "name": "repeated_unresolved_feedback_should_offer_handoff_with_context",
       "steps": [
         {
-          "message": "quero 1 brownie tradicional",
+          "message": "quero 1 bombom de morango",
           "expectAny": [
             "PEDIDO PREPARADO",
             "nome completo"
@@ -1237,7 +1237,7 @@
       "name": "waiting_payment_new_order_request_should_offer_safe_fork",
       "steps": [
         {
-          "message": "quero 1 brownie tradicional",
+          "message": "quero 1 bombom de morango",
           "expectAny": [
             "PEDIDO PREPARADO",
             "nome completo"
@@ -1302,7 +1302,7 @@
       "name": "waiting_payment_skip_slang_should_stay_on_safe_payment_path",
       "steps": [
         {
-          "message": "quero 1 brownie tradicional",
+          "message": "quero 1 bombom de morango",
           "expectAny": [
             "PEDIDO PREPARADO",
             "nome completo"
