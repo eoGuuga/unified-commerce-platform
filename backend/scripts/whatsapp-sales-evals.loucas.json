@@ -1166,6 +1166,256 @@
           ]
         }
       ]
+    },
+    {
+      "name": "waiting_payment_new_order_request_should_offer_safe_fork",
+      "steps": [
+        {
+          "message": "quero 1 brownie tradicional",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Jordan Lincoln",
+          "expectAny": [
+            "Como voce prefere receber esse pedido?",
+            "1. Entrega",
+            "2. Retirada"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "2",
+          "expectAny": [
+            "TELEFONE DE CONTATO",
+            "telefone"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "11987654321",
+          "expectAny": [
+            "OBSERVACOES DO PEDIDO",
+            "Se nao houver observacoes"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "sem",
+          "expectAny": [
+            "REVISAO FINAL DO PEDIDO",
+            "Se estiver tudo certo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "sim",
+          "expectAny": [
+            "PEDIDO CRIADO COM SUCESSO",
+            "FORMAS DE PAGAMENTO"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "quero fazer outro antes de pagar esse",
+          "expectAny": [
+            "consigo te ajudar com outro pedido",
+            "cancelar esse pedido",
+            "falar com a loja"
+          ],
+          "forbidAny": [
+            "eu nao altero itens, endereco ou forma de recebimento automaticamente nessa fase"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "waiting_payment_skip_slang_should_stay_on_safe_payment_path",
+      "steps": [
+        {
+          "message": "quero 1 brownie tradicional",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Jordan Lincoln",
+          "expectAny": [
+            "Como voce prefere receber esse pedido?",
+            "1. Entrega",
+            "2. Retirada"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "2",
+          "expectAny": [
+            "TELEFONE DE CONTATO",
+            "telefone"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "11987654321",
+          "expectAny": [
+            "OBSERVACOES DO PEDIDO",
+            "Se nao houver observacoes"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "sem",
+          "expectAny": [
+            "REVISAO FINAL DO PEDIDO",
+            "Se estiver tudo certo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "sim",
+          "expectAny": [
+            "PEDIDO CRIADO COM SUCESSO",
+            "FORMAS DE PAGAMENTO"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "pula",
+          "expectAny": [
+            "aguardando pagamento",
+            "cancelar esse pedido"
+          ],
+          "forbidAny": [
+            "Me diga em uma frase"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "large_invalid_delivery_choice_should_not_become_address_draft",
+      "steps": [
+        {
+          "message": "quero 5 bombom de morango",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Jordan Lincoln",
+          "expectAny": [
+            "Como voce prefere receber esse pedido?",
+            "1. Entrega",
+            "2. Retirada"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "10",
+          "expectAny": [
+            "preciso alinhar se vai ser entrega ou retirada",
+            "1. Entrega",
+            "2. Retirada"
+          ],
+          "forbidAny": [
+            "Rascunho atual: 10"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "loucas_pack_adjustment_should_map_three_brigadeiros_to_pack_product",
+      "steps": [
+        {
+          "message": "quero 5 bombom de morango",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "quero mais 3 brigadeiros tradiconais",
+          "expectAny": [
+            "Pedido ajustado com seguranca.",
+            "3 Brigadeiros tradicionais"
+          ],
+          "forbidAny": [
+            "ainda ficou ambigua"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "review_new_item_should_adjust_instead_of_restarting_order",
+      "steps": [
+        {
+          "message": "quero 5 bombom de morango",
+          "expectAny": [
+            "PEDIDO PREPARADO",
+            "nome completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Jordan Lincoln",
+          "expectAny": [
+            "Como voce prefere receber esse pedido?",
+            "1. Entrega",
+            "2. Retirada"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "1",
+          "expectAny": [
+            "ENDERECO DE ENTREGA",
+            "endereco completo"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "Rua das Flores, 123, Centro, Sao Paulo, SP, 01234-567",
+          "expectAny": [
+            "TELEFONE DE CONTATO",
+            "telefone"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "11987654321",
+          "expectAny": [
+            "OBSERVACOES DO PEDIDO",
+            "Se nao houver observacoes"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "sem",
+          "expectAny": [
+            "REVISAO FINAL DO PEDIDO",
+            "Bombom de morango"
+          ],
+          "forbidAny": []
+        },
+        {
+          "message": "quero 2 pao de mel doce de leite",
+          "expectAny": [
+            "Pedido ajustado com seguranca.",
+            "REVISAO FINAL DO PEDIDO",
+            "Pao de mel doce de leite"
+          ],
+          "forbidAny": [
+            "Antes de fechar, me diga o nome completo"
+          ]
+        }
+      ]
     }
   ]
 }

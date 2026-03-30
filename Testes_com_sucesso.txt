@@ -1522,3 +1522,24 @@
   - `npm.cmd run test -- notifications.service.spec.ts whatsapp.controller.spec.ts whatsapp.service.spec.ts` => `208/208` ok
   - `npm.cmd run lint` => ok
   - `npm.cmd run build` => ok
+
+## 2026-03-29 21:20 BRT - Estrutural do transcript ruim da Loucas
+
+- Problemas corrigidos a partir do transcript real:
+  - pedido novo enquanto ainda existe outro aguardando pagamento agora entra num desvio seguro, sem repetir a mesma trava seca
+  - giria como `pula` durante `waiting_payment` nao cai mais na recuperacao generica de `Me diga em uma frase`
+  - ajuste de item durante `REVISAO FINAL DO PEDIDO` nao reinicia mais o pedido do zero
+  - quantidades da linha Loucas como `3 brigadeiros tradicionais` agora podem fechar no pack correto, em vez de cair em ambiguidade solta
+  - escolha invalida como `10` na etapa `entrega ou retirada` nao vira mais rascunho de endereco
+- Ajuste aplicado:
+  - `backend/src/modules/whatsapp/whatsapp.service.ts` ganhou:
+    - desvio seguro para `quero fazer outro antes de pagar esse`
+    - desvio seguro para `pula` em `waiting_payment`
+    - resolucao pack-aware para itens da Loucas como `3 Brigadeiros tradicionais`
+    - protecao contra numero grande virar fragmento de endereco na escolha de entrega/retirada
+    - reforco para tratar mensagem `quantidade + produto` na revisao final como ajuste, nao como reinicio de fluxo
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` recebeu regressao dedicada para todos esses casos
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` foi ampliado com os cenarios reais do transcript da Loucas
+- Validacao local desta rodada:
+  - `npm.cmd run test -- whatsapp.service.spec.ts` => `201/201` ok
+  - `npm.cmd run build` => ok
