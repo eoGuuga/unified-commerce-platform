@@ -8011,6 +8011,20 @@ export class WhatsappService {
     );
   }
 
+  private shouldAnswerLoucasRecommendationDirectly(
+    analysis: SalesConversationAnalysis,
+  ): boolean {
+    return (
+      this.isSalesSocialProofQuery(analysis) ||
+      this.isSalesSafeChoiceQuery(analysis) ||
+      this.isSalesValueChoiceQuery(analysis) ||
+      Boolean(analysis.recipientHint) ||
+      /\b(bonit|delicad|discret|sem exagero|segur|sem erro|marcante|premium|caprichad|refinad)\b/.test(
+        analysis.normalizedText,
+      )
+    );
+  }
+
   private isLoucasBroadDiscoveryRecommendation(analysis: SalesConversationAnalysis): boolean {
     if (analysis.intent !== 'recommendation' || analysis.budgetCeiling !== null) {
       return false;
@@ -8023,6 +8037,7 @@ export class WhatsappService {
       analysis.recipientHint ||
       analysis.signals.reassurance ||
       analysis.pricePreference !== null ||
+      this.shouldAnswerLoucasRecommendationDirectly(analysis) ||
       /\b(bonit|segur|sem erro|delicad|discret|marcante|premium|caprichad)\b/.test(
         analysis.normalizedText,
       )
@@ -8060,16 +8075,13 @@ export class WhatsappService {
       analysis.budgetCeiling === null &&
       analysis.pricePreference === null &&
       !analysis.signals.reassurance &&
+      !this.shouldAnswerLoucasRecommendationDirectly(analysis) &&
       !profile.style &&
       !this.hasLoucasCatalogCue(analysis.normalizedText) &&
-      !/\b(delicad|discret|sem exagero|segur|sem erro|marcante|premium|caprichad)\b/.test(
+      !/\b(bonit|delicad|discret|sem exagero|segur|sem erro|marcante|premium|caprichad)\b/.test(
         analysis.normalizedText,
       )
     ) {
-      if (analysis.recipientHint) {
-        return `Perfeito. Para presentear ${analysis.recipientHint}, voce quer algo mais delicado e seguro ou mais marcante?`;
-      }
-
       return 'Perfeito. Para presentear, voce quer algo mais delicado e seguro ou mais marcante?';
     }
 

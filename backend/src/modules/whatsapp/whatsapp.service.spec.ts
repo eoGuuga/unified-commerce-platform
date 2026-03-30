@@ -1891,6 +1891,19 @@ describe('WhatsappService defensive WhatsApp flow', () => {
     expect(response).toContain('Brigadeiro individual mimo');
   });
 
+  it('answers recipient-aware Loucas gift requests directly when the ask is already specific enough', async () => {
+    const service = createService(loucasConsultativeCatalog) as any;
+
+    const response = await service.generateResponse(
+      'me indica um presente bonito pra minha mae',
+      'tenant-id',
+    );
+
+    expect(response).toContain('Estas sao as opcoes que eu colocaria na sua frente agora');
+    expect(response).toMatch(/Brigadeiro individual mimo|3 Brigadeiros tradicionais|Brownie/);
+    expect(response).not.toContain('voce quer algo mais delicado e seguro ou mais marcante?');
+  });
+
   it('answers safe-choice recommendation questions with a direct safest-option anchor', async () => {
     const service = createService(giftingCatalogWithAccessories) as any;
 

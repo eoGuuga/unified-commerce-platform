@@ -1714,3 +1714,20 @@
   - `npm.cmd run build` => ok
 - Observacao operacional:
   - a bateria `test:whatsapp:evals` ainda precisa ser rerrodada apos publicar o novo runtime no `dev/teste`, porque o resultado local desta etapa ainda estava lendo o backend remoto antigo
+
+## 2026-03-30 00:27 BRT - Loucas agora pergunta so quando realmente falta contexto
+
+- Objetivo desta rodada:
+  - aproximar o bot do padrao de atendimento mais maduro: se a mensagem ja traz direcao comercial suficiente, ele responde; so pergunta quando a ambiguidade realmente bloqueia a recomendacao
+- Ajuste aplicado:
+  - `backend/src/modules/whatsapp/whatsapp.service.ts` passou a:
+    - reconhecer quando a pergunta da Loucas ja merece resposta direta, como `o que sai mais para presente?`
+    - responder direto quando o pedido de presente ja vem com destinatario ou sinal de estilo, como `me indica um presente bonito pra minha mae`
+    - reservar a pergunta de refinamento `mais delicado e seguro ou mais marcante` apenas para casos realmente abertos
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` ganhou regressao para resposta direta em pedido de presente ja especifico
+- Validacao local desta rodada:
+  - `npm.cmd run test -- src/modules/whatsapp/whatsapp.service.spec.ts` => `212/212` ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+- Observacao operacional:
+  - o proximo passo desta rodada e publicar no `dev/teste` e rerrodar a bateria da Loucas no ambiente real
