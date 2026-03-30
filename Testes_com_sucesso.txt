@@ -1650,3 +1650,30 @@
   - `npm.cmd run build` => ok
 - Observacao operacional:
   - esta rodada ainda nao liga um modelo local pesado por padrao; ela deixa a IA da Loucas pronta para lembrar contexto como `presente delicado para mae`, `algo menos doce` ou `algo seguro`, sem custo recorrente e sem quebrar o fluxo seguro atual
+
+## 2026-03-29 22:29 BRT - Persistencia real da memoria comercial da Loucas no motor atual
+
+- Objetivo desta rodada:
+  - fazer a Loucas aproveitar a memoria comercial estruturada mesmo sem LLM ativa, para que os refinamentos fiquem menos burros entre uma mensagem e outra
+- Ajuste aplicado:
+  - `backend/src/modules/whatsapp/whatsapp.service.ts` passou a:
+    - derivar `sales_preference_profile` diretamente da conversa comercial atual
+    - mesclar esse perfil com a memoria existente em vez de sobrescrever tudo
+    - considerar esse perfil como memoria consultiva valida
+    - reaproveitar esse perfil ao montar consultas sinteticas de refinamento como `me mostra outra opcao`
+    - enriquecer a analise comercial com preferencia de ocasiao, estilo, sabor e destinatario lembrados
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` recebeu regressao para:
+    - persistencia heuristica de perfil comercial da Loucas
+    - recuperacao consultiva com memoria de perfil, mesmo sem `last_query` forte
+- Validacao local desta rodada:
+  - `npm.cmd run test -- src/modules/whatsapp/services/openai.service.spec.ts src/modules/whatsapp/whatsapp.service.spec.ts` => `211/211` ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+- Validacao em `dev/teste`:
+  - backend atualizado ate o commit `676c259`
+  - `npm.cmd run test:whatsapp:evals` => `59/59` cenarios ok
+  - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-222823.json`
+  - `https://dev.gtsofthub.com.br/api/v1/health` => `ok`
+  - `https://dev.gtsofthub.com.br/api/v1/whatsapp/health` => `ok`
+- Observacao operacional:
+  - o runner automatico do `package.json` nao roda direto no VPS porque la nao existe binario `powershell`; a bateria foi executada daqui contra o `dev/teste`, validando o ambiente real publicado
