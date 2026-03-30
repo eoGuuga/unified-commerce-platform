@@ -1692,3 +1692,23 @@
   - resultado salvo em `backend/whatsapp-sales-evals-results-20260329-235247.json`
 - Observacao operacional:
   - esta rodada nao muda o runtime do bot; ela fortalece a nossa malha automatica de certeza antes do seu teste humano
+
+## 2026-03-30 00:12 BRT - Loucas ganhou elicitação progressiva e leitura curta de preferencia
+
+- Objetivo desta rodada:
+  - aplicar o padrao de bots mais maduros estudados antes: menos despejo de opcao cedo demais e mais uma pergunta inteligente por vez
+- Ajuste aplicado:
+  - `backend/src/modules/whatsapp/whatsapp.service.ts` passou a:
+    - detectar respostas curtas de preferencia como `para presentear` e `mais delicado` como continuacao consultiva real, em vez de cair em fallback
+    - fazer elicitação progressiva na Loucas quando o pedido e aberto demais, com pergunta unica de ocasião ou estilo antes da recomendacao
+    - evitar que `para presentear` seja lido como comando de parar a conversa
+  - `backend/src/modules/whatsapp/whatsapp.service.spec.ts` ganhou regressao para:
+    - pergunta unica de ocasião em descoberta ampla
+    - funil progressivo `me indica alguma coisa -> para presentear -> mais delicado`
+  - `backend/scripts/whatsapp-sales-evals.loucas.json` ganhou cenarios de elicitação progressiva da Loucas
+- Validacao local desta rodada:
+  - `npm.cmd run test -- src/modules/whatsapp/whatsapp.service.spec.ts` => `210/210` ok
+  - `npm.cmd run lint` => ok
+  - `npm.cmd run build` => ok
+- Observacao operacional:
+  - a bateria `test:whatsapp:evals` ainda precisa ser rerrodada apos publicar o novo runtime no `dev/teste`, porque o resultado local desta etapa ainda estava lendo o backend remoto antigo
