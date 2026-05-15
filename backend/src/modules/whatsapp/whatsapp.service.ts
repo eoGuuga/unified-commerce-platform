@@ -108,6 +108,11 @@ import {
   CATALOG_PRODUCT_RECALL_PHRASES,
   CATALOG_SIMILAR_FOLLOWUP_PHRASES,
 } from './utils/catalog-intents';
+import {
+  validateName as validateNameUtil,
+  validatePhone as validatePhoneUtil,
+  validatePrice as validatePriceUtil,
+} from './utils/validators';
 
 export interface WhatsappMessage {
   from: string;
@@ -11021,77 +11026,9 @@ export class WhatsappService {
     return { valid: true };
   }
 
-  /**
-   * ✅ NOVO: Valida nome
-   */
+  // Validacao de nome: implementacao em utils/validators.ts.
   private validateName(name: string): { valid: boolean; error?: string } {
-    const sanitized = this.sanitizeInput(name);
-
-    if (sanitized.length < this.MIN_NAME_LENGTH) {
-      return { valid: false, error: `Nome deve ter no minimo ${this.MIN_NAME_LENGTH} caracteres` };
-    }
-
-    if (sanitized.length > this.MAX_NAME_LENGTH) {
-      return { valid: false, error: `Nome deve ter no maximo ${this.MAX_NAME_LENGTH} caracteres` };
-    }
-
-    // Validar caracteres permitidos (letras, espaços, acentos, hífen)
-    if (!/^[a-zA-ZÀ-ÿ\s\-']+$/.test(sanitized)) {
-      return { valid: false, error: 'Nome contem caracteres invalidos' };
-    }
-
-    const normalized = sanitized
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .trim();
-
-    const reservedNames = new Set([
-      'sim',
-      'ok',
-      'pix',
-      'credito',
-      'debito',
-      'dinheiro',
-      'entrega',
-      'retirada',
-      'cancelar',
-      'ajuda',
-      'cardapio',
-      'menu',
-      'status',
-      'pedido',
-      'quero',
-      'comprar',
-      'pedir',
-      'preco',
-      'valor',
-      'estoque',
-      'sem',
-      'nao',
-    ]);
-
-    if (reservedNames.has(normalized)) {
-      return { valid: false, error: 'Preciso do nome da pessoa, nao de um comando' };
-    }
-
-    if (
-      /\b(pix|credito|debito|dinheiro|entrega|retirada|pedido|cardapio|menu|status|preco|valor|estoque|telefone|numero|celular|whatsapp|rua|avenida|bairro|cep|endereco)\b/.test(
-        normalized,
-      )
-    ) {
-      return { valid: false, error: 'Preciso do nome da pessoa, nao de um dado de pedido' };
-    }
-
-    if (
-      /\b(brigadeiro|beijinho|bala|bombom|banoffe|brownie|bolo|pudim|torta|pao de mel|acai|kit|caixa presenteavel)\b/.test(
-        normalized,
-      )
-    ) {
-      return { valid: false, error: 'Isso parece nome de produto, nao nome da pessoa' };
-    }
-
-    return { valid: true };
+    return validateNameUtil(name);
   }
 
   private getAddressEvidence(address: string): {
@@ -11180,46 +11117,14 @@ export class WhatsappService {
     return { valid: true };
   }
 
-  /**
-   * ✅ NOVO: Valida telefone
-   */
+  // Validacao de telefone BR: implementacao em utils/validators.ts.
   private validatePhone(phone: string): { valid: boolean; error?: string } {
-    const digitsOnly = phone.replace(/\D/g, '');
-
-    if (digitsOnly.length < 10 || digitsOnly.length > 11) {
-      return { valid: false, error: 'Telefone deve ter 10 ou 11 digitos (com DDD)' };
-    }
-
-    if (!/^[1-9]\d/.test(digitsOnly)) {
-      return { valid: false, error: 'Telefone precisa comecar com um DDD valido' };
-    }
-
-    const subscriber = digitsOnly.slice(2);
-
-    if (digitsOnly.length === 11 && subscriber[0] !== '9') {
-      return { valid: false, error: 'Celular com 11 digitos precisa ter o 9 apos o DDD' };
-    }
-
-    return { valid: true };
+    return validatePhoneUtil(phone);
   }
 
-  /**
-   * ✅ NOVO: Valida preço
-   */
+  // Validacao de preco: implementacao em utils/validators.ts.
   private validatePrice(price: number): { valid: boolean; error?: string } {
-    if (typeof price !== 'number' || isNaN(price)) {
-      return { valid: false, error: 'Preco deve ser um numero valido' };
-    }
-
-    if (price <= 0) {
-      return { valid: false, error: 'Preco deve ser maior que zero' };
-    }
-
-    if (price > this.MAX_PRICE) {
-      return { valid: false, error: `Preco maximo e R$ ${this.MAX_PRICE.toLocaleString('pt-BR')}` };
-    }
-
-    return { valid: true };
+    return validatePriceUtil(price);
   }
 
   /**
