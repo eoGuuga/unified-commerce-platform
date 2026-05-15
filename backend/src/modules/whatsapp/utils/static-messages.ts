@@ -95,3 +95,114 @@ export function looksLikeExplicitNameIntroduction(message: string): boolean {
     sanitizeInput((message || '').trim()),
   );
 }
+
+/**
+ * Horario padrao de funcionamento. Sera overridado pelo service se
+ * tenant tiver setting proprio (proxima iteracao).
+ */
+export const DEFAULT_HORARIO_FUNCIONAMENTO =
+  'Segunda a Sábado: 8h às 18h\nDomingo: 9h às 13h';
+
+export const PREMIUM_PHONE_PROMPT = [
+  'TELEFONE DE CONTATO',
+  '',
+  'Antes de fechar, preciso do melhor numero para atualizar voce sobre o pedido.',
+  'Pode ser celular ou telefone fixo, desde que venha com DDD.',
+  'Pode enviar no formato:',
+  '- (11) 98765-4321',
+  '- 11987654321',
+].join('\n');
+
+export const PREMIUM_NOTES_PROMPT = [
+  'OBSERVACOES DO PEDIDO',
+  '',
+  'Se quiser, me diga algum detalhe importante para a equipe.',
+  'Exemplo: "sem acucar", "entregar na portaria" ou "caprichar na embalagem".',
+  '',
+  'Se nao houver observacoes, responda: "sem".',
+].join('\n');
+
+export const PREMIUM_HELP_MESSAGE = [
+  'COMO POSSO AJUDAR',
+  '',
+  'Voce pode falar comigo de forma natural ou usar atalhos como:',
+  '- "cardapio" para ver a vitrine da loja',
+  '- "preco de brigadeiro" para consultar um item',
+  '- "estoque de bolo de chocolate" para ver disponibilidade',
+  '- "quero 10 brigadeiros" para montar um pedido',
+  '- "status do pedido" para acompanhar a compra',
+  '- "reabrir pedido" para retomar um pagamento pendente',
+  '',
+  'Tambem posso recomendar produtos se voce disser algo como:',
+  '"me indica algo para presente" ou "o que voce tem com chocolate?"',
+].join('\n');
+
+export const PREMIUM_GREETING_MESSAGE = [
+  'Ola! Sou o concierge da loja no WhatsApp.',
+  '',
+  'Posso te ajudar a descobrir produtos, montar o pedido, acompanhar a compra e retomar pagamento sem perder contexto.',
+  '',
+  'Se quiser um atalho, envie "ajuda".',
+].join('\n');
+
+export const PREMIUM_FALLBACK_MESSAGE = [
+  'Nao quero te deixar preso num menu engessado.',
+  '',
+  'Pode falar do seu jeito que eu tento puxar para o caminho certo.',
+  'Se preferir um atalho, eu tambem consigo ajudar com coisas como:',
+  '- "quero 10 brigadeiros"',
+  '- "me indica algo para presente"',
+  '- "preco de brownie"',
+  '- "status do pedido"',
+  '',
+  'Se tiver dado algum problema, pode dizer algo como "o pix nao apareceu" ou "acho que voce nao entendeu".',
+].join('\n');
+
+/**
+ * Prompt de escolha entrega vs retirada. Personaliza saudacao com nome
+ * quando disponivel.
+ */
+export function buildPremiumDeliveryChoicePrompt(customerName?: string): string {
+  return [
+    customerName ? `Perfeito, ${customerName}.` : 'Perfeito.',
+    '',
+    'Como voce prefere receber esse pedido?',
+    '1. Entrega',
+    '2. Retirada',
+    '',
+    'Responda com "1", "2", "entrega" ou "retirada".',
+  ].join('\n');
+}
+
+/**
+ * Mensagem quando o usuario respondeu algo que nao eh "entrega" nem
+ * "retirada" e o bot precisa re-perguntar.
+ */
+export function buildPremiumDeliveryChoiceValidationMessage(
+  customerName?: string,
+): string {
+  return [
+    customerName ? `Perfeito, ${customerName}.` : 'Perfeito.',
+    '',
+    'Antes de seguir, eu preciso alinhar se vai ser entrega ou retirada para nao montar endereco errado.',
+    'Responda so com uma destas opcoes:',
+    '1. Entrega',
+    '2. Retirada',
+  ].join('\n');
+}
+
+/**
+ * Mensagem do horario. Recebe a string do horario pra permitir override
+ * por tenant.
+ */
+export function buildPremiumScheduleMessage(
+  horarioFuncionamento: string,
+): string {
+  return [
+    'HORARIO DE ATENDIMENTO',
+    '',
+    horarioFuncionamento,
+    '',
+    'Se quiser, eu ja posso te ajudar a montar o pedido agora.',
+  ].join('\n');
+}

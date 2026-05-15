@@ -184,9 +184,17 @@ import {
 import {
   PREMIUM_ADDRESS_PROMPT,
   PREMIUM_CARD_PAYMENT_FALLBACK_MESSAGE,
+  PREMIUM_FALLBACK_MESSAGE,
+  PREMIUM_GREETING_MESSAGE,
+  PREMIUM_HELP_MESSAGE,
   PREMIUM_NON_COMMERCIAL_RECOVERY_MESSAGE,
+  PREMIUM_NOTES_PROMPT,
+  PREMIUM_PHONE_PROMPT,
   PREMIUM_SOFT_RESET_MESSAGE,
   buildPremiumAddressDraftPrompt as buildPremiumAddressDraftPromptUtil,
+  buildPremiumDeliveryChoicePrompt as buildPremiumDeliveryChoicePromptUtil,
+  buildPremiumDeliveryChoiceValidationMessage as buildPremiumDeliveryChoiceValidationMessageUtil,
+  buildPremiumScheduleMessage as buildPremiumScheduleMessageUtil,
   getPaymentOptionsMessage as getPaymentOptionsMessageUtil,
   looksLikeExplicitNameIntroduction as looksLikeExplicitNameIntroductionUtil,
 } from './utils/static-messages';
@@ -4193,49 +4201,19 @@ export class WhatsappService {
   }
 
   private getPremiumPhonePrompt(): string {
-    return [
-      'TELEFONE DE CONTATO',
-      '',
-      'Antes de fechar, preciso do melhor numero para atualizar voce sobre o pedido.',
-      'Pode ser celular ou telefone fixo, desde que venha com DDD.',
-      'Pode enviar no formato:',
-      '- (11) 98765-4321',
-      '- 11987654321',
-    ].join('\n');
+    return PREMIUM_PHONE_PROMPT;
   }
 
   private getPremiumNotesPrompt(): string {
-    return [
-      'OBSERVACOES DO PEDIDO',
-      '',
-      'Se quiser, me diga algum detalhe importante para a equipe.',
-      'Exemplo: "sem acucar", "entregar na portaria" ou "caprichar na embalagem".',
-      '',
-      'Se nao houver observacoes, responda: "sem".',
-    ].join('\n');
+    return PREMIUM_NOTES_PROMPT;
   }
 
   private getPremiumDeliveryChoicePrompt(customerName?: string): string {
-    return [
-      customerName ? `Perfeito, ${customerName}.` : 'Perfeito.',
-      '',
-      'Como voce prefere receber esse pedido?',
-      '1. Entrega',
-      '2. Retirada',
-      '',
-      'Responda com "1", "2", "entrega" ou "retirada".',
-    ].join('\n');
+    return buildPremiumDeliveryChoicePromptUtil(customerName);
   }
 
   private getPremiumDeliveryChoiceValidationMessage(customerName?: string): string {
-    return [
-      customerName ? `Perfeito, ${customerName}.` : 'Perfeito.',
-      '',
-      'Antes de seguir, eu preciso alinhar se vai ser entrega ou retirada para nao montar endereco errado.',
-      'Responda so com uma destas opcoes:',
-      '1. Entrega',
-      '2. Retirada',
-    ].join('\n');
+    return buildPremiumDeliveryChoiceValidationMessageUtil(customerName);
   }
 
   private getPremiumCardPaymentFallbackMessage(): string {
@@ -4247,55 +4225,19 @@ export class WhatsappService {
   }
 
   private getPremiumScheduleMessage(): string {
-    return [
-      'HORARIO DE ATENDIMENTO',
-      '',
-      this.HORARIO_FUNCIONAMENTO,
-      '',
-      'Se quiser, eu ja posso te ajudar a montar o pedido agora.',
-    ].join('\n');
+    return buildPremiumScheduleMessageUtil(this.HORARIO_FUNCIONAMENTO);
   }
 
   private getPremiumHelpMessage(): string {
-    return [
-      'COMO POSSO AJUDAR',
-      '',
-      'Voce pode falar comigo de forma natural ou usar atalhos como:',
-      '- "cardapio" para ver a vitrine da loja',
-      '- "preco de brigadeiro" para consultar um item',
-      '- "estoque de bolo de chocolate" para ver disponibilidade',
-      '- "quero 10 brigadeiros" para montar um pedido',
-      '- "status do pedido" para acompanhar a compra',
-      '- "reabrir pedido" para retomar um pagamento pendente',
-      '',
-      'Tambem posso recomendar produtos se voce disser algo como:',
-      '"me indica algo para presente" ou "o que voce tem com chocolate?"',
-    ].join('\n');
+    return PREMIUM_HELP_MESSAGE;
   }
 
   private getPremiumGreetingMessage(): string {
-    return [
-      'Ola! Sou o concierge da loja no WhatsApp.',
-      '',
-      'Posso te ajudar a descobrir produtos, montar o pedido, acompanhar a compra e retomar pagamento sem perder contexto.',
-      '',
-      'Se quiser um atalho, envie "ajuda".',
-    ].join('\n');
+    return PREMIUM_GREETING_MESSAGE;
   }
 
   private getPremiumFallbackMessage(): string {
-    return [
-      'Nao quero te deixar preso num menu engessado.',
-      '',
-      'Pode falar do seu jeito que eu tento puxar para o caminho certo.',
-      'Se preferir um atalho, eu tambem consigo ajudar com coisas como:',
-      '- "quero 10 brigadeiros"',
-      '- "me indica algo para presente"',
-      '- "preco de brownie"',
-      '- "status do pedido"',
-      '',
-      'Se tiver dado algum problema, pode dizer algo como "o pix nao apareceu" ou "acho que voce nao entendeu".',
-    ].join('\n');
+    return PREMIUM_FALLBACK_MESSAGE;
   }
 
   private buildPremiumPendingOrderIntro(

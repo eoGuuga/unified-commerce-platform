@@ -1,9 +1,18 @@
 import {
+  DEFAULT_HORARIO_FUNCIONAMENTO,
   PREMIUM_ADDRESS_PROMPT,
   PREMIUM_CARD_PAYMENT_FALLBACK_MESSAGE,
+  PREMIUM_FALLBACK_MESSAGE,
+  PREMIUM_GREETING_MESSAGE,
+  PREMIUM_HELP_MESSAGE,
   PREMIUM_NON_COMMERCIAL_RECOVERY_MESSAGE,
+  PREMIUM_NOTES_PROMPT,
+  PREMIUM_PHONE_PROMPT,
   PREMIUM_SOFT_RESET_MESSAGE,
   buildPremiumAddressDraftPrompt,
+  buildPremiumDeliveryChoicePrompt,
+  buildPremiumDeliveryChoiceValidationMessage,
+  buildPremiumScheduleMessage,
   getPaymentOptionsMessage,
   looksLikeExplicitNameIntroduction,
 } from './static-messages';
@@ -86,6 +95,71 @@ describe('static-messages utils', () => {
       ['', false],
     ])('para "%s" retorna %s', (input, expected) => {
       expect(looksLikeExplicitNameIntroduction(input)).toBe(expected);
+    });
+  });
+
+  describe('outras constantes premium', () => {
+    it('DEFAULT_HORARIO_FUNCIONAMENTO menciona Segunda a Sabado', () => {
+      expect(DEFAULT_HORARIO_FUNCIONAMENTO).toMatch(/Segunda/i);
+      expect(DEFAULT_HORARIO_FUNCIONAMENTO).toMatch(/S[áa]bado/i);
+    });
+
+    it('PREMIUM_PHONE_PROMPT inclui exemplos de telefone', () => {
+      expect(PREMIUM_PHONE_PROMPT).toContain('TELEFONE DE CONTATO');
+      expect(PREMIUM_PHONE_PROMPT).toContain('11987654321');
+    });
+
+    it('PREMIUM_NOTES_PROMPT diz como skipar', () => {
+      expect(PREMIUM_NOTES_PROMPT).toContain('OBSERVACOES');
+      expect(PREMIUM_NOTES_PROMPT).toContain('"sem"');
+    });
+
+    it('PREMIUM_HELP_MESSAGE lista atalhos', () => {
+      expect(PREMIUM_HELP_MESSAGE).toContain('cardapio');
+      expect(PREMIUM_HELP_MESSAGE).toContain('status do pedido');
+    });
+
+    it('PREMIUM_GREETING_MESSAGE menciona concierge', () => {
+      expect(PREMIUM_GREETING_MESSAGE).toMatch(/concierge/i);
+    });
+
+    it('PREMIUM_FALLBACK_MESSAGE lista exemplos de atalhos', () => {
+      expect(PREMIUM_FALLBACK_MESSAGE).toContain('"quero 10 brigadeiros"');
+    });
+  });
+
+  describe('buildPremiumDeliveryChoicePrompt', () => {
+    it('saudacao personalizada com nome', () => {
+      const msg = buildPremiumDeliveryChoicePrompt('Maria');
+      expect(msg.split('\n')[0]).toBe('Perfeito, Maria.');
+      expect(msg).toContain('Entrega');
+      expect(msg).toContain('Retirada');
+    });
+
+    it('saudacao generica sem nome', () => {
+      const msg = buildPremiumDeliveryChoicePrompt();
+      expect(msg.split('\n')[0]).toBe('Perfeito.');
+    });
+  });
+
+  describe('buildPremiumDeliveryChoiceValidationMessage', () => {
+    it('explica que precisa alinhar entrega vs retirada', () => {
+      const msg = buildPremiumDeliveryChoiceValidationMessage('Joao');
+      expect(msg).toContain('Joao');
+      expect(msg).toContain('alinhar se vai ser entrega ou retirada');
+    });
+  });
+
+  describe('buildPremiumScheduleMessage', () => {
+    it('inclui o horario passado', () => {
+      const msg = buildPremiumScheduleMessage(DEFAULT_HORARIO_FUNCIONAMENTO);
+      expect(msg).toContain('HORARIO DE ATENDIMENTO');
+      expect(msg).toContain(DEFAULT_HORARIO_FUNCIONAMENTO);
+    });
+
+    it('aceita horario customizado', () => {
+      const custom = '24h por dia';
+      expect(buildPremiumScheduleMessage(custom)).toContain(custom);
     });
   });
 });
