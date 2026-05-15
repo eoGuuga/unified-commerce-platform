@@ -120,6 +120,13 @@ import {
   hasAddressKeyword as hasAddressKeywordUtil,
   normalizeAddressCandidate as normalizeAddressCandidateUtil,
 } from './utils/address-helpers';
+import {
+  buildClosedStageRecoveryMessage as buildClosedStageRecoveryMessageUtil,
+  buildPaymentStageGuardMessage as buildPaymentStageGuardMessageUtil,
+  buildWaitingPaymentStageRecoveryMessage as buildWaitingPaymentStageRecoveryMessageUtil,
+  getStageRecoveryLabel as getStageRecoveryLabelUtil,
+} from './utils/stage-recovery';
+import type { StageRecoveryKind as StageRecoveryKindUtil } from './utils/stage-recovery';
 
 export interface WhatsappMessage {
   from: string;
@@ -175,13 +182,9 @@ export type WhatsappOutboundResponse =
       list: WhatsAppInteractiveListMessage;
     };
 
-type StageRecoveryKind =
-  | 'phone'
-  | 'address'
-  | 'delivery'
-  | 'confirmation'
-  | 'notes'
-  | 'name';
+// Re-exporta o tipo de utils/stage-recovery.ts para nao mudar os call-sites
+// que se referem a StageRecoveryKind.
+type StageRecoveryKind = StageRecoveryKindUtil;
 
 type RankedSalesProduct = {
   product: ProductWithStock;
@@ -1085,17 +1088,9 @@ export class WhatsappService {
     );
   }
 
+  // Stage recovery: implementacao em utils/stage-recovery.ts.
   private getStageRecoveryLabel(kind: StageRecoveryKind): string {
-    const labels: Record<StageRecoveryKind, string> = {
-      phone: 'telefone',
-      address: 'endereco',
-      delivery: 'forma de recebimento',
-      confirmation: 'confirmacao final',
-      notes: 'observacao',
-      name: 'nome',
-    };
-
-    return labels[kind];
+    return getStageRecoveryLabelUtil(kind);
   }
 
   private classifyOutOfOrderReply(message: string): StageRecoveryKind | null {
@@ -1191,25 +1186,8 @@ export class WhatsappService {
     pedido: Pedido | null,
     kind: StageRecoveryKind,
   ): string {
-    const label = this.getStageRecoveryLabel(kind);
-    const intro =
-      kind === 'confirmation'
-        ? 'A revisao final ja foi registrada e o pedido entrou na etapa de pagamento.'
-        : `Nao preciso mais de ${label} para este pedido.`;
-
-    return [
-      intro,
-      pedido ? '' : 'Seu pedido ja esta aguardando a escolha do pagamento.',
-      pedido ? `Pedido: *${pedido.order_no}*` : '',
-      pedido ? `Status atual: *${this.getStatusLabel(pedido.status)}*` : '',
-      '',
-      'Para seguir agora, responda com a forma de pagamento:',
-      '- pix',
-      '- dinheiro',
-      pedido ? `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n');
+    const trackingUrl = pedido ? this.buildTrackingUrl(pedido.order_no) : '';
+    return buildWaitingPaymentStageRecoveryMessageUtil(pedido, kind, trackingUrl);
   }
 
   private buildClosedStageRecoveryMessage(
@@ -1217,44 +1195,20 @@ export class WhatsappService {
     currentState: ConversationState,
     kind: StageRecoveryKind,
   ): string {
-    const label = this.getStageRecoveryLabel(kind);
-    const intro =
-      currentState === 'order_completed'
-        ? `O ${label} ja ficou registrado antes e esse pedido concluiu a jornada.`
-        : `O ${label} ja ficou registrado antes e esse pedido ja esta em andamento.`;
-
-    return [
-      pedido ? `Pedido: *${pedido.order_no}*` : 'Esse pedido ja passou da etapa de cadastro.',
-      pedido ? `Status atual: *${this.getStatusLabel(pedido.status)}*` : '',
-      intro,
-      pedido
-        ? this.getNextStepSummary(pedido, pedido.status)
-        : 'Se quiser, me envie "status do pedido" para acompanhar.',
-      '',
-      pedido
-        ? `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`
-        : 'Envie "status do pedido" para acompanhar.',
-    ]
-      .filter(Boolean)
-      .join('\n');
+    const trackingUrl = pedido ? this.buildTrackingUrl(pedido.order_no) : '';
+    return buildClosedStageRecoveryMessageUtil(
+      pedido,
+      currentState,
+      kind,
+      trackingUrl,
+    );
   }
 
   private buildPaymentStageGuardMessage(pedido: Pedido): string {
-    if (pedido.status === PedidoStatus.CANCELADO) {
-      return [
-        `O pedido *${pedido.order_no}* esta cancelado, entao eu nao vou gerar uma nova cobranca por seguranca.`,
-        'Se quiser, eu monto um novo pedido do zero por aqui.',
-        `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
-      ].join('\n');
-    }
-
-    return [
-      `O pagamento do pedido *${pedido.order_no}* nao precisa ser escolhido novamente.`,
-      `Status atual: *${this.getStatusLabel(pedido.status)}*`,
-      this.getNextStepSummary(pedido, pedido.status),
-      '',
-      `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
-    ].join('\n');
+    return buildPaymentStageGuardMessageUtil(
+      pedido,
+      this.buildTrackingUrl(pedido.order_no),
+    );
   }
 
   private async tryHandleOutOfOrderStageReply(
