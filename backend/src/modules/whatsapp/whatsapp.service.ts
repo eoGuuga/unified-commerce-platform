@@ -181,6 +181,19 @@ import {
   parseAddressCandidate as parseAddressCandidateUtil,
   parseLooseAddress as parseLooseAddressUtil,
 } from './utils/address-parser';
+import {
+  PREMIUM_ADDRESS_PROMPT,
+  PREMIUM_CARD_PAYMENT_FALLBACK_MESSAGE,
+  PREMIUM_NON_COMMERCIAL_RECOVERY_MESSAGE,
+  PREMIUM_SOFT_RESET_MESSAGE,
+  buildPremiumAddressDraftPrompt as buildPremiumAddressDraftPromptUtil,
+  getPaymentOptionsMessage as getPaymentOptionsMessageUtil,
+  looksLikeExplicitNameIntroduction as looksLikeExplicitNameIntroductionUtil,
+} from './utils/static-messages';
+import {
+  COLLECTION_SOFT_STOP_PHRASES,
+  DISCOUNT_QUESTION_PHRASES,
+} from './utils/soft-stop-discount-intents';
 
 export interface WhatsappMessage {
   from: string;
@@ -1488,25 +1501,10 @@ export class WhatsappService {
   }
 
   private buildPremiumAddressDraftPrompt(draftText: string): string {
-    const hasNumber = /\d/.test(draftText);
-    const hasCep = /\b\d{5}-?\d{3}\b/.test(draftText);
-    const hasState = this.containsStateReference(draftText);
-
-    const nextStep = !hasNumber
-      ? 'Agora me envie o numero.'
-      : !hasState
-        ? 'Agora complete com bairro, cidade e estado.'
-        : !hasCep
-          ? 'Se puder, complete com CEP ou complemento para reduzir erro na entrega.'
-          : 'Se quiser, complete com complemento para reduzir erro na entrega.';
-
-    return [
-      'Estou montando o endereco por etapas para evitar erro de entrega.',
-      '',
-      `Rascunho atual: ${draftText}`,
-      nextStep,
-      'Exemplo completo: "Rua das Flores, 123, Apto 45, Centro, Sao Paulo, SP, 01234-567".',
-    ].join('\n');
+    return buildPremiumAddressDraftPromptUtil(
+      draftText,
+      this.containsStateReference(draftText),
+    );
   }
 
   // Post-order/payment intent detectors. As listas de phrases moram em
@@ -4233,23 +4231,11 @@ export class WhatsappService {
   }
 
   private getPremiumCardPaymentFallbackMessage(): string {
-    return [
-      'No WhatsApp, eu consigo fechar este pedido com seguranca por *PIX* ou *dinheiro*.',
-      '',
-      'Para cartao, a equipe precisa concluir manualmente para nao gerar erro no pagamento.',
-      'Se quiser seguir agora por aqui, responda: "pix" ou "dinheiro".',
-    ].join('\n');
+    return PREMIUM_CARD_PAYMENT_FALLBACK_MESSAGE;
   }
 
   private getPremiumAddressPrompt(): string {
-    return [
-      'ENDERECO DE ENTREGA',
-      '',
-      'Me envie o endereco completo para a entrega sair sem atrito.',
-      'Inclua rua, numero, complemento, bairro, cidade, estado e CEP.',
-      '',
-      'Exemplo: "Rua das Flores, 123, Apto 45, Centro, Sao Paulo, SP, 01234-567".',
-    ].join('\n');
+    return PREMIUM_ADDRESS_PROMPT;
   }
 
   private getPremiumScheduleMessage(): string {
@@ -9975,15 +9961,7 @@ export class WhatsappService {
   }
 
   private getPaymentOptionsMessage(total: number): string {
-    const totalAmount = Number(total || 0);
-    const pixAmount = totalAmount > 0 ? totalAmount * 0.95 : 0;
-    return (
-      `💳 *ESCOLHA A FORMA DE PAGAMENTO:*\n\n` +
-      `1️⃣ *PIX* - Desconto de 5% (R$ ${this.formatCurrency(pixAmount)})\n` +
-      `2️⃣ *Dinheiro*\n\n` +
-      `💬 Digite o número ou o nome do método de pagamento.\n` +
-      `Exemplo: "1", "pix", "dinheiro"`
-    );
+    return getPaymentOptionsMessageUtil(total);
   }
 
   private looksLikeOrderStatusQuery(
@@ -11962,12 +11940,7 @@ export class WhatsappService {
   }
 
   private getPremiumSoftResetMessage(): string {
-    return [
-      'Sem problema, vou parar por aqui.',
-      '',
-      'Quando quiser retomar, eu monto um novo pedido com voce sem perder tempo.',
-      'Se preferir, envie "cardapio" para ver os itens ou "ajuda" para ver os atalhos.',
-    ].join('\n');
+    return PREMIUM_SOFT_RESET_MESSAGE;
   }
 
   private isCollectionStageSoftStopIntent(message: string): boolean {
@@ -11976,20 +11949,10 @@ export class WhatsappService {
       return false;
     }
 
-    return this.hasAnyNormalizedPhrase(normalized, [
-      'nao quero',
-      'nao quero mais',
-      'nao vou querer',
-      'nao vou mais querer',
-      'quero mais n',
-      'quero mais nao',
-      'desisti',
-      'deixa pra la',
-      'deixa para la',
-      'tira isso',
-      'para com isso',
-      'pare com isso',
-    ]);
+    return this.hasAnyNormalizedPhrase(
+      normalized,
+      Array.from(COLLECTION_SOFT_STOP_PHRASES),
+    );
   }
 
   private isDiscountQuestion(message: string): boolean {
@@ -12000,28 +11963,15 @@ export class WhatsappService {
 
     return (
       /descont|promo|promoc/.test(normalized) ||
-      this.hasAnyNormalizedPhrase(normalized, [
-        'tem desconto',
-        'tem algum desconto',
-        'rola desconto',
-        'consegue desconto',
-        'tem promocao',
-        'tem promo',
-        'faz um preco melhor',
-        'faz melhor no preco',
-        'tem abatimento',
-      ])
+      this.hasAnyNormalizedPhrase(
+        normalized,
+        Array.from(DISCOUNT_QUESTION_PHRASES),
+      )
     );
   }
 
   private getPremiumNonCommercialRecoveryMessage(): string {
-    return [
-      'Calma, acho que eu puxei a conversa para o lado errado.',
-      '',
-      'Essa mensagem nao parece um pedido da loja, entao eu prefiro nao inventar item, preco ou quantidade.',
-      'Se voce quiser comprar, me diga o produto do seu jeito ou envie "cardapio".',
-      'Se era outro assunto, pode me explicar em uma frase que eu tento te entender sem forcar um pedido.',
-    ].join('\n');
+    return PREMIUM_NON_COMMERCIAL_RECOVERY_MESSAGE;
   }
 
   private isLikelyNonCommercialMessage(message: string): boolean {
@@ -12275,9 +12225,7 @@ export class WhatsappService {
   }
 
   private looksLikeExplicitNameIntroduction(message: string): boolean {
-    return /^(?:meu\s+nome\s+[eé]|o\s+nome\s+[eé]|nome\s+[eé]|me\s+chamo|eu\s+sou|sou\s+(?:o|a)|prazer\b)/i.test(
-      this.sanitizeInput((message || '').trim()),
-    );
+    return looksLikeExplicitNameIntroductionUtil(message);
   }
 
   private hasSpecificProductOrderShape(
