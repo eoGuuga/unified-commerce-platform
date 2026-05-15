@@ -127,6 +127,13 @@ import {
   getStageRecoveryLabel as getStageRecoveryLabelUtil,
 } from './utils/stage-recovery';
 import type { StageRecoveryKind as StageRecoveryKindUtil } from './utils/stage-recovery';
+import {
+  buildAddressDraftText as buildAddressDraftTextUtil,
+  getAddressDraftParts as getAddressDraftPartsUtil,
+  isAddressDraftWorthy as isAddressDraftWorthyUtil,
+  isNumericOnlyAddressFragment as isNumericOnlyAddressFragmentUtil,
+  mergeAddressDraftParts as mergeAddressDraftPartsUtil,
+} from './utils/address-draft';
 
 export interface WhatsappMessage {
   from: string;
@@ -1447,97 +1454,31 @@ export class WhatsappService {
     return extractedName !== sanitized && this.validateName(extractedName).valid;
   }
 
+  // Address draft helpers: implementacao em utils/address-draft.ts.
   private getAddressDraftParts(conversation?: TypedConversation): string[] {
-    const draft = conversation?.context?.address_draft_parts;
-    return Array.isArray(draft)
-      ? draft
-          .filter((part): part is string => typeof part === 'string')
-          .map((part) => part.trim())
-          .filter(Boolean)
-      : [];
+    return getAddressDraftPartsUtil(conversation?.context?.address_draft_parts);
   }
 
   private mergeAddressDraftParts(parts: string[], nextPart: string): string[] {
-    const sanitizedPart = this.normalizeAddressCandidate(nextPart);
-    if (!sanitizedPart) {
-      return parts;
-    }
-
-    const normalizedPart = this.normalizeIntentText(sanitizedPart);
-    if (!normalizedPart) {
-      return parts;
-    }
-
-    const looksLikeFreshAddress =
-      this.hasAddressKeyword(sanitizedPart) && /\d/.test(sanitizedPart) && sanitizedPart.length >= 12;
-    if (looksLikeFreshAddress) {
-      const existingHasStreetLike = parts.some((part) => this.hasAddressKeyword(part));
-      const existingOnlyLooseFragments = parts.every((part) => {
-        const normalizedExisting = this.normalizeAddressCandidate(part);
-        return (
-          /^\d{1,8}[A-Za-z]?$/.test(normalizedExisting) ||
-          /\b\d{5}-?\d{3}\b/.test(normalizedExisting) ||
-          !this.hasAddressKeyword(normalizedExisting)
-        );
-      });
-
-      if (existingHasStreetLike || existingOnlyLooseFragments) {
-        return [sanitizedPart];
-      }
-    }
-
-    const merged = [...parts];
-    const existingIndex = merged.findIndex((part) => {
-      const existing = this.normalizeIntentText(part);
-      return (
-        existing === normalizedPart ||
-        existing.includes(normalizedPart) ||
-        normalizedPart.includes(existing)
-      );
-    });
-    if (existingIndex >= 0) {
-      const existing = merged[existingIndex];
-      merged[existingIndex] =
-        this.normalizeIntentText(existing).length >= normalizedPart.length
-          ? existing
-          : sanitizedPart;
-      return merged;
-    }
-
-    return [...merged.slice(-4), sanitizedPart];
+    return mergeAddressDraftPartsUtil(parts, nextPart, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
+    );
   }
 
   private buildAddressDraftText(parts: string[]): string {
-    return parts
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .join(', ')
-      .replace(/,\s*,+/g, ', ')
-      .replace(/\s+,/g, ',')
-      .trim();
+    return buildAddressDraftTextUtil(parts);
   }
 
   private isAddressDraftWorthy(text: string): boolean {
-    const normalized = this.normalizeIntentText(text);
-    if (!normalized) {
-      return false;
-    }
-
-    const trimmed = text.trim();
-    if (trimmed === '0') {
-      return false;
-    }
-
-    return (
-      this.hasAddressKeyword(normalized) ||
-      /^(?:[1-9]\d{0,5}[A-Za-z]?)$/.test(trimmed) ||
-      /\b\d{5}-?\d{3}\b/.test(text)
+    return isAddressDraftWorthyUtil(text, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
     );
   }
 
   private isNumericOnlyAddressFragment(text: string): boolean {
-    const candidate = this.normalizeAddressCandidate(text);
-    return /^\d{1,8}[A-Za-z]?$/.test(candidate) && !this.hasAddressKeyword(candidate);
+    return isNumericOnlyAddressFragmentUtil(text, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
+    );
   }
 
   private parseLooseAddress(addressText: string): {
