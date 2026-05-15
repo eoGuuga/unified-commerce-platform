@@ -163,6 +163,10 @@ import {
   ORDER_STATUS_SIGNALS,
   REOPEN_INTENT_PHRASES,
 } from './utils/order-status-intents';
+import {
+  ORDER_INTENT_PHRASES,
+  REPEAT_ORDER_PHRASES,
+} from './utils/order-intents';
 
 export interface WhatsappMessage {
   from: string;
@@ -9998,12 +10002,7 @@ export class WhatsappService {
   private isRepeatOrderIntent(lowerMessage: string): boolean {
     const lm = (lowerMessage || '').trim();
     if (!lm) return false;
-    return (
-      lm.includes('repetir pedido') ||
-      lm.includes('pedido repetido') ||
-      lm.includes('repetir meu pedido') ||
-      lm.includes('refazer pedido')
-    );
+    return REPEAT_ORDER_PHRASES.some((phrase) => lm.includes(phrase));
   }
 
   private isAmbiguousFlowControlIntent(
@@ -12350,23 +12349,11 @@ export class WhatsappService {
       return true;
     }
 
-    const palavrasPedido = [
-      'quero', 'preciso', 'comprar', 'pedir', 'vou querer', 'gostaria de',
-      'desejo', 'vou comprar', 'preciso de', 'queria', 'ia querer',
-      'me manda', 'manda', 'manda ai', 'manda pra mim', 'me ve', 'separa', 'separa pra mim',
-      'separar', 'separar pra mim', 'separar para mim',
-      'pode ser', 'faz', 'me faz', 'faz pra mim', 'bota', 'coloca', 'traz', 'traz pra mim',
-      'pode me enviar', 'tem como', 'dá pra', 'dá pra fazer', 'dá pra me enviar',
-      'seria possível', 'poderia', 'pode me mandar', 'me envia', 'envia',
-      'vou pedir', 'quero comprar', 'preciso comprar', 'quero pedir', 'quero levar', 'quero pegar',
-      'preciso pedir', 'quero encomendar', 'preciso encomendar',
-      'quero fazer pedido', 'preciso fazer pedido', 'quero fazer um pedido',
-      'preciso fazer um pedido', 'quero fazer uma encomenda', 'preciso fazer uma encomenda',
-      'quero fazer encomenda', 'preciso fazer encomenda', 'quero fazer', 'preciso fazer',
-    ];
-
+    // Lista de phrases em utils/order-intents.ts.
     return (
-      palavrasPedido.some((palavra) => normalized.includes(this.normalizeForSearch(palavra))) &&
+      ORDER_INTENT_PHRASES.some((palavra) =>
+        normalized.includes(this.normalizeForSearch(palavra)),
+      ) &&
       Boolean(analysis.productCandidate)
     );
   }
