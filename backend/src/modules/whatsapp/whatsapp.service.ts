@@ -139,6 +139,15 @@ import {
   enrichPaymentMessage as enrichPaymentMessageUtil,
   getPremiumPaymentOptionsMessage as getPremiumPaymentOptionsMessageUtil,
 } from './utils/order-messages';
+import {
+  extractCustomerNameCandidate as extractCustomerNameCandidateUtil,
+  extractPhoneDigitsCandidate as extractPhoneDigitsCandidateUtil,
+  looksLikeStandalonePhoneMessage as looksLikeStandalonePhoneMessageUtil,
+} from './utils/customer-extract';
+import {
+  looksLikeAudioTranscription as looksLikeAudioTranscriptionUtil,
+  normalizeIncomingMessageBody as normalizeIncomingMessageBodyUtil,
+} from './utils/audio-message';
 
 export interface WhatsappMessage {
   from: string;
@@ -1292,53 +1301,22 @@ export class WhatsappService {
     return this.messageIntelligenceService.normalizeText(value);
   }
 
+  // Audio + customer extract helpers: implementacao em
+  // utils/audio-message.ts e utils/customer-extract.ts.
   private looksLikeAudioTranscription(message?: WhatsappMessage): boolean {
-    if (!message) {
-      return false;
-    }
-
-    if (message.messageType === 'audio') {
-      return true;
-    }
-
-    const metadata = message.metadata || {};
-    return Boolean(
-      metadata.audio === true ||
-      metadata.voice === true ||
-      metadata.transcript ||
-      metadata.transcription ||
-      metadata.transcriptionSource,
-    );
+    return looksLikeAudioTranscriptionUtil(message);
   }
 
   private normalizeIncomingMessageBody(message: WhatsappMessage): string {
-    let normalized = message.body || '';
-
-    if (this.looksLikeAudioTranscription(message)) {
-      normalized = normalized
-        .replace(/[\u200B-\u200D\uFEFF]/g, ' ')
-        .replace(/\b(aham|ahn|ahn?m|hum+|hmm+|eh+|ehh+|tipo|assim|entao|ta bom|beleza|visse|viu|ne|oxe|oxente|uai|eita|vixe|vish|rapaz|mano|minha fia|meu fi|meu filho|minha filha|kkk+|rs+|rsrs+|hein|seguinte|patrao|chefia|parceiro|meu rei|minha rainha|moca|moco)\b/gi, ' ')
-        .replace(/\b(queria ver se tem como|queria ver se|ve se tem como|ve se|sera que tem como|sera que da pra|deixa eu ver|deixa eu|deixa eu te falar|to querendo|estou querendo|negocio e o seguinte|me ajuda ai|me ajuda ae|faz favor|se tiver como|tem como)\b/gi, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
-
-    return normalized;
+    return normalizeIncomingMessageBodyUtil(message);
   }
 
   private extractCustomerNameCandidate(message: string): string {
-    return this.sanitizeInput(message.trim())
-      .replace(
-        /^(?:meu\s+nome\s+[eé]|o\s+nome\s+[eé]|nome\s+[eé]|me\s+chamo|eu\s+sou|sou\s+(?:o|a)|pode\s+colocar\s+no\s+nome\s+de|coloca\s+no\s+nome\s+de|anota\s+no\s+nome\s+de|prazer[,:\s]*)\s+/i,
-        '',
-      )
-      .replace(/\b(?:ta\s+bom|t[aá]|ok|beleza|blz|valeu|obrigad[oa]|por\s+favor)\b$/i, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    return extractCustomerNameCandidateUtil(message);
   }
 
   private extractPhoneDigitsCandidate(message: string): string {
-    return this.sanitizeInput(message).replace(/\D/g, '');
+    return extractPhoneDigitsCandidateUtil(message);
   }
 
   // Address helpers: implementacao em utils/address-helpers.ts.
@@ -1356,26 +1334,9 @@ export class WhatsappService {
   }
 
   private looksLikeStandalonePhoneMessage(message: string): boolean {
-    const sanitized = this.sanitizeInput((message || '').trim());
-    if (!sanitized) {
-      return false;
-    }
-
-    if (this.hasAddressKeyword(sanitized) || /\b\d{5}-?\d{3}\b/.test(sanitized)) {
-      return false;
-    }
-
-    const normalized = this.normalizeIntentText(sanitized);
-    const digitsOnly = this.extractPhoneDigitsCandidate(sanitized);
-    if (digitsOnly.length < 10 || digitsOnly.length > 11) {
-      return false;
-    }
-
-    if (/^\+?\d[\d\s().-]{8,}$/.test(sanitized)) {
-      return true;
-    }
-
-    return /^(meu numero|meu telefone|telefone|numero|zap|whatsapp)\b/.test(normalized);
+    return looksLikeStandalonePhoneMessageUtil(message, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
+    );
   }
 
   private normalizeAddressCandidate(message: string): string {
