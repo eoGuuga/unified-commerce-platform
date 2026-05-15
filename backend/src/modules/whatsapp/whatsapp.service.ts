@@ -45,6 +45,32 @@ import { TypedConversation, ProductSearchResult, toTypedConversation, Conversati
 import { ProductWithStock } from '../products/types/product.types';
 import * as crypto from 'crypto';
 import { CouponsService } from '../coupons/coupons.service';
+import {
+  CATALOG_CATEGORY_PAGE_SIZE,
+  CATALOG_PRODUCT_PAGE_SIZE,
+  MAX_ADDRESS_LENGTH,
+  MAX_MESSAGE_LENGTH,
+  MAX_NAME_LENGTH,
+  MAX_NOTES_LENGTH,
+  MAX_PRICE,
+  MAX_QUANTITY,
+  MIN_ADDRESS_LENGTH,
+  MIN_NAME_LENGTH,
+  MIN_QUANTITY,
+} from './utils/limits';
+import {
+  BRAZIL_STATE_CODES,
+  BRAZIL_STATE_NAME_TO_CODE,
+} from './utils/brazil-states';
+import {
+  matchesConfiguredPhoneNumber,
+  normalizePhoneForControl,
+  parsePhoneList,
+} from './utils/phone';
+import {
+  repairPotentialMojibake,
+  sanitizeInput,
+} from './utils/sanitize';
 
 export interface WhatsappMessage {
   from: string;
@@ -121,77 +147,24 @@ export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
   // ⚠️ REMOVIDO: DEFAULT_TENANT_ID hardcoded - deve vir do JWT ou contexto
   private readonly HORARIO_FUNCIONAMENTO = 'Segunda a Sábado: 8h às 18h\nDomingo: 9h às 13h';
-  
-  // ✅ NOVO: Limites de validação
-  private readonly MAX_MESSAGE_LENGTH = 1000;
-  private readonly MAX_NAME_LENGTH = 100;
-  private readonly MIN_NAME_LENGTH = 3;
-  private readonly MAX_ADDRESS_LENGTH = 500;
-  private readonly MIN_ADDRESS_LENGTH = 10;
-  private readonly MAX_NOTES_LENGTH = 500;
-  private readonly MAX_QUANTITY = 1000;
-  private readonly MIN_QUANTITY = 1;
-  private readonly MAX_PRICE = 1000000; // R$ 1.000.000,00
-  private readonly CATALOG_CATEGORY_PAGE_SIZE = 5;
-  private readonly CATALOG_PRODUCT_PAGE_SIZE = 6;
-  private readonly BRAZIL_STATE_CODES = new Set([
-    'AC',
-    'AL',
-    'AP',
-    'AM',
-    'BA',
-    'CE',
-    'DF',
-    'ES',
-    'GO',
-    'MA',
-    'MT',
-    'MS',
-    'MG',
-    'PA',
-    'PB',
-    'PR',
-    'PE',
-    'PI',
-    'RJ',
-    'RN',
-    'RS',
-    'RO',
-    'RR',
-    'SC',
-    'SP',
-    'SE',
-    'TO',
-  ]);
-  private readonly BRAZIL_STATE_NAME_TO_CODE: Record<string, string> = {
-    acre: 'AC',
-    alagoas: 'AL',
-    amapa: 'AP',
-    amazonas: 'AM',
-    bahia: 'BA',
-    ceara: 'CE',
-    'distrito federal': 'DF',
-    'espirito santo': 'ES',
-    goias: 'GO',
-    maranhao: 'MA',
-    'mato grosso': 'MT',
-    'mato grosso do sul': 'MS',
-    'minas gerais': 'MG',
-    para: 'PA',
-    paraiba: 'PB',
-    parana: 'PR',
-    pernambuco: 'PE',
-    piaui: 'PI',
-    'rio de janeiro': 'RJ',
-    'rio grande do norte': 'RN',
-    'rio grande do sul': 'RS',
-    rondonia: 'RO',
-    roraima: 'RR',
-    'santa catarina': 'SC',
-    'sao paulo': 'SP',
-    sergipe: 'SE',
-    tocantins: 'TO',
-  };
+
+  // Limites de validacao agora em utils/limits.ts. Aliases mantidos como
+  // propriedades para compatibilidade com o codigo existente que faz
+  // `this.MAX_*` em centenas de lugares (refactor incremental).
+  private readonly MAX_MESSAGE_LENGTH = MAX_MESSAGE_LENGTH;
+  private readonly MAX_NAME_LENGTH = MAX_NAME_LENGTH;
+  private readonly MIN_NAME_LENGTH = MIN_NAME_LENGTH;
+  private readonly MAX_ADDRESS_LENGTH = MAX_ADDRESS_LENGTH;
+  private readonly MIN_ADDRESS_LENGTH = MIN_ADDRESS_LENGTH;
+  private readonly MAX_NOTES_LENGTH = MAX_NOTES_LENGTH;
+  private readonly MAX_QUANTITY = MAX_QUANTITY;
+  private readonly MIN_QUANTITY = MIN_QUANTITY;
+  private readonly MAX_PRICE = MAX_PRICE;
+  private readonly CATALOG_CATEGORY_PAGE_SIZE = CATALOG_CATEGORY_PAGE_SIZE;
+  private readonly CATALOG_PRODUCT_PAGE_SIZE = CATALOG_PRODUCT_PAGE_SIZE;
+  // Constantes de estados BR agora em utils/brazil-states.ts.
+  private readonly BRAZIL_STATE_CODES = BRAZIL_STATE_CODES;
+  private readonly BRAZIL_STATE_NAME_TO_CODE = BRAZIL_STATE_NAME_TO_CODE;
   private readonly GENERIC_SEARCH_TOKENS = new Set([
     'produto',
     'produtos',
@@ -241,34 +214,23 @@ export class WhatsappService {
     private notificationsService: NotificationsService,
   ) {}
 
+  // Helpers de telefone agora em utils/phone.ts.
+  // Aliases para metodos antigos: o codigo do servico chama
+  // this.normalizePhoneForControl(...) em dezenas de lugares; refactor
+  // incremental troca chamada por chamada nas proximas iteracoes.
   private normalizePhoneForControl(phoneNumber?: string | null): string {
-    return String(phoneNumber || '').replace(/\D/g, '');
+    return normalizePhoneForControl(phoneNumber);
   }
 
   private parsePhoneList(value: unknown): string[] {
-    if (Array.isArray(value)) {
-      return Array.from(
-        new Set(
-          value
-            .map((item) => this.normalizePhoneForControl(item))
-            .filter(Boolean),
-        ),
-      );
-    }
+    return parsePhoneList(value);
+  }
 
-    const rawValue = String(value || '').trim();
-    if (!rawValue) {
-      return [];
-    }
-
-    return Array.from(
-      new Set(
-        rawValue
-          .split(/[\s,;]+/)
-          .map((item) => this.normalizePhoneForControl(item))
-          .filter(Boolean),
-      ),
-    );
+  private matchesConfiguredPhoneNumber(
+    phoneNumber: string,
+    configuredPhone: string,
+  ): boolean {
+    return matchesConfiguredPhoneNumber(phoneNumber, configuredPhone);
   }
 
   private getIgnoredInboundPhones(tenant?: Tenant): string[] {
@@ -285,37 +247,15 @@ export class WhatsappService {
 
     return Array.from(
       new Set([
-        ...this.parsePhoneList(tenantConfigured),
-        ...this.parsePhoneList(envConfigured),
+        ...parsePhoneList(tenantConfigured),
+        ...parsePhoneList(envConfigured),
       ]),
-    );
-  }
-
-  private matchesConfiguredPhoneNumber(phoneNumber: string, configuredPhone: string): boolean {
-    const normalizedPhone = this.normalizePhoneForControl(phoneNumber);
-    const normalizedConfigured = this.normalizePhoneForControl(configuredPhone);
-
-    if (!normalizedPhone || !normalizedConfigured) {
-      return false;
-    }
-
-    if (normalizedPhone === normalizedConfigured) {
-      return true;
-    }
-
-    const last11Phone = normalizedPhone.slice(-11);
-    const last11Configured = normalizedConfigured.slice(-11);
-
-    return (
-      last11Phone.length === 11 &&
-      last11Configured.length === 11 &&
-      last11Phone === last11Configured
     );
   }
 
   private isIgnoredInboundPhone(phoneNumber: string, tenant?: Tenant): boolean {
     return this.getIgnoredInboundPhones(tenant).some((configuredPhone) =>
-      this.matchesConfiguredPhoneNumber(phoneNumber, configuredPhone),
+      matchesConfiguredPhoneNumber(phoneNumber, configuredPhone),
     );
   }
 
@@ -506,81 +446,14 @@ export class WhatsappService {
     return `wa:${conversation.id}:create_order:${hash}`;
   }
 
-  /**
-   * ✅ NOVO: Sanitiza entrada do usuário para prevenir XSS e injeção
-   */
+  // Aliases delegando para utils/sanitize.ts. Permite migracao incremental
+  // dos call-sites (centenas de this.sanitizeInput espalhados).
   private sanitizeInput(input: string): string {
-    if (!input || typeof input !== 'string') {
-      return '';
-    }
-
-    // Limitar tamanho
-    let sanitized = input.substring(0, this.MAX_MESSAGE_LENGTH);
-
-    // Remover HTML/JavaScript
-    sanitized = sanitized
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<[^>]+>/g, '')
-      .replace(/javascript:/gi, '')
-      .replace(/on\w+\s*=/gi, '');
-
-    // Escapar caracteres especiais perigosos
-    sanitized = sanitized
-      .replace(/[\u0000-\u001F\u007F]/g, ' ')
-      .replace(/[<>]/g, '')
-      .replace(/['"]/g, '');
-
-    return sanitized.replace(/\s+/g, ' ').trim();
+    return sanitizeInput(input, this.MAX_MESSAGE_LENGTH);
   }
 
   private repairPotentialMojibake(input: string): string {
-    let current = String(input || '');
-    if (!current || !/[ÃÂâ�]/.test(current)) {
-      return current;
-    }
-
-    const countNoise = (text: string) => (text.match(/[ÃÂâ�]/g) || []).length;
-
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const repaired = Buffer.from(current, 'latin1').toString('utf8');
-        if (!repaired || repaired === current) {
-          break;
-        }
-
-        if (countNoise(repaired) < countNoise(current)) {
-          current = repaired;
-          continue;
-        }
-
-        break;
-      } catch {
-        break;
-      }
-    }
-
-    const directFixes: Array<[RegExp, string]> = [
-      [/ÃƒÆ’Ã‚Â¡|ÃƒÂ¡/g, 'a'],
-      [/ÃƒÆ’Ã‚Ã |ÃƒÃ /gi, 'a'],
-      [/ÃƒÆ’Ã‚Â¢|ÃƒÂ¢/gi, 'a'],
-      [/ÃƒÆ’Ã‚Ã£|ÃƒÂ£/gi, 'a'],
-      [/ÃƒÆ’Ã‚Â©|ÃƒÂ©|Ã’Â©/g, 'e'],
-      [/ÃƒÆ’Ã‚Ãª|ÃƒÃª/gi, 'e'],
-      [/ÃƒÆ’Ã‚Ã­|ÃƒÃ­/gi, 'i'],
-      [/ÃƒÆ’Ã‚Â³|ÃƒÂ³/gi, 'o'],
-      [/ÃƒÆ’Ã‚Ã´|ÃƒÂ´/gi, 'o'],
-      [/ÃƒÆ’Ã‚Ãµ|ÃƒÃµ/gi, 'o'],
-      [/ÃƒÆ’Ã‚Âº|ÃƒÂº/gi, 'u'],
-      [/ÃƒÆ’Ã‚Ã§|ÃƒÃ§/gi, 'c'],
-      [/Ã‚/g, ''],
-      [/ï¿½/g, ''],
-    ];
-
-    for (const [pattern, replacement] of directFixes) {
-      current = current.replace(pattern, replacement);
-    }
-
-    return current;
+    return repairPotentialMojibake(input);
   }
 
   private getDefaultShippingAmount(): number {
