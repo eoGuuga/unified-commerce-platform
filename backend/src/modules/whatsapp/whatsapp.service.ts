@@ -167,6 +167,15 @@ import {
   ORDER_INTENT_PHRASES,
   REPEAT_ORDER_PHRASES,
 } from './utils/order-intents';
+import {
+  BARE_ORDER_PHRASES,
+  isDirectCatalogRequest as isDirectCatalogRequestUtil,
+  isDirectGreeting as isDirectGreetingUtil,
+  isDirectHelpRequest as isDirectHelpRequestUtil,
+  isDirectPriceQuestion as isDirectPriceQuestionUtil,
+  isDirectScheduleQuestion as isDirectScheduleQuestionUtil,
+  isDirectStockQuestion as isDirectStockQuestionUtil,
+} from './utils/direct-intents';
 
 export interface WhatsappMessage {
   from: string;
@@ -11682,22 +11691,8 @@ export class WhatsappService {
       return false;
     }
 
-    const bareOrderPhrases = new Set([
-      'quero',
-      'pedido',
-      'pedir',
-      'comprar',
-      'preciso',
-      'quero pedir',
-      'quero comprar',
-      'vou querer',
-      'me manda',
-      'manda',
-      'gostaria de',
-      'quero fazer um pedido',
-    ]);
-
-    return bareOrderPhrases.has(normalized);
+    // BARE_ORDER_PHRASES vive em utils/direct-intents.ts.
+    return BARE_ORDER_PHRASES.has(normalized);
   }
 
   private getPremiumOrderNudgeMessage(): string {
@@ -12597,53 +12592,41 @@ export class WhatsappService {
     return !this.hasSpecificProductOrderShape(normalizedMessage, extractedProductName);
   }
 
+  // Direct intent detectors: implementacao em utils/direct-intents.ts.
   private isDirectCatalogRequest(message: string): boolean {
-    const normalized = this.normalizeIntentText(message);
-    return /\b(cardapio|catalogo|catalogue|menu)\b/.test(normalized);
+    return isDirectCatalogRequestUtil(message, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
+    );
   }
 
   private isDirectPriceQuestion(message: string): boolean {
-    const normalized = this.normalizeIntentText(message);
-    return /\b(preco|valor|quanto custa|qual o valor|quanto sai|quanto fica)\b/.test(normalized);
+    return isDirectPriceQuestionUtil(message, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
+    );
   }
 
   private isDirectStockQuestion(message: string): boolean {
-    const normalized = this.normalizeIntentText(message);
-    return (
-      /\b(estoque|disponivel|disponibilidade)\b/.test(normalized) ||
-      /\b(tem|ainda tem|restou|sobrou)\b.*\b(estoque|disponivel)\b/.test(normalized)
+    return isDirectStockQuestionUtil(message, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
     );
   }
 
   private isDirectScheduleQuestion(message: string): boolean {
-    const normalized = this.normalizeIntentText(message);
-    return /\b(horario|funciona|aberto|fecha|abre)\b/.test(normalized);
+    return isDirectScheduleQuestionUtil(message, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
+    );
   }
 
   private isDirectHelpRequest(message: string): boolean {
-    const normalized = this.normalizeIntentText(message);
-    if (!normalized) {
-      return false;
-    }
-
-    return /^(ajuda|help|comandos)$/.test(normalized);
+    return isDirectHelpRequestUtil(message, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
+    );
   }
 
   private isDirectGreeting(message: string): boolean {
-    const normalized = this.normalizeIntentText(message);
-    if (!normalized) {
-      return false;
-    }
-
-    if (
-      /\b(quero|preciso|preco|valor|estoque|pedido|indica|recomenda|sugere|compar|barato|caro|produto|item)\b/.test(
-        normalized,
-      )
-    ) {
-      return false;
-    }
-
-    return /^(oi|ola|bom dia|boa tarde|boa noite)(?:\s+tudo bem)?$/.test(normalized);
+    return isDirectGreetingUtil(message, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
+    );
   }
 
   private extractMultipleOrderInfos(
