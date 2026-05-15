@@ -116,7 +116,16 @@ npm run test:unit          # jest unit only
 npm run test:integration   # jest *.integration.spec.ts
 npm run test:acid          # acidez/consistency tests
 npm run lint
+
+# Schema/migrations (TypeORM CLI - usa src/database/data-source.ts):
+npm run migration:show                  # lista migrations pendentes
+npm run migration:run                   # aplica pendentes (cliente novo)
+npm run migration:revert                # desfaz a ultima (raro)
+npm run migration:create -- src/database/migrations/MinhaMigracao
 npm run migration:generate -- src/database/migrations/Nome
+# A baseline 1700000000000-BaselineFromSqlMigrations.ts engloba as
+# 14 SQLs legadas em scripts/migrations/. Em tenants ja em prod, marcar
+# como aplicada: INSERT INTO typeorm_migrations VALUES(1700000000000, 'BaselineFromSqlMigrations1700000000000').
 npm run migration:run
 ```
 
