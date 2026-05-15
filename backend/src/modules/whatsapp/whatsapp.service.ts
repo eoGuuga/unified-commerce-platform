@@ -113,6 +113,13 @@ import {
   validatePhone as validatePhoneUtil,
   validatePrice as validatePriceUtil,
 } from './utils/validators';
+import {
+  containsStateReference as containsStateReferenceUtil,
+  extractStateCodeFromText as extractStateCodeFromTextUtil,
+  getAddressEvidence as getAddressEvidenceUtil,
+  hasAddressKeyword as hasAddressKeywordUtil,
+  normalizeAddressCandidate as normalizeAddressCandidateUtil,
+} from './utils/address-helpers';
 
 export interface WhatsappMessage {
   from: string;
@@ -1397,29 +1404,18 @@ export class WhatsappService {
     return this.sanitizeInput(message).replace(/\D/g, '');
   }
 
+  // Address helpers: implementacao em utils/address-helpers.ts.
+  // Wrappers injetam o normalizador da messageIntelligenceService.
   private extractStateCodeFromText(value: string): string {
-    const sanitized = this.sanitizeInput(value || '');
-    if (!sanitized) {
-      return '';
-    }
-
-    const directCodeMatch = sanitized.toUpperCase().match(
-      new RegExp(`\\b(?:${Array.from(this.BRAZIL_STATE_CODES).join('|')})\\b`),
+    return extractStateCodeFromTextUtil(value, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
     );
-    if (directCodeMatch) {
-      return directCodeMatch[0];
-    }
-
-    const normalized = this.normalizeIntentText(sanitized).replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
-    if (!normalized) {
-      return '';
-    }
-
-    return this.BRAZIL_STATE_NAME_TO_CODE[normalized] || '';
   }
 
   private containsStateReference(value: string): boolean {
-    return Boolean(this.extractStateCodeFromText(value));
+    return containsStateReferenceUtil(value, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
+    );
   }
 
   private looksLikeStandalonePhoneMessage(message: string): boolean {
@@ -1446,22 +1442,12 @@ export class WhatsappService {
   }
 
   private normalizeAddressCandidate(message: string): string {
-    return this.sanitizeInput(message.trim())
-      .replace(
-        /^(?:meu\s+endere[cç]o\s+[eé]|o\s+endere[cç]o\s+[eé]|endere[cç]o\s+[eé]|entrega\s+[eé]\s+(?:na|no)|pode\s+entregar\s+(?:na|no)|entrega\s+(?:na|no)|manda\s+(?:na|no)|fica\s+(?:na|no)|anota\s+a[ií]|segue\s+o\s+endere[cç]o|[eé]\s+na)\s+/i,
-        '',
-      )
-      .replace(/\b(?:n[ºo]?|numero)\s*(\d+[A-Za-z]?)\b/gi, '$1')
-      .replace(/\b(?:cep)\s+(\d{5}-?\d{3})\b/gi, '$1')
-      .replace(/\s+-\s+/g, ', ')
-      .replace(/\b(?:ta\s+bom|ok|beleza|blz|valeu|obrigad[oa]|por\s+favor)\b$/i, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    return normalizeAddressCandidateUtil(message);
   }
 
   private hasAddressKeyword(text: string): boolean {
-    return /\b(rua|avenida|av|travessa|alameda|estrada|rodovia|bairro|cep|apto|apartamento|bloco|sala|quadra|lote|condominio|condomínio|casa)\b/i.test(
-      this.normalizeIntentText(text),
+    return hasAddressKeywordUtil(text, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
     );
   }
 
@@ -11039,41 +11025,9 @@ export class WhatsappService {
     hasState: boolean;
     segmentCount: number;
   } {
-    const candidate = this.normalizeAddressCandidate(address);
-    const segments = candidate
-      .split(',')
-      .map((segment) => segment.trim())
-      .filter(Boolean);
-    const hasStreetLike = this.hasAddressKeyword(candidate);
-    const hasZip = /\b\d{5}-?\d{3}\b/.test(candidate);
-    const hasState = this.containsStateReference(candidate);
-    const hasNumber = /\b\d{1,6}[A-Za-z]?\b/.test(candidate);
-
-    let score = 0;
-    if (hasStreetLike) {
-      score += 2;
-    }
-    if (hasZip) {
-      score += 2;
-    }
-    if (hasState) {
-      score += 1;
-    }
-    if (hasNumber) {
-      score += 1;
-    }
-    if (segments.length >= 3) {
-      score += 1;
-    }
-
-    return {
-      score,
-      hasStreetLike,
-      hasNumber,
-      hasZip,
-      hasState,
-      segmentCount: segments.length,
-    };
+    return getAddressEvidenceUtil(address, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
+    );
   }
 
   /**
