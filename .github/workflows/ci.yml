@@ -115,6 +115,10 @@ jobs:
         working-directory: frontend
         run: npm run type-check
 
+      - name: Unit tests (Vitest)
+        working-directory: frontend
+        run: npm test -- --reporter=default
+
       - name: Build
         working-directory: frontend
         env:
