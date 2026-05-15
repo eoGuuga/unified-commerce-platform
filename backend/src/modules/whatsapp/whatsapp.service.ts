@@ -176,6 +176,11 @@ import {
   isDirectScheduleQuestion as isDirectScheduleQuestionUtil,
   isDirectStockQuestion as isDirectStockQuestionUtil,
 } from './utils/direct-intents';
+import {
+  parseAddress as parseAddressUtil,
+  parseAddressCandidate as parseAddressCandidateUtil,
+  parseLooseAddress as parseLooseAddressUtil,
+} from './utils/address-parser';
 
 export interface WhatsappMessage {
   from: string;
@@ -1431,6 +1436,8 @@ export class WhatsappService {
     );
   }
 
+  // Address parsers: implementacao em utils/address-parser.ts.
+  // Wrappers injetam o normalizador da messageIntelligenceService.
   private parseLooseAddress(addressText: string): {
     street: string;
     number: string;
@@ -1440,96 +1447,9 @@ export class WhatsappService {
     state: string;
     zipCode: string;
   } | null {
-    const sanitized = this.normalizeAddressCandidate(addressText);
-    if (!sanitized || sanitized.includes(',')) {
-      return null;
-    }
-
-    let working = sanitized.replace(/\bcep\b/gi, ' ').replace(/\s+/g, ' ').trim();
-    let zipCode = '';
-    const zipMatch = working.match(/\b(\d{5}-?\d{3})\b/);
-    if (zipMatch) {
-      zipCode = zipMatch[1].replace('-', '');
-      working = working.replace(zipMatch[0], ' ').replace(/\s+/g, ' ').trim();
-    }
-
-    const tokens = working.split(/\s+/).filter(Boolean);
-    if (tokens.length < 4) {
-      return null;
-    }
-
-    let state = '';
-    const lastToken = tokens[tokens.length - 1];
-    const detectedState = this.extractStateCodeFromText(lastToken);
-    if (detectedState) {
-      state = detectedState;
-      tokens.pop();
-    }
-
-    const numberIndex = tokens.findIndex((token) => /^\d+[A-Za-z]?$/.test(token));
-    if (numberIndex <= 0) {
-      return null;
-    }
-
-    const street = tokens.slice(0, numberIndex).join(' ').trim();
-    const number = tokens[numberIndex];
-    const remainder = tokens.slice(numberIndex + 1);
-    if (!street || remainder.length === 0) {
-      return null;
-    }
-
-    const complementKeywords = new Set([
-      'apto',
-      'apartamento',
-      'bloco',
-      'bl',
-      'casa',
-      'fundos',
-      'sala',
-      'sl',
-      'cj',
-      'conjunto',
-      'loja',
-      'andar',
-      'cobertura',
-      'cob',
-      'quadra',
-      'qd',
-      'lote',
-      'lt',
-    ]);
-    const complementParts: string[] = [];
-    while (remainder.length > 2 && complementKeywords.has(remainder[0].toLowerCase())) {
-      complementParts.push(remainder.shift() as string);
-      if (remainder.length > 2) {
-        complementParts.push(remainder.shift() as string);
-      }
-    }
-
-    if (remainder.length < 2) {
-      return null;
-    }
-
-    let cityTokenCount = 1;
-    if (state && remainder.length >= 3) {
-      cityTokenCount = Math.min(2, remainder.length - 1);
-    }
-
-    const city = remainder.slice(-cityTokenCount).join(' ').trim();
-    const neighborhood = remainder.slice(0, -cityTokenCount).join(' ').trim();
-    if (!city || !neighborhood) {
-      return null;
-    }
-
-    return {
-      street,
-      number,
-      complement: complementParts.length > 0 ? complementParts.join(' ') : undefined,
-      neighborhood,
-      city,
-      state,
-      zipCode,
-    };
+    return parseLooseAddressUtil(addressText, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
+    );
   }
 
   private parseAddressCandidate(addressText: string): {
@@ -1541,8 +1461,9 @@ export class WhatsappService {
     state: string;
     zipCode: string;
   } | null {
-    const normalizedCandidate = this.normalizeAddressCandidate(addressText);
-    return this.parseAddress(normalizedCandidate) || this.parseLooseAddress(normalizedCandidate);
+    return parseAddressCandidateUtil(addressText, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
+    );
   }
 
   private isAddressLikelyComplete(addressText: string): boolean {
@@ -14650,9 +14571,7 @@ export class WhatsappService {
     return this.getPremiumNotesPrompt();
   }
 
-  /**
-   * ✅ NOVO: Faz parse básico do endereço
-   */
+  // parseAddress: implementacao em utils/address-parser.ts.
   private parseAddress(addressText: string): {
     street: string;
     number: string;
@@ -14662,108 +14581,9 @@ export class WhatsappService {
     state: string;
     zipCode: string;
   } | null {
-    // Formato esperado: "Rua, número, complemento, bairro, cidade, estado, CEP"
-    const parts = addressText.split(',').map(p => p.trim()).filter(Boolean);
-
-    if (parts.length < 3) {
-      return null; // Endereço muito simples, não consegue fazer parse
-    }
-
-    // Extrair CEP a partir do final
-    let zipCode = '';
-    for (let i = parts.length - 1; i >= 0; i -= 1) {
-      const match = parts[i].match(/(\d{5}-?\d{3})/);
-      if (match) {
-        zipCode = match[1].replace('-', '');
-        parts.splice(i, 1);
-        break;
-      }
-    }
-
-    // Estado = último item com 2 letras (se existir)
-    const complementKeywords = new Set([
-      'apto',
-      'apartamento',
-      'bloco',
-      'bl',
-      'casa',
-      'fundos',
-      'sala',
-      'sl',
-      'cj',
-      'conjunto',
-      'loja',
-      'andar',
-      'cobertura',
-      'cob',
-      'quadra',
-      'qd',
-      'lote',
-      'lt',
-    ]);
-
-    let state = '';
-    if (parts.length > 0) {
-      const last = parts[parts.length - 1];
-      const detectedState = this.extractStateCodeFromText(last);
-      if (detectedState) {
-        state = detectedState;
-        const normalizedLast = this.normalizeIntentText(last);
-        const stateName = Object.entries(this.BRAZIL_STATE_NAME_TO_CODE).find(
-          ([name, code]) => code === detectedState && normalizedLast.includes(name),
-        )?.[0];
-        const strippedLast = last
-          .replace(new RegExp(`\\b${detectedState}\\b`, 'i'), ' ')
-          .replace(/[.,-]/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-
-        if (!strippedLast || strippedLast === last || (stateName && this.normalizeIntentText(strippedLast) === stateName)) {
-          parts.pop();
-        } else {
-          parts[parts.length - 1] = strippedLast;
-        }
-      }
-    }
-
-    if (parts.length === 4 && complementKeywords.has(this.normalizeIntentText(parts[2]))) {
-      return null;
-    }
-
-    // Cidade e bairro (a partir do final)
-    const city = parts.length > 0 ? parts.pop() || '' : '';
-    const neighborhood = parts.length > 0 ? parts.pop() || '' : '';
-
-    // Rua e número
-    let street = parts.length > 0 ? parts.shift() || '' : '';
-    let number = '';
-    let complement: string | undefined;
-
-    if (street) {
-      const numberMatch = street.match(/(\d+)/);
-      if (numberMatch) {
-        number = numberMatch[1];
-        street = street.replace(/\d+.*$/, '').trim();
-      }
-    }
-
-    if (!number && parts.length > 0 && /^\d+[A-Za-z]?$/.test(parts[0])) {
-      number = parts.shift() || '';
-    }
-
-    if (parts.length > 0) {
-      complement = parts.join(', ').trim();
-    }
-
-    return {
-      street: street || addressText,
-      number: number || '',
-      complement,
-      neighborhood: neighborhood || '',
-      city: city || '',
-      state: state || '',
-      zipCode: zipCode || '',
-    };
+    return parseAddressUtil(addressText, (s) =>
+      this.messageIntelligenceService.normalizeText(s),
+    );
   }
 
   /**
