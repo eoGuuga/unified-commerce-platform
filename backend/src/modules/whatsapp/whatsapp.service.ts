@@ -194,6 +194,14 @@ import {
   COLLECTION_SOFT_STOP_PHRASES,
   DISCOUNT_QUESTION_PHRASES,
 } from './utils/soft-stop-discount-intents';
+import {
+  isLikelyNonCommercialMessage as isLikelyNonCommercialMessageUtil,
+  isOutOfFlowStopIntent as isOutOfFlowStopIntentUtil,
+} from './utils/non-commercial-intents';
+import {
+  hasImplicitSingularOrderLead as hasImplicitSingularOrderLeadUtil,
+  isAbstractConsultativeNeed as isAbstractConsultativeNeedUtil,
+} from './utils/consultative-needs';
 
 export interface WhatsappMessage {
   from: string;
@@ -11975,66 +11983,21 @@ export class WhatsappService {
   }
 
   private isLikelyNonCommercialMessage(message: string): boolean {
-    const normalized = this.normalizeIntentText(message);
-    if (!normalized) {
-      return false;
-    }
-
-    const emotionalOrRejectivePhrases = [
-      'meu deus',
-      'mds',
-      'socorro',
-      'credo',
-      'aff',
-      'affs',
-      'oxe',
-      'eita',
-      'que isso',
-      'para com isso',
-      'tira isso',
-      'pelo amor de deus',
-    ];
-
-    if (this.hasAnyNormalizedPhrase(normalized, emotionalOrRejectivePhrases)) {
-      return true;
-    }
-
-    return /^(vou|to|estou|fui)\s+(fazer|comer|cozinhar|dormir|sair|trabalhar|estudar)\b/.test(
-      normalized,
+    return isLikelyNonCommercialMessageUtil(
+      message,
+      (s) => this.messageIntelligenceService.normalizeText(s),
+      (n, phrases) =>
+        this.messageIntelligenceService.hasAnyPhrase(n, phrases),
     );
   }
 
   private isOutOfFlowStopIntent(message: string): boolean {
-    const normalized = this.normalizeIntentText(message);
-    if (!normalized) {
-      return false;
-    }
-
-    const explicitStopPhrases = [
-      'tira isso',
-      'para com isso',
-      'pare com isso',
-      'deixa isso',
-      'deixa quieto',
-      'para ai',
-      'pare ai',
-    ];
-
-    if (this.hasAnyNormalizedPhrase(normalized, explicitStopPhrases)) {
-      return true;
-    }
-
-    if (/^(para|pare|chega)\b/.test(normalized)) {
-      if (
-        /\b(presente|presentear|dividir|visita|sobremesa|matar a vontade)\b/.test(normalized)
-      ) {
-        return false;
-      }
-
-      return normalized.split(/\s+/).length <= 2;
-    }
-
-    return false;
+    return isOutOfFlowStopIntentUtil(
+      message,
+      (s) => this.messageIntelligenceService.normalizeText(s),
+      (n, phrases) =>
+        this.messageIntelligenceService.hasAnyPhrase(n, phrases),
+    );
   }
 
   private shouldUseNonCommercialRecovery(
@@ -12264,85 +12227,11 @@ export class WhatsappService {
   }
 
   private hasImplicitSingularOrderLead(normalizedMessage: string): boolean {
-    return /^(quero|me ve|me manda|manda|separa|traz|coloca|bota|preciso|vou querer|gostaria de)\s+(um|uma)\b/.test(
-      normalizedMessage,
-    );
+    return hasImplicitSingularOrderLeadUtil(normalizedMessage);
   }
 
   private isAbstractConsultativeNeed(normalizedProduct: string): boolean {
-    const words = normalizedProduct
-      .split(/\s+/)
-      .map((word) => word.trim())
-      .filter(Boolean);
-
-    if (!words.length) {
-      return false;
-    }
-
-    const abstractWords = new Set([
-      'algo',
-      'opcao',
-      'opcoes',
-      'sobremesa',
-      'sobremesas',
-      'cremosa',
-      'cremoso',
-      'colher',
-      'doce',
-      'doces',
-      'docinho',
-      'docinhos',
-      'brigadeiro',
-      'brigadeiros',
-      'beijinho',
-      'beijinhos',
-      'presente',
-      'presentear',
-      'mimo',
-      'lembranca',
-      'lembrancinha',
-      'chocolate',
-      'chocolatudo',
-      'depois',
-      'do',
-      'da',
-      'pra',
-      'para',
-      'almoco',
-      'jantar',
-      'cafe',
-      'tarde',
-      'manha',
-      'visita',
-      'familia',
-      'gente',
-      'agradecer',
-    ]);
-    const specificTokens = new Set([
-      'banoffe',
-      'brownie',
-      'bala',
-      'pudim',
-      'morango',
-      'uva',
-      'prestigio',
-      'maracuja',
-      'nutella',
-      'acai',
-      'torta',
-      'supreme',
-      'pote',
-      'caixa',
-      'kit',
-      'cestinha',
-      'individual',
-    ]);
-
-    if (words.some((word) => specificTokens.has(word))) {
-      return false;
-    }
-
-    return words.every((word) => abstractWords.has(word));
+    return isAbstractConsultativeNeedUtil(normalizedProduct);
   }
 
   private isBareExactProductInsightCandidate(message: string): boolean {
