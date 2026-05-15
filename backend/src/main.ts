@@ -183,10 +183,13 @@ async function bootstrap() {
     });
   }
 
-  const shouldSeedDevUser = !isProd && process.env.SEED_DEV_USER !== 'false';
   if (isProd && process.env.SEED_DEV_USER === 'true') {
-    console.warn('[SECURITY] SEED_DEV_USER=true em produção. Desative imediatamente.');
+    throw new Error(
+      '[SECURITY] SEED_DEV_USER=true em producao e BLOQUEADO. ' +
+        'Remova SEED_DEV_USER do .env de producao (ou defina como "false").',
+    );
   }
+  const shouldSeedDevUser = !isProd && process.env.SEED_DEV_USER !== 'false';
   if (shouldSeedDevUser) {
     const devTenantId =
       process.env.DEV_TENANT_ID || '00000000-0000-0000-0000-000000000000';

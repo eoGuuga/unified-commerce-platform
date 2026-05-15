@@ -35,6 +35,11 @@ import { TenantDbContextInterceptor } from './common/interceptors/tenant-db-cont
         ttl: 60000, // 1 minute
         limit: process.env.NODE_ENV === 'production' ? 10 : 200, // dev/test: mais folga
       },
+      {
+        name: 'webhook',
+        ttl: 60000, // 1 minute
+        limit: process.env.NODE_ENV === 'production' ? 60 : 600, // protege webhooks publicos de flood
+      },
     ]),
     TypeOrmModule.forRootAsync(databaseConfig),
     ProductsModule,

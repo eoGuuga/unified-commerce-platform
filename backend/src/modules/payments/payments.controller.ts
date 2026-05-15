@@ -10,6 +10,7 @@ import {
   Headers,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { PaymentsService, CreatePaymentDto } from './payments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../common/decorators/tenant.decorator';
@@ -24,6 +25,7 @@ export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
   @Public()
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
   @Post('public')
   @ApiOperation({ summary: 'Criar pagamento publico para pedido da loja' })
   async createPublicPayment(
@@ -71,6 +73,7 @@ export class PaymentsController {
   }
 
   @Public()
+  @Throttle({ webhook: { ttl: 60000, limit: 60 } })
   @Post('webhook/mercadopago')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Webhook Mercado Pago (publico)' })
