@@ -3,6 +3,9 @@ services:
     image: postgres:15-alpine
     container_name: ucm-postgres
     restart: unless-stopped
+    mem_limit: 1g
+    mem_reservation: 256m
+    cpus: 1.0
     logging:
       driver: "json-file"
       options:
@@ -26,12 +29,15 @@ services:
     image: redis:7-alpine
     container_name: ucm-redis
     restart: unless-stopped
+    mem_limit: 256m
+    mem_reservation: 64m
+    cpus: 0.5
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "5"
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}", "--maxmemory", "200mb", "--maxmemory-policy", "allkeys-lru"]
     volumes:
       - redis_data:/data
     healthcheck:
@@ -49,6 +55,9 @@ services:
     container_name: ucm-backend
     restart: unless-stopped
     init: true
+    mem_limit: 1g
+    mem_reservation: 256m
+    cpus: 1.0
     logging:
       driver: "json-file"
       options:
@@ -80,6 +89,9 @@ services:
     container_name: ucm-frontend
     restart: unless-stopped
     init: true
+    mem_limit: 512m
+    mem_reservation: 128m
+    cpus: 0.5
     logging:
       driver: "json-file"
       options:
@@ -98,6 +110,9 @@ services:
     image: nginx:1.27-alpine
     container_name: ucm-nginx
     restart: unless-stopped
+    mem_limit: 128m
+    mem_reservation: 32m
+    cpus: 0.5
     logging:
       driver: "json-file"
       options:

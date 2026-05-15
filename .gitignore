@@ -21,6 +21,9 @@ out/
 *.swo
 *~
 
+# Claude Code runtime
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
