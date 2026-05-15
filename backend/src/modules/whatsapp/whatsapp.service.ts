@@ -184,14 +184,19 @@ import {
 import {
   PREMIUM_ADDRESS_PROMPT,
   PREMIUM_CARD_PAYMENT_FALLBACK_MESSAGE,
+  PREMIUM_CONTEXT_RECOVERY_MESSAGE,
   PREMIUM_FALLBACK_MESSAGE,
+  PREMIUM_FLOW_CONTROL_CLARIFICATION_MESSAGE,
   PREMIUM_GREETING_MESSAGE,
   PREMIUM_HELP_MESSAGE,
   PREMIUM_NON_COMMERCIAL_RECOVERY_MESSAGE,
   PREMIUM_NOTES_PROMPT,
+  PREMIUM_ORDER_CHOICE_CLARIFICATION_MESSAGE,
+  PREMIUM_ORDER_NUDGE_MESSAGE,
   PREMIUM_PHONE_PROMPT,
   PREMIUM_SOFT_RESET_MESSAGE,
   buildPremiumAddressDraftPrompt as buildPremiumAddressDraftPromptUtil,
+  buildPremiumBoundaryMessage as buildPremiumBoundaryMessageUtil,
   buildPremiumDeliveryChoicePrompt as buildPremiumDeliveryChoicePromptUtil,
   buildPremiumDeliveryChoiceValidationMessage as buildPremiumDeliveryChoiceValidationMessageUtil,
   buildPremiumScheduleMessage as buildPremiumScheduleMessageUtil,
@@ -2267,15 +2272,7 @@ export class WhatsappService {
   }
 
   private getPremiumOrderChoiceClarificationMessage(): string {
-    return [
-      'Eu prefiro fechar uma decisao por vez para nao montar o item errado.',
-      '',
-      'Me envie uma opcao clara para eu seguir sem risco.',
-      'Exemplos:',
-      '- "quero 1 brigadeiro gourmet"',
-      '- "me indica entre brownie e brigadeiro"',
-      '- "cardapio"',
-    ].join('\n');
+    return PREMIUM_ORDER_CHOICE_CLARIFICATION_MESSAGE;
   }
 
   private shouldGuardPostFlowMutation(
@@ -3483,21 +3480,7 @@ export class WhatsappService {
   }
 
   private getPremiumBoundaryMessage(abuseCount = 0): string {
-    const tone =
-      abuseCount >= 2
-        ? 'Eu nao vou seguir nesse tom. Se quiser atendimento, me envie uma mensagem objetiva e respeitosa.'
-        : abuseCount >= 1
-        ? 'Eu sigo disponivel para ajudar, mas preciso que a mensagem venha objetiva e respeitosa.'
-        : 'Posso te ajudar melhor se a mensagem vier objetiva e respeitosa.';
-
-    return [
-      tone,
-      '',
-      abuseCount >= 2 ? 'Escolha um caminho claro para eu continuar sem ruido:' : 'Se quiser seguir, me diga o que precisa. Exemplos:',
-      '- "quero 2 brigadeiros e 1 brownie"',
-      '- "status do pedido"',
-      '- "cardapio"',
-    ].join('\n');
+    return buildPremiumBoundaryMessageUtil(abuseCount);
   }
 
   private async getCatalogProducts(tenantId: string): Promise<ProductWithStock[]> {
@@ -9900,14 +9883,7 @@ export class WhatsappService {
   }
 
   private getPremiumFlowControlClarificationMessage(): string {
-    return [
-      'Sua mensagem mistura cancelar e continuar o pedido.',
-      '',
-      'Para eu agir sem erro, responda com uma opcao por vez:',
-      '- "cancelar pedido"',
-      '- "continuar pedido"',
-      '- "status do pedido"',
-    ].join('\n');
+    return PREMIUM_FLOW_CONTROL_CLARIFICATION_MESSAGE;
   }
 
   private getPaymentOptionsMessage(total: number): string {
@@ -11545,15 +11521,7 @@ export class WhatsappService {
   }
 
   private getPremiumOrderNudgeMessage(): string {
-    return [
-      'Eu monto o pedido inteiro por aqui.',
-      '',
-      'Me envie quantidade + produto para eu seguir sem erro.',
-      'Exemplos:',
-      '- "quero 6 brigadeiros"',
-      '- "1 bolo de chocolate"',
-      '- "me mostra o cardapio"',
-    ].join('\n');
+    return PREMIUM_ORDER_NUDGE_MESSAGE;
   }
 
   private isLooseReplyWithoutContext(lowerMessage: string): boolean {
@@ -11878,15 +11846,7 @@ export class WhatsappService {
   }
 
   private getPremiumContextRecoveryMessage(): string {
-    return [
-      'Ainda nao tenho um pedido em andamento com esse contexto.',
-      '',
-      'Se quiser comprar, me envie quantidade + produto.',
-      'Exemplos:',
-      '- "quero 2 brigadeiros"',
-      '- "1 bolo de chocolate"',
-      '- "cardapio"',
-    ].join('\n');
+    return PREMIUM_CONTEXT_RECOVERY_MESSAGE;
   }
 
   private getPremiumSoftResetMessage(): string {

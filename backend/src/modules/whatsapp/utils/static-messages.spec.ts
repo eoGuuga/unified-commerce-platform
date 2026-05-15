@@ -2,14 +2,19 @@ import {
   DEFAULT_HORARIO_FUNCIONAMENTO,
   PREMIUM_ADDRESS_PROMPT,
   PREMIUM_CARD_PAYMENT_FALLBACK_MESSAGE,
+  PREMIUM_CONTEXT_RECOVERY_MESSAGE,
   PREMIUM_FALLBACK_MESSAGE,
+  PREMIUM_FLOW_CONTROL_CLARIFICATION_MESSAGE,
   PREMIUM_GREETING_MESSAGE,
   PREMIUM_HELP_MESSAGE,
   PREMIUM_NON_COMMERCIAL_RECOVERY_MESSAGE,
   PREMIUM_NOTES_PROMPT,
+  PREMIUM_ORDER_CHOICE_CLARIFICATION_MESSAGE,
+  PREMIUM_ORDER_NUDGE_MESSAGE,
   PREMIUM_PHONE_PROMPT,
   PREMIUM_SOFT_RESET_MESSAGE,
   buildPremiumAddressDraftPrompt,
+  buildPremiumBoundaryMessage,
   buildPremiumDeliveryChoicePrompt,
   buildPremiumDeliveryChoiceValidationMessage,
   buildPremiumScheduleMessage,
@@ -160,6 +165,58 @@ describe('static-messages utils', () => {
     it('aceita horario customizado', () => {
       const custom = '24h por dia';
       expect(buildPremiumScheduleMessage(custom)).toContain(custom);
+    });
+  });
+
+  describe('outros premium static (clarification/nudge/recovery)', () => {
+    it('PREMIUM_ORDER_CHOICE_CLARIFICATION_MESSAGE pede uma escolha por vez', () => {
+      expect(PREMIUM_ORDER_CHOICE_CLARIFICATION_MESSAGE).toContain(
+        'uma decisao por vez',
+      );
+      expect(PREMIUM_ORDER_CHOICE_CLARIFICATION_MESSAGE).toContain(
+        'brigadeiro gourmet',
+      );
+    });
+
+    it('PREMIUM_FLOW_CONTROL_CLARIFICATION_MESSAGE menciona cancelar/continuar', () => {
+      expect(PREMIUM_FLOW_CONTROL_CLARIFICATION_MESSAGE).toContain(
+        'cancelar pedido',
+      );
+      expect(PREMIUM_FLOW_CONTROL_CLARIFICATION_MESSAGE).toContain(
+        'continuar pedido',
+      );
+    });
+
+    it('PREMIUM_ORDER_NUDGE_MESSAGE pede quantidade+produto', () => {
+      expect(PREMIUM_ORDER_NUDGE_MESSAGE).toContain('quantidade + produto');
+    });
+
+    it('PREMIUM_CONTEXT_RECOVERY_MESSAGE informa que nao ha pedido em andamento', () => {
+      expect(PREMIUM_CONTEXT_RECOVERY_MESSAGE).toContain(
+        'pedido em andamento',
+      );
+    });
+  });
+
+  describe('buildPremiumBoundaryMessage', () => {
+    it('tom suave quando abuseCount=0', () => {
+      const msg = buildPremiumBoundaryMessage(0);
+      expect(msg).toContain('te ajudar melhor');
+    });
+
+    it('tom intermediario quando abuseCount=1', () => {
+      const msg = buildPremiumBoundaryMessage(1);
+      expect(msg).toContain('respeitosa');
+      expect(msg).not.toMatch(/Eu nao vou seguir/);
+    });
+
+    it('tom firme quando abuseCount>=2', () => {
+      const msg = buildPremiumBoundaryMessage(2);
+      expect(msg).toContain('Eu nao vou seguir nesse tom');
+    });
+
+    it('default param sem argumento = 0', () => {
+      expect(buildPremiumBoundaryMessage()).toBe(buildPremiumBoundaryMessage(0));
     });
   });
 });

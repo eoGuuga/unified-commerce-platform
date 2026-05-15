@@ -206,3 +206,81 @@ export function buildPremiumScheduleMessage(
     'Se quiser, eu ja posso te ajudar a montar o pedido agora.',
   ].join('\n');
 }
+
+/**
+ * Mensagem quando o cliente envia uma escolha ambigua de produto (ex.:
+ * "brigadeiro ou brownie?"). Pede pra escolher um por vez.
+ */
+export const PREMIUM_ORDER_CHOICE_CLARIFICATION_MESSAGE = [
+  'Eu prefiro fechar uma decisao por vez para nao montar o item errado.',
+  '',
+  'Me envie uma opcao clara para eu seguir sem risco.',
+  'Exemplos:',
+  '- "quero 1 brigadeiro gourmet"',
+  '- "me indica entre brownie e brigadeiro"',
+  '- "cardapio"',
+].join('\n');
+
+/**
+ * Mensagem quando o cliente mistura "cancelar" e "continuar" o pedido.
+ */
+export const PREMIUM_FLOW_CONTROL_CLARIFICATION_MESSAGE = [
+  'Sua mensagem mistura cancelar e continuar o pedido.',
+  '',
+  'Para eu agir sem erro, responda com uma opcao por vez:',
+  '- "cancelar pedido"',
+  '- "continuar pedido"',
+  '- "status do pedido"',
+].join('\n');
+
+/**
+ * "Empurrao" pra estruturar pedido quando o cliente envia algo solto e
+ * sem quantidade + produto.
+ */
+export const PREMIUM_ORDER_NUDGE_MESSAGE = [
+  'Eu monto o pedido inteiro por aqui.',
+  '',
+  'Me envie quantidade + produto para eu seguir sem erro.',
+  'Exemplos:',
+  '- "quero 6 brigadeiros"',
+  '- "1 bolo de chocolate"',
+  '- "me mostra o cardapio"',
+].join('\n');
+
+/**
+ * Mensagem quando o cliente referencia um pedido mas o bot nao tem
+ * contexto/pedido em andamento.
+ */
+export const PREMIUM_CONTEXT_RECOVERY_MESSAGE = [
+  'Ainda nao tenho um pedido em andamento com esse contexto.',
+  '',
+  'Se quiser comprar, me envie quantidade + produto.',
+  'Exemplos:',
+  '- "quero 2 brigadeiros"',
+  '- "1 bolo de chocolate"',
+  '- "cardapio"',
+].join('\n');
+
+/**
+ * Mensagem de "boundary" quando o cliente envia algo abusivo/ruidoso.
+ * O tom muda baseado em quantas vezes ja foi sinalizado nessa conversa.
+ */
+export function buildPremiumBoundaryMessage(abuseCount = 0): string {
+  const tone =
+    abuseCount >= 2
+      ? 'Eu nao vou seguir nesse tom. Se quiser atendimento, me envie uma mensagem objetiva e respeitosa.'
+      : abuseCount >= 1
+        ? 'Eu sigo disponivel para ajudar, mas preciso que a mensagem venha objetiva e respeitosa.'
+        : 'Posso te ajudar melhor se a mensagem vier objetiva e respeitosa.';
+
+  return [
+    tone,
+    '',
+    abuseCount >= 2
+      ? 'Escolha um caminho claro para eu continuar sem ruido:'
+      : 'Se quiser seguir, me diga o que precisa. Exemplos:',
+    '- "quero 2 brigadeiros e 1 brownie"',
+    '- "status do pedido"',
+    '- "cardapio"',
+  ].join('\n');
+}
