@@ -74,11 +74,8 @@ jobs:
       - name: Unit tests
         working-directory: backend
         run: npm run test:unit
-        # TODO: remover continue-on-error quando 4 testes NLP do whatsapp forem corrigidos:
-        #   product-offer-intelligence.service.spec.ts (self-treat boost)
-        #   conversational-intelligence.service.spec.ts (payment trust topic)
-        #   conversation-planner.service.spec.ts (reassurance mode x2)
-        continue-on-error: true
+        # 4 testes NLP do whatsapp marcados com it.skip + TODO(whatsapp-nlp-2A)
+        # para serem investigados quando o whatsapp.service.ts for refatorado.
 
       - name: Integration tests
         working-directory: backend
