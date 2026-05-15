@@ -156,6 +156,13 @@ import {
   POST_ORDER_COURTESY_PHRASES,
   POST_ORDER_EXPLICIT_CHANGE_PHRASES,
 } from './utils/post-order-intents';
+import {
+  ACTIVE_CONTEXT_STATUS_PHRASES,
+  ORDER_KEYWORDS,
+  ORDER_STATUS_QUERY_PHRASES,
+  ORDER_STATUS_SIGNALS,
+  REOPEN_INTENT_PHRASES,
+} from './utils/order-status-intents';
 
 export interface WhatsappMessage {
   from: string;
@@ -9982,14 +9989,10 @@ export class WhatsappService {
       return true;
     }
 
-    return this.hasAnyNormalizedPhrase(analysis.normalizedText, [
-      'reabri pedid',
-      'reabri pedido',
-      'reabrir pedid',
-      'reabre pedid',
-      'continuar pedid',
-      'retomar pedid',
-    ]);
+    return this.hasAnyNormalizedPhrase(
+      analysis.normalizedText,
+      Array.from(REOPEN_INTENT_PHRASES),
+    );
   }
 
   private isRepeatOrderIntent(lowerMessage: string): boolean {
@@ -10066,84 +10069,25 @@ export class WhatsappService {
     if (analysis.flags.hasOrderCode || this.extractOrderNo(lm)) return true;
     if (analysis.scores.status >= 0.72) return true;
 
-    if (this.hasAnyNormalizedPhrase(lm, [
-      'meu pedido',
-      'status do pedido',
-      'status pedido',
-      'acompanhar pedido',
-      'acompanha pedido',
-      'rastrear pedido',
-      'rastreia pedido',
-      'cade meu pedido',
-      'cade o pedido',
-      'onde ta meu pedido',
-      'onde ta o pedido',
-      'aonde ta meu pedido',
-      'como ta meu pedido',
-      'qual status do pedido',
-      'quando chega meu pedido',
-      'quando chega minha entrega',
-      'onde ta minha encomenda',
-      'cade minha encomenda',
-      'cade o motoboy',
-      'onde ta o motoboy',
-      'cade o entregador',
-      'onde ta o entregador',
-      'ja saiu com o motoboy',
-      'ja saiu com o entregador',
-      'andamento do pedido',
-      'atualizacao do pedido',
-      'atualizacao da entrega',
-      'pedido saiu',
-      'ja saiu meu pedido',
-      'saiu para entrega',
-      'chega que horas',
-    ])) {
+    if (this.hasAnyNormalizedPhrase(lm, Array.from(ORDER_STATUS_QUERY_PHRASES))) {
       return true;
     }
 
-    const hasOrderKeyword = ['pedido', 'encomenda', 'entrega'].some((keyword) =>
-      lm.includes(keyword),
+    const hasOrderKeyword = ORDER_KEYWORDS.some((keyword) => lm.includes(keyword));
+    const hasStatusSignal = this.hasAnyNormalizedPhrase(
+      lm,
+      Array.from(ORDER_STATUS_SIGNALS),
     );
-    const hasStatusSignal = this.hasAnyNormalizedPhrase(lm, [
-      'status',
-      'acompanhar',
-      'acompanha',
-      'rastrear',
-      'rastreia',
-      'cade',
-      'onde ta',
-      'aonde ta',
-      'como ta',
-      'quando chega',
-      'demora',
-      'andamento',
-      'atualizacao',
-      'ja saiu',
-      'saiu',
-    ]);
 
     if (hasOrderKeyword && hasStatusSignal) {
       return true;
     }
 
     if (this.hasActiveOrderContext(conversation, currentState)) {
-      return this.hasAnyNormalizedPhrase(lm, [
-        'cade',
-        'onde ta',
-        'aonde ta',
-        'como ta',
-        'quando chega',
-        'demora',
-        'ja saiu',
-        'saiu',
-        'motoboy',
-        'entregador',
-        'chega que horas',
-        'ta pronto',
-        'ficou pronto',
-        'status',
-      ]);
+      return this.hasAnyNormalizedPhrase(
+        lm,
+        Array.from(ACTIVE_CONTEXT_STATUS_PHRASES),
+      );
     }
 
     return false;
