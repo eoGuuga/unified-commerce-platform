@@ -57,8 +57,10 @@ import {
   getRelevanceScore,
   getStockTone,
 } from '@/lib/loja/product-utils';
+import { EmptyTenantState } from '@/components/loja/EmptyTenantState';
 import { LojaConfidenceCard } from '@/components/loja/LojaConfidenceCard';
 import { MetricCard } from '@/components/loja/MetricCard';
+import { ProductGridSkeleton } from '@/components/loja/ProductGridSkeleton';
 import { StoreHeader } from '@/components/loja/StoreHeader';
 import { StoreHero } from '@/components/loja/StoreHero';
 import { SummaryRow } from '@/components/loja/SummaryRow';
@@ -1137,62 +1139,9 @@ export default function LojaPage() {
             </div>
 
             {!hasTenantConfiguration ? (
-              <div className="rounded-[32px] border border-amber-300/15 bg-[linear-gradient(135deg,rgba(251,191,36,0.12)_0%,rgba(245,158,11,0.08)_42%,rgba(15,23,42,0.88)_100%)] p-6 sm:p-8">
-                <p className="text-xs uppercase tracking-[0.22em] text-amber-100/70">
-                  {isOperatorPreview ? 'configuracao necessaria' : 'vitrine em preparacao'}
-                </p>
-                <h3 className="mt-3 text-2xl font-semibold tracking-tight text-amber-50">
-                  {isOperatorPreview
-                    ? 'A loja precisa de um tenant configurado para carregar o catalogo.'
-                    : 'Estamos preparando esta vitrine para abrir com tudo no lugar.'}
-                </h3>
-                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-amber-50/75">
-                  {isOperatorPreview
-                    ? 'Defina `NEXT_PUBLIC_TENANT_ID` ou use um token com tenant valido no login para conectar esta vitrine ao ambiente certo.'
-                    : 'Volte em instantes. Assim que a curadoria terminar, o catalogo aparecera aqui com a experiencia completa de compra.'}
-                </p>
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-amber-200/15 bg-black/10 px-4 py-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-amber-100/70">tenant</p>
-                    <p className="mt-2 text-sm font-medium text-amber-50">
-                      {isOperatorPreview
-                        ? 'Conecta a vitrine ao catalogo correto.'
-                        : 'A abertura acontece quando o catalogo estiver certo.'}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-amber-200/15 bg-black/10 px-4 py-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-amber-100/70">login</p>
-                    <p className="mt-2 text-sm font-medium text-amber-50">
-                      {isOperatorPreview
-                        ? 'Um token valido tambem libera o tenant automaticamente.'
-                        : 'A experiencia final vai surgir aqui sem friccao.'}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-amber-200/15 bg-black/10 px-4 py-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-amber-100/70">resultado</p>
-                    <p className="mt-2 text-sm font-medium text-amber-50">
-                      {isOperatorPreview
-                        ? 'Catalogo, checkout e pagamento passam a refletir a operacao real.'
-                        : 'Catalogo, checkout e pagamento vao nascer aqui de forma integrada.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <EmptyTenantState isOperatorPreview={isOperatorPreview} />
             ) : loading ? (
-              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.04] p-6"
-                  >
-                    <div className="h-32 animate-pulse rounded-[24px] bg-white/[0.06]" />
-                    <div className="mt-6 h-6 w-2/3 animate-pulse rounded-full bg-white/[0.06]" />
-                    <div className="mt-3 h-4 w-full animate-pulse rounded-full bg-white/[0.05]" />
-                    <div className="mt-2 h-4 w-4/5 animate-pulse rounded-full bg-white/[0.05]" />
-                    <div className="mt-6 h-12 animate-pulse rounded-2xl bg-white/[0.06]" />
-                  </div>
-                ))}
-              </div>
+              <ProductGridSkeleton />
             ) : sortedProducts.length === 0 && products.length === 0 ? (
               <div className="rounded-[32px] border border-white/10 bg-[linear-gradient(135deg,rgba(16,185,129,0.12)_0%,rgba(56,189,248,0.08)_36%,rgba(15,23,42,0.9)_100%)] px-6 py-12 sm:px-8">
                 <div className="mx-auto max-w-3xl text-center">
