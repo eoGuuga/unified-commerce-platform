@@ -86,6 +86,17 @@ import {
   buildTrackingUrl as buildTrackingUrlUtil,
   getOrdersPortalUrl as getOrdersPortalUrlUtil,
 } from './utils/tracking-url';
+import {
+  buildCollectionStageDetourMessage as buildCollectionStageDetourMessageUtil,
+  getCollectionStageHint as getCollectionStageHintUtil,
+  getCollectionStageRequirement as getCollectionStageRequirementUtil,
+  getConversationStageLabel as getConversationStageLabelUtil,
+} from './utils/conversation-stage';
+import {
+  buildContextRecapMessage as buildContextRecapMessageUtil,
+  buildMemoryAwareHandoffMessage as buildMemoryAwareHandoffMessageUtil,
+  isConversationalUnresolvedFeedback as isConversationalUnresolvedFeedbackUtil,
+} from './utils/conversation-messages';
 
 export interface WhatsappMessage {
   from: string;
@@ -665,38 +676,14 @@ export class WhatsappService {
     });
   }
 
+  // Stage labels/hints: implementacao em utils/conversation-stage.ts.
+  // O wrapper aqui aceita TypedConversation (extraindo customer_data) para
+  // manter assinatura compativel com os call-sites existentes.
   private getConversationStageLabel(
     currentState?: ConversationState,
     customerData?: CustomerData,
   ): string {
-    switch (currentState) {
-      case 'collecting_order':
-        return 'Montando o pedido';
-      case 'collecting_name':
-        return 'Coletando o nome do cliente';
-      case 'collecting_address':
-        return customerData?.delivery_type
-          ? 'Coletando o endereco de entrega'
-          : 'Escolhendo entrega ou retirada';
-      case 'collecting_phone':
-        return 'Coletando o telefone de contato';
-      case 'collecting_notes':
-        return 'Coletando observacoes finais';
-      case 'collecting_cash_change':
-        return 'Coletando informacao de troco';
-      case 'confirming_stock_adjustment':
-        return 'Confirmando ajuste por estoque';
-      case 'confirming_order':
-        return 'Revisando o pedido antes de fechar';
-      case 'waiting_payment':
-        return 'Aguardando pagamento';
-      case 'order_confirmed':
-        return 'Pedido confirmado';
-      case 'order_completed':
-        return 'Pedido concluido';
-      default:
-        return 'Conversa aberta';
-    }
+    return getConversationStageLabelUtil(currentState, customerData);
   }
 
   private getCollectionStageRequirement(
@@ -704,19 +691,7 @@ export class WhatsappService {
     conversation?: TypedConversation,
   ): string {
     const customerData = conversation?.context?.customer_data as CustomerData | undefined;
-
-    switch (currentState) {
-      case 'collecting_name':
-        return 'do nome completo de quem vai receber o pedido';
-      case 'collecting_address':
-        return customerData?.delivery_type === 'delivery'
-          ? 'do endereco de entrega'
-          : 'de como voce prefere receber: entrega ou retirada';
-      case 'collecting_phone':
-        return 'do telefone de contato com DDD';
-      default:
-        return 'da etapa atual do pedido';
-    }
+    return getCollectionStageRequirementUtil(currentState, customerData);
   }
 
   private getCollectionStageHint(
@@ -724,19 +699,7 @@ export class WhatsappService {
     conversation?: TypedConversation,
   ): string {
     const customerData = conversation?.context?.customer_data as CustomerData | undefined;
-
-    switch (currentState) {
-      case 'collecting_name':
-        return 'Me envie so o nome completo. Exemplo: "Jordan Lincoln".';
-      case 'collecting_address':
-        return customerData?.delivery_type === 'delivery'
-          ? 'Me envie rua, numero, bairro, cidade, estado e CEP.'
-          : 'Responda com "entrega" ou "retirada".';
-      case 'collecting_phone':
-        return 'Me envie so o telefone com DDD. Exemplo: 11987654321.';
-      default:
-        return 'Me responda so essa etapa para eu seguir sem me perder.';
-    }
+    return getCollectionStageHintUtil(currentState, customerData);
   }
 
   private buildCollectionStageDetourMessage(
@@ -745,15 +708,13 @@ export class WhatsappService {
     conversation?: TypedConversation,
     extraLines: string[] = [],
   ): string {
-    return [
+    const customerData = conversation?.context?.customer_data as CustomerData | undefined;
+    return buildCollectionStageDetourMessageUtil(
       intro,
-      ...extraLines,
-      '',
-      `Antes disso, preciso ${this.getCollectionStageRequirement(currentState, conversation)}.`,
-      this.getCollectionStageHint(currentState, conversation),
-    ]
-      .filter(Boolean)
-      .join('\n');
+      currentState,
+      customerData,
+      extraLines,
+    );
   }
 
   private buildCustomerFocusSnapshot(
@@ -837,21 +798,13 @@ export class WhatsappService {
     return true;
   }
 
+  // Mensagens compostas: implementacao em utils/conversation-messages.ts.
   private buildMemoryAwareHandoffMessage(
     lead: string,
     summaryLines: string[],
     guidance: string,
   ): string {
-    return [
-      lead,
-      '',
-      'Posso deixar esse contexto mastigado para atendimento humano, sem te fazer repetir tudo.',
-      '',
-      'RESUMO PRONTO PARA ATENDIMENTO',
-      ...summaryLines,
-      '',
-      guidance,
-    ].join('\n');
+    return buildMemoryAwareHandoffMessageUtil(lead, summaryLines, guidance);
   }
 
   private buildContextRecapMessage(
@@ -859,30 +812,11 @@ export class WhatsappService {
     summaryLines: string[],
     guidance: string,
   ): string {
-    return [
-      lead,
-      '',
-      'RESUMO DO QUE JA ENTENDI',
-      ...(summaryLines.length ? summaryLines : ['- Ainda nao tenho contexto suficiente travado aqui.']),
-      '',
-      guidance,
-    ].join('\n');
+    return buildContextRecapMessageUtil(lead, summaryLines, guidance);
   }
 
   private isConversationalUnresolvedFeedback(normalizedMessage: string): boolean {
-    if (!normalizedMessage) {
-      return false;
-    }
-
-    return [
-      'nao ajudou',
-      'isso nao ajudou',
-      'nao resolveu',
-      'isso nao resolveu',
-      'continua sem resolver',
-      'nao era bem isso',
-      'ainda nao resolveu',
-    ].some((signal) => normalizedMessage.includes(signal));
+    return isConversationalUnresolvedFeedbackUtil(normalizedMessage);
   }
 
   private buildUnresolvedSupportNextStep(
