@@ -1,6 +1,6 @@
 'use client';
 
-import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -59,6 +59,8 @@ import {
   getRelevanceScore,
   getStockTone,
 } from '@/lib/loja/product-utils';
+import { MetricCard } from '@/components/loja/MetricCard';
+import { SummaryRow } from '@/components/loja/SummaryRow';
 
 interface Product {
   id: string;
@@ -165,51 +167,6 @@ const initialCustomerInfo: CustomerInfo = {
 
 const controlClassName =
   'w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/70 transition focus:border-accent/50 focus:outline-none focus:ring-4 focus:ring-accent/10';
-
-function MetricCard({
-  icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  hint: string;
-}) {
-  return (
-    <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl">
-      <div className="mb-4 inline-flex size-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-accent">
-        {icon}
-      </div>
-      <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">{label}</p>
-      <p className="mt-3 text-2xl font-semibold tracking-tight text-foreground">{value}</p>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{hint}</p>
-    </div>
-  );
-}
-
-function SummaryRow({
-  label,
-  value,
-  strong = false,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex items-center justify-between gap-4 text-sm',
-        strong ? 'text-foreground' : 'text-muted-foreground',
-      )}
-    >
-      <span>{label}</span>
-      <span className={cn(strong && 'text-lg font-semibold tracking-tight')}>{value}</span>
-    </div>
-  );
-}
 
 export default function LojaPage() {
   const router = useRouter();
