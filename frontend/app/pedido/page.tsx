@@ -25,6 +25,7 @@ import {
 import api from '@/lib/api-client';
 import { readOrderTrackingContext, saveOrderTrackingContext } from '@/lib/order-tracking';
 import { cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/format';
 
 type OrderStatus =
   | 'pendente_pagamento'
@@ -125,13 +126,6 @@ const statusFlow: Array<{
     description: 'Pedido concluido com sucesso.',
   },
 ];
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value);
-}
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('pt-BR', {

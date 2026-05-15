@@ -46,6 +46,19 @@ import api from '@/lib/api-client';
 import { useAuth } from '@/hooks/useAuth';
 import { TENANT_ID, getDevCredentials, hasDevCredentials } from '@/lib/config';
 import { saveOrderTrackingContext } from '@/lib/order-tracking';
+import { formatCurrency, parseCurrencyInput } from '@/lib/format';
+import {
+  getDeliveryTypeLabel,
+  getPaymentMethodLabel,
+  getPaymentStatusLabel,
+} from '@/lib/loja/labels';
+import {
+  PRODUCT_PALETTES,
+  getAvailableUnits,
+  getProductPalette,
+  getRelevanceScore,
+  getStockTone,
+} from '@/lib/loja/product-utils';
 
 interface Product {
   id: string;
@@ -133,29 +146,6 @@ const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'Loja Modelo GTSoftHub'
 const STORE_TAGLINE =
   'Uma experiencia de compra feita para inspirar confianca: estoque sincronizado, checkout claro e pagamento sem atrito.';
 
-const PRODUCT_PALETTES = [
-  {
-    gradient: 'from-emerald-400/22 via-cyan-400/12 to-transparent',
-    accent: 'bg-emerald-400/15 text-emerald-200 border-emerald-400/20',
-    glow: 'shadow-[0_22px_60px_-34px_rgba(16,185,129,0.65)]',
-  },
-  {
-    gradient: 'from-sky-400/22 via-blue-400/12 to-transparent',
-    accent: 'bg-sky-400/15 text-sky-200 border-sky-400/20',
-    glow: 'shadow-[0_22px_60px_-34px_rgba(56,189,248,0.6)]',
-  },
-  {
-    gradient: 'from-amber-300/22 via-orange-400/12 to-transparent',
-    accent: 'bg-amber-300/15 text-amber-100 border-amber-300/20',
-    glow: 'shadow-[0_22px_60px_-34px_rgba(251,191,36,0.55)]',
-  },
-  {
-    gradient: 'from-fuchsia-400/22 via-violet-400/12 to-transparent',
-    accent: 'bg-fuchsia-400/15 text-fuchsia-100 border-fuchsia-400/20',
-    glow: 'shadow-[0_22px_60px_-34px_rgba(232,121,249,0.55)]',
-  },
-];
-
 const initialCustomerInfo: CustomerInfo = {
   name: '',
   email: '',
@@ -175,85 +165,6 @@ const initialCustomerInfo: CustomerInfo = {
 
 const controlClassName =
   'w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/70 transition focus:border-accent/50 focus:outline-none focus:ring-4 focus:ring-accent/10';
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value);
-}
-
-function parseCurrencyInput(value: string) {
-  const normalized = value.replace(/\./g, '').replace(',', '.').trim();
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : Number.NaN;
-}
-
-function getAvailableUnits(product: Pick<Product, 'stock' | 'available_stock'>) {
-  return Math.max(0, product.available_stock ?? product.stock ?? 0);
-}
-
-function getProductPalette(index: number) {
-  return PRODUCT_PALETTES[index % PRODUCT_PALETTES.length];
-}
-
-function getRelevanceScore(product: Product, query: string) {
-  if (!query) return 0;
-
-  const normalizedQuery = query.trim().toLowerCase();
-  const name = product.name.toLowerCase();
-  const description = (product.description || '').toLowerCase();
-
-  if (name.startsWith(normalizedQuery)) return 3;
-  if (name.includes(normalizedQuery)) return 2;
-  if (description.includes(normalizedQuery)) return 1;
-  return 0;
-}
-
-function getStockTone(stock: number, minStock = 0) {
-  if (stock <= 0) {
-    return {
-      label: 'Sem estoque',
-      detail: 'Reposicao em andamento',
-      className: 'border-rose-400/25 bg-rose-400/10 text-rose-100',
-    };
-  }
-
-  if ((minStock > 0 && stock <= minStock) || stock <= 3) {
-    return {
-      label: 'Ultimas unidades',
-      detail: `${stock} disponiveis agora`,
-      className: 'border-amber-300/25 bg-amber-300/10 text-amber-100',
-    };
-  }
-
-  return {
-    label: 'Pronta entrega',
-    detail: `${stock} disponiveis para venda`,
-    className: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-100',
-  };
-}
-
-function getPaymentStatusLabel(status: string) {
-  const labels: Record<string, string> = {
-    pending: 'Aguardando pagamento',
-    approved: 'Pagamento aprovado',
-    confirmed: 'Pagamento confirmado',
-    paid: 'Pagamento aprovado',
-    cancelled: 'Pagamento cancelado',
-    rejected: 'Pagamento recusado',
-  };
-
-  return labels[status] || status;
-}
-
-function getPaymentMethodLabel(method: PaymentMethod) {
-  return method === 'pix' ? 'Pix' : 'Dinheiro';
-}
-
-function getDeliveryTypeLabel(deliveryType: CustomerInfo['deliveryType']) {
-  return deliveryType === 'delivery' ? 'Entrega' : 'Retirada';
-}
 
 function MetricCard({
   icon,

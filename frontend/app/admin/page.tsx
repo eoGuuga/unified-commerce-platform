@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import api from '@/lib/api-client';
 import { useAuth } from '@/hooks/useAuth';
 import { getDevCredentials, hasDevCredentials } from '@/lib/config';
+import { formatCurrency } from '@/lib/format';
 
 interface Product {
   id: string;
@@ -72,12 +73,6 @@ const panelClassName =
 const controlClassName =
   'w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/70 transition focus:border-accent/50 focus:outline-none focus:ring-4 focus:ring-accent/10';
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value);
-}
 
 function formatShortDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('pt-BR', {
