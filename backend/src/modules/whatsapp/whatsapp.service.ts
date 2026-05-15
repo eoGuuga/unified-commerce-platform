@@ -621,15 +621,15 @@ export class WhatsappService {
 
     if (typeof payload === 'string') {
       try {
-        const parsed = JSON.parse(payload) as WhatsappOutboundResponse;
+        const parsed: unknown = JSON.parse(payload);
         if (
           typeof parsed === 'string' ||
-          (parsed &&
-            typeof parsed === 'object' &&
+          (typeof parsed === 'object' &&
+            parsed !== null &&
             'kind' in parsed &&
-            (parsed as any).kind === 'interactive_list')
+            (parsed as { kind?: unknown }).kind === 'interactive_list')
         ) {
-          return parsed;
+          return parsed as WhatsappOutboundResponse;
         }
       } catch {
         return payload;
@@ -640,7 +640,7 @@ export class WhatsappService {
       typeof payload === 'object' &&
       payload !== null &&
       'kind' in payload &&
-      (payload as any).kind === 'interactive_list'
+      (payload as { kind?: unknown }).kind === 'interactive_list'
     ) {
       return payload as WhatsappOutboundResponse;
     }

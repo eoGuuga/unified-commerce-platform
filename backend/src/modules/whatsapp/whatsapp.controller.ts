@@ -10,9 +10,28 @@ import {
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TenantsService } from '../tenants/tenants.service';
 import { WhatsappWebhookDto } from './dto/whatsapp-webhook.dto';
-import { WhatsappService } from './whatsapp.service';
+import {
+  WhatsappService,
+  type WhatsappOutboundResponse,
+} from './whatsapp.service';
 
 type RawWhatsappWebhookBody = Partial<WhatsappWebhookDto> & Record<string, any>;
+
+type InteractiveListResponse = Extract<
+  WhatsappOutboundResponse,
+  { kind: 'interactive_list' }
+>;
+
+function isInteractiveListResponse(
+  response: unknown,
+): response is InteractiveListResponse {
+  return (
+    typeof response === 'object' &&
+    response !== null &&
+    'kind' in response &&
+    (response as { kind?: unknown }).kind === 'interactive_list'
+  );
+}
 
 function normalizeDigits(value?: string | null): string {
   return String(value || '').replace(/\D/g, '');
@@ -264,13 +283,8 @@ function getOutboundPreview(response: unknown): string {
     return response;
   }
 
-  if (
-    response &&
-    typeof response === 'object' &&
-    'kind' in response &&
-    (response as any).kind === 'interactive_list'
-  ) {
-    return String((response as any).previewText || '').trim();
+  if (isInteractiveListResponse(response)) {
+    return String(response.previewText || '').trim();
   }
 
   return '';
@@ -281,15 +295,10 @@ function shouldDispatchOutboundResponse(response: unknown): boolean {
     return response.trim().length > 0;
   }
 
-  if (
-    response &&
-    typeof response === 'object' &&
-    'kind' in response &&
-    (response as any).kind === 'interactive_list'
-  ) {
-    const preview = String((response as any).previewText || '').trim();
-    const sections = Array.isArray((response as any).list?.sections)
-      ? (response as any).list.sections
+  if (isInteractiveListResponse(response)) {
+    const preview = String(response.previewText || '').trim();
+    const sections = Array.isArray(response.list?.sections)
+      ? response.list.sections
       : [];
 
     return preview.length > 0 && sections.length > 0;
