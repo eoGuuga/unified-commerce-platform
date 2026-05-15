@@ -3,17 +3,19 @@
 Plataforma SaaS para vendas omnichannel (WhatsApp + PDV + loja online) com estoque consistente e pagamentos integrados.
 
 ## Documentacao oficial
+- [CLAUDE.md](CLAUDE.md) - Guia tecnico de bordo (RLS, webhooks, comandos)
 - `docs/CONSOLIDADO/README.md`
 - `docs/INDICE-DOCUMENTACAO.md`
-- Legado: `docs/LEGADO/README.md`
+- Legado (apenas referencia historica): `docs/LEGADO/README.md`
 
-## Status rapido (2026-02-22)
+## Status rapido (2026-05-14)
 - Producao: https://gtsofthub.com.br (stack em /opt/ucm)
 - DEV/TESTE: https://dev.gtsofthub.com.br (stack em /opt/ucm-test-repo)
-- Testes backend (unit/integration/acid) PASS em 2026-02-22 (ver Testes_com_sucesso.txt)
+- Testes backend (unit/integration/acid) PASS - evidencias em `docs/CONSOLIDADO/EVIDENCIAS-TESTES.md`
 - WhatsApp PIX E2E validado em DEV/TESTE (2026-02-13 e 2026-02-14)
 - WhatsApp /whatsapp/test validado em DEV/TESTE (2026-02-22)
-- Pendencias: e-commerce completo e dashboard avancado
+- CI/CD (lint+build+test) configurado em `.github/workflows/ci.yml`
+- Pendencias: e-commerce completo, dashboard avancado, refactor do whatsapp.service.ts
 
 ## Stack
 - Backend: NestJS + TypeORM

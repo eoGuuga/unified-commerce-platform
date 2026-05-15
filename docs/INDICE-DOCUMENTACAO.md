@@ -15,11 +15,9 @@ Este indice aponta apenas para a documentacao consolidada.
 - `docs/CONSOLIDADO/09-CRONOLOGIA-DOCS.md`
 - `docs/CONSOLIDADO/10-SERVIDOR-COMANDOS.md`
 - `docs/CONSOLIDADO/11-CHECKLIST-FINAL-ENTREGA.md`
-
-## Registros
-- Testes_com_sucesso.txt
+- `docs/CONSOLIDADO/EVIDENCIAS-TESTES.md`
 
 ## Legado (arquivado)
 - `docs/LEGADO/README.md`
 
-Ultima atualizacao: 2026-02-22
+Ultima atualizacao: 2026-05-14
