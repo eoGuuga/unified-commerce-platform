@@ -134,6 +134,11 @@ import {
   isNumericOnlyAddressFragment as isNumericOnlyAddressFragmentUtil,
   mergeAddressDraftParts as mergeAddressDraftPartsUtil,
 } from './utils/address-draft';
+import {
+  buildOrderCreatedMessage as buildOrderCreatedMessageUtil,
+  enrichPaymentMessage as enrichPaymentMessageUtil,
+  getPremiumPaymentOptionsMessage as getPremiumPaymentOptionsMessageUtil,
+} from './utils/order-messages';
 
 export interface WhatsappMessage {
   from: string;
@@ -987,58 +992,29 @@ export class WhatsappService {
     return buildOrderItemsPreview(pedido);
   }
 
+  // Order/payment messages: implementacao em utils/order-messages.ts.
   private enrichPaymentMessage(
     baseMessage: string,
     pedido: Pedido,
     method: MetodoPagamento,
   ): string {
-    const followUp =
-      method === MetodoPagamento.PIX
-        ? 'Assim que o pagamento for reconhecido, o pedido avanca automaticamente.'
-        : method === MetodoPagamento.DINHEIRO
-          ? 'Assim que a equipe confirmar o recebimento, o pedido segue para a preparacao.'
-          : 'A proxima atualizacao chega assim que o pagamento avancar.';
-
-    return [
-      baseMessage.trim(),
-      '',
-      followUp,
-      `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
-    ].join('\n');
+    return enrichPaymentMessageUtil(
+      baseMessage,
+      pedido,
+      method,
+      this.buildTrackingUrl(pedido.order_no),
+    );
   }
 
   private getPremiumPaymentOptionsMessage(total: number): string {
-    const totalAmount = Number(total || 0);
-    const pixAmount = totalAmount > 0 ? totalAmount * 0.95 : 0;
-
-    return [
-      'FORMAS DE PAGAMENTO',
-      '',
-      `1. PIX com 5% de desconto (R$ ${this.formatCurrency(pixAmount)})`,
-      '2. Dinheiro',
-      '',
-      'Responda com o numero ou o nome do metodo.',
-      'Exemplo: "1", "pix" ou "dinheiro".',
-    ].join('\n');
+    return getPremiumPaymentOptionsMessageUtil(total);
   }
 
   private buildOrderCreatedMessage(pedido: Pedido): string {
-    return [
-      this.getGreetingLine(pedido.customer_name),
-      '',
-      'PEDIDO CRIADO COM SUCESSO',
-      '',
-      `Pedido: *${pedido.order_no}*`,
-      `Recebimento: ${this.getDeliveryTypeLabel(pedido.delivery_type)}`,
-      `Total: R$ ${this.formatCurrency(Number(pedido.total_amount || 0))}`,
-      '',
-      'Seu pedido ja esta reservado e pronto para seguir assim que o pagamento for escolhido.',
-      this.getNextStepSummary(pedido, PedidoStatus.PENDENTE_PAGAMENTO),
-      '',
-      this.getPremiumPaymentOptionsMessage(Number(pedido.total_amount || 0)),
-      '',
-      `Acompanhamento completo: ${this.buildTrackingUrl(pedido.order_no)}`,
-    ].join('\n');
+    return buildOrderCreatedMessageUtil(
+      pedido,
+      this.buildTrackingUrl(pedido.order_no),
+    );
   }
 
   private async safelyFindOrderById(
