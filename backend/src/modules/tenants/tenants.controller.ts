@@ -1,9 +1,13 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Post, Patch, Get, Body, Param, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../common/decorators/public.decorator';
-import { TenantsService, TenantSignupResult } from './tenants.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/user.decorator';
+import { Usuario } from '../../database/entities/Usuario.entity';
+import { TenantsService, TenantSignupResult, TenantBranding } from './tenants.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
+import { UpdateBrandingDto } from './dto/update-branding.dto';
 
 @ApiTags('Tenants')
 @Controller('tenants')
@@ -25,5 +29,33 @@ export class TenantsController {
   @ApiResponse({ status: 429, description: 'Rate limit excedido' })
   async signup(@Body() dto: CreateTenantDto): Promise<TenantSignupResult> {
     return this.tenantsService.createTenantWithAdmin(dto);
+  }
+
+  @Get(':slug/branding')
+  @Public()
+  @ApiOperation({
+    summary: 'Obter branding publico de um tenant pelo slug',
+    description: 'Retorna logo, cor, nome e tagline para renderizar a vitrine.',
+  })
+  @ApiResponse({ status: 200, description: 'Branding do tenant' })
+  @ApiResponse({ status: 404, description: 'Tenant nao encontrado' })
+  async getBranding(@Param('slug') slug: string): Promise<TenantBranding> {
+    return this.tenantsService.getBrandingBySlug(slug);
+  }
+
+  @Patch('branding')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Atualizar branding do tenant autenticado',
+    description: 'Atualiza logo, cor primaria, nome e tagline. Requer role admin.',
+  })
+  @ApiResponse({ status: 200, description: 'Branding atualizado' })
+  @ApiResponse({ status: 401, description: 'Nao autorizado' })
+  async updateBranding(
+    @CurrentUser() user: Usuario,
+    @Body() dto: UpdateBrandingDto,
+  ): Promise<TenantBranding> {
+    return this.tenantsService.updateBranding(user.tenant_id, dto);
   }
 }

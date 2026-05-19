@@ -4,6 +4,17 @@ import { Tenant } from '../../database/entities/Tenant.entity';
 import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
 import { DbContextService } from '../common/services/db-context.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
+import { UpdateBrandingDto } from './dto/update-branding.dto';
+
+export interface TenantBranding {
+  tenant_id: string;
+  slug: string;
+  store_name: string;
+  tagline?: string;
+  logo_url?: string;
+  favicon_url?: string;
+  primary_color?: string;
+}
 
 export interface TenantSignupResult {
   tenant: {
@@ -223,5 +234,53 @@ export class TenantsService {
         },
       };
     });
+  }
+
+  async getBrandingBySlug(slug: string): Promise<TenantBranding> {
+    const tenant = await this.dbContext.runInTransaction(async (manager) => {
+      return manager.getRepository(Tenant).findOne({ where: { slug } });
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant com slug "${slug}" nao encontrado`);
+    }
+
+    if (!tenant.is_active) {
+      throw new ForbiddenException(`Tenant "${slug}" esta inativo`);
+    }
+
+    const settings = tenant.settings || {};
+
+    return {
+      tenant_id: tenant.id,
+      slug: tenant.slug,
+      store_name: settings.store_name || tenant.name,
+      tagline: settings.tagline,
+      logo_url: settings.logo_url,
+      favicon_url: settings.favicon_url,
+      primary_color: settings.primary_color,
+    };
+  }
+
+  async updateBranding(tenantId: string, dto: UpdateBrandingDto): Promise<TenantBranding> {
+    const brandingSettings: Record<string, unknown> = {};
+    if (dto.logo_url !== undefined) brandingSettings.logo_url = dto.logo_url;
+    if (dto.primary_color !== undefined) brandingSettings.primary_color = dto.primary_color;
+    if (dto.store_name !== undefined) brandingSettings.store_name = dto.store_name;
+    if (dto.tagline !== undefined) brandingSettings.tagline = dto.tagline;
+    if (dto.favicon_url !== undefined) brandingSettings.favicon_url = dto.favicon_url;
+
+    const updated = await this.updateSettings(tenantId, brandingSettings);
+    const settings = updated.settings || {};
+
+    return {
+      tenant_id: updated.id,
+      slug: updated.slug,
+      store_name: settings.store_name || updated.name,
+      tagline: settings.tagline,
+      logo_url: settings.logo_url,
+      favicon_url: settings.favicon_url,
+      primary_color: settings.primary_color,
+    };
   }
 }
