@@ -2,11 +2,15 @@ import { Controller, Get, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Response } from 'express';
 import { HealthService } from './health.service';
+import { MetricsService } from './metrics.service';
 
 @ApiTags('Health')
 @Controller('health')
 export class HealthController {
-  constructor(private readonly healthService: HealthService) {}
+  constructor(
+    private readonly healthService: HealthService,
+    private readonly metricsService: MetricsService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Health check completo (verifica DB, Redis, etc)' })
@@ -34,5 +38,13 @@ export class HealthController {
   async live(@Res() res: Response) {
     const health = await this.healthService.live();
     return res.status(200).json(health);
+  }
+
+  @Get('metrics')
+  @ApiOperation({ summary: 'Metricas Prometheus-style (uptime, memoria, requests)' })
+  @ApiResponse({ status: 200, description: 'Metricas em formato text/plain' })
+  metrics(@Res() res: Response) {
+    res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    return res.status(200).send(this.metricsService.getPrometheusMetrics());
   }
 }

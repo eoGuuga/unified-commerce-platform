@@ -15,6 +15,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { HealthModule } from './modules/health/health.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { TenantDbContextInterceptor } from './common/interceptors/tenant-db-context.interceptor';
+import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
 
 @Module({
   imports: [
@@ -54,6 +55,10 @@ import { TenantDbContextInterceptor } from './common/interceptors/tenant-db-cont
   controllers: [AppController],
   providers: [
     AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: MetricsInterceptor,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: TenantDbContextInterceptor,
