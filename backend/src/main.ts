@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
@@ -7,24 +7,27 @@ import cookieParser from 'cookie-parser';
 import { DataSource } from 'typeorm';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { CsrfGuard } from './common/guards/csrf.guard';
+import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
+import { StructuredLogger } from './common/services/structured-logger.service';
 import { AppModule } from './app.module';
 import { Usuario, UserRole } from './database/entities/Usuario.entity';
 
 async function bootstrap() {
-  // Tratamento de erros nao capturados para evitar crashes.
+  const logger = new Logger('Bootstrap');
+
   process.on('uncaughtException', (error: Error) => {
-    console.error('UNCAUGHT EXCEPTION - Backend pode crashar:', error);
-    console.error('Stack:', error.stack);
+    logger.error(`UNCAUGHT EXCEPTION - Backend pode crashar: ${error.message}`, error.stack);
   });
 
   process.on('unhandledRejection', (reason: any) => {
-    console.error('UNHANDLED REJECTION - Backend pode crashar:', reason);
-    if (reason instanceof Error) {
-      console.error('Stack:', reason.stack);
-    }
+    const msg = reason instanceof Error ? reason.message : String(reason);
+    const stack = reason instanceof Error ? reason.stack : undefined;
+    logger.error(`UNHANDLED REJECTION - Backend pode crashar: ${msg}`, stack);
   });
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: new StructuredLogger(),
+  });
 
   const isProd = process.env.NODE_ENV === 'production';
   const enableSwagger = !isProd || process.env.ENABLE_SWAGGER === 'true';
@@ -62,8 +65,7 @@ async function bootstrap() {
     : [];
 
   if (isProd && !frontendUrl) {
-    console.error('ERRO CRITICO: FRONTEND_URL nao definido em producao!');
-    console.error('Configure: FRONTEND_URL=https://app.suaempresa.com');
+    logger.error('FRONTEND_URL nao definido em producao! Configure: FRONTEND_URL=https://app.suaempresa.com');
     throw new Error(
       'FRONTEND_URL deve ser definido em producao (CORS). ' +
         'Ex.: FRONTEND_URL=https://app.suaempresa.com',
@@ -95,9 +97,9 @@ async function bootstrap() {
     );
   }
 
-  console.log(`CORS configurado: ${allowedOrigins.length} origem(ns) permitida(s)`);
+  logger.log(`CORS configurado: ${allowedOrigins.length} origem(ns) permitida(s)`);
   if (isProd) {
-    console.log(`Producao: ${allowedOrigins.join(', ')}`);
+    logger.log(`Producao: ${allowedOrigins.join(', ')}`);
   }
 
   const allowTenantHeader =
@@ -120,7 +122,7 @@ async function bootstrap() {
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
       if (!isProd) {
-        console.warn(`CORS bloqueado para origin: ${origin}`);
+        logger.warn(`CORS bloqueado para origin: ${origin}`);
       }
       return callback(new Error(`CORS bloqueado para origin: ${origin}`), false);
     },
@@ -130,6 +132,7 @@ async function bootstrap() {
     exposedHeaders: ['X-Total-Count', 'X-Rate-Limit-Remaining'],
   });
 
+  app.useGlobalInterceptors(new RequestIdInterceptor());
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalGuards(new CsrfGuard());
   app.useGlobalPipes(
@@ -224,8 +227,8 @@ async function bootstrap() {
           process.env.DEV_USER_PASSWORD_HASH || defaultHash;
         const devPassword = process.env.DEV_USER_PASSWORD;
         if (devPassword && !process.env.DEV_USER_PASSWORD_HASH && devPassword !== '12345678') {
-          console.warn(
-            '[DEV] DEV_USER_PASSWORD informado sem hash. Use DEV_USER_PASSWORD_HASH para alterar a senha.',
+          logger.warn(
+            'DEV_USER_PASSWORD informado sem hash. Use DEV_USER_PASSWORD_HASH para alterar a senha.',
           );
         }
 
@@ -239,7 +242,7 @@ async function bootstrap() {
             is_active: true,
           });
           await repo.save(user);
-          console.log(`[DEV] Usuario de teste criado: ${devEmail}`);
+          logger.log(`Usuario de teste criado: ${devEmail}`);
         } else if (forceReset) {
           await repo.update(
             { id: existing.id },
@@ -250,16 +253,16 @@ async function bootstrap() {
               is_active: true,
             },
           );
-          console.log(`[DEV] Usuario de teste atualizado: ${devEmail}`);
+          logger.log(`Usuario de teste atualizado: ${devEmail}`);
         } else {
-          console.log(`[DEV] Usuario de teste ja existe: ${devEmail}`);
+          logger.log(`Usuario de teste ja existe: ${devEmail}`);
         }
       }
 
       await runner.commitTransaction();
     } catch (error) {
       await runner.rollbackTransaction();
-      console.error('[DEV] Falha ao criar usuario de teste', error);
+      logger.error('[DEV] Falha ao criar usuario de teste', error instanceof Error ? error.stack : String(error));
     } finally {
       await runner.release();
     }
@@ -269,8 +272,8 @@ async function bootstrap() {
   const host = process.env.HOST || '0.0.0.0';
   await app.listen(port, host);
 
-  console.log(`Backend running on http://${host}:${port}/api/v1`);
-  console.log(`Swagger documentation: http://${host}:${port}/api/docs`);
+  logger.log(`Backend running on http://${host}:${port}/api/v1`);
+  logger.log(`Swagger documentation: http://${host}:${port}/api/docs`);
 }
 
 bootstrap();

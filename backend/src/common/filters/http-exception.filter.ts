@@ -57,6 +57,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
       method: request.method,
+      requestId: (request as any).requestId || null,
       message,
       error,
       ...(details && { details }),
