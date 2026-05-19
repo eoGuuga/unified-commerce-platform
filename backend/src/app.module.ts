@@ -14,6 +14,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { HealthModule } from './modules/health/health.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
+import { TenantsModule } from './modules/tenants/tenants.module';
 import { TenantDbContextInterceptor } from './common/interceptors/tenant-db-context.interceptor';
 import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
 
@@ -51,6 +52,7 @@ import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
     NotificationsModule,
     HealthModule,
     CouponsModule,
+    TenantsModule,
   ],
   controllers: [AppController],
   providers: [

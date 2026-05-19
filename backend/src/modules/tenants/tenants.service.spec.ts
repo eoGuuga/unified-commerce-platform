@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { TenantsService } from './tenants.service';
 import { Tenant } from '../../database/entities/Tenant.entity';
 import { DbContextService } from '../common/services/db-context.service';
@@ -188,6 +188,98 @@ describe('TenantsService', () => {
           whatsappBotControlCode: '4321',
         }),
       );
+    });
+  });
+
+  describe('createTenantWithAdmin', () => {
+    const signupDto = {
+      company_name: 'Padaria do Joao',
+      slug: 'padaria-do-joao',
+      admin_email: 'joao@padaria.com',
+      admin_password: 'senhaSegura123',
+      admin_name: 'Joao Silva',
+    };
+
+    it('cria tenant e admin com sucesso quando slug e email sao unicos', async () => {
+      const savedTenant = { id: 'new-tenant-uuid', name: signupDto.company_name, slug: signupDto.slug };
+      const savedAdmin = { id: 'new-admin-uuid', email: signupDto.admin_email, full_name: signupDto.admin_name, role: 'admin' };
+
+      const tenantRepo = {
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockReturnValue(savedTenant),
+        save: jest.fn().mockResolvedValue(savedTenant),
+        update: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const userRepo = {
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockReturnValue(savedAdmin),
+        save: jest.fn().mockResolvedValue(savedAdmin),
+      };
+
+      mockDbContextService.runInTransaction.mockImplementation(async (callback) => {
+        const manager = {
+          query: jest.fn().mockResolvedValue(undefined),
+          getRepository: jest.fn((entity: any) => {
+            const name = typeof entity === 'function' ? entity.name : entity;
+            return name === 'Tenant' ? tenantRepo : userRepo;
+          }),
+        };
+        return callback(manager as any);
+      });
+
+      const result = await service.createTenantWithAdmin(signupDto);
+
+      expect(result.tenant.id).toBe('new-tenant-uuid');
+      expect(result.tenant.slug).toBe('padaria-do-joao');
+      expect(result.admin.email).toBe('joao@padaria.com');
+      expect(result.admin.role).toBe('admin');
+      expect(tenantRepo.update).toHaveBeenCalledWith('new-tenant-uuid', { owner_id: 'new-admin-uuid' });
+    });
+
+    it('lanca ConflictException se slug ja esta em uso', async () => {
+      const tenantRepo = {
+        findOne: jest.fn().mockResolvedValue({ id: 'existing', slug: signupDto.slug }),
+      };
+
+      mockDbContextService.runInTransaction.mockImplementation(async (callback) => {
+        const manager = {
+          query: jest.fn(),
+          getRepository: jest.fn(() => tenantRepo),
+        };
+        return callback(manager as any);
+      });
+
+      await expect(service.createTenantWithAdmin(signupDto)).rejects.toThrow(ConflictException);
+      await expect(service.createTenantWithAdmin(signupDto)).rejects.toThrow('ja esta em uso');
+    });
+
+    it('lanca ConflictException se email ja existe no tenant criado', async () => {
+      const savedTenant = { id: 'new-tenant-uuid', name: signupDto.company_name, slug: signupDto.slug };
+
+      const tenantRepo = {
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockReturnValue(savedTenant),
+        save: jest.fn().mockResolvedValue(savedTenant),
+      };
+
+      const userRepo = {
+        findOne: jest.fn().mockResolvedValue({ id: 'existing-user' }),
+      };
+
+      mockDbContextService.runInTransaction.mockImplementation(async (callback) => {
+        const manager = {
+          query: jest.fn(),
+          getRepository: jest.fn((entity: any) => {
+            const name = typeof entity === 'function' ? entity.name : entity;
+            return name === 'Tenant' ? tenantRepo : userRepo;
+          }),
+        };
+        return callback(manager as any);
+      });
+
+      await expect(service.createTenantWithAdmin(signupDto)).rejects.toThrow(ConflictException);
+      await expect(service.createTenantWithAdmin(signupDto)).rejects.toThrow('ja cadastrado');
     });
   });
 });

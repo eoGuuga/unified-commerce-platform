@@ -1,6 +1,23 @@
-import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException, Logger } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import { Tenant } from '../../database/entities/Tenant.entity';
+import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
 import { DbContextService } from '../common/services/db-context.service';
+import { CreateTenantDto } from './dto/create-tenant.dto';
+
+export interface TenantSignupResult {
+  tenant: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  admin: {
+    id: string;
+    email: string;
+    full_name?: string;
+    role: UserRole;
+  };
+}
 
 @Injectable()
 export class TenantsService {
@@ -143,6 +160,68 @@ export class TenantsService {
       }
 
       return updatedTenant;
+    });
+  }
+
+  async createTenantWithAdmin(dto: CreateTenantDto): Promise<TenantSignupResult> {
+    return await this.dbContext.runInTransaction(async (manager) => {
+      const tenantRepo = manager.getRepository(Tenant);
+      const userRepo = manager.getRepository(Usuario);
+
+      const existingTenant = await tenantRepo.findOne({
+        where: { slug: dto.slug },
+      });
+      if (existingTenant) {
+        throw new ConflictException(`Slug "${dto.slug}" ja esta em uso. Escolha outro.`);
+      }
+
+      const tenant = tenantRepo.create({
+        name: dto.company_name,
+        slug: dto.slug,
+        settings: {},
+        is_active: true,
+      });
+      const savedTenant = await tenantRepo.save(tenant);
+
+      await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [savedTenant.id]);
+
+      const existingUser = await userRepo.findOne({
+        where: { email: dto.admin_email, tenant_id: savedTenant.id },
+      });
+      if (existingUser) {
+        throw new ConflictException(`Email "${dto.admin_email}" ja cadastrado neste tenant.`);
+      }
+
+      const hashedPassword = await bcrypt.hash(dto.admin_password, 10);
+
+      const admin = userRepo.create({
+        tenant_id: savedTenant.id,
+        email: dto.admin_email,
+        encrypted_password: hashedPassword,
+        full_name: dto.admin_name,
+        phone: dto.admin_phone,
+        role: UserRole.ADMIN,
+        is_active: true,
+      });
+      const savedAdmin = await userRepo.save(admin);
+
+      await tenantRepo.update(savedTenant.id, { owner_id: savedAdmin.id });
+
+      this.logger.log(`Novo tenant criado: ${savedTenant.slug} (${savedTenant.id}) por ${dto.admin_email}`);
+
+      return {
+        tenant: {
+          id: savedTenant.id,
+          name: savedTenant.name,
+          slug: savedTenant.slug,
+        },
+        admin: {
+          id: savedAdmin.id,
+          email: savedAdmin.email,
+          full_name: savedAdmin.full_name,
+          role: savedAdmin.role,
+        },
+      };
     });
   }
 }
