@@ -15,7 +15,6 @@ import {
   Copy,
   CreditCard,
   MapPin,
-  Minus,
   Package2,
   Plus,
   Rocket,
@@ -23,7 +22,6 @@ import {
   ShoppingBag,
   Store,
   Truck,
-  X,
 } from 'lucide-react';
 import {
   Dialog,
@@ -32,13 +30,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api-client';
 import { useAuth } from '@/hooks/useAuth';
@@ -58,6 +49,8 @@ import {
   getStockTone,
 } from '@/lib/loja/product-utils';
 import { EmptyTenantState } from '@/components/loja/EmptyTenantState';
+import { CartSheet } from '@/components/loja/CartSheet';
+import { CheckoutSuccessPanel } from '@/components/loja/CheckoutSuccessPanel';
 import { LojaConfidenceCard } from '@/components/loja/LojaConfidenceCard';
 import { MetricCard } from '@/components/loja/MetricCard';
 import { ProductGridSkeleton } from '@/components/loja/ProductGridSkeleton';
@@ -1333,173 +1326,23 @@ export default function LojaPage() {
         </button>
       )}
 
-      <Sheet open={showCart} onOpenChange={setShowCart}>
-        <SheetContent className="overflow-hidden border-white/10 bg-[rgba(5,8,22,0.97)] p-0 text-foreground sm:max-w-xl">
-          <div className="flex h-full flex-col">
-            <SheetHeader className="border-b border-white/10 px-6 py-6">
-              <div className="flex items-start justify-between gap-4 pr-10">
-                <div>
-                  <SheetTitle className="text-2xl tracking-tight text-foreground">
-                    Seu carrinho
-                  </SheetTitle>
-                  <SheetDescription className="mt-2">
-                    Revise os itens e siga para um checkout mais claro e confiavel.
-                  </SheetDescription>
-                </div>
-                <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                  {cartCount} item{cartCount === 1 ? '' : 's'}
-                </div>
-              </div>
-            </SheetHeader>
-
-            <div className="flex-1 overflow-y-auto px-6 py-6">
-              {cart.length === 0 ? (
-                <div className="rounded-[28px] border border-dashed border-white/10 bg-[linear-gradient(135deg,rgba(16,185,129,0.08)_0%,rgba(56,189,248,0.06)_38%,rgba(255,255,255,0.03)_100%)] p-6">
-                  <div className="text-center">
-                    <ShoppingBag className="mx-auto size-10 text-muted-foreground" />
-                    <h3 className="mt-4 text-xl font-semibold tracking-tight text-foreground">
-                      Carrinho vazio
-                    </h3>
-                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                      Adicione o primeiro produto e veja como o checkout assume o resto com mais elegancia.
-                    </p>
-                  </div>
-
-                  <div className="mt-6 grid gap-3">
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        entrega ou retirada
-                      </p>
-                      <p className="mt-2 text-sm font-medium text-foreground">
-                        O cliente entende o caminho do pedido sem friccao.
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        pagamento claro
-                      </p>
-                      <p className="mt-2 text-sm font-medium text-foreground">
-                        Pix e dinheiro aparecem com resumo, valor e confirmacao mais limpos.
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        estoque confiavel
-                      </p>
-                      <p className="mt-2 text-sm font-medium text-foreground">
-                        A disponibilidade visivel evita surpresa e protege a percepcao da marca.
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCart(false);
-                      document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-4 py-3 text-sm font-semibold text-background transition hover:opacity-90"
-                  >
-                    Explorar catalogo
-                    <ArrowRight className="size-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {cart.map((item) => (
-                    <div
-                      key={item.id}
-                      className="rounded-[28px] border border-white/10 bg-white/[0.04] p-4"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-lg font-semibold tracking-tight text-foreground">
-                            {item.name}
-                          </p>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {formatCurrency(item.price)} por unidade
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateQuantity(item.id, 0)}
-                          className="rounded-full border border-white/10 p-2 text-muted-foreground transition hover:border-rose-400/20 hover:bg-rose-400/10 hover:text-rose-100"
-                          aria-label={`Remover ${item.name} do carrinho`}
-                        >
-                          <X className="size-4" />
-                        </button>
-                      </div>
-
-                      <div className="mt-4 flex items-center justify-between gap-4">
-                        <div className="inline-flex items-center rounded-2xl border border-white/10 bg-white/[0.04] p-1">
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                            className="rounded-xl p-2 text-muted-foreground transition hover:bg-white/[0.06] hover:text-foreground"
-                            aria-label={`Diminuir quantidade de ${item.name}`}
-                          >
-                            <Minus className="size-4" />
-                          </button>
-                          <span className="min-w-10 px-2 text-center text-sm font-semibold text-foreground">
-                            {item.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                            className="rounded-xl p-2 text-muted-foreground transition hover:bg-white/[0.06] hover:text-foreground"
-                            aria-label={`Aumentar quantidade de ${item.name}`}
-                          >
-                            <Plus className="size-4" />
-                          </button>
-                        </div>
-
-                        <p className="text-lg font-semibold tracking-tight text-foreground">
-                          {formatCurrency(item.price * item.quantity)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="border-t border-white/10 px-6 py-6">
-              <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-5">
-                <div className="mb-5 space-y-3">
-                  <SummaryRow label="Subtotal" value={formatCurrency(subtotal)} />
-                  <SummaryRow
-                    label={customerInfo.deliveryType === 'delivery' ? 'Entrega' : 'Retirada'}
-                    value={
-                      customerInfo.deliveryType === 'delivery'
-                        ? formatCurrency(deliveryFee)
-                        : 'Sem taxa'
-                    }
-                  />
-                  <SummaryRow label="Total" value={formatCurrency(checkoutTotal)} strong />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={openCheckout}
-                  disabled={cart.length === 0}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-4 py-3 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Finalizar compra
-                  <ArrowRight className="size-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleClearCart}
-                  className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-foreground transition hover:border-accent/30 hover:bg-white/[0.08]"
-                >
-                  Limpar carrinho
-                </button>
-              </div>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <CartSheet
+        open={showCart}
+        onOpenChange={setShowCart}
+        cart={cart}
+        cartCount={cartCount}
+        subtotal={subtotal}
+        deliveryFee={deliveryFee}
+        total={checkoutTotal}
+        deliveryType={customerInfo.deliveryType}
+        onUpdateQuantity={handleUpdateQuantity}
+        onClearCart={handleClearCart}
+        onCheckout={openCheckout}
+        onContinueShopping={() => {
+          setShowCart(false);
+          document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' });
+        }}
+      />
 
       <Dialog
         open={showCheckout}
@@ -1517,164 +1360,16 @@ export default function LojaPage() {
           className="max-h-[92vh] max-w-6xl overflow-hidden border-white/10 bg-[rgba(5,8,22,0.98)] p-0 text-foreground shadow-[0_40px_140px_-60px_rgba(2,6,23,1)]"
         >
           {checkoutSuccess ? (
-            <div className="grid h-full lg:grid-cols-[1.08fr_0.92fr]">
-              <div className="relative overflow-hidden border-b border-white/10 bg-[linear-gradient(160deg,rgba(16,185,129,0.2)_0%,rgba(56,189,248,0.14)_42%,rgba(5,8,22,0.98)_100%)] px-6 py-8 sm:px-8 sm:py-9 lg:border-b-0 lg:border-r">
-                <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(110,231,183,0.22),transparent_45%),radial-gradient(circle_at_80%_20%,rgba(34,211,238,0.18),transparent_38%)]" />
-                <div className="relative">
-                  <div className="inline-flex size-14 items-center justify-center rounded-3xl border border-emerald-300/20 bg-emerald-400/10 text-emerald-100">
-                    <BadgeCheck className="size-7" />
-                  </div>
-                  <p className="mt-6 text-xs uppercase tracking-[0.28em] text-emerald-100/75">
-                    pagamento confirmado
-                  </p>
-                  <h3 className="mt-3 max-w-2xl text-4xl font-semibold tracking-tight text-white">
-                    {checkoutSuccess.customerName
-                      ? `${checkoutSuccess.customerName.split(' ')[0]}, seu pedido agora esta oficialmente a caminho.`
-                      : 'Seu pedido agora esta oficialmente a caminho.'}
-                  </h3>
-                  <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-200/85">
-                    A experiencia fechou com o mesmo cuidado do resto da jornada: clareza no total,
-                    confianca no pagamento e um proximo passo obvio para o cliente.
-                  </p>
-
-                  <div className="mt-8 grid gap-4 sm:grid-cols-3">
-                    <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
-                      <p className="text-xs uppercase tracking-[0.22em] text-slate-300">pedido</p>
-                      <p className="mt-2 text-lg font-semibold text-white">
-                        {checkoutSuccess.orderNo || 'Pedido confirmado'}
-                      </p>
-                    </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
-                      <p className="text-xs uppercase tracking-[0.22em] text-slate-300">total</p>
-                      <p className="mt-2 text-lg font-semibold text-white">
-                        {formatCurrency(checkoutSuccess.total)}
-                      </p>
-                    </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
-                      <p className="text-xs uppercase tracking-[0.22em] text-slate-300">recebimento</p>
-                      <p className="mt-2 text-lg font-semibold text-white">
-                        {getDeliveryTypeLabel(checkoutSuccess.deliveryType)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col justify-between bg-white/[0.03] px-6 py-8 sm:px-8 sm:py-9">
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                      proximo capitulo
-                    </p>
-                    <h4 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-                      O cliente sai com mais serenidade e mais vontade de voltar.
-                    </h4>
-                  </div>
-
-                  <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-5">
-                    <div className="space-y-3">
-                      <SummaryRow
-                        label="Metodo"
-                        value={getPaymentMethodLabel(checkoutSuccess.paymentMethod)}
-                      />
-                      <SummaryRow
-                        label="Recebimento"
-                        value={getDeliveryTypeLabel(checkoutSuccess.deliveryType)}
-                      />
-                      {typeof checkoutSuccess.changeAmount === 'number' && (
-                        <SummaryRow
-                          label="Troco previsto"
-                          value={formatCurrency(checkoutSuccess.changeAmount)}
-                        />
-                      )}
-                      <SummaryRow label="Total confirmado" value={formatCurrency(checkoutSuccess.total)} strong />
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3">
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        confianca
-                      </p>
-                      <p className="mt-2 text-sm font-medium text-foreground">
-                        O pedido ficou claro do carrinho ate a confirmacao final.
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        retorno
-                      </p>
-                      <p className="mt-2 text-sm font-medium text-foreground">
-                        Agora a vitrine esta pronta para a proxima compra com o mesmo padrao premium.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[28px] border border-white/10 bg-background/60 p-5">
-                    <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
-                      acompanhamento
-                    </p>
-                    <div className="mt-4 space-y-3">
-                      <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-4">
-                        <p className="text-xs uppercase tracking-[0.2em] text-emerald-100/70">
-                          etapa 1
-                        </p>
-                        <p className="mt-2 text-sm font-medium text-emerald-50">
-                          Pagamento confirmado e pedido registrado com o codigo {checkoutSuccess.orderNo || 'da compra'}.
-                        </p>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                          etapa 2
-                        </p>
-                        <p className="mt-2 text-sm font-medium text-foreground">
-                          A preparacao e a retirada ou entrega aparecem na pagina de acompanhamento em tempo real.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-8 flex flex-col gap-3">
-                  {checkoutSuccess.orderNo && (
-                    <button
-                      type="button"
-                      onClick={handleOpenOrderTracking}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
-                    >
-                      Acompanhar pedido agora
-                      <ArrowRight className="size-4" />
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => void handleCopyCheckoutReceipt()}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-foreground transition hover:border-accent/30 hover:bg-white/[0.08]"
-                  >
-                    <Copy className="size-4" />
-                    Copiar comprovante
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      closeCheckout();
-                      document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-4 py-3 text-sm font-semibold text-background transition hover:opacity-90"
-                  >
-                    Continuar comprando
-                    <ArrowRight className="size-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={closeCheckout}
-                    className="inline-flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-foreground transition hover:border-accent/30 hover:bg-white/[0.08]"
-                  >
-                    Fechar resumo
-                  </button>
-                </div>
-              </div>
-            </div>
+            <CheckoutSuccessPanel
+              data={checkoutSuccess}
+              onTrackOrder={handleOpenOrderTracking}
+              onCopyReceipt={() => void handleCopyCheckoutReceipt()}
+              onContinueShopping={() => {
+                closeCheckout();
+                document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              onClose={closeCheckout}
+            />
           ) : (
             <form
               onSubmit={(event) => {
