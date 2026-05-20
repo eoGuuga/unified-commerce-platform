@@ -11360,6 +11360,13 @@ export class WhatsappService {
       return this.getPremiumSoftResetMessage();
     }
 
+    // LLM Router: primeira tentativa (substitui lógica determinística quando habilitado)
+    const llmRouterResult = await this.tryLLMRouterResponse(message, tenantId, conversation, currentState);
+    if (llmRouterResult) {
+      return llmRouterResult;
+    }
+
+    // Fallback: lógica determinística (quando LLM desabilitado ou confidence < 0.6)
     if (this.isBareOrderIntent(lowerMessage)) {
       return this.getPremiumOrderNudgeMessage();
     }
@@ -11375,14 +11382,9 @@ export class WhatsappService {
     }
 
     if (this.shouldUseNonCommercialRecovery(message, conversation, currentState)) {
-      const llmEnabled =
-        String(this.config.get('WHATSAPP_LLM_ASSIST_ENABLED') || '').toLowerCase() === 'true';
-      if (!llmEnabled) {
-        return this.getPremiumNonCommercialRecoveryMessage();
-      }
+      return this.getPremiumNonCommercialRecoveryMessage();
     }
 
-    // IMPORTANTE: Verificar pedidos (antes de outras respostas)
     if (this.isOrderIntent(lowerMessage)) {
       if (currentState === 'waiting_payment' && conversation) {
         await this.conversationService.clearPendingOrder(conversation.id);
@@ -11394,8 +11396,6 @@ export class WhatsappService {
           state: 'idle',
         };
       }
-      // ✅ NOVO: Pedido com 2+ itens na mesma frase (ex.: "quero 5 brigadeiros e 1 brownie")
-      // Faz parse e cria pending_order com múltiplos itens de uma vez.
       if (this.looksLikeMultiItemOrder(message)) {
         const multi = await this.processMultiItemOrder(message, tenantId, conversation);
         if (multi) return multi;
@@ -11403,56 +11403,28 @@ export class WhatsappService {
       return await this.processOrder(message, tenantId, conversation);
     }
 
-    // Comando: Cardápio / Menu
     if (this.isDirectCatalogRequest(message)) {
       return await this.getPremiumCardapio(tenantId);
     }
 
-    // Comando: Preço de [produto]
     if (this.isDirectPriceQuestion(message)) {
       return await this.getPremiumPriceResponse(message, tenantId, conversation);
     }
 
-    // Comando: Estoque de [produto]
     if (this.isDirectStockQuestion(message)) {
       return await this.getPremiumStockResponse(message, tenantId, conversation);
     }
 
-    // Comando: Horário
     if (this.isDirectScheduleQuestion(message)) {
       return this.getPremiumScheduleMessage();
     }
 
-    // Comando: Ajuda
     if (this.isDirectHelpRequest(message)) {
       return this.getPremiumHelpMessage();
     }
 
-    // Saudação
     if (this.isDirectGreeting(message)) {
       return this.getPremiumGreetingMessage();
-    }
-
-    // Resposta padrão
-    const shouldPreferConsultativeMemoryOverBareInsight =
-      this.hasConsultativeMemory(conversation) &&
-      this.isSalesPreferenceOnlyReply(message);
-
-    if (!shouldPreferConsultativeMemoryOverBareInsight) {
-      const exactProductInsight = await this.tryBareExactProductInsight(
-        message,
-        tenantId,
-        conversation,
-        currentState,
-      );
-      if (exactProductInsight) {
-        return exactProductInsight;
-      }
-    }
-
-    const llmRouterResult = await this.tryLLMRouterResponse(message, tenantId, conversation, currentState);
-    if (llmRouterResult) {
-      return llmRouterResult;
     }
 
     const conciergeResponse = await this.trySmartConciergeResponse(message, tenantId, conversation);
