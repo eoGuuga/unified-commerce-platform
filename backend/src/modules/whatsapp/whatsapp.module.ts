@@ -13,6 +13,9 @@ import { SalesVerticalPackService } from './services/sales-vertical-pack.service
 import { CatalogSalesContextService } from './services/catalog-sales-context.service';
 import { ProductOfferIntelligenceService } from './services/product-offer-intelligence.service';
 import { ConversationService } from './services/conversation.service';
+import { LLMRouterService } from './services/llm-router.service';
+import { ActionExecutorService } from './services/action-executor.service';
+import { BotConfigService } from './services/bot-config.service';
 import { ProductsModule } from '../products/products.module';
 import { OrdersModule } from '../orders/orders.module';
 import { PaymentsModule } from '../payments/payments.module';
@@ -48,6 +51,9 @@ import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity'
     CatalogSalesContextService,
     ProductOfferIntelligenceService,
     ConversationService,
+    LLMRouterService,
+    ActionExecutorService,
+    BotConfigService,
   ],
   exports: [WhatsappService, ConversationService],
 })

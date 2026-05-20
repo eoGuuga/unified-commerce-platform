@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MessageIntelligenceService } from './message-intelligence.service';
+import { RouterDecision } from './llm-router.service';
 import {
   ConversationResponseMode,
   ConversationSalesPreferenceProfile,
@@ -409,6 +410,92 @@ export class OpenAIService {
       quantity: analysis.quantity || undefined,
       confidence: analysis.confidence,
     };
+  }
+
+  async routeMessage(
+    systemPrompt: string,
+    userPrompt: string,
+    model?: string,
+    temperature?: number,
+  ): Promise<RouterDecision> {
+    const { apiKey, baseUrl, timeoutMs, allowNoKey, model: defaultModel } = this.getClientConfig();
+    if (!apiKey && !allowNoKey) {
+      throw new Error('OpenAI API key not configured');
+    }
+
+    const content = await this.callChatCompletions({
+      apiKey,
+      baseUrl,
+      timeoutMs,
+      body: {
+        model: model || defaultModel,
+        temperature: temperature ?? 0.3,
+        max_tokens: 200,
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'router_decision',
+            schema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                action: { type: 'string' },
+                params: { type: 'object' },
+                confidence: { type: 'number' },
+              },
+              required: ['action', 'params', 'confidence'],
+            },
+          },
+        },
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      },
+    });
+
+    if (!content) {
+      throw new Error('Empty response from LLM router');
+    }
+
+    const parsed = JSON.parse(content);
+    return {
+      action: parsed.action,
+      params: parsed.params || {},
+      confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.5,
+    };
+  }
+
+  async generateTextReply(
+    systemPrompt: string,
+    model?: string,
+    temperature?: number,
+  ): Promise<string | null> {
+    const { apiKey, baseUrl, timeoutMs, allowNoKey, model: defaultModel } = this.getClientConfig();
+    if (!apiKey && !allowNoKey) {
+      return null;
+    }
+
+    const content = await this.callChatCompletions({
+      apiKey,
+      baseUrl,
+      timeoutMs,
+      body: {
+        model: model || defaultModel,
+        temperature: temperature ?? 0.5,
+        max_tokens: 250,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: 'Gere a resposta.' },
+        ],
+      },
+    });
+
+    if (!content) {
+      return null;
+    }
+
+    return content.replace(/^["']|["']$/g, '').trim().slice(0, 600);
   }
 
   private getClientConfig() {

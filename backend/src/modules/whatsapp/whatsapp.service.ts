@@ -32,6 +32,9 @@ import {
   ProductOfferIntelligenceService,
 } from './services/product-offer-intelligence.service';
 import { ConversationService } from './services/conversation.service';
+import { LLMRouterService, RouterDecision } from './services/llm-router.service';
+import { ActionExecutorService } from './services/action-executor.service';
+import { BotConfigService } from './services/bot-config.service';
 import { ProductsService } from '../products/products.service';
 import { OrdersService } from '../orders/orders.service';
 import { PaymentsService, CreatePaymentDto } from '../payments/payments.service';
@@ -352,6 +355,9 @@ export class WhatsappService {
     private paymentsService: PaymentsService,
     private couponsService: CouponsService,
     private notificationsService: NotificationsService,
+    private llmRouterService: LLMRouterService,
+    private actionExecutorService: ActionExecutorService,
+    private botConfigService: BotConfigService,
   ) {}
 
   // Helpers de telefone agora em utils/phone.ts.
@@ -8778,6 +8784,124 @@ export class WhatsappService {
     }
   }
 
+  private async tryLLMRouterResponse(
+    message: string,
+    tenantId: string,
+    conversation?: TypedConversation,
+    currentState?: ConversationState,
+  ): Promise<string | null> {
+    const llmEnabled =
+      String(this.config.get('WHATSAPP_LLM_ASSIST_ENABLED') || '').toLowerCase() === 'true';
+    if (!llmEnabled) {
+      return null;
+    }
+
+    const isIdleLike =
+      !currentState ||
+      currentState === 'idle' ||
+      currentState === 'order_confirmed' ||
+      currentState === 'order_completed';
+    if (!isIdleLike) {
+      return null;
+    }
+
+    try {
+      const botConfig = await this.botConfigService.loadConfig(tenantId);
+      const products = await this.getCatalogProducts(tenantId);
+      const catalogSummary = products.slice(0, 20).map(
+        (p) => `${p.name} - R$${this.formatCurrency(Number(p.price || 0))}${Number(p.available_stock || 0) > 0 ? '' : ' (sem estoque)'}`,
+      );
+
+      const recentMessages: string[] = [];
+      const memory = this.getConversationIntelligenceMemory(conversation);
+      if (memory?.last_intent) {
+        recentMessages.push(`(ultima intencao: ${memory.last_intent})`);
+      }
+      if (memory?.last_product_name) {
+        recentMessages.push(`(ultimo produto mencionado: ${memory.last_product_name})`);
+      }
+
+      const customerName = conversation?.context?.customer_data?.name || null;
+      const pendingOrder = conversation?.context?.pending_order;
+      let pendingOrderSummary: string | null = null;
+      if (pendingOrder?.items?.length) {
+        pendingOrderSummary = pendingOrder.items
+          .map((i) => `${i.quantity}x ${i.produto_name}`)
+          .join(', ');
+      }
+
+      const decision = await this.llmRouterService.route({
+        message,
+        botConfig,
+        catalogSummary,
+        currentState: currentState || null,
+        recentMessages,
+        customerName,
+        pendingOrderSummary,
+      });
+
+      if (decision.confidence < 0.6) {
+        return null;
+      }
+
+      switch (decision.action) {
+        case 'show_catalog':
+          return await this.getPremiumCardapio(tenantId);
+        case 'process_order':
+          return await this.processOrder(
+            decision.params?.product
+              ? `quero ${decision.params.quantity || 1} ${decision.params.product}`
+              : message,
+            tenantId,
+            conversation,
+          );
+        case 'check_price':
+          return await this.getPremiumPriceResponse(
+            decision.params?.product || message,
+            tenantId,
+            conversation,
+          );
+        case 'check_stock':
+          return await this.getPremiumStockResponse(
+            decision.params?.product || message,
+            tenantId,
+            conversation,
+          );
+        case 'check_order_status':
+          return await this.handlePremiumOrderStatusQuery(tenantId, conversation, decision.params?.order_number || null);
+        case 'cancel_order':
+          return await this.handleCancelIntent(tenantId, conversation, currentState);
+        case 'select_payment':
+          return await this.processPaymentSelection(
+            decision.params?.method || message,
+            tenantId,
+            conversation,
+          );
+        case 'greeting':
+        case 'farewell':
+        case 'answer_question':
+        case 'clarify':
+        case 'handoff_human': {
+          const result = await this.actionExecutorService.execute(decision, {
+            tenantId,
+            conversation,
+            botConfig,
+            message,
+            customerName,
+          });
+          return result.response || null;
+        }
+        default:
+          return null;
+      }
+    } catch (error) {
+      this.logger.warn('LLM Router failed, falling through', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
   private async tryAIAssistedRouting(
     message: string,
     tenantId: string,
@@ -11324,6 +11448,11 @@ export class WhatsappService {
       if (exactProductInsight) {
         return exactProductInsight;
       }
+    }
+
+    const llmRouterResult = await this.tryLLMRouterResponse(message, tenantId, conversation, currentState);
+    if (llmRouterResult) {
+      return llmRouterResult;
     }
 
     const conciergeResponse = await this.trySmartConciergeResponse(message, tenantId, conversation);

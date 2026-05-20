@@ -629,6 +629,9 @@ describe('WhatsappService defensive WhatsApp flow', () => {
         validateCoupon: jest.fn(),
       } as any,
       notificationsService as any,
+      { route: jest.fn().mockResolvedValue({ action: 'clarify', params: {}, confidence: 0 }) } as any,
+      { execute: jest.fn().mockResolvedValue({ response: '' }) } as any,
+      { loadConfig: jest.fn().mockResolvedValue({ persona: { name: 'Assistente', role: 'vendedora', tone: 'acolhedora', greeting_style: '' }, store: { name: 'Loja', description: '', payment_methods: ['pix'], delivery_options: ['entrega'], business_hours: '' }, rules: [], model: 'gpt-4o-mini', temperature: 0.3 }) } as any,
     );
 
     return {
