@@ -8789,7 +8789,7 @@ export class WhatsappService {
     }
 
     const localAnalysis = this.messageIntelligenceService.analyze(message);
-    if (localAnalysis.flags.needsClarification || localAnalysis.flags.lowSignal) {
+    if (localAnalysis.flags.lowSignal) {
       return null;
     }
 
@@ -11216,7 +11216,11 @@ export class WhatsappService {
       this.isLooseReplyWithoutContext(lowerMessage) &&
       !this.hasConsultativeMemory(conversation)
     ) {
-      return this.getPremiumContextRecoveryMessage();
+      const llmEnabled =
+        String(this.config.get('WHATSAPP_LLM_ASSIST_ENABLED') || '').toLowerCase() === 'true';
+      if (!llmEnabled) {
+        return this.getPremiumContextRecoveryMessage();
+      }
     }
 
     const isCollectionStage =
@@ -11247,7 +11251,11 @@ export class WhatsappService {
     }
 
     if (this.shouldUseNonCommercialRecovery(message, conversation, currentState)) {
-      return this.getPremiumNonCommercialRecoveryMessage();
+      const llmEnabled =
+        String(this.config.get('WHATSAPP_LLM_ASSIST_ENABLED') || '').toLowerCase() === 'true';
+      if (!llmEnabled) {
+        return this.getPremiumNonCommercialRecoveryMessage();
+      }
     }
 
     // IMPORTANTE: Verificar pedidos (antes de outras respostas)
@@ -11726,7 +11734,7 @@ export class WhatsappService {
         storeContext,
       });
 
-      if (!assist || assist.confidence < 0.55 || !assist.safeReply) {
+      if (!assist || assist.confidence < 0.4 || !assist.safeReply) {
         return null;
       }
 
