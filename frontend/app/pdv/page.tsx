@@ -32,7 +32,7 @@ interface CartItem {
 interface Product {
   id: string;
   name: string;
-  price: string;
+  price: number | string;
   description?: string;
   is_active: boolean;
   stock?: number;
@@ -41,11 +41,11 @@ interface Product {
 
 interface Order {
   id: string;
-  total_amount: number;
+  total_amount: number | string;
   created_at: string;
 }
 
-type PaymentMethod = 'pix' | 'dinheiro';
+type PaymentMethod = 'pix' | 'dinheiro' | 'debito' | 'credito' | 'boleto';
 
 interface PaymentResult {
   pagamento: {
@@ -253,8 +253,8 @@ export default function PDVPage() {
   // SWR para produtos - configurado para atualizaÃ§Ã£o quase em tempo real
   // âš ï¸ CRÃTICO: tenantId deve vir do contexto JWT, nunca hardcoded
   const swrKey = mounted && tenantId ? `products:${tenantId}` : null;
-  const { data: products = [], error, isLoading, mutate } = useSWR<Product[]>(
-    swrKey, // SÃ³ buscar quando montado e tenantId disponÃ­vel
+  const { data: products = [], error, isLoading, mutate } = useSWR(
+    swrKey,
     () => productsFetcher(tenantId!),
     {
       refreshInterval: 3000, // Atualiza a cada 3 segundos para quase tempo real
@@ -278,9 +278,9 @@ export default function PDVPage() {
 
   // SWR para pedidos (estatÃ­sticas) - sÃ³ buscar se montado e com token
   const ordersKey = mounted && tenantId ? `orders-${tenantId}` : null;
-  const { data: orders = [] } = useSWR<Order[]>(
+  const { data: orders = [] } = useSWR(
     ordersKey,
-    () => ordersFetcher(tenantId!), // tenantId vem do contexto JWT
+    () => ordersFetcher(tenantId!),
     {
       refreshInterval: 10000,
       revalidateOnFocus: false, // Desabilitado para evitar erros 401 constantes
@@ -296,12 +296,12 @@ export default function PDVPage() {
   // EstatÃ­sticas em tempo real
   const stats = useMemo(() => {
     const today = new Date().toDateString();
-    const todayOrders = (orders || []).filter((o: Order) => {
+    const todayOrders = (orders || []).filter((o) => {
       if (!o || !o.created_at) return false;
       return new Date(o.created_at).toDateString() === today;
     });
 
-    const totalSales = todayOrders.reduce((sum: number, o: Order) => {
+    const totalSales = todayOrders.reduce((sum: number, o) => {
       const amount = o.total_amount;
       if (amount === null || amount === undefined) return sum;
       const numAmount = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
@@ -602,7 +602,7 @@ export default function PDVPage() {
         setCart([...cart, { 
           id: product.id, 
           name: product.name, 
-          price: parseFloat(product.price), 
+          price: parseFloat(String(product.price)), 
           quantity: 1,
           stock: availableStock - 1
         }]);
@@ -773,7 +773,7 @@ export default function PDVPage() {
     }
 
     const order = {
-      channel: 'pdv',
+      channel: 'pdv' as const,
       items: cart.map(item => ({
         produto_id: item.id,
         quantity: item.quantity,
@@ -833,7 +833,7 @@ export default function PDVPage() {
       }
 
       setPaymentData(null);
-      const paymentResult: PaymentResult = await api.createPayment(
+      const paymentResult = await api.createPayment(
         {
           pedido_id: activeOrder.id,
           method: paymentMethod,
@@ -842,7 +842,7 @@ export default function PDVPage() {
         tenantId,
       );
 
-      setPaymentData(paymentResult);
+      setPaymentData(paymentResult as unknown as PaymentResult);
       const isDevHost =
         typeof window !== 'undefined' &&
         (['localhost', '127.0.0.1'].includes(window.location.hostname) ||
@@ -1368,7 +1368,7 @@ export default function PDVPage() {
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="font-medium text-slate-900">{highlightText(product.name, searchTerm)}</p>
-                        <p className="mt-1 text-sm text-slate-500">{currencyFormatter.format(parseFloat(product.price))}</p>
+                        <p className="mt-1 text-sm text-slate-500">{currencyFormatter.format(parseFloat(String(product.price)))}</p>
                       </div>
                       <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600">
                         {((product as any).available_stock ?? product.stock ?? 0)} un.
@@ -1534,7 +1534,7 @@ export default function PDVPage() {
 
                           <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-slate-500">
                             <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-700">
-                              {currencyFormatter.format(parseFloat(product.price))}
+                              {currencyFormatter.format(parseFloat(String(product.price)))}
                             </span>
                             <span className="rounded-full bg-slate-100 px-3 py-1">Disponivel: {availableStock}</span>
                             <span className="rounded-full bg-slate-100 px-3 py-1">Total: {totalStock}</span>

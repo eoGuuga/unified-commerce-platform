@@ -42,21 +42,27 @@ export interface CreateProductInput {
 export type UpdateProductInput = Partial<CreateProductInput>;
 
 export interface StockSummaryEntry {
+  id: string;
   product_id: string;
   product_name: string;
+  name: string;
   sku?: string;
   stock: number;
+  current_stock: number;
+  available_stock: number;
+  reserved_stock: number;
   min_stock?: number;
-  reserved?: number;
-  available?: number;
+  status: 'ok' | 'low' | 'out';
   /** Permite campos extras de relatorio que o backend possa adicionar. */
   [key: string]: unknown;
 }
 
 export interface StockSummary {
+  total_products: number;
+  low_stock_count: number;
+  out_of_stock_count: number;
+  products?: StockSummaryEntry[];
   items?: StockSummaryEntry[];
-  total_products?: number;
-  /** Algumas versoes retornam o array direto sem envelope. */
   [key: string]: unknown;
 }
 

@@ -11,7 +11,7 @@ interface CartItem {
   stock?: number;
 }
 
-type PaymentMethod = 'pix' | 'dinheiro';
+type PaymentMethod = 'pix' | 'dinheiro' | 'debito' | 'credito' | 'boleto';
 
 interface PaymentResult {
   pagamento: {

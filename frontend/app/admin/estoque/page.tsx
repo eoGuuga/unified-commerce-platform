@@ -158,7 +158,7 @@ export default function EstoquePage() {
     void autoLogin();
   }, [authLoading, isAuthenticated, tenantId, login, router]);
 
-  const { data: stockSummary, error, isLoading, mutate } = useSWR<StockSummary>(
+  const { data: stockSummary, error, isLoading, mutate } = useSWR(
     tenantId ? `stock-summary:${tenantId}` : null,
     () => api.getStockSummary(tenantId!),
     {
@@ -539,7 +539,7 @@ export default function EstoquePage() {
                 const statusMeta = getStatusMeta(product.status);
                 const adjustment = adjustments[product.id] || { quantity: '', reason: '' };
                 const minStockValue =
-                  minStockEdits[product.id] ?? (product.min_stock > 0 ? String(product.min_stock) : '');
+                  minStockEdits[product.id] ?? ((product.min_stock ?? 0) > 0 ? String(product.min_stock) : '');
                 const isAdjusting = adjustingProduct === product.id;
 
                 return (

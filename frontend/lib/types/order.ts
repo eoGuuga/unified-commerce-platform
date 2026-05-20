@@ -97,6 +97,26 @@ export interface SalesReportEntry {
 }
 
 export interface SalesReport {
+  totalSales: number;
+  totalOrders: number;
+  avgTicket: number;
+  salesByChannel: Record<string, number>;
+  ordersByStatus: Record<string, number>;
+  topProducts: Array<{ name: string; quantity: number; revenue: number; rank: number }>;
+  salesByPeriod: {
+    today: number;
+    thisWeek: number;
+    thisMonth: number;
+  };
+  salesByDay: Array<{ date: string; value: number }>;
+  recentOrders: Array<{
+    id: string;
+    order_no: string;
+    status: string;
+    total_amount: string;
+    created_at: string;
+    channel?: string;
+  }>;
   entries?: SalesReportEntry[];
   total_revenue?: Decimal;
   total_orders?: number;

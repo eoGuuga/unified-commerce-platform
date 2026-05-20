@@ -262,19 +262,19 @@ export default function AdminDashboard() {
     void autoLogin();
   }, [authLoading, isAuthenticated, tenantId, login, router]);
 
-  const { data: productsData, mutate: mutateProducts } = useSWR<Product[]>(
+  const { data: productsData, mutate: mutateProducts } = useSWR(
     tenantId ? `products:${tenantId}` : null,
     () => api.getProducts(tenantId!),
     { refreshInterval: 10000, revalidateOnFocus: true },
   );
 
-  const { data: salesReport, error, isLoading, mutate: mutateSalesReport } = useSWR<SalesReport>(
+  const { data: salesReport, error, isLoading, mutate: mutateSalesReport } = useSWR(
     tenantId ? `sales-report:${tenantId}` : null,
     () => api.getSalesReport(tenantId!),
     { refreshInterval: 30000, revalidateOnFocus: true },
   );
 
-  const { data: stockOverview, mutate: mutateStockOverview } = useSWR<StockOverview>(
+  const { data: stockOverview, mutate: mutateStockOverview } = useSWR(
     tenantId ? `stock-summary:${tenantId}` : null,
     () => api.getStockSummary(tenantId!),
     { refreshInterval: 30000, revalidateOnFocus: true },
@@ -1202,7 +1202,7 @@ export default function AdminDashboard() {
                           preco
                         </p>
                         <p className="mt-1 font-semibold text-foreground">
-                          {formatCurrency(parseFloat(product.price))}
+                          {formatCurrency(parseFloat(String(product.price)))}
                         </p>
                       </div>
                       <span

@@ -61,7 +61,7 @@ import { SummaryRow } from '@/components/loja/SummaryRow';
 interface Product {
   id: string;
   name: string;
-  price: string;
+  price: number | string;
   description?: string;
   stock?: number;
   available_stock?: number;
@@ -353,8 +353,8 @@ export default function LojaPage() {
     const list = [...filteredProducts];
 
     list.sort((a, b) => {
-      const priceA = parseFloat(a.price);
-      const priceB = parseFloat(b.price);
+      const priceA = parseFloat(String(a.price));
+      const priceB = parseFloat(String(b.price));
       const stockA = getAvailableUnits(a);
       const stockB = getAvailableUnits(b);
 
@@ -480,7 +480,7 @@ export default function LojaPage() {
       {
         id: product.id,
         name: product.name,
-        price: parseFloat(product.price),
+        price: parseFloat(String(product.price)),
         quantity: 1,
       },
     ]);
@@ -663,7 +663,7 @@ export default function LojaPage() {
       const phoneDigits = customerInfo.phone.replace(/\D/g, '');
       const snapshotItems = cart.map((item) => ({ ...item }));
       const orderPayload = {
-        channel: 'ecommerce',
+        channel: 'ecommerce' as const,
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
         customer_phone: phoneDigits,
@@ -705,7 +705,7 @@ export default function LojaPage() {
         orderContext = {
           id: created.id,
           total: orderTotal,
-          orderNo: created.order_no || created.orderNo,
+          orderNo: (created as any).order_no || (created as any).orderNo,
         };
 
         setCreatedOrder(orderContext);
@@ -716,9 +716,9 @@ export default function LojaPage() {
           total: orderTotal,
         });
 
-        if (orderContext.orderNo) {
+        if (orderContext!.orderNo) {
           saveOrderTrackingContext({
-            orderNo: orderContext.orderNo,
+            orderNo: orderContext!.orderNo,
             customerEmail: customerInfo.email,
             customerPhone: customerInfo.phone,
             customerName: customerInfo.name,
@@ -729,7 +729,7 @@ export default function LojaPage() {
           items: snapshotItems,
           subtotal,
           deliveryFee,
-          total: orderContext.total,
+          total: orderContext!.total,
         });
       }
 
@@ -739,22 +739,22 @@ export default function LojaPage() {
         amount: number;
         metadata?: Record<string, unknown>;
       } = {
-        pedido_id: orderContext.id,
+        pedido_id: orderContext!.id,
         method: paymentMethod,
-        amount: orderContext.total,
+        amount: orderContext!.total,
       };
 
       if (paymentMethod === 'dinheiro' && Number.isFinite(cashReceivedNumber)) {
         paymentPayload.metadata = {
           cash_change_for: cashReceivedNumber,
-          cash_change_amount: Math.max(0, cashReceivedNumber - orderContext.total),
+          cash_change_amount: Math.max(0, cashReceivedNumber - orderContext!.total),
         };
       }
 
       const paymentResult = isOperatorPreview
         ? await api.createPayment(paymentPayload, activeTenantId)
         : await api.createPublicPayment(paymentPayload, activeTenantId);
-      setPaymentData(paymentResult);
+      setPaymentData(paymentResult as unknown as PaymentResult);
       setCart([]);
       setShowCart(false);
       toast.success(
@@ -1263,7 +1263,7 @@ export default function LojaPage() {
                                   preco
                                 </p>
                                 <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-                                  {formatCurrency(parseFloat(product.price))}
+                                  {formatCurrency(parseFloat(String(product.price)))}
                                 </p>
                               </div>
                               <div className="text-right text-xs text-muted-foreground">

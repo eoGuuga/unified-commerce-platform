@@ -536,7 +536,7 @@ export default function PedidoPage() {
           order_no: orderNoValue,
           customer_email: emailValue || undefined,
           customer_phone: phoneValue || undefined,
-        })) as TrackedOrder;
+        })) as unknown as TrackedOrder;
 
         setTrackedOrder(result);
         setOrderNo(orderNoValue);
