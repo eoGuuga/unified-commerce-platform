@@ -20,7 +20,7 @@ import { resolve } from 'node:path';
 // dotenv eh dep transitiva (via @nestjs/config); o require sob try/catch
 // evita quebrar caso esteja ausente - em CI as env vars vem do processo.
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
   const dotenv = require('dotenv') as { config: (opts: { path: string }) => void };
   dotenv.config({ path: resolve(__dirname, '..', '..', '.env') });
 } catch {

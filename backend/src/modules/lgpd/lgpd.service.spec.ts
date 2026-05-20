@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
 import { LgpdService } from './lgpd.service';
 import { LgpdRequestType, LgpdRequestStatus } from './dto/create-lgpd-request.dto';
 
