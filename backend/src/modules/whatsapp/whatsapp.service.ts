@@ -11062,6 +11062,12 @@ export class WhatsappService {
       }
     }
 
+    // LLM Router: quando habilitado e estado idle-like, processar ANTES de toda lógica determinística
+    const llmRouterResult = await this.tryLLMRouterResponse(message, tenantId, conversation, currentState);
+    if (llmRouterResult) {
+      return llmRouterResult;
+    }
+
     const orderNo = this.extractOrderNo(message);
     const mixedStatusAndPostFlowMutation = this.isMixedStatusAndMutationIntent(
       lowerMessage,
@@ -11358,12 +11364,6 @@ export class WhatsappService {
       await this.conversationService.clearCustomerData(conversation.id);
       await this.conversationService.updateState(conversation.id, 'idle');
       return this.getPremiumSoftResetMessage();
-    }
-
-    // LLM Router: primeira tentativa (substitui lógica determinística quando habilitado)
-    const llmRouterResult = await this.tryLLMRouterResponse(message, tenantId, conversation, currentState);
-    if (llmRouterResult) {
-      return llmRouterResult;
     }
 
     // Fallback: lógica determinística (quando LLM desabilitado ou confidence < 0.6)
