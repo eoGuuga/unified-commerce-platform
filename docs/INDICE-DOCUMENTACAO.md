@@ -15,9 +15,11 @@ Este indice aponta apenas para a documentacao consolidada.
 - `docs/CONSOLIDADO/09-CRONOLOGIA-DOCS.md`
 - `docs/CONSOLIDADO/10-SERVIDOR-COMANDOS.md`
 - `docs/CONSOLIDADO/11-CHECKLIST-FINAL-ENTREGA.md`
+- `docs/CONSOLIDADO/11-HOMOLOGACAO-LOUCAS-POR-BRIGADEIRO.md`
+- `docs/CONSOLIDADO/12-AUDITORIA-2026-05-20.md`
 - `docs/CONSOLIDADO/EVIDENCIAS-TESTES.md`
 
 ## Legado (arquivado)
 - `docs/LEGADO/README.md`
 
-Ultima atualizacao: 2026-05-14
+Ultima atualizacao: 2026-05-20

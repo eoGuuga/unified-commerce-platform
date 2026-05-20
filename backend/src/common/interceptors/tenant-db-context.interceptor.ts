@@ -34,12 +34,15 @@ export class TenantDbContextInterceptor implements NestInterceptor {
     const isWebhookRoute = this.isWebhookOrWhatsappRoute(request);
 
     if (allowNonJwtTenant || isWebhookRoute) {
-      const headerTenant = request.headers?.['x-tenant-id'];
-      const normalizedHeaderTenant = Array.isArray(headerTenant)
-        ? headerTenant[0]
-        : headerTenant;
-      if (typeof normalizedHeaderTenant === 'string' && normalizedHeaderTenant.trim()) {
-        return normalizedHeaderTenant.trim();
+      // Header x-tenant-id: aceito apenas em dev (nunca em webhook de produção)
+      if (allowNonJwtTenant) {
+        const headerTenant = request.headers?.['x-tenant-id'];
+        const normalizedHeaderTenant = Array.isArray(headerTenant)
+          ? headerTenant[0]
+          : headerTenant;
+        if (typeof normalizedHeaderTenant === 'string' && normalizedHeaderTenant.trim()) {
+          return normalizedHeaderTenant.trim();
+        }
       }
 
       const bodyTenant = request.body?.tenantId || request.body?.tenant_id;

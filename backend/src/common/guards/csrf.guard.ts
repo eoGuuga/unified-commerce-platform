@@ -1,4 +1,5 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { timingSafeEqual } from 'crypto';
 import { Request } from 'express';
 
 /**
@@ -43,7 +44,9 @@ export class CsrfGuard implements CanActivate {
       throw new ForbiddenException('CSRF token nao fornecido');
     }
 
-    if (csrfToken !== sessionToken) {
+    const a = Buffer.from(String(csrfToken));
+    const b = Buffer.from(String(sessionToken));
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
       throw new ForbiddenException('CSRF token invalido');
     }
 

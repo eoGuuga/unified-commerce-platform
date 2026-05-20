@@ -4,7 +4,7 @@ Objetivo: consolidar toda a documentacao antiga em poucos arquivos oficiais (cer
 Este diretorio e a fonte de verdade.
 
 Status: ATUALIZADO (revisao continua, fonte de verdade)
-Ultima atualizacao: 2026-03-08
+Ultima atualizacao: 2026-05-20
 
 ## Estrutura (fonte de verdade)
 1. 01-ESTADO-ATUAL.md
@@ -18,9 +18,12 @@ Ultima atualizacao: 2026-03-08
 9. 09-CRONOLOGIA-DOCS.md
 10. 10-SERVIDOR-COMANDOS.md
 11. 11-CHECKLIST-FINAL-ENTREGA.md
+12. 11-HOMOLOGACAO-LOUCAS-POR-BRIGADEIRO.md
+13. 12-AUDITORIA-2026-05-20.md
+14. EVIDENCIAS-TESTES.md
 
 Observacoes:
-- Registro de execucoes de testes: Testes_com_sucesso.txt
+- Registro de execucoes de testes: EVIDENCIAS-TESTES.md
 - Gate final automatizado: deploy/scripts/run-final-delivery-gate.sh
 - Os arquivos acima substituem a documentacao espalhada.
 - Documentacao antiga foi movida para docs/LEGADO (nenhum arquivo foi deletado).

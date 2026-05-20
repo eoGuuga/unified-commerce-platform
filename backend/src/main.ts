@@ -16,13 +16,15 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
   process.on('uncaughtException', (error: Error) => {
-    logger.error(`UNCAUGHT EXCEPTION - Backend pode crashar: ${error.message}`, error.stack);
+    logger.error(`UNCAUGHT EXCEPTION: ${error.message}`, error.stack);
+    process.exit(1);
   });
 
   process.on('unhandledRejection', (reason: any) => {
     const msg = reason instanceof Error ? reason.message : String(reason);
     const stack = reason instanceof Error ? reason.stack : undefined;
-    logger.error(`UNHANDLED REJECTION - Backend pode crashar: ${msg}`, stack);
+    logger.error(`UNHANDLED REJECTION: ${msg}`, stack);
+    process.exit(1);
   });
 
   const app = await NestFactory.create(AppModule, {

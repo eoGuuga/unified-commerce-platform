@@ -102,10 +102,16 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    * Remove múltiplas chaves (pattern)
    */
   async deletePattern(pattern: string): Promise<void> {
-    const keys = await this.redis.keys(pattern);
-    if (keys.length > 0) {
-      await this.redis.del(...keys);
-    }
+    let cursor = '0';
+    do {
+      const [nextCursor, keys] = await this.redis.scan(
+        cursor, 'MATCH', pattern, 'COUNT', '100',
+      );
+      cursor = nextCursor;
+      if (keys.length > 0) {
+        await this.redis.del(...keys);
+      }
+    } while (cursor !== '0');
   }
 
   private isRedisReady(): boolean {
