@@ -1,8 +1,7 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { Toaster, toast } from 'react-hot-toast';
 import useSWR from 'swr';
 import {
@@ -10,7 +9,6 @@ import {
   Boxes,
   CheckCircle2,
   Compass,
-  Copy,
   Rocket,
   Search,
   ShieldCheck,
@@ -18,6 +16,7 @@ import {
   Sparkles,
   Store,
 } from 'lucide-react';
+import { PdvPaymentModal } from '@/components/pdv/PdvPaymentModal';
 import api from '@/lib/api-client';
 import { useAuth } from '@/hooks/useAuth';
 import { getDevCredentials, hasDevCredentials } from '@/lib/config';
@@ -76,28 +75,28 @@ interface CompletedSaleState {
   changeAmount?: number;
 }
 
-// ⚠️ REMOVIDO: TENANT_ID hardcoded - deve vir do contexto JWT
+// âš ï¸ REMOVIDO: TENANT_ID hardcoded - deve vir do contexto JWT
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
 // Fetchers para SWR
 const productsFetcher = async (tenantId: string) => {
   try {
     if (!tenantId) {
-      throw new Error('Tenant ID é obrigatório');
+      throw new Error('Tenant ID Ã© obrigatÃ³rio');
     }
-    console.log('🔄 Buscando produtos para tenant:', tenantId);
+    console.log('ðŸ”„ Buscando produtos para tenant:', tenantId);
     const products = await api.getProducts(tenantId);
-    console.log('✅ Fetcher retornou:', products?.length || 0, 'produtos');
+    console.log('âœ… Fetcher retornou:', products?.length || 0, 'produtos');
     if (products && products.length > 0) {
-      console.log('📦 Exemplos:', products.slice(0, 3).map((p: Product) => ({ name: p.name, stock: p.stock })));
+      console.log('ðŸ“¦ Exemplos:', products.slice(0, 3).map((p: Product) => ({ name: p.name, stock: p.stock })));
     } else {
-      console.warn('⚠️ Nenhum produto retornado. Verifique se produtos foram cadastrados.');
+      console.warn('âš ï¸ Nenhum produto retornado. Verifique se produtos foram cadastrados.');
     }
     return Array.isArray(products) ? products : [];
   } catch (error: any) {
-    console.error('❌ Erro no fetcher de produtos:', error);
-    // Não fazer login automático aqui - deixar o hook useAuth gerenciar
-    console.warn('⚠️ Retornando array vazio devido ao erro');
+    console.error('âŒ Erro no fetcher de produtos:', error);
+    // NÃ£o fazer login automÃ¡tico aqui - deixar o hook useAuth gerenciar
+    console.warn('âš ï¸ Retornando array vazio devido ao erro');
     return [];
   }
 };
@@ -106,9 +105,9 @@ const ordersFetcher = async (tenantId: string) => {
   try {
     return await api.getOrders(tenantId);
   } catch (error: any) {
-    // Se for erro de autenticação, retornar array vazio silenciosamente
+    // Se for erro de autenticaÃ§Ã£o, retornar array vazio silenciosamente
     if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
-      console.warn('⚠️ Erro de autenticação ao buscar pedidos (normal se token expirou)');
+      console.warn('âš ï¸ Erro de autenticaÃ§Ã£o ao buscar pedidos (normal se token expirou)');
       return [];
     }
     console.error('Erro ao buscar pedidos:', error);
@@ -251,33 +250,33 @@ export default function PDVPage() {
     [],
   );
 
-  // SWR para produtos - configurado para atualização quase em tempo real
-  // ⚠️ CRÍTICO: tenantId deve vir do contexto JWT, nunca hardcoded
+  // SWR para produtos - configurado para atualizaÃ§Ã£o quase em tempo real
+  // âš ï¸ CRÃTICO: tenantId deve vir do contexto JWT, nunca hardcoded
   const swrKey = mounted && tenantId ? `products:${tenantId}` : null;
   const { data: products = [], error, isLoading, mutate } = useSWR<Product[]>(
-    swrKey, // Só buscar quando montado e tenantId disponível
+    swrKey, // SÃ³ buscar quando montado e tenantId disponÃ­vel
     () => productsFetcher(tenantId!),
     {
       refreshInterval: 3000, // Atualiza a cada 3 segundos para quase tempo real
       revalidateOnFocus: true, // Revalidar ao focar para garantir dados atualizados
       revalidateOnReconnect: true,
-      keepPreviousData: true, // Manter dados anteriores durante atualização
-      dedupingInterval: 1000, // Evitar requisições duplicadas em 1s
+      keepPreviousData: true, // Manter dados anteriores durante atualizaÃ§Ã£o
+      dedupingInterval: 1000, // Evitar requisiÃ§Ãµes duplicadas em 1s
       onError: (err) => {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error('❌ Erro ao carregar produtos:', err);
-        toast.error(msg.includes('401') ? 'Sessão expirada. Faça login novamente.' : 'Erro ao carregar produtos. Verifique o console (F12).');
+        console.error('âŒ Erro ao carregar produtos:', err);
+        toast.error(msg.includes('401') ? 'SessÃ£o expirada. FaÃ§a login novamente.' : 'Erro ao carregar produtos. Verifique o console (F12).');
       },
       onSuccess: (data) => {
-        // Log apenas em desenvolvimento e quando necessário
+        // Log apenas em desenvolvimento e quando necessÃ¡rio
         if (process.env.NODE_ENV === 'development') {
-          console.log('✅ Produtos atualizados:', data?.length || 0, 'produtos');
+          console.log('âœ… Produtos atualizados:', data?.length || 0, 'produtos');
         }
       },
     }
   );
 
-  // SWR para pedidos (estatísticas) - só buscar se montado e com token
+  // SWR para pedidos (estatÃ­sticas) - sÃ³ buscar se montado e com token
   const ordersKey = mounted && tenantId ? `orders-${tenantId}` : null;
   const { data: orders = [] } = useSWR<Order[]>(
     ordersKey,
@@ -286,7 +285,7 @@ export default function PDVPage() {
       refreshInterval: 10000,
       revalidateOnFocus: false, // Desabilitado para evitar erros 401 constantes
       onError: (err) => {
-        // Silenciar erros 401 de pedidos (não crítico para PDV)
+        // Silenciar erros 401 de pedidos (nÃ£o crÃ­tico para PDV)
         if (!err.message?.includes('401') && !err.message?.includes('Unauthorized')) {
           console.error('Erro ao buscar pedidos:', err);
         }
@@ -294,7 +293,7 @@ export default function PDVPage() {
     }
   );
 
-  // Estatísticas em tempo real
+  // EstatÃ­sticas em tempo real
   const stats = useMemo(() => {
     const today = new Date().toDateString();
     const todayOrders = (orders || []).filter((o: Order) => {
@@ -316,7 +315,7 @@ export default function PDVPage() {
     return { totalSales, totalOrders, avgTicket, lowStockCount };
   }, [orders, products]);
 
-  // Produtos filtrados com autocomplete - com memoização estável
+  // Produtos filtrados com autocomplete - com memoizaÃ§Ã£o estÃ¡vel
   const filteredProducts = useMemo(() => {
     if (!products || products.length === 0) return [];
     if (!debouncedSearch) return products;
@@ -328,13 +327,13 @@ export default function PDVPage() {
     ).slice(0, 10);
   }, [products, debouncedSearch]);
 
-  // Sugestões de autocomplete
+  // SugestÃµes de autocomplete
   const suggestions = useMemo(() => {
     if (!debouncedSearch || debouncedSearch.length < 2) return [];
     return filteredProducts.slice(0, 5);
   }, [filteredProducts, debouncedSearch]);
 
-  // Garantir que só execute no cliente
+  // Garantir que sÃ³ execute no cliente
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -342,7 +341,7 @@ export default function PDVPage() {
   // Debug: Log quando produtos mudarem
   useEffect(() => {
     if (mounted) {
-      console.log('📊 Estado dos produtos:', {
+      console.log('ðŸ“Š Estado dos produtos:', {
         count: products?.length || 0,
         isLoading,
         hasError: !!error,
@@ -353,11 +352,11 @@ export default function PDVPage() {
     }
   }, [products, isLoading, error, mounted]);
 
-  // Liberar reservas apenas ao sair da página.
+  // Liberar reservas apenas ao sair da pÃ¡gina.
   useEffect(() => {
     if (!mounted) return;
 
-    // Liberar ao fechar página/aba
+    // Liberar ao fechar pÃ¡gina/aba
     const handleBeforeUnload = () => {
       void releaseCartReservations(cartRef.current, { keepalive: true });
     };
@@ -374,18 +373,18 @@ export default function PDVPage() {
   useEffect(() => {
     if (!mounted || authLoading) return;
     
-    // Se não está autenticado ou não tem tenantId, fazer login automático (desenvolvimento)
+    // Se nÃ£o estÃ¡ autenticado ou nÃ£o tem tenantId, fazer login automÃ¡tico (desenvolvimento)
     if (!isAuthenticated || !tenantId) {
       if (process.env.NODE_ENV === 'development' && hasDevCredentials()) {
-        console.log('Não autenticado, fazendo login automático...');
+        console.log('NÃ£o autenticado, fazendo login automÃ¡tico...');
         autoLogin();
       } else {
-        toast.error('Autenticação necessária. Faça login para continuar.');
+        toast.error('AutenticaÃ§Ã£o necessÃ¡ria. FaÃ§a login para continuar.');
         router.push('/login');
       }
     } else {
-      console.log('Autenticado, forçando carregamento de produtos...');
-      // Forçar revalidação após montar
+      console.log('Autenticado, forÃ§ando carregamento de produtos...');
+      // ForÃ§ar revalidaÃ§Ã£o apÃ³s montar
       setTimeout(() => mutate(), 500);
     }
   }, [mounted, authLoading, isAuthenticated, tenantId, mutate, router]);
@@ -412,7 +411,7 @@ export default function PDVPage() {
         return;
       }
 
-      // Se estiver digitando na busca, não processar outros atalhos
+      // Se estiver digitando na busca, nÃ£o processar outros atalhos
       if (document.activeElement === searchInputRef.current) {
         // Enter: Adicionar produto selecionado
         if (e.key === 'Enter' && !e.ctrlKey && selectedProductIndex >= 0 && suggestions[selectedProductIndex]) {
@@ -423,7 +422,7 @@ export default function PDVPage() {
           return;
         }
 
-        // Setas: Navegar sugestões
+        // Setas: Navegar sugestÃµes
         if (e.key === 'ArrowDown') {
           e.preventDefault();
           setSelectedProductIndex(prev => 
@@ -458,7 +457,7 @@ export default function PDVPage() {
         return;
       }
 
-      // Delete: Remover último item do carrinho
+      // Delete: Remover Ãºltimo item do carrinho
       if (e.key === 'Delete' && cart.length > 0 && !isSelling) {
         const lastItem = cart[cart.length - 1];
         handleRemoveFromCart(lastItem.id);
@@ -507,41 +506,41 @@ export default function PDVPage() {
   const autoLogin = useCallback(async () => {
     if (typeof window === 'undefined') return;
     
-    // ✅ CRÍTICO: Auto-login APENAS em desenvolvimento e se explicitamente habilitado
+    // âœ… CRÃTICO: Auto-login APENAS em desenvolvimento e se explicitamente habilitado
     const isDevelopment = process.env.NODE_ENV === 'development';
     const allowAutoLogin = process.env.NEXT_PUBLIC_ALLOW_AUTO_LOGIN === 'true';
     
     if (!isDevelopment || !allowAutoLogin) {
-      // Em produção ou se não habilitado, não fazer auto-login
+      // Em produÃ§Ã£o ou se nÃ£o habilitado, nÃ£o fazer auto-login
       setIsLoggingIn(false);
       return;
     }
     
     setIsLoggingIn(true);
     try {
-      // ⚠️ CRÍTICO: Em desenvolvimento, usar credenciais apenas se configuradas via env
+      // âš ï¸ CRÃTICO: Em desenvolvimento, usar credenciais apenas se configuradas via env
       if (!hasDevCredentials()) {
-        toast.error('Credenciais de desenvolvimento não configuradas. Configure NEXT_PUBLIC_DEV_EMAIL, NEXT_PUBLIC_DEV_PASSWORD e NEXT_PUBLIC_DEV_TENANT_ID');
+        toast.error('Credenciais de desenvolvimento nÃ£o configuradas. Configure NEXT_PUBLIC_DEV_EMAIL, NEXT_PUBLIC_DEV_PASSWORD e NEXT_PUBLIC_DEV_TENANT_ID');
         setIsLoggingIn(false);
         return;
       }
 
-      console.log('[DEV] Fazendo login automático...');
+      console.log('[DEV] Fazendo login automÃ¡tico...');
       const devCreds = getDevCredentials();
       const result = await login(devCreds.email, devCreds.password, devCreds.tenantId);
       
       if (result.success) {
         console.log('[DEV] Login realizado, carregando produtos...');
-        // Aguardar um pouco antes de forçar revalidação
+        // Aguardar um pouco antes de forÃ§ar revalidaÃ§Ã£o
         setTimeout(() => {
           mutate();
         }, 300);
       } else {
-        toast.error(result.error || 'Erro ao fazer login automático. Verifique as credenciais.');
+        toast.error(result.error || 'Erro ao fazer login automÃ¡tico. Verifique as credenciais.');
       }
     } catch (err: any) {
-      console.error('Erro no login automático:', err);
-      toast.error(err.message || 'Erro ao fazer login automático. Verifique se o usuário padrão foi criado.');
+      console.error('Erro no login automÃ¡tico:', err);
+      toast.error(err.message || 'Erro ao fazer login automÃ¡tico. Verifique se o usuÃ¡rio padrÃ£o foi criado.');
     } finally {
       setIsLoggingIn(false);
     }
@@ -567,24 +566,24 @@ export default function PDVPage() {
 
   const handleAddToCart = useCallback(async (product: Product) => {
     if (!tenantId) {
-      toast.error('Tenant ID não disponível. Faça login novamente.');
+      toast.error('Tenant ID nÃ£o disponÃ­vel. FaÃ§a login novamente.');
       return;
     }
 
-    // Usar available_stock se disponível, senão usar stock
+    // Usar available_stock se disponÃ­vel, senÃ£o usar stock
     const availableStock = (product as any).available_stock ?? product.stock ?? 0;
     
     if (availableStock === 0) {
-      toast.error('Produto sem estoque disponível!');
+      toast.error('Produto sem estoque disponÃ­vel!');
       return;
     }
 
     const existingItem = cart.find(item => item.id === product.id);
     const quantityToAdd = existingItem ? existingItem.quantity + 1 : 1;
 
-    // Validação crítica: verificar se tem estoque suficiente
+    // ValidaÃ§Ã£o crÃ­tica: verificar se tem estoque suficiente
     if (quantityToAdd > availableStock) {
-      toast.error(`Estoque insuficiente! Disponível: ${availableStock} unidades.`);
+      toast.error(`Estoque insuficiente! DisponÃ­vel: ${availableStock} unidades.`);
       return;
     }
 
@@ -592,7 +591,7 @@ export default function PDVPage() {
       // Reservar estoque no backend
       await api.reserveStock(product.id, 1, tenantId);
       
-      // Adicionar ao carrinho com informação de estoque
+      // Adicionar ao carrinho com informaÃ§Ã£o de estoque
       if (existingItem) {
         setCart(cart.map(item =>
           item.id === product.id
@@ -609,16 +608,16 @@ export default function PDVPage() {
         }]);
       }
 
-      // Atualizar produtos para refletir nova reserva (sem revalidação completa)
-      await mutate(undefined, { revalidate: false }); // Atualizar cache sem nova requisição
+      // Atualizar produtos para refletir nova reserva (sem revalidaÃ§Ã£o completa)
+      await mutate(undefined, { revalidate: false }); // Atualizar cache sem nova requisiÃ§Ã£o
 
       toast.success(`${product.name} adicionado ao carrinho!`, {
-        icon: '✅',
+        icon: 'âœ…',
       });
     } catch (error: any) {
       const errorMsg = error.message || 'Erro ao reservar estoque';
-      if (errorMsg.includes('Unauthorized') || errorMsg.includes('autenticação')) {
-        toast.error('Sessão expirada. Redirecionando para login...');
+      if (errorMsg.includes('Unauthorized') || errorMsg.includes('autenticaÃ§Ã£o')) {
+        toast.error('SessÃ£o expirada. Redirecionando para login...');
         router.push('/login');
       } else {
         toast.error(errorMsg);
@@ -628,7 +627,7 @@ export default function PDVPage() {
 
   const handleRemoveFromCart = async (id: string) => {
     if (!tenantId) {
-      toast.error('Tenant ID não disponível.');
+      toast.error('Tenant ID nÃ£o disponÃ­vel.');
       return;
     }
 
@@ -642,13 +641,13 @@ export default function PDVPage() {
       // Remover do carrinho
       setCart(cart.filter(cartItem => cartItem.id !== id));
       
-      // Forçar atualização imediata dos produtos para refletir liberação
+      // ForÃ§ar atualizaÃ§Ã£o imediata dos produtos para refletir liberaÃ§Ã£o
       await mutate(); // Revalidar imediatamente
 
       toast.success(`${item.name} removido do carrinho`);
     } catch (error: any) {
       const errorMsg = error.message || 'Erro ao liberar estoque';
-      if (errorMsg.includes('Unauthorized') || errorMsg.includes('autenticação')) {
+      if (errorMsg.includes('Unauthorized') || errorMsg.includes('autenticaÃ§Ã£o')) {
         // Se for erro de auth, apenas remover do carrinho localmente
         setCart(cart.filter(cartItem => cartItem.id !== id));
         toast.success(`${item.name} removido do carrinho`);
@@ -661,7 +660,7 @@ export default function PDVPage() {
 
   const handleUpdateQuantity = async (id: string, quantity: number) => {
     if (!tenantId) {
-      toast.error('Tenant ID não disponível.');
+      toast.error('Tenant ID nÃ£o disponÃ­vel.');
       return;
     }
 
@@ -677,9 +676,9 @@ export default function PDVPage() {
 
     const availableStock = (product as any).available_stock ?? product.stock ?? 0;
 
-    // Validação crítica: não permitir quantidade > estoque disponível
+    // ValidaÃ§Ã£o crÃ­tica: nÃ£o permitir quantidade > estoque disponÃ­vel
     if (quantity > availableStock) {
-      toast.error(`Estoque insuficiente! Disponível: ${availableStock} unidades.`);
+      toast.error(`Estoque insuficiente! DisponÃ­vel: ${availableStock} unidades.`);
       return;
     }
 
@@ -699,12 +698,12 @@ export default function PDVPage() {
         item.id === id ? { ...item, quantity, stock: availableStock - quantity } : item
       ));
 
-      // Forçar atualização imediata dos produtos para refletir mudança na reserva
+      // ForÃ§ar atualizaÃ§Ã£o imediata dos produtos para refletir mudanÃ§a na reserva
       await mutate(); // Revalidar imediatamente
     } catch (error: any) {
       const errorMsg = error.message || 'Erro ao atualizar estoque';
-      if (errorMsg.includes('Unauthorized') || errorMsg.includes('autenticação')) {
-        toast.error('Sessão expirada. Redirecionando para login...');
+      if (errorMsg.includes('Unauthorized') || errorMsg.includes('autenticaÃ§Ã£o')) {
+        toast.error('SessÃ£o expirada. Redirecionando para login...');
         router.push('/login');
       } else {
         toast.error(errorMsg);
@@ -714,7 +713,7 @@ export default function PDVPage() {
 
   const handleSell = async () => {
     if (!tenantId) {
-      toast.error('Tenant ID não disponível. Faça login novamente.');
+      toast.error('Tenant ID nÃ£o disponÃ­vel. FaÃ§a login novamente.');
       return;
     }
 
@@ -732,7 +731,7 @@ export default function PDVPage() {
       }
       const availableStock = (product as any).available_stock ?? product.stock ?? 0;
       if (item.quantity > availableStock) {
-        invalidItems.push(`${item.name} (disponível: ${availableStock})`);
+        invalidItems.push(`${item.name} (disponÃ­vel: ${availableStock})`);
       }
     }
 
@@ -751,7 +750,7 @@ export default function PDVPage() {
 
   const handleCreateOrderAndPayment = async () => {
     if (!tenantId) {
-      toast.error('Tenant ID não disponível. Faça login novamente.');
+      toast.error('Tenant ID nÃ£o disponÃ­vel. FaÃ§a login novamente.');
       return;
     }
     const hasExistingOrder = Boolean(orderData?.id);
@@ -872,7 +871,7 @@ export default function PDVPage() {
           : 'Pedido criado. Pagamento gerado!',
       );
     } catch (error: any) {
-      const message = error.message || 'Não foi possível criar o pedido/pagamento';
+      const message = error.message || 'NÃ£o foi possÃ­vel criar o pedido/pagamento';
       setPaymentError(message);
       toast.error(message);
     } finally {
@@ -1043,7 +1042,7 @@ export default function PDVPage() {
     }
   };
 
-  // Evitar renderização até montar no cliente e ter tenantId
+  // Evitar renderizaÃ§Ã£o atÃ© montar no cliente e ter tenantId
   if (!mounted || authLoading || !tenantId) {
     return (
       <div className="app-shell full-bleed relative isolate overflow-hidden bg-slate-950">
@@ -1058,18 +1057,18 @@ export default function PDVPage() {
               PDV premium omnichannel
             </p>
             <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
-              Preparando a operação para vender com fluidez.
+              Preparando a operaÃ§Ã£o para vender com fluidez.
             </h1>
             <p className="mt-4 text-sm leading-7 text-slate-200/85">
               {authLoading
-                ? 'Validando autenticação e sincronizando o estoque em tempo real.'
+                ? 'Validando autenticaÃ§Ã£o e sincronizando o estoque em tempo real.'
                 : !tenantId
-                  ? 'Aguardando identificação do tenant para abrir o caixa com segurança.'
-                  : 'Carregando o PDV e conectando os atalhos da operação.'}
+                  ? 'Aguardando identificaÃ§Ã£o do tenant para abrir o caixa com seguranÃ§a.'
+                  : 'Carregando o PDV e conectando os atalhos da operaÃ§Ã£o.'}
             </p>
             {!tenantId && !authLoading && (
               <p className="mt-4 rounded-full border border-rose-300/20 bg-rose-400/10 px-4 py-2 text-sm text-rose-100">
-                Tenant ID indisponível. Faça login novamente para continuar.
+                Tenant ID indisponÃ­vel. FaÃ§a login novamente para continuar.
               </p>
             )}
           </div>
@@ -1193,7 +1192,7 @@ export default function PDVPage() {
                 <p className="text-xs uppercase tracking-[0.28em] text-cyan-100/70">Operacao atual</p>
                 <h2 className="mt-3 text-2xl font-semibold">Loja Chocola Velha</h2>
                 <p className="mt-2 text-sm text-slate-200/80">
-                  {todayLabel} • {user?.email || 'operador autenticado'}
+                  {todayLabel} â€¢ {user?.email || 'operador autenticado'}
                 </p>
                 <div className="mt-5 space-y-3">
                   <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
@@ -1749,297 +1748,30 @@ export default function PDVPage() {
       </div>
 
       {showPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-3xl rounded-[30px] border border-white/10 bg-white p-6 shadow-[0_40px_120px_rgba(15,23,42,0.4)] sm:p-8">
-            {completedSale ? (
-              <div className="grid gap-4 lg:grid-cols-[1.05fr,0.95fr]">
-                <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(160deg,rgba(16,185,129,0.18)_0%,rgba(56,189,248,0.14)_45%,rgba(15,23,42,0.98)_100%)] p-6 text-white">
-                  <div className="inline-flex size-14 items-center justify-center rounded-3xl border border-emerald-300/20 bg-emerald-400/10 text-emerald-100">
-                    <CheckCircle2 className="size-7" />
-                  </div>
-                  <p className="mt-6 text-xs uppercase tracking-[0.28em] text-emerald-100/80">
-                    venda confirmada
-                  </p>
-                  <h2 className="mt-3 text-3xl font-semibold tracking-tight">
-                    Caixa concluido com a serenidade de uma operacao madura.
-                  </h2>
-                  <p className="mt-4 text-sm leading-7 text-slate-200/85">
-                    Pedido, total e recebimento ficaram claros do primeiro clique ate a confirmacao final.
-                  </p>
-
-                  <div className="mt-8 grid gap-4 sm:grid-cols-3">
-                    <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
-                      <p className="text-xs uppercase tracking-[0.22em] text-slate-300">pedido</p>
-                      <p className="mt-2 text-lg font-semibold text-white">
-                        {completedSale.orderNo || 'Venda confirmada'}
-                      </p>
-                    </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
-                      <p className="text-xs uppercase tracking-[0.22em] text-slate-300">total</p>
-                      <p className="mt-2 text-lg font-semibold text-white">
-                        {currencyFormatter.format(completedSale.total)}
-                      </p>
-                    </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
-                      <p className="text-xs uppercase tracking-[0.22em] text-slate-300">itens</p>
-                      <p className="mt-2 text-lg font-semibold text-white">
-                        {completedSale.itemsCount}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6">
-                  <p className="text-xs uppercase tracking-[0.28em] text-slate-500">pos-venda</p>
-                  <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-                    O operador sai com clareza e pronto para a proxima venda.
-                  </h3>
-
-                  <div className="mt-6 rounded-[24px] border border-slate-200 bg-white p-5">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-4">
-                        <span className="text-sm text-slate-500">Metodo</span>
-                        <strong className="text-sm font-semibold text-slate-950">
-                          {completedSale.paymentMethod === 'pix' ? 'Pix' : 'Dinheiro'}
-                        </strong>
-                      </div>
-                      {typeof completedSale.changeAmount === 'number' && (
-                        <div className="flex items-center justify-between gap-4">
-                          <span className="text-sm text-slate-500">Troco</span>
-                          <strong className="text-sm font-semibold text-slate-950">
-                            {currencyFormatter.format(completedSale.changeAmount)}
-                          </strong>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between gap-4">
-                        <span className="text-sm text-slate-500">Total confirmado</span>
-                        <strong className="text-base font-semibold text-slate-950">
-                          {currencyFormatter.format(completedSale.total)}
-                        </strong>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-3">
-                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">ritmo</p>
-                      <p className="mt-2 text-sm font-medium text-slate-900">
-                        O fechamento terminou sem esconder risco, valor ou proximo passo.
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">proxima venda</p>
-                      <p className="mt-2 text-sm font-medium text-slate-900">
-                        O caixa ja pode voltar para a busca com o mesmo fluxo premium.
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">comprovante</p>
-                      <p className="mt-2 text-sm font-medium text-slate-900">
-                        O resumo da venda pode ser copiado em um clique para registro ou envio interno.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 flex flex-col gap-3">
-                    <button
-                      onClick={() => void copyCompletedSaleReceipt()}
-                      className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                    >
-                      <Copy className="size-4" />
-                      Copiar comprovante
-                    </button>
-                    <button
-                      onClick={() => {
-                        resetPaymentFlow();
-                        focusSearch();
-                      }}
-                      className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-                    >
-                      Nova venda
-                      <ArrowRight className="size-4" />
-                    </button>
-                    <button
-                      onClick={resetPaymentFlow}
-                      className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                    >
-                      Fechar resumo
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Fechamento da venda</p>
-                    <h2 className="mt-2 text-2xl font-semibold text-slate-950">Pagamento</h2>
-                    <p className="mt-2 text-sm text-slate-600">Total: {currencyFormatter.format(saleSummaryTotal)}</p>
-                    {orderData?.orderNo && (
-                      <p className="text-xs text-slate-400">Pedido: {orderData.orderNo}</p>
-                    )}
-                  </div>
-                  <button
-                    onClick={resetPaymentFlow}
-                    disabled={paymentLoading}
-                    className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Fechar
-                  </button>
-                </div>
-
-                <div className="mt-8 grid gap-4 lg:grid-cols-[1fr,0.9fr]">
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <button
-                        onClick={() => setPaymentMethod('pix')}
-                        className={`rounded-[24px] border-2 px-5 py-4 text-left transition ${
-                          paymentMethod === 'pix'
-                            ? 'border-cyan-500 bg-cyan-50 shadow-[0_12px_26px_rgba(8,145,178,0.12)]'
-                            : 'border-slate-200 bg-white hover:border-slate-300'
-                        }`}
-                      >
-                        <p className="text-sm font-semibold text-slate-950">PIX</p>
-                        <p className="mt-1 text-xs text-slate-500">QR code e copia e cola</p>
-                      </button>
-                      <button
-                        onClick={() => setPaymentMethod('dinheiro')}
-                        className={`rounded-[24px] border-2 px-5 py-4 text-left transition ${
-                          paymentMethod === 'dinheiro'
-                            ? 'border-emerald-500 bg-emerald-50 shadow-[0_12px_26px_rgba(16,185,129,0.12)]'
-                            : 'border-slate-200 bg-white hover:border-slate-300'
-                        }`}
-                      >
-                        <p className="text-sm font-semibold text-slate-950">Dinheiro</p>
-                        <p className="mt-1 text-xs text-slate-500">Troco calculado automaticamente</p>
-                      </button>
-                    </div>
-
-                    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-                      <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Parametros</p>
-                      <div className="mt-4 grid gap-4 md:grid-cols-2">
-                        <div>
-                          <label className="text-xs uppercase tracking-[0.24em] text-slate-500">Cupom</label>
-                          <input
-                            value={couponCode}
-                            onChange={(e) => setCouponCode(e.target.value)}
-                            disabled={Boolean(orderData?.id)}
-                            placeholder="EX: PROMO10"
-                            className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                          />
-                          {orderData?.id && (
-                            <p className="mt-2 text-xs text-slate-500">
-                              O pedido ja foi criado. Agora vamos apenas regenerar o pagamento com seguranca.
-                            </p>
-                          )}
-                        </div>
-                        {paymentMethod === 'dinheiro' && (
-                          <div>
-                            <label className="text-xs uppercase tracking-[0.24em] text-slate-500">Valor recebido</label>
-                            <input
-                              value={cashReceived}
-                              onChange={(e) => setCashReceived(e.target.value)}
-                              placeholder="0,00"
-                              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                            />
-                            {cashReceived && (
-                              <p className="mt-2 text-xs text-slate-500">Troco: {currencyFormatter.format(cashChange)}</p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <p className="text-xs leading-6 text-slate-500">
-                      Ambiente de teste: o Pix funciona com comprador de teste do Mercado Pago.
-                    </p>
-
-                    {paymentError && (
-                      <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                        {paymentError}
-                      </div>
-                    )}
-
-                    <div className="flex flex-col gap-3 sm:flex-row">
-                      <button
-                        onClick={handleCreateOrderAndPayment}
-                        disabled={paymentLoading}
-                        className="inline-flex flex-1 items-center justify-center rounded-full bg-[linear-gradient(135deg,#0891b2_0%,#0f766e_100%)] px-6 py-4 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(8,145,178,0.22)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
-                      >
-                        {paymentLoading
-                          ? 'Processando...'
-                          : orderData?.id
-                            ? 'Gerar pagamento novamente'
-                            : 'Gerar pagamento'}
-                      </button>
-                      {paymentData?.pagamento?.id && (
-                        <button
-                          onClick={handleConfirmPayment}
-                          disabled={paymentLoading}
-                          className="inline-flex flex-1 items-center justify-center rounded-full bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-4 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(34,197,94,0.2)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
-                        >
-                          Confirmar pagamento
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-950 p-6 text-white">
-                    <p className="text-xs uppercase tracking-[0.28em] text-cyan-100/70">Resumo da venda</p>
-                    <div className="mt-4 space-y-3">
-                      {saleSummaryItems.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-white">{item.name}</p>
-                            <p className="mt-1 text-xs text-slate-300">{item.quantity} x {currencyFormatter.format(item.price)}</p>
-                          </div>
-                          <strong className="text-sm font-semibold text-white">
-                            {currencyFormatter.format(item.price * item.quantity)}
-                          </strong>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-5">
-                      <span className="text-sm text-slate-300">Total final</span>
-                      <strong className="text-2xl font-semibold text-white">{currencyFormatter.format(saleSummaryTotal)}</strong>
-                    </div>
-
-                    {paymentData && (
-                      <div className="mt-6 rounded-[22px] border border-white/10 bg-white/5 p-4">
-                        {paymentData.message && (
-                          <p className="text-sm whitespace-pre-line text-slate-300">{paymentData.message}</p>
-                        )}
-                        {paymentMethod === 'pix' && paymentData.qr_code && (
-                          <div className="mt-4 flex flex-col items-center gap-4">
-                            <Image
-                              src={paymentData.qr_code}
-                              alt="QR Code Pix"
-                              width={192}
-                              height={192}
-                              unoptimized
-                              className="h-48 w-48 rounded-2xl border border-white/10 bg-white p-3"
-                            />
-                            {paymentData.copy_paste && (
-                              <div className="w-full">
-                                <label className="text-xs uppercase tracking-[0.24em] text-slate-400">Copia e cola</label>
-                                <textarea
-                                  readOnly
-                                  className="mt-2 h-28 w-full rounded-2xl border border-white/10 bg-slate-950/70 p-3 text-xs text-slate-200 outline-none"
-                                  value={paymentData.copy_paste}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+        <PdvPaymentModal
+          saleSummaryItems={saleSummaryItems}
+          saleSummaryTotal={saleSummaryTotal}
+          orderData={orderData}
+          paymentMethod={paymentMethod}
+          onPaymentMethodChange={setPaymentMethod}
+          cashReceived={cashReceived}
+          onCashReceivedChange={setCashReceived}
+          cashChange={cashChange}
+          couponCode={couponCode}
+          onCouponCodeChange={setCouponCode}
+          paymentLoading={paymentLoading}
+          paymentError={paymentError}
+          paymentData={paymentData}
+          completedSale={completedSale}
+          onCreateOrderAndPayment={handleCreateOrderAndPayment}
+          onConfirmPayment={handleConfirmPayment}
+          onCopyReceipt={() => void copyCompletedSaleReceipt()}
+          onNewSale={() => {
+            resetPaymentFlow();
+            focusSearch();
+          }}
+          onClose={resetPaymentFlow}
+        />
       )}
 
       <style jsx>{`
