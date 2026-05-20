@@ -29,7 +29,11 @@ export class TenantDbContextInterceptor implements NestInterceptor {
     const allowNonJwtTenant =
       !isProd && process.env.ALLOW_TENANT_FROM_REQUEST !== 'false';
 
-    if (allowNonJwtTenant) {
+    // Rotas de webhook/whatsapp validam o tenant por conta propria,
+    // entao extrair do body/query eh seguro mesmo em producao.
+    const isWebhookRoute = this.isWebhookOrWhatsappRoute(request);
+
+    if (allowNonJwtTenant || isWebhookRoute) {
       const headerTenant = request.headers?.['x-tenant-id'];
       const normalizedHeaderTenant = Array.isArray(headerTenant)
         ? headerTenant[0]
@@ -47,6 +51,11 @@ export class TenantDbContextInterceptor implements NestInterceptor {
     }
 
     return null;
+  }
+
+  private isWebhookOrWhatsappRoute(request: any): boolean {
+    const url = String(request.url || request.originalUrl || '');
+    return url.includes('/whatsapp/') || url.includes('/webhook');
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
