@@ -12054,6 +12054,7 @@ export class WhatsappService {
     }
 
     if (
+      this.isDirectCatalogRequest(normalized) ||
       this.isDirectPriceQuestion(normalized) ||
       this.isDirectStockQuestion(normalized) ||
       this.isDirectScheduleQuestion(normalized)
@@ -12535,7 +12536,7 @@ export class WhatsappService {
         );
 
         if (!resultadoBuscaSemQuantidade.produto && !resultadoBuscaSemQuantidade.sugestoes?.length) {
-          return this.getPremiumNonCommercialRecoveryMessage();
+          return `Nao encontrei "${orderInfo.productName}" no catalogo.\n\nEnvie "cardapio" para ver os produtos disponiveis ou me diga o que voce procura de outro jeito.`;
         }
 
         if (!resultadoBuscaSemQuantidade.produto && resultadoBuscaSemQuantidade.sugestoes?.length) {

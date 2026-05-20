@@ -5672,8 +5672,8 @@ describe('WhatsappService defensive WhatsApp flow', () => {
 
     const response = await service.generateResponse('vou fazer omelete', 'tenant-id');
 
-    expect(response).toContain('Calma, acho que eu puxei a conversa para o lado errado');
     expect(response).not.toContain('Quantos *vou fazer omelete*');
+    expect(response).toContain('cardapio');
   });
 
   it('uses non-commercial recovery for emotional reactions instead of opening a price flow', async () => {
