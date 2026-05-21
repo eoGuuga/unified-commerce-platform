@@ -141,24 +141,82 @@ export class ActionExecutorService {
     decision: RouterDecision,
     context: ExecutionContext,
   ): Promise<ExecutionResult> {
-    const { botConfig, message } = context;
-    const reason = decision.params?.reason || 'mensagem ambigua';
+    const { botConfig, message, conversation } = context;
+    const reason = decision.params?.reason || 'indeterminado';
 
-    const prompt = this.buildConversationalPrompt(
-      botConfig,
-      [
-        `A mensagem do cliente foi ambigua ou nao ficou clara.`,
-        `Mensagem: "${message}"`,
-        `Motivo da ambiguidade: ${reason}`,
-        '',
-        `Peca esclarecimento de forma natural e acolhedora como ${botConfig.persona.name}.`,
-        `Sugira opcoes se possivel (ex: "Voce gostaria de ver o cardapio ou fazer um pedido?").`,
-        'Maximo 2 linhas.',
-      ].join('\n'),
+    const conversationContext = this.buildClarifyContext(context);
+    const reasonHint = this.mapClarifyReason(reason);
+
+    const sections = [
+      `Contexto da conversa ate agora:`,
+      conversationContext,
+      '',
+      `Mensagem atual do cliente: "${message}"`,
+    ];
+
+    if (reasonHint) {
+      sections.push(`Dica: ${reasonHint}`);
+    }
+
+    sections.push(
+      '',
+      `Como ${botConfig.persona.name}, responda com naturalidade para entender melhor o que o cliente deseja.`,
+      `Nao diga "nao entendi" nem que a mensagem foi confusa — apenas peca mais contexto ou sugira opcoes de forma acolhedora.`,
+      '',
+      'Exemplos de tom natural:',
+      '- "Ah, que legal! Voce quer dar uma olhada no cardapio ou ja sabe o que quer?"',
+      '- "Pode me contar mais? Assim consigo ajudar melhor!"',
+      '- "Poxa, me ajuda a te ajudar — e pra uma ocasiao especial ou so uma vontade de doce?"',
+      '- "Pode me dar mais detalhes? Aqui tenho varias opcoes e quero te mostrar as melhores!"',
+      '',
+      'Maximo 2 linhas. Nao use marcacoes ou aspas.',
     );
 
+    const prompt = this.buildConversationalPrompt(botConfig, sections.join('\n'));
     const reply = await this.generateConversationalReply(prompt, botConfig);
     return { response: reply };
+  }
+
+  private buildClarifyContext(context: ExecutionContext): string {
+    const { conversation, customerName } = context;
+    const lines: string[] = [];
+
+    if (customerName) {
+      lines.push(`Cliente: ${customerName}`);
+    }
+
+    const state = conversation?.context?.state;
+    if (state && state !== 'idle') {
+      lines.push(`Etapa atual: ${state}`);
+    }
+
+    const memory = conversation?.context?.intelligence_memory;
+    if (memory?.last_intent) {
+      lines.push(`Ultima intencao: ${memory.last_intent}`);
+    }
+    if (memory?.last_product_name) {
+      lines.push(`Ultimo produto mencionado: ${memory.last_product_name}`);
+    }
+    if (memory?.last_customer_goal) {
+      lines.push(`Objetivo do cliente: ${memory.last_customer_goal}`);
+    }
+
+    const pendingOrder = conversation?.context?.pending_order;
+    if (pendingOrder?.items?.length) {
+      const items = pendingOrder.items.map((i) => `${i.quantity}x ${i.produto_name}`).join(', ');
+      lines.push(`Pedido em andamento: ${items}`);
+    }
+
+    return lines.length > 0 ? lines.join('\n') : '(conversa nova, sem contexto previo)';
+  }
+
+  private mapClarifyReason(reason: string): string {
+    const map: Record<string, string> = {
+      llm_error: 'o cliente pode estar se referindo a algo que precisa ser interpretado com mais contexto',
+      unknown_action: 'o cliente disse algo que nao se encaixa claramente nas opcoes disponiveis',
+      indeterminado: 'a mensagem pode ter multiplas interpretacoes',
+    };
+    return map[reason] || '';
   }
 
   private async handleHandoff(
