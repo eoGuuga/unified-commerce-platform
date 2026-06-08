@@ -1,218 +1,251 @@
 'use client';
 
-import { ArrowRight, Minus, Plus, ShoppingBag, X } from 'lucide-react';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { ShoppingCart, Minus, Plus, Trash2, X, CheckCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useCart, CartItem } from '@/hooks/useCart';
 import { formatCurrency } from '@/lib/format';
-import { SummaryRow } from './SummaryRow';
+import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
-export interface CartSheetItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-}
-
-interface CartSheetProps {
+/**
+ * CartSheet compativel com o page.tsx atual.
+ * Aceita props externas (modo legado) OU usa useCart() interno.
+ *
+ * - Modo legado: page.tsx passa cart/cartCount/onUpdateQuantity etc.
+ * - Modo novo: nao passa nada, usa useCart() diretamente.
+ */
+interface LegacyCartSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  cart: CartSheetItem[];
+  cart: CartItem[];
   cartCount: number;
   subtotal: number;
   deliveryFee: number;
   total: number;
   deliveryType: 'delivery' | 'pickup';
-  onUpdateQuantity: (id: string, quantity: number) => void;
+  onUpdateQuantity: (id: string, qty: number) => void;
   onClearCart: () => void;
   onCheckout: () => void;
   onContinueShopping: () => void;
 }
 
-/**
- * Side sheet do carrinho da loja online. Apresenta itens, controla
- * quantidade e expoe os botoes "Finalizar compra" + "Limpar carrinho".
- */
-export function CartSheet({
-  open,
-  onOpenChange,
-  cart,
-  cartCount,
-  subtotal,
-  deliveryFee,
-  total,
-  deliveryType,
-  onUpdateQuantity,
-  onClearCart,
-  onCheckout,
-  onContinueShopping,
-}: CartSheetProps) {
+interface NewCartSheetProps {
+  trigger?: React.ReactNode;
+  className?: string;
+}
+
+type CartSheetProps = LegacyCartSheetProps | NewCartSheetProps;
+
+export function CartSheet(props: CartSheetProps) {
+  // Detectar se estamos no modo legado (tem prop `cart`)
+  const isLegacy = 'cart' in props && Array.isArray((props as LegacyCartSheetProps).cart);
+
+  // Hook novo (sempre chamamos - regras dos hooks)
+  const cartHook = useCart();
+
+  // Dados efetivos (legado ou hook)
+  const items = isLegacy ? (props as LegacyCartSheetProps).cart : cartHook.items;
+  const totalItems = isLegacy ? (props as LegacyCartSheetProps).cartCount : cartHook.totalItems;
+  const subtotal = isLegacy ? (props as LegacyCartSheetProps).subtotal : cartHook.subtotal;
+  const deliveryFee = isLegacy ? (props as LegacyCartSheetProps).deliveryFee : cartHook.deliveryFee;
+  const total = isLegacy ? (props as LegacyCartSheetProps).total : cartHook.total;
+  const deliveryType = isLegacy ? (props as LegacyCartSheetProps).deliveryType : cartHook.deliveryType;
+
+  const handleUpdateQuantity = (id: string, qty: number) => {
+    if (isLegacy) {
+      (props as LegacyCartSheetProps).onUpdateQuantity(id, qty);
+    } else {
+      cartHook.updateQuantity(id, qty);
+    }
+  };
+
+  const handleRemoveItem = (id: string) => {
+    if (isLegacy) {
+      (props as LegacyCartSheetProps).onUpdateQuantity(id, 0);
+    } else {
+      cartHook.removeItem(id);
+    }
+  };
+
+  const handleClearCart = () => {
+    if (isLegacy) {
+      (props as LegacyCartSheetProps).onClearCart();
+    } else {
+      cartHook.clearCart();
+    }
+  };
+
+  const handleCheckout = () => {
+    if (isLegacy) {
+      (props as LegacyCartSheetProps).onCheckout();
+    } else {
+      // No-op - botao usa Link para /loja/checkout
+    }
+  };
+
+  const handleContinueShopping = () => {
+    if (isLegacy) {
+      (props as LegacyCartSheetProps).onContinueShopping();
+    } else {
+      // No-op no modo novo
+    }
+  };
+
+  // Controle de abertura (so faz sentido no modo legado)
+  const isOpen = isLegacy ? (props as LegacyCartSheetProps).open : false;
+  const onOpenChange = isLegacy
+    ? (props as LegacyCartSheetProps).onOpenChange
+    : (_open: boolean) => { /* no-op */ };
+
+  const hasItems = items.length > 0;
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="overflow-hidden border-white/10 bg-[rgba(5,8,22,0.97)] p-0 text-foreground sm:max-w-xl">
-        <div className="flex h-full flex-col">
-          <SheetHeader className="border-b border-white/10 px-6 py-6">
-            <div className="flex items-start justify-between gap-4 pr-10">
-              <div>
-                <SheetTitle className="text-2xl tracking-tight text-foreground">
-                  Seu carrinho
-                </SheetTitle>
-                <SheetDescription className="mt-2">
-                  Revise os itens e siga para um checkout mais claro e confiavel.
-                </SheetDescription>
-              </div>
-              <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                {cartCount} item{cartCount === 1 ? '' : 's'}
-              </div>
-            </div>
-          </SheetHeader>
+    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-hidden bg-background">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5" />
+            Seu carrinho
+          </SheetTitle>
+          <SheetDescription>
+            {hasItems
+              ? `${totalItems} item${totalItems === 1 ? '' : 's'} no carrinho`
+              : 'Seu carrinho está vazio'
+            }
+          </SheetDescription>
+        </SheetHeader>
 
-          <div className="flex-1 overflow-y-auto px-6 py-6">
-            {cart.length === 0 ? (
-              <div className="rounded-[28px] border border-dashed border-white/10 bg-[linear-gradient(135deg,rgba(16,185,129,0.08)_0%,rgba(56,189,248,0.06)_38%,rgba(255,255,255,0.03)_100%)] p-6">
-                <div className="text-center">
-                  <ShoppingBag className="mx-auto size-10 text-muted-foreground" />
-                  <h3 className="mt-4 text-xl font-semibold tracking-tight text-foreground">
-                    Carrinho vazio
-                  </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    Adicione o primeiro produto e veja como o checkout assume o resto com mais elegancia.
-                  </p>
+        <div className="flex flex-col h-full">
+          {hasItems ? (
+            <>
+              {/* Tipo de entrega */}
+              <div className="mb-6 p-4 border rounded-lg">
+                <h4 className="text-sm font-medium mb-3">Tipo de entrega</h4>
+                <div className="flex gap-2 text-xs text-muted-foreground">
+                  <span>Atual: {deliveryType === 'delivery' ? 'Entrega' : 'Retirada'}</span>
                 </div>
-
-                <div className="mt-6 grid gap-3">
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                      entrega ou retirada
-                    </p>
-                    <p className="mt-2 text-sm font-medium text-foreground">
-                      O cliente entende o caminho do pedido sem friccao.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                      pagamento claro
-                    </p>
-                    <p className="mt-2 text-sm font-medium text-foreground">
-                      Pix e dinheiro aparecem com resumo, valor e confirmacao mais limpos.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                      estoque confiavel
-                    </p>
-                    <p className="mt-2 text-sm font-medium text-foreground">
-                      A disponibilidade visivel evita surpresa e protege a percepcao da marca.
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={onContinueShopping}
-                  className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-4 py-3 text-sm font-semibold text-background transition hover:opacity-90"
-                >
-                  Explorar catalogo
-                  <ArrowRight className="size-4" />
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {cart.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-[28px] border border-white/10 bg-white/[0.04] p-4"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-lg font-semibold tracking-tight text-foreground">
-                          {item.name}
-                        </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {formatCurrency(item.price)} por unidade
-                        </p>
+                {deliveryType === 'delivery' && subtotal > 0 && subtotal < 30 && (
+                  <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="h-4 w-4 text-yellow-600 mt-0.5" />
+                      <div className="text-xs text-yellow-800">
+                        <p className="font-medium">Frete aplicado</p>
+                        <p>Adicione mais R$ {(30 - subtotal).toFixed(2)} para frete grátis</p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => onUpdateQuantity(item.id, 0)}
-                        className="rounded-full border border-white/10 p-2 text-muted-foreground transition hover:border-rose-400/20 hover:bg-rose-400/10 hover:text-rose-100"
-                        aria-label={`Remover ${item.name} do carrinho`}
-                      >
-                        <X className="size-4" />
-                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Itens do carrinho */}
+              <div className="flex-1 overflow-y-auto space-y-4">
+                {items.map((item) => (
+                  <div key={item.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <h5 className="font-medium text-sm">{item.name}</h5>
+                      <p className="text-xs text-muted-foreground">
+                        {formatCurrency(item.price)} unidade
+                      </p>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between gap-4">
-                      <div className="inline-flex items-center rounded-2xl border border-white/10 bg-white/[0.04] p-1">
-                        <button
-                          type="button"
-                          onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-                          className="rounded-xl p-2 text-muted-foreground transition hover:bg-white/[0.06] hover:text-foreground"
-                          aria-label={`Diminuir quantidade de ${item.name}`}
-                        >
-                          <Minus className="size-4" />
-                        </button>
-                        <span className="min-w-10 px-2 text-center text-sm font-semibold text-foreground">
-                          {item.quantity}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                          className="rounded-xl p-2 text-muted-foreground transition hover:bg-white/[0.06] hover:text-foreground"
-                          aria-label={`Aumentar quantidade de ${item.name}`}
-                        >
-                          <Plus className="size-4" />
-                        </button>
-                      </div>
-
-                      <p className="text-lg font-semibold tracking-tight text-foreground">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                        disabled={item.quantity <= 1}
+                        className="h-8 w-8"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <span className="text-sm font-medium min-w-[2rem] text-center">
+                        {item.quantity}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                        className="h-8 w-8"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                      <span className="text-sm font-medium min-w-[3rem] text-right">
                         {formatCurrency(item.price * item.quantity)}
-                      </p>
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveItem(item.id)}
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
 
-          <div className="border-t border-white/10 px-6 py-6">
-            <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-5">
-              <div className="mb-5 space-y-3">
-                <SummaryRow label="Subtotal" value={formatCurrency(subtotal)} />
-                <SummaryRow
-                  label={deliveryType === 'delivery' ? 'Entrega' : 'Retirada'}
-                  value={
-                    deliveryType === 'delivery'
-                      ? formatCurrency(deliveryFee)
-                      : 'Sem taxa'
-                  }
-                />
-                <SummaryRow label="Total" value={formatCurrency(total)} strong />
+              {/* Resumo */}
+              <div className="border-t pt-4 space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span>Subtotal</span>
+                  <span>{formatCurrency(subtotal)}</span>
+                </div>
+
+                {deliveryType === 'delivery' && subtotal > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span>Frete</span>
+                    <span className={subtotal >= 30 ? 'text-green-600' : ''}>
+                      {subtotal >= 30 ? 'Grátis' : formatCurrency(deliveryFee)}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-between font-semibold pt-2 border-t">
+                  <span>Total</span>
+                  <span>{formatCurrency(total)}</span>
+                </div>
+
+                {/* Botao de checkout */}
+                {isLegacy ? (
+                  <Button
+                    className="w-full mt-4"
+                    onClick={handleCheckout}
+                    disabled={total <= 0 || (deliveryType === 'delivery' && subtotal < 30)}
+                  >
+                    Finalizar compra
+                  </Button>
+                ) : (
+                  <Link href="/loja/checkout">
+                    <Button className="w-full mt-4" disabled={!cartHook.canCheckout}>
+                      Finalizar compra
+                    </Button>
+                  </Link>
+                )}
+
+                <Button
+                  onClick={handleClearCart}
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2"
+                >
+                  Limpar carrinho
+                </Button>
               </div>
-
-              <button
-                type="button"
-                onClick={onCheckout}
-                disabled={cart.length === 0}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-4 py-3 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Finalizar compra
-                <ArrowRight className="size-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={onClearCart}
-                className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-foreground transition hover:border-accent/30 hover:bg-white/[0.08]"
-              >
-                Limpar carrinho
-              </button>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <ShoppingCart className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Carrinho vazio</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Adicione produtos para começar a comprar
+                </p>
+                <Button onClick={handleContinueShopping}>Ver produtos</Button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>

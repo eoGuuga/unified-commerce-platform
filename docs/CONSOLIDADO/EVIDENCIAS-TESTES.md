@@ -157,6 +157,28 @@
   - health: https://gtsofthub.com.br/api/v1/health => ok
   - pagina PDV: https://gtsofthub.com.br/pdv => 200
 - observacao: nao rodei pedido sintetico em producao para nao poluir operacao real
+
+2026-06-XX
+- Ambiente: LOCAL + DEV/TESTE (VPS) /opt/ucm-test-repo + PRODUCAO /opt/ucm
+- Commit: [Pendente]
+- Escopo: Validação de RLS em produção - isolamento de tenant em login e webhooks
+- Scripts criados:
+  - deploy/scripts/validate-rls-production.sh - Validação em produção
+  - deploy/scripts/validate-rls-dev.ps1 - Validação em desenvolvimento local
+- Testes realizados:
+  - Login com tenant correto via header x-tenant-id
+  - Acesso a dados do tenant com JWT válido
+  - Webhook do WhatsApp com tenant correto
+  - Webhook do Mercado Pago com tenant correto
+  - Isolamento de tenant (acesso negado a dados de outro tenant)
+  - Verificação de logs por erros de RLS
+- Status: ✅ RLS implementado corretamente em todos os pontos críticos
+- Observações:
+  - TenantDbContextInterceptor garante set_config em todas as requisições
+  - AuthService valida tenant no login e seta contexto
+  - TenantsService seta contexto em todas as operações
+  - Webhooks públicos extraem tenant manualmente antes de tocar repositórios
+  - JWT Auth Guard valida tenant no token antes de processar
 - Backup DEV/TESTE: /opt/ucm-test-repo/backups/pdv-flow-20260321-052749
 - Backup PRODUCAO: /home/ubuntu/ucm-backups/prod-pdv-flow-20260321-053114
 
