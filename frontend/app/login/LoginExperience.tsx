@@ -15,24 +15,6 @@ const trustSignals = [
   'Fluxo pensado para abrir a rotina sem ruido',
 ];
 
-const productPathways = [
-  {
-    title: 'Loja e conversao',
-    description: 'Entre para acompanhar a experiencia do cliente final e a leitura do catalogo.',
-    href: '/loja',
-  },
-  {
-    title: 'Gestao e comando',
-    description: 'Painel executivo, estoque e operacao em um unico cockpit visual.',
-    href: '/admin',
-  },
-  {
-    title: 'Atendimento e caixa',
-    description: 'PDV fluido para vender com contexto, velocidade e seguranca.',
-    href: '/pdv',
-  },
-];
-
 type LoginExperienceProps = {
   redirectTarget: string;
 };
@@ -117,57 +99,13 @@ export default function LoginExperience({ redirectTarget }: LoginExperienceProps
                 </p>
               </div>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-10 flex flex-wrap gap-3">
                 {trustSignals.map((signal) => (
                   <div key={signal} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-4 py-2 text-sm text-slate-200">
                     <span className="h-2 w-2 rounded-full bg-accent" />
                     {signal}
                   </div>
                 ))}
-              </div>
-
-              <div className="mt-8 grid gap-4 xl:grid-cols-3">
-                {productPathways.map((pathway) => (
-                  <Link
-                    key={pathway.title}
-                    href={pathway.href}
-                    className="rounded-[1.6rem] border border-white/8 bg-slate-950/45 p-5 transition hover:-translate-y-1 hover:border-white/16"
-                  >
-                    <p className="text-lg font-semibold tracking-[-0.02em] text-white">{pathway.title}</p>
-                    <p className="mt-3 text-sm leading-6 text-slate-300">{pathway.description}</p>
-                    <div className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-accent">
-                      Explorar
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                      </svg>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-
-              <div className="mt-8 rounded-[1.9rem] border border-white/8 bg-slate-950/50 p-6 sm:p-7">
-                <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Signal room</p>
-                    <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">Tudo pronto para abrir o dia com serenidade.</p>
-                  </div>
-                  <div className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">
-                    Ambientes operacionais online
-                  </div>
-                </div>
-
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  {[
-                    ['Loja premium', 'Vitrine elegante e checkout fluido.'],
-                    ['Admin executivo', 'Leitura imediata de vendas, canais e decisoes.'],
-                    ['Estoque vivo', 'Risco, minimo e ajuste na mesma experiencia.'],
-                  ].map(([title, description]) => (
-                    <div key={title} className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
-                      <p className="text-sm font-semibold text-white">{title}</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-300">{description}</p>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           </section>
