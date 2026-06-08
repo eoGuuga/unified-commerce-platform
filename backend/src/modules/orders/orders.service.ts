@@ -274,7 +274,7 @@ export class OrdersService {
       pedido.coupon_code = couponCode || undefined;
       pedido.total_amount = total;
       pedido.delivery_type = deliveryType;
-      pedido.delivery_address = deliveryType === 'delivery' ? (deliveryAddress as any) : null;
+      pedido.delivery_address = deliveryType === 'delivery' ? (deliveryAddress as NonNullable<typeof pedido.delivery_address>) : undefined;
 
       const savedPedido = await manager.save(pedido);
 

@@ -9,7 +9,7 @@ export interface IdempotencyRecord {
   key_hash: string;
   operation_type: string;
   status: 'pending' | 'completed' | 'failed';
-  result?: any;
+  result?: unknown;
   expires_at: Date;
   created_at: Date;
   metadata: Record<string, any>;

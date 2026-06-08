@@ -45,7 +45,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
     // Se for lazyConnect (test), conectar explicitamente uma vez (sem retry).
     try {
-      if ((this.redis as any).status === 'wait') {
+      if ((this.redis as Redis & { status?: string }).status === 'wait') {
         await this.redis.connect();
       }
     } catch (error) {

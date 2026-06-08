@@ -47,7 +47,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Email ja cadastrado' })
   async register(@Body() registerDto: RegisterDto, @Request() req: TypedRequest): Promise<LoginResponse> {
     const isProd = process.env.NODE_ENV === 'production';
-    const userTenant = (req as any)?.user?.tenant_id;
+    const userTenant = req.user?.tenant_id;
     const headerValue = req.headers['x-tenant-id'];
     const headerTenant = Array.isArray(headerValue) ? headerValue[0] : headerValue;
     const tenantId = isProd ? userTenant : headerTenant;

@@ -18,11 +18,11 @@ export class AuditLogService {
       action: params.action,
       table_name: params.tableName,
       record_id: params.recordId,
-      old_data: (params.oldData || null) as any, // TypeORM JSONB requer 'any'
-      new_data: (params.newData || null) as any, // TypeORM JSONB requer 'any'
+      old_data: (params.oldData || null) as never, // TypeORM JSONB: any-like aceito
+      new_data: (params.newData || null) as never, // TypeORM JSONB: any-like aceito
       ip_address: params.ipAddress,
       user_agent: params.userAgent,
-      metadata: (params.metadata || {}) as Record<string, any>, // TypeORM JSONB requer 'any'
+      metadata: (params.metadata || {}) as never, // TypeORM JSONB: any-like aceito
     });
 
     return auditLogRepository.save(auditLog);

@@ -27,9 +27,51 @@ export interface MercadoPagoBoletoResult {
 export interface MercadoPagoPaymentDetails {
   status: string;
   status_detail: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   external_reference?: string;
   payment_method_id?: string;
+}
+
+/**
+ * Payload enviado para a API do Mercado Pago em payment.create().
+ * Modelado a partir do tipo PaymentCreateRequest do SDK, com apenas
+ * os campos que o provider usa de fato.
+ */
+export interface MercadoPagoPaymentBody {
+  transaction_amount: number;
+  description: string;
+  payment_method_id: string;
+  payer: { email: string };
+  external_reference: string;
+  notification_url?: string;
+  metadata?: Record<string, unknown>;
+  token?: string;
+  installments?: number;
+  date_of_expiration?: string;
+}
+
+/**
+ * Subset do response do Mercado Pago que o provider consome.
+ * SDK retorna muito mais campos; esses sao os que usamos.
+ */
+export interface MercadoPagoPaymentResponse {
+  id?: number | string;
+  status?: string;
+  status_detail?: string;
+  payment_method_id?: string;
+  external_reference?: string;
+  metadata?: Record<string, unknown>;
+  external_resource_url?: string;
+  point_of_interaction?: {
+    transaction_data?: {
+      qr_code?: string;
+      qr_code_base64?: string;
+    };
+  };
+  transaction_details?: {
+    external_resource_url?: string;
+    financial_institution?: string;
+  };
 }
 
 @Injectable()
@@ -74,7 +116,7 @@ export class MercadoPagoProvider {
     try {
       const payment = new Payment(this.client!);
 
-      const paymentData: any = {
+      const paymentData: MercadoPagoPaymentBody = {
         transaction_amount: amount,
         description: description,
         payment_method_id: 'pix',
@@ -86,7 +128,7 @@ export class MercadoPagoProvider {
         ...(metadata ? { metadata } : {}),
       };
 
-      const result = await payment.create({ body: paymentData });
+      const result = (await payment.create({ body: paymentData })) as MercadoPagoPaymentResponse;
 
       if (!result.point_of_interaction?.transaction_data) {
         throw new Error('Resposta do Mercado Pago invalida para Pix');
@@ -100,10 +142,11 @@ export class MercadoPagoProvider {
         copy_paste: transactionData.qr_code || '',
         transaction_id: String(result.id || ''),
       };
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as Error;
       const payload = {
-        error: error?.message,
-        stack: error?.stack,
+        error: err?.message,
+        stack: err?.stack,
       };
       if (this.isProd) {
         this.logger.error('Erro ao criar pagamento Pix no Mercado Pago', payload);
@@ -130,7 +173,7 @@ export class MercadoPagoProvider {
     try {
       const payment = new Payment(this.client!);
 
-      const paymentData: any = {
+      const paymentData: MercadoPagoPaymentBody = {
         transaction_amount: amount,
         description: description,
         payment_method_id: 'credit_card',
@@ -144,7 +187,7 @@ export class MercadoPagoProvider {
         ...(metadata ? { metadata } : {}),
       };
 
-      const result = await payment.create({ body: paymentData });
+      const result = (await payment.create({ body: paymentData })) as MercadoPagoPaymentResponse;
 
       return {
         transaction_id: String(result.id || ''),
@@ -152,10 +195,11 @@ export class MercadoPagoProvider {
         status_detail: result.status_detail || '',
         payment_method_id: result.payment_method_id || 'credit_card',
       };
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as Error;
       const payload = {
-        error: error?.message,
-        stack: error?.stack,
+        error: err?.message,
+        stack: err?.stack,
       };
       if (this.isProd) {
         this.logger.error('Erro ao criar pagamento com cartao no Mercado Pago', payload);
@@ -183,7 +227,7 @@ export class MercadoPagoProvider {
 
       const expireDate = expirationDate || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-      const paymentData: any = {
+      const paymentData: MercadoPagoPaymentBody = {
         transaction_amount: amount,
         description: description,
         payment_method_id: 'bolbradesco',
@@ -196,24 +240,25 @@ export class MercadoPagoProvider {
         ...(metadata ? { metadata } : {}),
       };
 
-      const result = await payment.create({ body: paymentData });
+      const result = (await payment.create({ body: paymentData })) as MercadoPagoPaymentResponse;
 
-      const barcode = (result as any).transaction_details?.external_resource_url ||
-                     (result as any).transaction_details?.financial_institution ||
+      const barcode = result.transaction_details?.external_resource_url ||
+                     result.transaction_details?.financial_institution ||
                      '';
 
       return {
         transaction_id: String(result.id || ''),
         barcode: barcode,
-        external_resource_url: (result as any).transaction_details?.external_resource_url ||
-                              (result as any).external_resource_url ||
+        external_resource_url: result.transaction_details?.external_resource_url ||
+                              result.external_resource_url ||
                               '',
         date_of_expiration: expireDate,
       };
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as Error;
       const payload = {
-        error: error?.message,
-        stack: error?.stack,
+        error: err?.message,
+        stack: err?.stack,
       };
       if (this.isProd) {
         this.logger.error('Erro ao criar pagamento com boleto no Mercado Pago', payload);
@@ -231,18 +276,19 @@ export class MercadoPagoProvider {
 
     try {
       const payment = new Payment(this.client!);
-      const result = await payment.get({ id: paymentId });
+      const result = (await payment.get({ id: paymentId })) as MercadoPagoPaymentResponse;
 
       return {
         status: result.status || 'pending',
         status_detail: result.status_detail || '',
-        metadata: (result as any).metadata || {},
-        external_reference: (result as any).external_reference || undefined,
+        metadata: result.metadata || {},
+        external_reference: result.external_reference || undefined,
         payment_method_id: result.payment_method_id || undefined,
       };
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as Error;
       const payload = {
-        error: error?.message,
+        error: err?.message,
         paymentId,
       };
       if (this.isProd) {

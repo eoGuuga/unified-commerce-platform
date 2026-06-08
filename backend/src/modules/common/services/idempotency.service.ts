@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import { IdempotencyKey } from '../../../database/entities/IdempotencyKey.entity';
 import { DbContextService } from './db-context.service';
@@ -75,15 +76,15 @@ export class IdempotencyService {
   ): Promise<void> {
     await this.db.getRepository(IdempotencyKey).update(id, {
       status: 'completed',
-      result: result as any, // TypeORM JSONB requer 'any'
-      metadata: (metadata || {}) as Record<string, any>, // TypeORM JSONB requer 'any'
+      result: (result ?? null) as never, // TypeORM JSONB: any-like aceito
+      metadata: (metadata || {}) as never, // TypeORM JSONB: any-like aceito
     });
   }
 
   async markFailed(id: string, metadata?: Record<string, unknown>): Promise<void> {
     await this.db.getRepository(IdempotencyKey).update(id, {
       status: 'failed',
-      metadata: (metadata || {}) as Record<string, any>, // TypeORM JSONB requer 'any'
+      metadata: (metadata || {}) as never, // TypeORM JSONB: any-like aceito
     });
   }
 
@@ -93,7 +94,7 @@ export class IdempotencyService {
       tenant_id: tenantId,
       key_hash: keyHash,
       ...(operationType ? { operation_type: operationType } : {}),
-    } as any);
+    } as Parameters<Repository<IdempotencyKey>['delete']>[0]);
   }
 
   async cleanup(tenantId: string, olderThanDays = 7): Promise<number> {
