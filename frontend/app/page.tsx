@@ -1,21 +1,31 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, ArrowUpRight, MessageCircle, Heart, Zap, Package, BarChart3, Users, Receipt, Check, Sparkles, Star } from 'lucide-react';
-import { ScrollReveal, ScrollParallax, ScrollCountUp, WhatsAppMockup, MetricCard } from '@/components/landing/Animations';
+import { ArrowRight, ArrowUpRight, MessageCircle, Heart, Zap, Package, BarChart3, Users, Receipt, Check, Sparkles, Star, MousePointer2, ChevronDown, ShieldCheck, Clock4, TrendingUp, Boxes, Bell, ShoppingBag } from 'lucide-react';
+import { ScrollReveal, ScrollParallax, ScrollCountUp, WhatsAppMockup, MetricCard, MóduloVisual, TimelineStep, AvatarGradiente, PlanoDestaque, BotaoMicro, ScrollHint } from '@/components/landing/Animations';
 
 /**
- * Landing page GTSoftHub - editorial premium.
- * - Copy autoexplicativa
- * - Animações de scroll
- * - Destaque do bot WhatsApp
- * - Página de preços
+ * Landing page GTSoftHub - 10/10.
+ * Cada detalhe intencional: copy autoexplicativa, animações sutis,
+ * mockup WhatsApp como protagonista, ícones visuais, micro-interações.
  */
 
-const modules = [
+type VisualType = 'loja' | 'pdv' | 'admin' | 'estoque';
+
+const modules: Array<{
+  number: string;
+  icon: typeof Package;
+  visual: VisualType;
+  title: string;
+  headline: string;
+  description: string;
+  href: string;
+  tags: string[];
+}> = [
   {
     number: '01',
     icon: Package,
+    visual: 'loja',
     title: 'Loja',
     headline: 'Sua vitrine na internet, aberta 24 horas.',
     description: 'O cliente vê o que tem, escolhe, paga, recebe. Sem ligar, sem esperar. Funciona enquanto você dorme.',
@@ -25,6 +35,7 @@ const modules = [
   {
     number: '02',
     icon: Receipt,
+    visual: 'pdv',
     title: 'PDV',
     headline: 'O caixa que entende o que está acontecendo.',
     description: 'Quando o cliente chega na loja, você sabe o que vendeu online, o que entrou, o que precisa repor. Tudo junto.',
@@ -34,6 +45,7 @@ const modules = [
   {
     number: '03',
     icon: BarChart3,
+    visual: 'admin',
     title: 'Admin',
     headline: 'A visão geral do seu negócio, numa tela só.',
     description: 'Vendas, clientes, produtos, canais. Sem planilha, sem montagem. Você abre, entende, decide.',
@@ -42,7 +54,8 @@ const modules = [
   },
   {
     number: '04',
-    icon: Users,
+    icon: Boxes,
+    visual: 'estoque',
     title: 'Estoque',
     headline: 'Nunca mais perder venda por falta de produto.',
     description: 'O sistema avisa antes de acabar. Você compra no tempo certo, na quantidade certa.',
@@ -75,57 +88,11 @@ const principios = [
   { k: '03', t: 'Você no controle', d: 'O sistema cuida do operacional. Você cuida da estratégia. Reunião pra entender o que aconteceu ontem não existe mais.' },
 ];
 
-const principles = principios;
-
-const planos = [
-  {
-    nome: 'Começar',
-    preco: 'R$ 197',
-    periodo: '/mês',
-    descricao: 'Para quem está validando o modelo e quer parar de controlar tudo no caderno.',
-    destaque: false,
-    features: [
-      'Loja online com até 100 produtos',
-      'PDV com 1 caixa',
-      'Bot de WhatsApp (100 conversas/mês)',
-      'Painel admin básico',
-      'Suporte por e-mail',
-    ],
-    cta: 'Começar agora',
-  },
-  {
-    nome: 'Crescer',
-    preco: 'R$ 497',
-    periodo: '/mês',
-    descricao: 'Para quem já vende e quer profissionalizar a operação sem perder o controle.',
-    destaque: true,
-    badge: 'Mais popular',
-    features: [
-      'Loja online com produtos ilimitados',
-      'PDV com até 5 caixas',
-      'Bot de WhatsApp ilimitado',
-      'Painel admin avançado com relatórios',
-      'Estoque com reposição automática',
-      'Suporte por WhatsApp em horário comercial',
-    ],
-    cta: 'Assinar Crescer',
-  },
-  {
-    nome: 'Escalar',
-    preco: 'R$ 1.297',
-    periodo: '/mês',
-    descricao: 'Para operações com várias lojas, alto volume ou necessidade de integrações.',
-    destaque: false,
-    features: [
-      'Tudo do plano Crescer',
-      'PDV com caixas ilimitados',
-      'Multi-loja (matriz + filiais)',
-      'API e integrações personalizadas',
-      'Gerente de conta dedicado',
-      'Suporte 24/7',
-    ],
-    cta: 'Falar com vendas',
-  },
+const etapas = [
+  { dia: '01', t: 'Diagnóstico', d: 'Entendemos sua operação, seus produtos, seu volume. Nada de "template genérico".' },
+  { dia: '02', t: 'Configuração', d: 'Importamos seus produtos, configuramos o bot de WhatsApp, ligamos tudo ao seu estoque.' },
+  { dia: '03', t: 'Treinamento', d: 'Ensinamos sua equipe a usar. Em vídeo, ao vivo, no ritmo deles. Sem pressa.' },
+  { dia: '04', t: 'Operação', d: 'Você atende pela loja, pelo site, pelo WhatsApp. Tudo no mesmo painel.' },
 ];
 
 const depoimentos = [
@@ -134,19 +101,82 @@ const depoimentos = [
     negocio: 'Brechó online · SP',
     texto: 'Antes eu respondia cliente no WhatsApp até meia-noite. Hoje o bot responde por mim e eu só acordo pra embalar. Triplicou as vendas.',
     iniciais: 'CM',
+    cor: 'from-emerald-300 to-cyan-400',
   },
   {
     nome: 'Roberto A.',
     negocio: 'Loja de cosméticos · RJ',
     texto: 'O que mais me impressionou foi o estoque. Nunca mais vendi algo que não tinha. E o cliente percebeu.',
     iniciais: 'RA',
+    cor: 'from-amber-300 to-rose-400',
   },
   {
     nome: 'Mariana S.',
     negocio: 'Cafeteria com e-commerce · MG',
     texto: 'Eu achava que precisava de 3 sistemas diferentes. A GTSoftHub fez tudo num lugar só, e ainda é bonito de ver.',
     iniciais: 'MS',
+    cor: 'from-violet-300 to-fuchsia-400',
   },
+];
+
+const planos = [
+  {
+    nome: 'Começar',
+    preco: 'R$ 197',
+    periodo: '/mês',
+    descricao: 'Para quem está validando o modelo e quer parar de controlar tudo no caderno.',
+    destaque: false,
+    cta: 'Começar 14 dias grátis',
+    ctaIcon: ArrowRight,
+    features: [
+      'Loja online com até 100 produtos',
+      'PDV com 1 caixa',
+      'Bot de WhatsApp (100 conversas/mês)',
+      'Painel admin básico',
+      'Suporte por e-mail',
+    ],
+  },
+  {
+    nome: 'Crescer',
+    preco: 'R$ 497',
+    periodo: '/mês',
+    descricao: 'Para quem já vende e quer profissionalizar a operação sem perder o controle.',
+    destaque: true,
+    badge: 'Mais escolhido',
+    cta: 'Assinar Crescer',
+    ctaIcon: Sparkles,
+    features: [
+      'Loja online com produtos ilimitados',
+      'PDV com até 5 caixas',
+      'Bot de WhatsApp ilimitado',
+      'Painel admin avançado com relatórios',
+      'Estoque com reposição automática',
+      'Suporte por WhatsApp em horário comercial',
+    ],
+  },
+  {
+    nome: 'Escalar',
+    preco: 'R$ 1.297',
+    periodo: '/mês',
+    descricao: 'Para operações com várias lojas, alto volume ou necessidade de integrações.',
+    destaque: false,
+    cta: 'Falar com vendas',
+    ctaIcon: MessageCircle,
+    features: [
+      'Tudo do plano Crescer',
+      'PDV com caixas ilimitados',
+      'Multi-loja (matriz + filiais)',
+      'API e integrações personalizadas',
+      'Gerente de conta dedicado',
+      'Suporte 24/7',
+    ],
+  },
+];
+
+const garantias = [
+  { icon: ShieldCheck, t: '14 dias grátis', d: 'Sem cartão, sem compromisso' },
+  { icon: Clock4, t: 'Setup em 15 dias', d: 'A gente configura tudo' },
+  { icon: TrendingUp, t: 'Cancele quando quiser', d: 'Sem multa, sem letra miúda' },
 ];
 
 export default function HomePage() {
@@ -188,13 +218,9 @@ export default function HomePage() {
             >
               Entrar
             </Link>
-            <Link
-              href="#preços"
-              className="group inline-flex h-9 items-center gap-1.5 rounded-full bg-[#1a1814] px-4 text-[13px] font-medium text-[#f6f3ee] transition-all duration-300 hover:bg-[#1a1814]/90 hover:gap-2.5"
-            >
+            <BotaoMicro href="#preços" variant="dark" icon="right">
               Ver planos
-              <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
-            </Link>
+            </BotaoMicro>
           </div>
         </div>
       </header>
@@ -229,45 +255,41 @@ export default function HomePage() {
           </div>
 
           <div className="mt-12 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Link
-              href="#preços"
-              className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#1a1814] px-7 text-[14px] font-medium text-[#f6f3ee] transition-all duration-300 hover:bg-[#1a1814]/90 hover:gap-3"
-            >
+            <BotaoMicro href="#preços" variant="dark" icon="right" size="lg">
               Ver planos e preços
-              <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-            </Link>
-            <Link
-              href="#whatsapp"
-              className="group inline-flex h-12 items-center justify-center gap-2 rounded-full border border-[#1a1814]/15 bg-[#f6f3ee] px-7 text-[14px] font-medium text-[#1a1814] transition-all duration-300 hover:border-[#1a1814]/30 hover:gap-3"
-            >
+            </BotaoMicro>
+            <BotaoMicro href="#whatsapp" variant="outline" icon="up-right" size="lg">
               Conhecer o bot de WhatsApp
-              <ArrowUpRight className="h-4 w-4 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-            </Link>
+            </BotaoMicro>
           </div>
         </div>
 
-        {/* Hero image com mockup WhatsApp */}
+        {/* Hero image - WHATSAPP MOCKUP GRANDE */}
         <ScrollReveal>
           <div className="mx-auto max-w-[1320px] px-6 pb-20">
             <div className="group relative aspect-[16/8] overflow-hidden rounded-[2px] border border-[#1a1814]/8 transition-transform duration-700 hover:scale-[1.005]">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#e8d5c4] via-[#d4b896] to-[#8b6f47] transition-transform duration-1000 group-hover:scale-105" />
+              {/* Background com gradiente sutil */}
+              <div className="absolute inset-0 bg-gradient-to-br from-[#e8d5c4] via-[#d4b896] to-[#8b6f47]" />
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,rgba(255,255,255,0.25),transparent_60%)]" />
 
-              <div className="absolute inset-0 flex flex-col justify-between p-8 sm:p-12">
+              <div className="absolute inset-0 flex flex-col justify-between p-6 sm:p-10 md:p-12">
                 <div className="flex items-start justify-between text-[11px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/60">
                   <span className="inline-flex items-center gap-2">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     WhatsApp · Bot ativo agora
                   </span>
-                  <span>GTSoftHub · Demonstração real</span>
+                  <span className="hidden sm:inline">GTSoftHub · Demonstração real</span>
                 </div>
 
-                <div className="grid gap-6 sm:grid-cols-[1.4fr_1fr]">
+                <div className="grid gap-4 sm:gap-6 sm:grid-cols-[1.3fr_1fr] sm:items-end">
                   <WhatsAppMockup />
 
                   <div className="hidden self-end sm:block">
-                    <p className="text-[24px] leading-[1.15] tracking-[-0.02em] text-[#1a1814] sm:text-[28px]" style={{ fontFamily: 'var(--font-display)' }}>
-                      Vendas que acontecem enquanto você dorme, viaja ou almoça.
+                    <p className="text-[20px] leading-[1.15] tracking-[-0.02em] text-[#1a1814] sm:text-[26px] md:text-[32px]" style={{ fontFamily: 'var(--font-display)' }}>
+                      Vendas que acontecem enquanto você <em className="text-[#b8654a]">dorme</em>, viaja ou almoça.
+                    </p>
+                    <p className="mt-3 text-[13px] text-[#1a1814]/65">
+                      ↑ Demonstração real de uma conversa no WhatsApp.
                     </p>
                   </div>
                 </div>
@@ -275,16 +297,19 @@ export default function HomePage() {
             </div>
           </div>
         </ScrollReveal>
+
+        {/* Scroll hint */}
+        <ScrollHint />
       </section>
 
-      {/* WHATSAPP - DESTAQUE */}
+      {/* WHATSAPP - DESTAQUE PRINCIPAL */}
       <section id="whatsapp" className="border-t border-[#1a1814]/8 bg-[#1a1814] py-20 text-[#f6f3ee] sm:py-28">
         <div className="mx-auto max-w-[1320px] px-6">
           <div className="mb-16 grid gap-8 lg:grid-cols-[1.2fr_1fr] lg:items-end">
             <ScrollReveal>
               <p className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.2em] text-[#b8654a]">
                 <span className="h-px w-8 bg-[#b8654a]" />
-                O que faz a diferença
+                O diferencial da plataforma
               </p>
               <h2 className="mt-5 max-w-3xl text-[clamp(2.25rem,5vw,4rem)] font-normal leading-[1] tracking-[-0.04em] text-[#f6f3ee]" style={{ fontFamily: 'var(--font-display)' }}>
                 Um <em className="text-[#b8654a]">vendedor</em> que nunca dorme, nunca esquece e nunca pede aumento.
@@ -321,13 +346,9 @@ export default function HomePage() {
 
           <ScrollReveal delay={300}>
             <div className="mt-12 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <Link
-                href="#preços"
-                className="group inline-flex h-12 items-center gap-2 rounded-full bg-[#b8654a] px-7 text-[14px] font-medium text-[#f6f3ee] transition-all duration-300 hover:bg-[#b8654a]/90 hover:gap-3"
-              >
+              <BotaoMicro href="#preços" variant="accent" icon="right">
                 Quero esse bot no meu WhatsApp
-                <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-              </Link>
+              </BotaoMicro>
               <Link
                 href="#modulos"
                 className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#f6f3ee]/55 transition-colors duration-300 hover:text-[#f6f3ee]"
@@ -339,7 +360,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* MÓDULOS */}
+      {/* MÓDULOS - COM VISUAIS */}
       <section id="modulos" className="border-t border-[#1a1814]/8 bg-[#f6f3ee] py-20 sm:py-28">
         <div className="mx-auto max-w-[1320px] px-6">
           <div className="mb-16 grid items-end gap-6 lg:grid-cols-[1fr_1fr]">
@@ -367,10 +388,13 @@ export default function HomePage() {
                     {m.number}
                   </div>
 
-                  <div className="relative mb-8 flex items-center justify-between">
+                  {/* Visual SVG no topo */}
+                  <MóduloVisual tipo={m.visual} />
+
+                  <div className="relative mb-6 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#1a1814]/10 bg-[#f6f3ee] transition-colors duration-300 group-hover:border-[#b8654a]/40 group-hover:bg-[#b8654a]/10">
-                        <m.icon className="h-4 w-4 text-[#1a1814] transition-colors duration-300 group-hover:text-[#b8654a]" strokeWidth={1.4} />
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#1a1814]/10 bg-[#f6f3ee] transition-all duration-500 group-hover:scale-110 group-hover:border-[#b8654a]/40 group-hover:bg-[#b8654a]/10">
+                        <m.icon className="h-4 w-4 text-[#1a1814] transition-colors duration-500 group-hover:text-[#b8654a]" strokeWidth={1.4} />
                       </div>
                       <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">
                         {m.number} · {m.title}
@@ -404,7 +428,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* COMO FUNCIONA - PASSO A PASSO */}
+      {/* COMO FUNCIONA - TIMELINE */}
       <section className="border-t border-[#1a1814]/8 bg-[#1a1814] py-20 text-[#f6f3ee] sm:py-28">
         <div className="mx-auto max-w-[1320px] px-6">
           <ScrollReveal>
@@ -417,25 +441,11 @@ export default function HomePage() {
             </p>
           </ScrollReveal>
 
-          <div className="mt-16 grid gap-px bg-[#f6f3ee]/10 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { dia: 'Dia 1', t: 'Diagnóstico', d: 'Entendemos sua operação, seus produtos, seu volume. Nada de "template genérico".' },
-              { dia: 'Dia 3-7', t: 'Configuração', d: 'Importamos seus produtos, configuramos o bot de WhatsApp, ligamos tudo ao seu estoque.' },
-              { dia: 'Dia 8-12', t: 'Treinamento', d: 'Ensinamos sua equipe a usar. Em vídeo, ao vivo, no ritmo deles. Sem pressa.' },
-              { dia: 'Dia 15+', t: 'Operação rodando', d: 'Você atende pela loja, pelo site, pelo WhatsApp. Tudo no mesmo painel.' },
-            ].map((step, i) => (
+          {/* Timeline com linha conectora */}
+          <div className="mt-20 grid gap-px bg-[#f6f3ee]/10 sm:grid-cols-2 lg:grid-cols-4">
+            {etapas.map((step, i) => (
               <ScrollReveal key={step.dia} delay={i * 100}>
-                <div className="group bg-[#1a1814] p-8 transition-all duration-500 hover:bg-[#25221c]">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#b8654a]">
-                    {step.dia}
-                  </p>
-                  <h3 className="mt-6 text-[22px] font-normal leading-[1.2] tracking-[-0.02em] text-[#f6f3ee]" style={{ fontFamily: 'var(--font-display)' }}>
-                    {step.t}
-                  </h3>
-                  <p className="mt-3 text-[14px] leading-[1.55] text-[#f6f3ee]/60">
-                    {step.d}
-                  </p>
-                </div>
+                <TimelineStep dia={step.dia} titulo={step.t} descricao={step.d} />
               </ScrollReveal>
             ))}
           </div>
@@ -454,12 +464,12 @@ export default function HomePage() {
             </ScrollReveal>
 
             <div className="space-y-10">
-              {principles.map((p, i) => (
+              {principios.map((p, i) => (
                 <ScrollReveal key={p.k} delay={i * 100}>
-                  <div className="grid grid-cols-[auto_1fr] gap-6 border-t border-[#1a1814]/15 pt-6">
+                  <div className="group grid grid-cols-[auto_1fr] gap-6 border-t border-[#1a1814]/15 pt-6 transition-colors duration-500 hover:border-[#b8654a]/30">
                     <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#b8654a]">{p.k}</span>
                     <div>
-                      <h3 className="text-[24px] font-normal leading-[1.2] tracking-[-0.02em] text-[#1a1814]" style={{ fontFamily: 'var(--font-display)' }}>
+                      <h3 className="text-[24px] font-normal leading-[1.2] tracking-[-0.02em] text-[#1a1814] transition-colors duration-300 group-hover:text-[#b8654a]" style={{ fontFamily: 'var(--font-display)' }}>
                         {p.t}
                       </h3>
                       <p className="mt-3 text-[15px] leading-[1.55] text-[#1a1814]/65">
@@ -474,7 +484,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* DEPOIMENTOS */}
+      {/* DEPOIMENTOS - COM AVATARES GRADIENTE */}
       <section id="depoimentos" className="border-t border-[#1a1814]/8 bg-[#efe9df] py-20 sm:py-28">
         <div className="mx-auto max-w-[1320px] px-6">
           <ScrollReveal>
@@ -487,7 +497,7 @@ export default function HomePage() {
           <div className="mt-12 grid gap-px bg-[#1a1814]/8 sm:grid-cols-3">
             {depoimentos.map((d, i) => (
               <ScrollReveal key={d.nome} delay={i * 100}>
-                <div className="group bg-[#f6f3ee] p-8 transition-all duration-500 hover:bg-[#f6f3ee] sm:p-10">
+                <div className="group bg-[#f6f3ee] p-8 transition-all duration-500 hover:-translate-y-1 hover:bg-[#f6f3ee] sm:p-10">
                   <div className="flex gap-0.5 text-[#b8654a]">
                     {Array.from({ length: 5 }).map((_, j) => (
                       <Star key={j} className="h-3.5 w-3.5 fill-current" />
@@ -497,9 +507,7 @@ export default function HomePage() {
                     "{d.texto}"
                   </p>
                   <div className="mt-8 flex items-center gap-3 border-t border-[#1a1814]/8 pt-6">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1a1814] text-[12px] font-medium text-[#f6f3ee]">
-                      {d.iniciais}
-                    </div>
+                    <AvatarGradiente iniciais={d.iniciais} cor={d.cor} />
                     <div>
                       <p className="text-[13px] font-medium text-[#1a1814]">{d.nome}</p>
                       <p className="text-[11px] text-[#1a1814]/55">{d.negocio}</p>
@@ -512,7 +520,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* PLANOS E PREÇOS */}
+      {/* PLANOS E PREÇOS - DESTAQUE FORTE */}
       <section id="preços" className="border-t border-[#1a1814]/8 bg-[#f6f3ee] py-20 sm:py-28">
         <div className="mx-auto max-w-[1320px] px-6">
           <ScrollReveal>
@@ -527,79 +535,32 @@ export default function HomePage() {
             </div>
           </ScrollReveal>
 
-          <div className="mt-16 grid gap-6 lg:grid-cols-3">
+          <div className="mt-16 grid items-stretch gap-6 lg:grid-cols-3">
             {planos.map((plano, i) => (
-              <ScrollReveal key={plano.nome} delay={i * 150}>
-                <div
-                  className={`group relative flex h-full flex-col overflow-hidden rounded-[3px] border p-8 transition-all duration-500 sm:p-10 ${
-                    plano.destaque
-                      ? 'border-[#1a1814] bg-[#1a1814] text-[#f6f3ee]'
-                      : 'border-[#1a1814]/15 bg-[#f6f3ee] text-[#1a1814] hover:border-[#1a1814]/30'
-                  }`}
-                >
-                  {plano.badge && (
-                    <span className="absolute right-6 top-6 rounded-full bg-[#b8654a] px-3 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[#f6f3ee]">
-                      {plano.badge}
-                    </span>
-                  )}
-
-                  <h3
-                    className={`text-[28px] font-normal leading-[1.1] tracking-[-0.02em] ${plano.destaque ? 'text-[#f6f3ee]' : 'text-[#1a1814]'}`}
-                    style={{ fontFamily: 'var(--font-display)' }}
-                  >
-                    {plano.nome}
-                  </h3>
-
-                  <p className={`mt-3 text-[14px] leading-[1.55] ${plano.destaque ? 'text-[#f6f3ee]/65' : 'text-[#1a1814]/65'}`}>
-                    {plano.descricao}
-                  </p>
-
-                  <div className="mt-8 flex items-baseline gap-2 border-t border-current/10 pt-8">
-                    <span
-                      className={`text-[48px] font-normal leading-none tracking-[-0.04em] ${plano.destaque ? 'text-[#f6f3ee]' : 'text-[#1a1814]'}`}
-                      style={{ fontFamily: 'var(--font-display)' }}
-                    >
-                      {plano.preco}
-                    </span>
-                    <span className={`text-[14px] ${plano.destaque ? 'text-[#f6f3ee]/55' : 'text-[#1a1814]/55'}`}>
-                      {plano.periodo}
-                    </span>
-                  </div>
-
-                  <ul className="mt-8 space-y-3 text-[14px]">
-                    {plano.features.map((f) => (
-                      <li
-                        key={f}
-                        className={`flex items-start gap-2 ${plano.destaque ? 'text-[#f6f3ee]/80' : 'text-[#1a1814]/80'}`}
-                      >
-                        <Check className={`mt-0.5 h-4 w-4 flex-shrink-0 ${plano.destaque ? 'text-[#b8654a]' : 'text-[#1a1814]'}`} strokeWidth={2} />
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className="mt-auto pt-8">
-                    <Link
-                      href={plano.nome === 'Escalar' ? '/login' : '/login'}
-                      className={`group/btn flex h-12 w-full items-center justify-center gap-2 rounded-full text-[14px] font-medium transition-all duration-300 ${
-                        plano.destaque
-                          ? 'bg-[#f6f3ee] text-[#1a1814] hover:bg-white hover:gap-3'
-                          : 'bg-[#1a1814] text-[#f6f3ee] hover:bg-[#1a1814]/90 hover:gap-3'
-                      }`}
-                    >
-                      {plano.cta}
-                      <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover/btn:translate-x-1" />
-                    </Link>
-                  </div>
-                </div>
+              <ScrollReveal key={plano.nome} delay={i * 150} className={plano.destaque ? 'lg:-mt-6' : ''}>
+                <PlanoDestaque plano={plano} />
               </ScrollReveal>
             ))}
           </div>
 
+          {/* Garantias inline */}
           <ScrollReveal delay={300}>
-            <p className="mt-12 text-center text-[13px] text-[#1a1814]/55">
-              Não tem cartão de crédito na contratação. Você paga boleto ou Pix. Cancela quando quiser.
-            </p>
+            <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {garantias.map((g) => (
+                <div
+                  key={g.t}
+                  className="flex items-start gap-3 border-t border-[#1a1814]/15 pt-5"
+                >
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-[#1a1814]/15 bg-[#f6f3ee]">
+                    <g.icon className="h-4 w-4 text-[#b8654a]" strokeWidth={1.4} />
+                  </div>
+                  <div>
+                    <p className="text-[14px] font-medium text-[#1a1814]">{g.t}</p>
+                    <p className="mt-0.5 text-[12px] text-[#1a1814]/55">{g.d}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </ScrollReveal>
         </div>
       </section>
@@ -618,37 +579,55 @@ export default function HomePage() {
               </p>
 
               <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <Link
-                  href="#preços"
-                  className="group inline-flex h-12 items-center gap-2 rounded-full bg-[#1a1814] px-7 text-[14px] font-medium text-[#f6f3ee] transition-all duration-300 hover:bg-[#1a1814]/90 hover:gap-3"
-                >
+                <BotaoMicro href="#preços" variant="dark" icon="right" size="lg">
                   Começar 14 dias grátis
-                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                </Link>
-                <Link
-                  href="/loja"
-                  className="inline-flex h-12 items-center gap-2 rounded-full border border-[#1a1814]/15 px-7 text-[14px] font-medium text-[#1a1814] transition-all duration-300 hover:border-[#1a1814]/30 hover:gap-3"
-                >
+                </BotaoMicro>
+                <BotaoMicro href="/loja" variant="outline" icon="up-right" size="lg">
                   Ver a loja funcionando
-                  <ArrowUpRight className="h-4 w-4 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-                </Link>
+                </BotaoMicro>
               </div>
             </div>
           </ScrollReveal>
         </div>
 
-        {/* Footer */}
-        <div className="border-t border-[#1a1814]/8">
-          <div className="mx-auto flex max-w-[1320px] flex-col gap-6 px-6 py-8 text-[12px] text-[#1a1814]/55 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex h-5 w-5 items-center justify-center rounded bg-[#1a1814] text-[8px] font-semibold text-[#f6f3ee]">GT</div>
-              <span>GTSoftHub · Operação premium para varejo</span>
+        {/* Footer expandido */}
+        <div className="border-t border-[#1a1814]/8 bg-[#1a1814] py-12 text-[#f6f3ee]">
+          <div className="mx-auto max-w-[1320px] px-6">
+            <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-4">
+              <div className="sm:col-span-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-[3px] bg-[#f6f3ee] text-[10px] font-semibold text-[#1a1814]">GT</div>
+                  <span className="text-[15px] font-medium tracking-[-0.01em] text-[#f6f3ee]" style={{ fontFamily: 'var(--font-display)' }}>GTSoftHub</span>
+                </div>
+                <p className="mt-4 max-w-sm text-[13px] leading-[1.55] text-[#f6f3ee]/60">
+                  Plataforma premium para varejo omnichannel. Estoque, PDV, loja online e atendimento num só ecossistema.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#f6f3ee]/50">Plataforma</h4>
+                <ul className="mt-4 space-y-2 text-[13px]">
+                  <li><Link href="/loja" className="text-[#f6f3ee]/75 transition-colors duration-300 hover:text-[#f6f3ee]">Loja</Link></li>
+                  <li><Link href="/pdv" className="text-[#f6f3ee]/75 transition-colors duration-300 hover:text-[#f6f3ee]">PDV</Link></li>
+                  <li><Link href="/admin" className="text-[#f6f3ee]/75 transition-colors duration-300 hover:text-[#f6f3ee]">Admin</Link></li>
+                  <li><Link href="/admin/estoque" className="text-[#f6f3ee]/75 transition-colors duration-300 hover:text-[#f6f3ee]">Estoque</Link></li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#f6f3ee]/50">Conta</h4>
+                <ul className="mt-4 space-y-2 text-[13px]">
+                  <li><Link href="/login" className="text-[#f6f3ee]/75 transition-colors duration-300 hover:text-[#f6f3ee]">Entrar</Link></li>
+                  <li><Link href="#preços" className="text-[#f6f3ee]/75 transition-colors duration-300 hover:text-[#f6f3ee]">Planos</Link></li>
+                  <li><Link href="/info/privacidade" className="text-[#f6f3ee]/75 transition-colors duration-300 hover:text-[#f6f3ee]">Privacidade</Link></li>
+                  <li><Link href="/info/termos" className="text-[#f6f3ee]/75 transition-colors duration-300 hover:text-[#f6f3ee]">Termos</Link></li>
+                </ul>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-6">
-              <Link href="/loja" className="transition-colors duration-300 hover:text-[#1a1814]">Loja</Link>
-              <Link href="/pdv" className="transition-colors duration-300 hover:text-[#1a1814]">PDV</Link>
-              <Link href="/admin" className="transition-colors duration-300 hover:text-[#1a1814]">Admin</Link>
-              <Link href="/info/privacidade" className="transition-colors duration-300 hover:text-[#1a1814]">Privacidade</Link>
+
+            <div className="mt-10 flex flex-col gap-3 border-t border-[#f6f3ee]/10 pt-6 text-[11px] uppercase tracking-[0.16em] text-[#f6f3ee]/40 sm:flex-row sm:items-center sm:justify-between">
+              <span>© 2026 GTSoftHub · Operação premium para varejo</span>
+              <span>Feito no Brasil 🇧🇷</span>
             </div>
           </div>
         </div>
