@@ -6,56 +6,45 @@ import { useState } from 'react';
 import { useCart } from '@/hooks/useCart';
 import { cn } from '@/lib/utils';
 
-interface StoreHeaderProps {
-  variant?: 'transparent' | 'solid';
-}
-
 /**
- * Header sticky da loja: logo + nav + cart + menu mobile.
- * Bg com blur (glass) e borda inferior sutil.
+ * Header sticky - off-white com blur sutil.
  */
-export function StoreHeader({ variant = 'solid' }: StoreHeaderProps) {
+export function StoreHeader() {
   const { totalItems } = useCart();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navItems = [
-    { href: '/', label: 'Inicio' },
+    { href: '/', label: 'Início' },
     { href: '/loja', label: 'Loja' },
     { href: '/pdv', label: 'PDV' },
     { href: '/admin', label: 'Admin' },
   ];
 
   return (
-    <header
-      className={cn(
-        'sticky top-0 z-40 border-b border-white/6',
-        variant === 'transparent'
-          ? 'bg-background/60 backdrop-blur-xl'
-          : 'bg-background/80 backdrop-blur-xl'
-      )}
-    >
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white text-[11px] font-semibold tracking-[0.18em] text-slate-950">
+    <header className="sticky top-0 z-40 border-b border-[#1a1814]/8 bg-[#f6f3ee]/85 backdrop-blur-md">
+      <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between px-6">
+        <Link href="/" className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-[3px] bg-[#1a1814] text-[10px] font-semibold text-[#f6f3ee]">
             GT
           </div>
-          <span className="text-sm font-semibold tracking-tight text-white">
+          <span
+            className="text-[15px] font-medium tracking-[-0.01em] text-[#1a1814]"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
             GTSoftHub
           </span>
         </Link>
 
-        {/* Nav desktop */}
         <nav className="hidden items-center gap-1 md:flex">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                'rounded-full px-3.5 py-1.5 text-sm font-medium transition',
+                'rounded-full px-3.5 py-1.5 text-[13px] font-medium transition',
                 item.href === '/loja'
-                  ? 'text-white'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'text-[#1a1814]'
+                  : 'text-[#1a1814]/60 hover:text-[#1a1814]'
               )}
             >
               {item.label}
@@ -63,12 +52,21 @@ export function StoreHeader({ variant = 'solid' }: StoreHeaderProps) {
           ))}
         </nav>
 
-        {/* Acoes */}
         <div className="flex items-center gap-2">
-          <CartButton count={totalItems} />
+          <button
+            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-[#1a1814]/15 bg-white/30 text-[#1a1814] transition hover:bg-white/50"
+            aria-label={`Carrinho (${totalItems} ${totalItems === 1 ? 'item' : 'itens'})`}
+          >
+            <ShoppingBag className="h-4 w-4" />
+            {totalItems > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#b8654a] px-1 text-[10px] font-semibold text-[#f6f3ee]">
+                {totalItems > 9 ? '9+' : totalItems}
+              </span>
+            )}
+          </button>
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="rounded-full p-2 text-slate-400 transition hover:bg-white/5 hover:text-white md:hidden"
+            className="rounded-full p-2 text-[#1a1814]/60 transition hover:bg-[#1a1814]/5 hover:text-[#1a1814] md:hidden"
             aria-label="Menu"
           >
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -76,16 +74,15 @@ export function StoreHeader({ variant = 'solid' }: StoreHeaderProps) {
         </div>
       </div>
 
-      {/* Mobile menu */}
       {mobileOpen && (
-        <div className="border-t border-white/6 bg-background/95 backdrop-blur-xl md:hidden">
-          <nav className="container mx-auto flex flex-col gap-1 px-4 py-3">
+        <div className="border-t border-[#1a1814]/8 bg-[#f6f3ee]/95 backdrop-blur-md md:hidden">
+          <nav className="mx-auto flex max-w-[1320px] flex-col gap-0.5 px-6 py-3">
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
-                className="rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
+                className="rounded-[2px] px-3 py-2.5 text-[14px] font-medium text-[#1a1814]/70 transition hover:bg-[#1a1814]/5 hover:text-[#1a1814]"
               >
                 {item.label}
               </Link>
@@ -94,21 +91,5 @@ export function StoreHeader({ variant = 'solid' }: StoreHeaderProps) {
         </div>
       )}
     </header>
-  );
-}
-
-function CartButton({ count }: { count: number }) {
-  return (
-    <button
-      className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition hover:bg-white/10"
-      aria-label={`Carrinho (${count} ${count === 1 ? 'item' : 'itens'})`}
-    >
-      <ShoppingBag className="h-4 w-4" />
-      {count > 0 && (
-        <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-slate-950">
-          {count > 9 ? '9+' : count}
-        </span>
-      )}
-    </button>
   );
 }

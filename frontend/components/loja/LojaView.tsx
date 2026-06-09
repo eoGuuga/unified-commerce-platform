@@ -2,7 +2,7 @@
 
 import { useState, useDeferredValue, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, ShoppingBag, ArrowRight, Sparkles, X } from 'lucide-react';
+import { Search, ShoppingBag, ArrowRight, X, ArrowUpRight } from 'lucide-react';
 import { useProducts } from '@/hooks/useProducts';
 import { ProductCard } from './ProductCard';
 import { StoreHeader } from './StoreHeader';
@@ -14,16 +14,14 @@ interface Product {
   name: string;
   price: number;
   image?: string;
+  image_url?: string;
   category?: string;
   stock?: number;
 }
 
 /**
- * Página da loja: minimalista, linda e responsiva.
- * - Hero compacto com busca
- * - Grid de produtos limpo
- * - Filtro por categoria inline
- * - Empty state quando não há produtos
+ * Loja - design editorial off-white premium.
+ * Consistente com a landing page.
  */
 export function LojaView() {
   const { products, loading, error, refetch } = useProducts();
@@ -31,14 +29,12 @@ export function LojaView() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(search);
 
-  // Extrair categorias únicas
   const categories = useMemo(() => {
     const set = new Set<string>();
     products.forEach((p: any) => p.category && set.add(p.category));
     return Array.from(set);
   }, [products]);
 
-  // Filtrar produtos
   const filtered = useMemo(() => {
     return products.filter((p: any) => {
       const matchesSearch = !deferredSearch ||
@@ -49,41 +45,40 @@ export function LojaView() {
   }, [products, deferredSearch, activeCategory]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#f6f3ee] text-[#1a1814]">
       <StoreHeader />
 
-      {/* Hero compacto */}
-      <section className="relative overflow-hidden border-b border-white/6">
-        <div className="absolute inset-0 mesh-gradient opacity-50" />
-        <div className="absolute top-0 left-1/2 h-72 w-[600px] -translate-x-1/2 rounded-full bg-accent/10 blur-[120px]" />
-
-        <div className="container relative mx-auto px-4 py-12 sm:py-16 md:py-20">
-          <div className="mx-auto max-w-2xl text-center">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-accent">
-              <Sparkles className="h-3 w-3" />
+      {/* HERO */}
+      <section className="border-b border-[#1a1814]/8">
+        <div className="mx-auto max-w-[1320px] px-6 py-16 sm:py-20">
+          <div className="max-w-3xl">
+            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">
               Vitrine
-            </span>
-            <h1 className="mt-5 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl md:text-5xl">
+            </p>
+            <h1
+              className="mt-5 text-[clamp(2.5rem,5vw,4.5rem)] font-normal leading-[0.98] tracking-[-0.04em] text-[#1a1814]"
+              style={{ fontFamily: 'var(--font-display)' }}
+            >
               Encontre o que move sua rotina.
             </h1>
-            <p className="mt-4 text-base text-slate-300 sm:text-lg">
-              Curadoria premium com leitura de estoque em tempo real.
+            <p className="mt-5 max-w-xl text-[16px] leading-[1.55] text-[#1a1814]/70 sm:text-[18px]">
+              Curadoria premium, estoque em tempo real, atendimento que entende.
             </p>
 
             {/* Busca */}
-            <div className="relative mx-auto mt-8 max-w-md">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <div className="relative mt-10 max-w-md">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#1a1814]/40" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar produtos..."
-                className="w-full rounded-full border border-white/10 bg-white/6 py-3 pl-11 pr-11 text-sm text-white placeholder:text-slate-500 transition focus:border-accent/40 focus:bg-white/8 focus:outline-none focus:ring-2 focus:ring-accent/30"
+                className="w-full rounded-full border border-[#1a1814]/15 bg-white/40 py-3 pl-11 pr-11 text-[14px] text-[#1a1814] placeholder:text-[#1a1814]/40 transition focus:border-[#1a1814]/40 focus:bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#b8654a]/30"
               />
               {search && (
                 <button
                   onClick={() => setSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-slate-400 transition hover:bg-white/8 hover:text-white"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-[#1a1814]/40 transition hover:bg-[#1a1814]/5 hover:text-[#1a1814]"
                   aria-label="Limpar busca"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -94,18 +89,18 @@ export function LojaView() {
         </div>
       </section>
 
-      {/* Filtro de categoria (inline) */}
+      {/* FILTRO DE CATEGORIA */}
       {categories.length > 0 && (
-        <div className="border-b border-white/6 bg-background/40 backdrop-blur">
-          <div className="container mx-auto px-4">
-            <div className="flex gap-2 overflow-x-auto py-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div className="border-b border-[#1a1814]/8 bg-[#efe9df]/40">
+          <div className="mx-auto max-w-[1320px] px-6">
+            <div className="flex gap-1.5 overflow-x-auto py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               <button
                 onClick={() => setActiveCategory(null)}
                 className={cn(
-                  'flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition',
+                  'flex-shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium transition',
                   !activeCategory
-                    ? 'bg-white text-slate-950'
-                    : 'border border-white/10 bg-white/5 text-slate-300 hover:bg-white/8'
+                    ? 'bg-[#1a1814] text-[#f6f3ee]'
+                    : 'border border-[#1a1814]/15 text-[#1a1814]/70 hover:bg-[#1a1814]/5'
                 )}
               >
                 Tudo
@@ -115,10 +110,10 @@ export function LojaView() {
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
                   className={cn(
-                    'flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition',
+                    'flex-shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium transition',
                     activeCategory === cat
-                      ? 'bg-white text-slate-950'
-                      : 'border border-white/10 bg-white/5 text-slate-300 hover:bg-white/8'
+                      ? 'bg-[#1a1814] text-[#f6f3ee]'
+                      : 'border border-[#1a1814]/15 text-[#1a1814]/70 hover:bg-[#1a1814]/5'
                   )}
                 >
                   {cat}
@@ -129,22 +124,28 @@ export function LojaView() {
         </div>
       )}
 
-      {/* Conteúdo */}
-      <section className="container mx-auto px-4 py-8 sm:py-12">
+      {/* CONTEUDO */}
+      <section className="mx-auto max-w-[1320px] px-6 py-16">
         {loading ? (
           <ProductGridSkeleton />
         ) : error ? (
           <ErrorState onRetry={refetch} error={error} />
         ) : filtered.length === 0 ? (
-          <EmptyState hasSearch={!!search || !!activeCategory} onClear={() => { setSearch(''); setActiveCategory(null); }} />
+          <EmptyState
+            hasSearch={!!search || !!activeCategory}
+            onClear={() => { setSearch(''); setActiveCategory(null); }}
+          />
         ) : (
           <>
-            <div className="mb-6 flex items-end justify-between">
-              <p className="text-sm text-slate-400">
+            <div className="mb-10 flex items-end justify-between border-b border-[#1a1814]/8 pb-4">
+              <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">
                 {filtered.length} {filtered.length === 1 ? 'produto' : 'produtos'}
               </p>
+              <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">
+                Atualizado agora
+              </p>
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 md:grid-cols-3 lg:grid-cols-4 lg:gap-6">
+            <div className="grid grid-cols-1 gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filtered.map((product: any) => (
                 <ProductCard key={product.id} product={product} />
               ))}
@@ -160,18 +161,14 @@ export function LojaView() {
 
 function ProductGridSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 md:grid-cols-3 lg:grid-cols-4 lg:gap-6">
+    <div className="grid grid-cols-1 gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 8 }).map((_, i) => (
-        <div
-          key={i}
-          className="overflow-hidden rounded-2xl border border-white/6 bg-white/[0.02]"
-          style={{ animationDelay: `${(i % 4) * 0.1}s` }}
-        >
-          <div className="aspect-square animate-pulse bg-white/[0.04]" />
-          <div className="space-y-2 p-4">
-            <div className="h-3 w-1/3 animate-pulse rounded bg-white/6" />
-            <div className="h-4 w-3/4 animate-pulse rounded bg-white/8" />
-            <div className="h-5 w-1/2 animate-pulse rounded bg-white/8" />
+        <div key={i} className="space-y-4">
+          <div className="aspect-[4/5] animate-pulse rounded-[2px] bg-[#1a1814]/5" />
+          <div className="space-y-2">
+            <div className="h-3 w-16 animate-pulse rounded-[1px] bg-[#1a1814]/8" />
+            <div className="h-4 w-3/4 animate-pulse rounded-[1px] bg-[#1a1814]/10" />
+            <div className="h-4 w-1/3 animate-pulse rounded-[1px] bg-[#1a1814]/8" />
           </div>
         </div>
       ))}
@@ -181,25 +178,28 @@ function ProductGridSkeleton() {
 
 function EmptyState({ hasSearch, onClear }: { hasSearch: boolean; onClear: () => void }) {
   return (
-    <div className="mx-auto max-w-md py-20 text-center">
-      <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02]">
-        <ShoppingBag className="h-8 w-8 text-accent" strokeWidth={1.5} />
+    <div className="mx-auto max-w-md py-24 text-center">
+      <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#1a1814]/15">
+        <ShoppingBag className="h-8 w-8 text-[#1a1814]/40" strokeWidth={1.2} />
       </div>
-      <h3 className="mt-6 text-2xl font-semibold tracking-[-0.04em] text-white">
-        {hasSearch ? 'Nenhum resultado' : 'Vitrine em breve'}
+      <h3
+        className="mt-8 text-[28px] font-normal leading-[1.1] tracking-[-0.02em] text-[#1a1814]"
+        style={{ fontFamily: 'var(--font-display)' }}
+      >
+        {hasSearch ? 'Nenhum resultado.' : 'Vitrine em breve.'}
       </h3>
-      <p className="mt-3 text-slate-300">
+      <p className="mt-4 text-[15px] leading-[1.55] text-[#1a1814]/60">
         {hasSearch
-          ? 'Tente ajustar a busca ou os filtros para encontrar o que procura.'
+          ? 'Tente outros termos ou remova os filtros.'
           : 'Estamos selecionando produtos para abrir com tudo no lugar.'}
       </p>
       {hasSearch && (
         <button
           onClick={onClear}
-          className="mt-6 inline-flex h-10 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
+          className="group mt-8 inline-flex h-11 items-center gap-2 rounded-full bg-[#1a1814] px-6 text-[13px] font-medium text-[#f6f3ee] transition hover:bg-[#1a1814]/90"
         >
           Limpar filtros
-          <ArrowRight className="ml-2 h-4 w-4" />
+          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
         </button>
       )}
     </div>
@@ -208,12 +208,17 @@ function EmptyState({ hasSearch, onClear }: { hasSearch: boolean; onClear: () =>
 
 function ErrorState({ onRetry, error }: { onRetry: () => void; error: string }) {
   return (
-    <div className="mx-auto max-w-md py-20 text-center">
-      <h3 className="text-xl font-semibold text-white">Algo deu errado</h3>
-      <p className="mt-2 text-slate-300">{error}</p>
+    <div className="mx-auto max-w-md py-24 text-center">
+      <h3
+        className="text-[24px] font-normal tracking-[-0.02em] text-[#1a1814]"
+        style={{ fontFamily: 'var(--font-display)' }}
+      >
+        Algo deu errado.
+      </h3>
+      <p className="mt-3 text-[15px] text-[#1a1814]/60">{error}</p>
       <button
         onClick={onRetry}
-        className="mt-6 inline-flex h-10 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
+        className="mt-8 inline-flex h-11 items-center gap-2 rounded-full bg-[#1a1814] px-6 text-[13px] font-medium text-[#f6f3ee] transition hover:bg-[#1a1814]/90"
       >
         Tentar novamente
       </button>

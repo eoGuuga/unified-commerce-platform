@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, ArrowUpRight } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -21,12 +21,8 @@ interface ProductCardProps {
 }
 
 /**
- * Card de produto limpo, minimalista e responsivo.
- * - Imagem quadrada
- * - Nome do produto
- * - Preco (com original riscado se houver desconto)
- * - CTA "Adicionar" sutil
- * - Badge de estoque baixo
+ * Card de produto editorial - limpo e minimalista.
+ * Tema off-white, sem bordas pesadas.
  */
 export function ProductCard({ product, className }: ProductCardProps) {
   const imageUrl = product.image_url || product.image;
@@ -38,66 +34,68 @@ export function ProductCard({ product, className }: ProductCardProps) {
     <Link
       href={`/loja/produto/${product.id}`}
       className={cn(
-        'group block overflow-hidden rounded-2xl border border-white/6 bg-white/[0.02] transition hover:border-white/12 hover:bg-white/[0.04]',
-        outOfStock && 'opacity-60',
+        'group block transition',
+        outOfStock && 'opacity-50',
         className
       )}
     >
-      {/* Imagem */}
-      <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-white/[0.04] to-white/[0.01]">
+      {/* Imagem com aspect ratio 4:5 (editorial) */}
+      <div className="relative aspect-[4/5] overflow-hidden rounded-[2px] bg-[#1a1814]/5">
         {imageUrl ? (
           <Image
             src={imageUrl}
             alt={product.name}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
           />
         ) : (
           <PlaceholderImage name={product.name} />
         )}
 
-        {/* Badges */}
-        <div className="absolute left-2 top-2 flex flex-col gap-1.5">
+        {/* Badges no topo esquerdo */}
+        <div className="absolute left-3 top-3 flex flex-col gap-1.5">
           {outOfStock && (
-            <span className="rounded-full bg-slate-900/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-300 backdrop-blur-sm">
+            <span className="rounded-[2px] bg-[#1a1814] px-2 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-[#f6f3ee]">
               Esgotado
             </span>
           )}
           {lowStock && !outOfStock && (
-            <span className="rounded-full bg-amber-500/20 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-200 backdrop-blur-sm">
-              Ultimas {product.stock}
+            <span className="rounded-[2px] bg-[#b8654a] px-2 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-[#f6f3ee]">
+              Últimas {product.stock}
             </span>
           )}
         </div>
 
-        {/* Floating action button */}
+        {/* CTA flutuante no hover */}
         {!outOfStock && (
-          <div className="absolute bottom-2 right-2 translate-y-2 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-950 shadow-lg">
-              <ShoppingBag className="h-4 w-4" />
+          <div className="absolute bottom-3 right-3 translate-y-2 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1a1814] text-[#f6f3ee] shadow-lg transition group-hover:scale-105">
+              <ArrowUpRight className="h-4 w-4" />
             </div>
           </div>
         )}
       </div>
 
       {/* Info */}
-      <div className="p-4">
+      <div className="mt-5 space-y-1.5">
         {product.category && (
-          <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500">
+          <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-[#1a1814]/45">
             {product.category}
           </p>
         )}
-        <h3 className="mt-1.5 line-clamp-2 text-sm font-medium text-white">
+        <h3
+          className="text-[16px] font-normal leading-[1.3] tracking-[-0.01em] text-[#1a1814] line-clamp-2"
+          style={{ fontFamily: 'var(--font-display)' }}
+        >
           {product.name}
         </h3>
-
-        <div className="mt-2 flex items-baseline gap-2">
-          <p className="text-base font-semibold text-white">
+        <div className="flex items-baseline gap-2 pt-1">
+          <p className="text-[15px] font-medium text-[#1a1814]">
             {formatCurrency(product.price)}
           </p>
           {hasDiscount && (
-            <p className="text-xs text-slate-500 line-through">
+            <p className="text-[13px] text-[#1a1814]/40 line-through">
               {formatCurrency(product.original_price!)}
             </p>
           )}
@@ -107,24 +105,18 @@ export function ProductCard({ product, className }: ProductCardProps) {
   );
 }
 
-/**
- * Placeholder bonito para produtos sem imagem.
- * Usa gradiente baseado no nome para parecer consistente.
- */
 function PlaceholderImage({ name }: { name: string }) {
-  // Hash simples baseado no nome
   const hash = name.split('').reduce((a, c) => c.charCodeAt(0) + ((a << 5) - a), 0);
   const gradients = [
-    'from-emerald-400/20 to-cyan-300/10',
-    'from-amber-300/20 to-orange-300/10',
-    'from-violet-400/20 to-fuchsia-300/10',
-    'from-rose-300/20 to-pink-300/10',
-    'from-sky-300/20 to-blue-300/10',
-    'from-lime-300/20 to-emerald-300/10',
+    'from-[#e8d5c4] to-[#d4b896]',
+    'from-[#c7d3c0] to-[#8b9d7e]',
+    'from-[#d6c9c0] to-[#a08b7a]',
+    'from-[#b8a89c] to-[#7a6655]',
+    'from-[#cdb89c] to-[#8a6f4a]',
+    'from-[#a8b5b0] to-[#5d6e69]',
   ];
   const gradient = gradients[Math.abs(hash) % gradients.length];
 
-  // Iniciais do produto
   const initials = name
     .split(' ')
     .filter(Boolean)
@@ -135,7 +127,10 @@ function PlaceholderImage({ name }: { name: string }) {
 
   return (
     <div className={cn('flex h-full w-full items-center justify-center bg-gradient-to-br', gradient)}>
-      <span className="text-3xl font-semibold tracking-tight text-white/40 sm:text-4xl">
+      <span
+        className="text-[48px] font-normal text-[#1a1814]/35"
+        style={{ fontFamily: 'var(--font-display)' }}
+      >
         {initials || '·'}
       </span>
     </div>

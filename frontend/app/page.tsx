@@ -1,439 +1,328 @@
-import Link from "next/link"
-import { Container } from "@/components/landing/Container"
+'use client';
 
-const proofMetrics = [
-  { value: "1 estoque", label: "fonte de verdade entre PDV, loja, WhatsApp e operacao interna" },
-  { value: "0 ruido", label: "para o empreendedor que precisa vender com clareza, ritmo e previsibilidade" },
-  { value: "24/7", label: "de leitura operacional para saber o que vender, repor e acelerar" },
-]
+import Link from 'next/link';
+import { ArrowRight, ArrowUpRight } from 'lucide-react';
 
-const moduleCards = [
-  {
-    title: "Loja online que converte",
-    description:
-      "Vitrine elegante, catalogo claro e checkout com leitura de disponibilidade para vender com mais confianca.",
-    eyebrow: "Storefront",
-    href: "/loja",
-    detail: "Perfeito para encantar no primeiro clique.",
-  },
-  {
-    title: "PDV que flui no ritmo da operacao",
-    description:
-      "Caixa, carrinho, pagamento e estoque trabalhando juntos para a equipe vender rapido sem perder controle.",
-    eyebrow: "Point of sale",
-    href: "/pdv",
-    detail: "Ideal para atendimento presencial sem atrito.",
-  },
-  {
-    title: "Comando central para o dono",
-    description:
-      "Visao executiva de vendas, canais, pipeline e produtos para tomar decisoes sem adivinhacao.",
-    eyebrow: "Command center",
-    href: "/admin",
-    detail: "Leitura imediata do que cresce, trava e precisa de acao.",
-  },
-  {
-    title: "Estoque tratado como ativo estrategico",
-    description:
-      "Ajustes, risco, minimo e reposicao em uma experiencia pensada para evitar falhas e aumentar confianca.",
-    eyebrow: "Inventory intelligence",
-    href: "/admin/estoque",
-    detail: "Menos ruptura, menos excesso, mais margem.",
-  },
-]
+/**
+ * Landing page GTSoftHub - design editorial/magazine premium.
+ * Tipografia: Fraunces (display serif) + Geist (body sans)
+ * Paleta: off-white + preto + accent dourado/cobre sutil
+ */
 
-const operatingMoments = [
+const modules = [
   {
-    title: "Receba pedidos sem medo",
-    description:
-      "A mesma venda pode nascer no WhatsApp, na loja online ou no caixa. O sistema organiza tudo como uma operacao so.",
+    number: '01',
+    title: 'Loja',
+    headline: 'A vitrine como argumento de venda.',
+    description: 'Catálogo elegante, leitura de estoque em tempo real, checkout que entende o cliente antes dele pedir.',
+    href: '/loja',
+    tags: ['storefront', 'conversão'],
   },
   {
-    title: "Saiba o que precisa acontecer agora",
-    description:
-      "Os sinais de estoque, venda e canal aparecem com leitura executiva para a equipe agir rapido e com criterio.",
+    number: '02',
+    title: 'PDV',
+    headline: 'Caixa que respira com a operação.',
+    description: 'Venda presencial sem perder o contexto do que acontece no online. Estoque único, atendimento humano, zero improviso.',
+    href: '/pdv',
+    tags: ['atendimento', 'velocidade'],
   },
   {
-    title: "Cresca sem parecer improviso",
-    description:
-      "O cliente percebe consistencia. O empreendedor percebe controle. A operacao ganha escala com mais serenidade.",
+    number: '03',
+    title: 'Admin',
+    headline: 'O cockpit do dono que pensa no negócio.',
+    description: 'Visão executiva de vendas, canais, margens e produtos. Decisão com leitura, não com achismo.',
+    href: '/admin',
+    tags: ['estratégia', 'comando'],
   },
-]
+  {
+    number: '04',
+    title: 'Estoque',
+    headline: 'Ativo que vira vantagem competitiva.',
+    description: 'Risco, mínimo, reposição. Tratado como o que é: a peça mais cara do seu negócio.',
+    href: '/admin/estoque',
+    tags: ['inteligência', 'margem'],
+  },
+];
 
-const launchTracks = [
-  {
-    step: "01",
-    title: "Diagnostico da operacao",
-    description:
-      "Mapeamos seus canais, estoque, gargalos e rituais para transformar tecnologia em vantagem real de negocio.",
-  },
-  {
-    step: "02",
-    title: "Configuracao do ecossistema",
-    description:
-      "Conectamos os modulos certos para o seu momento: loja, PDV, automacao, estoque e monitoramento.",
-  },
-  {
-    step: "03",
-    title: "Ritmo de evolucao continua",
-    description:
-      "Depois de entrar no ar, a plataforma vira alavanca permanente para melhorar conversao, operacao e experiencia.",
-  },
-]
-
-const confidenceSignals = [
-  "Estoque unico entre canais",
-  "Leitura executiva para o dono",
-  "Experiencia de compra e operacao no mesmo nivel",
-]
-
-function ArrowIcon() {
-  return (
-    <svg className="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-    </svg>
-  )
-}
+const principles = [
+  { k: '01', t: 'Estoque é verdade', d: 'Loja, PDV, WhatsApp e admin leem a mesma fonte. Sem overselling, sem retrabalho.' },
+  { k: '02', t: 'Cliente é contexto', d: 'Cada interação carrega o histórico. O sistema lembra para a equipe não precisar adivinhar.' },
+  { k: '03', t: 'Operação é ritmo', d: 'Sinais claros, decisões rápidas, sem reunião para entender o que aconteceu ontem.' },
+];
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-background" />
-        <div className="absolute inset-0 mesh-gradient opacity-60" />
-        <div className="absolute inset-0 grid-pattern-fade opacity-25" />
-        <div className="absolute left-1/2 top-0 h-[560px] w-[920px] -translate-x-1/2 rounded-full bg-accent/10 blur-[140px]" />
-        <div className="absolute -left-20 top-48 h-72 w-72 rounded-full bg-accent-secondary/10 blur-[120px]" />
+    <div className="min-h-screen bg-[#f6f3ee] text-[#1a1814]">
+      {/* TOP BAR */}
+      <header className="border-b border-[#1a1814]/8 bg-[#f6f3ee]/85 backdrop-blur-md sticky top-0 z-40">
+        <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between px-6">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#1a1814] text-[11px] font-semibold tracking-[0.04em] text-[#f6f3ee]" style={{ fontFamily: 'var(--font-display)' }}>
+              GT
+            </div>
+            <span className="text-[15px] font-medium tracking-[-0.01em] text-[#1a1814]" style={{ fontFamily: 'var(--font-display)' }}>
+              GTSoftHub
+            </span>
+          </Link>
 
-        <header className="sticky top-0 z-40 border-b border-white/6 bg-background/72 backdrop-blur-xl">
-          <Container className="py-4">
-            <div className="flex items-center justify-between gap-6">
-              <Link href="/" className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/92 text-sm font-semibold tracking-[0.26em] text-slate-950 shadow-[0_18px_60px_-32px_rgba(255,255,255,0.85)]">
-                  GT
-                </div>
-                <div>
-                  <p className="text-base font-semibold tracking-tight text-white">GTSoftHub</p>
-                  <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400">Retail operating system</p>
-                </div>
+          <nav className="hidden items-center gap-8 md:flex">
+            {[
+              { href: '#modulos', label: 'Módulos' },
+              { href: '#principios', label: 'Princípios' },
+              { href: '#jornada', label: 'Jornada' },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="text-[13px] font-medium tracking-[0.01em] text-[#1a1814]/70 transition hover:text-[#1a1814]"
+              >
+                {item.label}
               </Link>
+            ))}
+          </nav>
 
-              <nav className="hidden items-center gap-8 text-sm text-slate-300 lg:flex">
-                <Link href="#modulos" className="transition-colors hover:text-white">
-                  Modulos
-                </Link>
-                <Link href="#jornada" className="transition-colors hover:text-white">
-                  Jornada
-                </Link>
-                <Link href="#impacto" className="transition-colors hover:text-white">
-                  Impacto
-                </Link>
-                <Link href="#demo" className="transition-colors hover:text-white">
-                  Demonstracao
-                </Link>
-              </nav>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/login"
+              className="hidden h-9 items-center rounded-full px-4 text-[13px] font-medium text-[#1a1814]/80 transition hover:text-[#1a1814] sm:inline-flex"
+            >
+              Entrar
+            </Link>
+            <Link
+              href="/loja"
+              className="group inline-flex h-9 items-center gap-1.5 rounded-full bg-[#1a1814] px-4 text-[13px] font-medium text-[#f6f3ee] transition hover:bg-[#1a1814]/90"
+            >
+              Ver a plataforma
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+        </div>
+      </header>
 
-              <div className="flex items-center gap-3">
-                <Link href="/login" className="hidden text-sm text-slate-300 transition-colors hover:text-white sm:inline-flex">
-                  Entrar
-                </Link>
-                <Link href="#demo" className="inline-flex h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">
-                  Ver a plataforma
-                </Link>
+      {/* HERO EDITORIAL */}
+      <section className="relative overflow-hidden">
+        <div className="mx-auto max-w-[1320px] px-6 pb-16 pt-12 sm:pb-24 sm:pt-16 lg:pb-32 lg:pt-20">
+          {/* Eyebrow com data e número de edição */}
+          <div className="mb-10 flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">
+            <span className="h-px w-8 bg-[#1a1814]/30" />
+            <span>Edição 01</span>
+            <span>·</span>
+            <span>Retail OS</span>
+            <span>·</span>
+            <span>2026</span>
+          </div>
+
+          {/* Headline em serifa gigante */}
+          <h1 className="max-w-5xl text-[clamp(2.75rem,7vw,6.5rem)] font-normal leading-[0.95] tracking-[-0.04em] text-[#1a1814]" style={{ fontFamily: 'var(--font-display)' }}>
+            Cada canal vendendo como se a operação inteira <em className="text-[#b8654a]" style={{ fontStyle: 'italic' }}>respirasse em uníssono</em>.
+          </h1>
+
+          {/* Subheadline + meta */}
+          <div className="mt-12 grid gap-12 lg:grid-cols-[1.2fr_1fr] lg:gap-16">
+            <p className="max-w-2xl text-[18px] leading-[1.55] text-[#1a1814]/75 sm:text-[20px]">
+              GTSoftHub transforma estoque, PDV, loja online e atendimento em uma única experiência de controle, beleza e fluidez. Para o empreendedor que se recusa a aceitar improviso.
+            </p>
+
+            <div className="grid grid-cols-3 gap-6 self-end border-t border-[#1a1814]/15 pt-6">
+              {[
+                { v: '1', l: 'Estoque' },
+                { v: '4', l: 'Canais' },
+                { v: '0', l: 'Ruído' },
+              ].map((m) => (
+                <div key={m.l}>
+                  <div className="text-[36px] font-normal leading-none tracking-[-0.03em] text-[#1a1814]" style={{ fontFamily: 'var(--font-display)' }}>
+                    {m.v}
+                  </div>
+                  <div className="mt-2 text-[11px] font-medium uppercase tracking-[0.16em] text-[#1a1814]/50">
+                    {m.l}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* CTAs */}
+          <div className="mt-12 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Link
+              href="/login"
+              className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#1a1814] px-7 text-[14px] font-medium text-[#f6f3ee] transition hover:bg-[#1a1814]/90"
+            >
+              Entrar no ecossistema
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
+            <Link
+              href="/loja"
+              className="group inline-flex h-12 items-center justify-center gap-2 rounded-full border border-[#1a1814]/15 bg-[#f6f3ee] px-7 text-[14px] font-medium text-[#1a1814] transition hover:border-[#1a1814]/30"
+            >
+              Explorar a vitrine ao vivo
+              <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Imagem hero — placeholder editorial com gradiente sutil */}
+        <div className="mx-auto max-w-[1320px] px-6 pb-20">
+          <div className="relative aspect-[16/8] overflow-hidden rounded-[2px] border border-[#1a1814]/8">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#e8d5c4] via-[#d4b896] to-[#8b6f47]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,rgba(255,255,255,0.25),transparent_60%)]" />
+
+            {/* Grid overlay sutil */}
+            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(to right, #1a1814 1px, transparent 1px), linear-gradient(to bottom, #1a1814 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
+
+            {/* Texto editorial sobreposto */}
+            <div className="absolute inset-0 flex flex-col justify-between p-8 sm:p-12">
+              <div className="flex items-start justify-between text-[11px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/60">
+                <span>01 — Vitrine</span>
+                <span>GTSoftHub · 2026</span>
+              </div>
+
+              <div>
+                <p className="max-w-md text-[24px] leading-[1.15] tracking-[-0.02em] text-[#1a1814] sm:text-[32px]" style={{ fontFamily: 'var(--font-display)' }}>
+                  Onde o operador, o cliente e o sistema encontram a mesma página.
+                </p>
               </div>
             </div>
-          </Container>
-        </header>
+          </div>
+        </div>
+      </section>
 
-        <main>
-          <section className="relative pb-20 pt-14 sm:pb-24 sm:pt-20 lg:pb-28 lg:pt-24">
-            <Container>
-              <div className="grid gap-14 lg:grid-cols-[minmax(0,1.08fr)_minmax(420px,0.92fr)] lg:items-center">
-                <div className="max-w-3xl">
-                  <div className="animate-slide-up opacity-0">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/10 px-4 py-2 text-xs font-medium uppercase tracking-[0.28em] text-accent">
-                      Plataforma premium para varejo
-                    </span>
-                  </div>
+      {/* MÓDULOS */}
+      <section id="modulos" className="border-t border-[#1a1814]/8 bg-[#f6f3ee] py-20 sm:py-28">
+        <div className="mx-auto max-w-[1320px] px-6">
+          <div className="mb-16 flex items-end justify-between gap-6">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">
+                Módulos
+              </p>
+              <h2 className="mt-4 max-w-2xl text-[clamp(2rem,4vw,3.25rem)] font-normal leading-[1.05] tracking-[-0.03em] text-[#1a1814]" style={{ fontFamily: 'var(--font-display)' }}>
+                Quatro peças, uma só operação.
+              </h2>
+            </div>
+            <p className="hidden max-w-md text-[15px] leading-[1.55] text-[#1a1814]/65 lg:block">
+              Cada módulo é desenhado para resolver uma parte do problema, mas só funciona bem junto. A soma é maior que as partes.
+            </p>
+          </div>
 
-                  <h1 className="animate-slide-up mt-7 max-w-4xl text-5xl font-semibold leading-[0.92] tracking-[-0.05em] text-white opacity-0 sm:text-6xl lg:text-7xl xl:text-[5.4rem]" style={{ animationDelay: "0.1s" }}>
-                    O sistema que faz cada canal vender como se toda a operacao respirasse em unissono.
-                  </h1>
-
-                  <p className="animate-slide-up mt-8 max-w-2xl text-lg leading-8 text-slate-300 opacity-0 sm:text-xl" style={{ animationDelay: "0.18s" }}>
-                    GTSoftHub transforma estoque, PDV, loja online e atendimento em uma experiencia unica de controle, beleza e fluidez para o empreendedor que nao aceita improviso.
-                  </p>
-
-                  <div className="animate-slide-up mt-10 flex flex-col gap-4 opacity-0 sm:flex-row" style={{ animationDelay: "0.26s" }}>
-                    <Link href="/login" className="group inline-flex h-14 items-center justify-center rounded-full bg-white px-7 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">
-                      Entrar no ecossistema
-                      <ArrowIcon />
-                    </Link>
-                    <Link href="/loja" className="inline-flex h-14 items-center justify-center rounded-full border border-white/12 bg-white/6 px-7 text-sm font-semibold text-white transition hover:border-white/24 hover:bg-white/10">
-                      Explorar a vitrine ao vivo
-                    </Link>
-                  </div>
-
-                  <div className="animate-slide-up mt-10 flex flex-wrap gap-3 opacity-0" style={{ animationDelay: "0.34s" }}>
-                    {confidenceSignals.map((signal) => (
-                      <div
-                        key={signal}
-                        className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200"
-                      >
-                        <span className="h-2 w-2 rounded-full bg-accent" />
-                        {signal}
-                      </div>
-                    ))}
-                  </div>
+          <div className="grid gap-px bg-[#1a1814]/8 sm:grid-cols-2">
+            {modules.map((m) => (
+              <Link
+                key={m.number}
+                href={m.href}
+                className="group relative bg-[#f6f3ee] p-8 transition hover:bg-[#efe9df] sm:p-10"
+              >
+                <div className="mb-8 flex items-center justify-between">
+                  <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">
+                    {m.number} · {m.title}
+                  </span>
+                  <ArrowUpRight className="h-4 w-4 text-[#1a1814]/30 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-[#1a1814]/70" />
                 </div>
 
-                <div className="animate-slide-up relative opacity-0 lg:pl-6" style={{ animationDelay: "0.42s" }}>
-                  <div className="absolute -inset-4 rounded-[2rem] bg-white/6 blur-3xl" />
-                  <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(14,17,20,0.96),rgba(6,8,11,0.98))] shadow-[0_40px_120px_-48px_rgba(6,182,212,0.65)]">
-                    <div className="flex items-center justify-between border-b border-white/8 px-6 py-5">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.32em] text-slate-500">Operating pulse</p>
-                        <h2 className="mt-2 text-xl font-semibold text-white">Comando unificado GTSoftHub</h2>
-                      </div>
-                      <div className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">
-                        Operacao sincronizada
-                      </div>
-                    </div>
+                <h3 className="mb-4 text-[28px] font-normal leading-[1.1] tracking-[-0.02em] text-[#1a1814] sm:text-[32px]" style={{ fontFamily: 'var(--font-display)' }}>
+                  {m.headline}
+                </h3>
 
-                    <div className="grid gap-4 p-6 sm:grid-cols-2">
-                      <div className="rounded-[1.6rem] border border-white/8 bg-white/5 p-5">
-                        <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Receita viva</p>
-                        <p className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white">R$ 182k</p>
-                        <p className="mt-2 text-sm text-slate-300">ultima semana com crescimento puxado por loja, caixa e WhatsApp.</p>
-                        <div className="mt-5 h-2 rounded-full bg-white/8">
-                          <div className="h-2 w-[72%] rounded-full bg-[linear-gradient(90deg,#6ee7b7,#22d3ee)]" />
-                        </div>
-                      </div>
-
-                      <div className="rounded-[1.6rem] border border-white/8 bg-white/5 p-5">
-                        <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Leitura de estoque</p>
-                        <div className="mt-4 space-y-3">
-                          {[
-                            ["Disponivel para vender", "94%", "bg-emerald-400"],
-                            ["Itens em atencao", "11 SKUs", "bg-amber-300"],
-                            ["Reposicao automatizada", "ativa", "bg-cyan-300"],
-                          ].map(([label, value, color]) => (
-                            <div key={label} className="flex items-center justify-between rounded-2xl border border-white/8 bg-slate-950/40 px-4 py-3">
-                              <div className="flex items-center gap-3">
-                                <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
-                                <span className="text-sm text-slate-200">{label}</span>
-                              </div>
-                              <span className="text-sm font-semibold text-white">{value}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="rounded-[1.6rem] border border-white/8 bg-white/5 p-5 sm:col-span-2">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Jornada do cliente</p>
-                            <p className="mt-2 text-lg font-semibold text-white">Do primeiro clique ao recebimento sem perder contexto</p>
-                          </div>
-                          <div className="hidden rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300 sm:block">
-                            Omnichannel orchestration
-                          </div>
-                        </div>
-
-                        <div className="mt-6 grid gap-3 md:grid-cols-3">
-                          {[
-                            ["Atracao", "Loja premium, campanhas e prova visual forte."],
-                            ["Conversao", "PDV e WhatsApp com estoque fiel e decisao agil."],
-                            ["Retencao", "Acompanhamento, reposicao e gestao de canal em um painel unico."],
-                          ].map(([title, description]) => (
-                            <div key={title} className="rounded-[1.35rem] border border-white/8 bg-slate-950/45 p-4">
-                              <p className="text-sm font-semibold text-white">{title}</p>
-                              <p className="mt-2 text-sm leading-6 text-slate-300">{description}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-16 grid gap-4 md:grid-cols-3">
-                {proofMetrics.map((metric, index) => (
-                  <div
-                    key={metric.value}
-                    className="animate-slide-up rounded-[1.75rem] border border-white/8 bg-white/[0.045] p-6 opacity-0"
-                    style={{ animationDelay: `${0.2 + index * 0.08}s` }}
-                  >
-                    <p className="text-3xl font-semibold tracking-[-0.04em] text-white">{metric.value}</p>
-                    <p className="mt-3 text-sm leading-6 text-slate-300">{metric.label}</p>
-                  </div>
-                ))}
-              </div>
-            </Container>
-          </section>
-
-          <section id="modulos" className="border-y border-white/6 bg-white/[0.02] py-20 sm:py-24">
-            <Container>
-              <div className="max-w-3xl">
-                <p className="text-xs uppercase tracking-[0.32em] text-accent">Modulos que conversam entre si</p>
-                <h2 className="mt-5 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
-                  Cada tela foi desenhada para ser bonita aos olhos e indispensavel na rotina.
-                </h2>
-                <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
-                  Nao existe glamour sem operacao. Por isso a plataforma une experiencia premium, clareza de decisao e disciplina de estoque em todos os pontos da jornada.
+                <p className="mb-6 max-w-md text-[15px] leading-[1.55] text-[#1a1814]/70">
+                  {m.description}
                 </p>
-              </div>
 
-              <div className="mt-12 grid gap-5 lg:grid-cols-2">
-                {moduleCards.map((card) => (
-                  <Link
-                    key={card.title}
-                    href={card.href}
-                    className="group rounded-[1.9rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-7 transition hover:-translate-y-1 hover:border-white/16 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))]"
-                  >
-                    <p className="text-xs uppercase tracking-[0.28em] text-slate-500">{card.eyebrow}</p>
-                    <h3 className="mt-5 text-2xl font-semibold tracking-[-0.03em] text-white">{card.title}</h3>
-                    <p className="mt-4 text-sm leading-7 text-slate-300">{card.description}</p>
-                    <div className="mt-6 flex items-center justify-between gap-4">
-                      <span className="text-sm font-medium text-slate-100">{card.detail}</span>
-                      <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white transition group-hover:border-accent/40 group-hover:bg-accent/12">
-                        <ArrowIcon />
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </Container>
-          </section>
-
-          <section id="impacto" className="py-20 sm:py-24">
-            <Container>
-              <div className="grid gap-10 lg:grid-cols-[0.88fr_minmax(0,1.12fr)] lg:items-start">
-                <div className="rounded-[2rem] border border-white/8 bg-white/[0.04] p-8 sm:p-10">
-                  <p className="text-xs uppercase tracking-[0.32em] text-accent">O que muda na vida do empreendedor</p>
-                  <h2 className="mt-5 text-4xl font-semibold tracking-[-0.04em] text-white">
-                    Controle, calma e confianca viram sensacao diaria, nao promessa de software.
-                  </h2>
-                  <p className="mt-5 text-base leading-7 text-slate-300">
-                    Quando a operacao esta realmente orquestrada, o dono para de apagar incendio e volta a construir marca, margem e relacionamento com o cliente.
-                  </p>
-                </div>
-
-                <div className="grid gap-5">
-                  {operatingMoments.map((moment, index) => (
-                    <div
-                      key={moment.title}
-                      className="rounded-[1.75rem] border border-white/8 bg-slate-950/55 p-6 sm:p-7"
+                <div className="flex flex-wrap gap-1.5">
+                  {m.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full border border-[#1a1814]/15 px-2.5 py-0.5 text-[11px] font-medium tracking-wide text-[#1a1814]/65"
                     >
-                      <div className="flex items-start gap-4">
-                        <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-accent/20 bg-accent/10 text-sm font-semibold text-accent">
-                          0{index + 1}
-                        </span>
-                        <div>
-                          <h3 className="text-xl font-semibold tracking-[-0.02em] text-white">{moment.title}</h3>
-                          <p className="mt-3 text-sm leading-7 text-slate-300">{moment.description}</p>
-                        </div>
-                      </div>
-                    </div>
+                      {tag}
+                    </span>
                   ))}
                 </div>
-              </div>
-            </Container>
-          </section>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
 
-          <section id="jornada" className="border-t border-white/6 py-20 sm:py-24">
-            <Container>
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-                <div className="max-w-3xl">
-                  <p className="text-xs uppercase tracking-[0.32em] text-accent">Jornada de implantacao</p>
-                  <h2 className="mt-5 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
-                    Tecnologia bonita demais para ser superficial. Estrategia suficiente para sustentar crescimento real.
-                  </h2>
-                </div>
-                <p className="max-w-xl text-base leading-7 text-slate-300">
-                  Cada etapa foi pensada para transformar implementacao em ganho tangivel de negocio, com ritmo claro, prioridades certas e refinamento continuo.
-                </p>
-              </div>
+      {/* PRINCÍPIOS */}
+      <section id="principios" className="border-t border-[#1a1814]/8 bg-[#1a1814] py-20 text-[#f6f3ee] sm:py-28">
+        <div className="mx-auto max-w-[1320px] px-6">
+          <div className="grid gap-16 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#f6f3ee]/50">
+                Princípios
+              </p>
+              <h2 className="mt-4 text-[clamp(2rem,4vw,3.25rem)] font-normal leading-[1.05] tracking-[-0.03em] text-[#f6f3ee]" style={{ fontFamily: 'var(--font-display)' }}>
+                Três coisas que não negociamos.
+              </h2>
+            </div>
 
-              <div className="mt-12 grid gap-5 lg:grid-cols-3">
-                {launchTracks.map((track) => (
-                  <div key={track.step} className="rounded-[1.8rem] border border-white/8 bg-white/[0.035] p-7">
-                    <p className="text-sm font-semibold tracking-[0.24em] text-accent">{track.step}</p>
-                    <h3 className="mt-6 text-2xl font-semibold tracking-[-0.03em] text-white">{track.title}</h3>
-                    <p className="mt-4 text-sm leading-7 text-slate-300">{track.description}</p>
-                  </div>
-                ))}
-              </div>
-            </Container>
-          </section>
-
-          <section id="demo" className="pb-24 pt-6 sm:pb-28">
-            <Container>
-              <div className="relative overflow-hidden rounded-[2.4rem] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] p-8 shadow-[0_32px_120px_-48px_rgba(34,211,238,0.55)] sm:p-10 lg:p-12">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(110,231,183,0.15),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.16),transparent_38%)]" />
-                <div className="relative grid gap-8 lg:grid-cols-[1.15fr_minmax(320px,0.85fr)] lg:items-center">
-                  <div className="max-w-3xl">
-                    <p className="text-xs uppercase tracking-[0.32em] text-accent">Demonstracao guiada</p>
-                    <h2 className="mt-5 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
-                      Se a meta e emocionar o cliente final e devolver paz ao empreendedor, a plataforma precisa ser sentida ao vivo.
-                    </h2>
-                    <p className="mt-5 text-base leading-7 text-slate-200">
-                      Entre na operacao, explore a vitrine, acompanhe o painel e veja como GTSoftHub transforma rotina, imagem e decisao em uma unica experiencia de crescimento.
+            <div className="space-y-10">
+              {principles.map((p) => (
+                <div key={p.k} className="grid grid-cols-[auto_1fr] gap-6 border-t border-[#f6f3ee]/15 pt-6">
+                  <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#b8654a]">
+                    {p.k}
+                  </span>
+                  <div>
+                    <h3 className="text-[24px] font-normal leading-[1.2] tracking-[-0.02em] text-[#f6f3ee]" style={{ fontFamily: 'var(--font-display)' }}>
+                      {p.t}
+                    </h3>
+                    <p className="mt-3 text-[15px] leading-[1.55] text-[#f6f3ee]/65">
+                      {p.d}
                     </p>
                   </div>
-
-                  <div className="rounded-[2rem] border border-white/12 bg-slate-950/55 p-6">
-                    <div className="space-y-3">
-                      {[
-                        "Ver a vitrine premium funcionando",
-                        "Sentir o PDV e o painel no mesmo ecossistema",
-                        "Entender como estoque e canais viram uma so decisao",
-                      ].map((item) => (
-                        <div key={item} className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3">
-                          <span className="mt-1 h-2.5 w-2.5 rounded-full bg-accent" />
-                          <span className="text-sm leading-6 text-slate-200">{item}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="mt-6 flex flex-col gap-3">
-                      <Link href="/login" className="group inline-flex h-14 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">
-                        Entrar agora
-                        <ArrowIcon />
-                      </Link>
-                      <Link href="/loja" className="inline-flex h-14 items-center justify-center rounded-full border border-white/12 bg-white/6 px-6 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10">
-                        Ver a loja ao vivo
-                      </Link>
-                    </div>
-                  </div>
                 </div>
-              </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
 
-              <footer className="mt-12 flex flex-col gap-6 border-t border-white/8 pt-8 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-medium text-slate-200">GTSoftHub</p>
-                  <p className="mt-1">Operacao premium para varejo omnichannel sem overselling.</p>
-                </div>
-                <div className="flex flex-wrap gap-4">
-                  <Link href="/login" className="transition-colors hover:text-white">
-                    Login
-                  </Link>
-                  <Link href="/loja" className="transition-colors hover:text-white">
-                    Loja
-                  </Link>
-                  <Link href="/pdv" className="transition-colors hover:text-white">
-                    PDV
-                  </Link>
-                  <Link href="/admin" className="transition-colors hover:text-white">
-                    Admin
-                  </Link>
-                </div>
-              </footer>
-            </Container>
-          </section>
-        </main>
-      </div>
+      {/* CTA FINAL + FOOTER */}
+      <section id="jornada" className="border-t border-[#1a1814]/8 bg-[#f6f3ee]">
+        <div className="mx-auto max-w-[1320px] px-6 py-24 sm:py-32">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">
+              Próximo passo
+            </p>
+            <h2 className="mt-6 text-[clamp(2.5rem,5vw,4.5rem)] font-normal leading-[1] tracking-[-0.03em] text-[#1a1814]" style={{ fontFamily: 'var(--font-display)' }}>
+              Viu? Não parece <em className="text-[#b8654a]" style={{ fontStyle: 'italic' }}>software</em>.
+            </h2>
+            <p className="mx-auto mt-6 max-w-xl text-[16px] leading-[1.55] text-[#1a1814]/70 sm:text-[18px]">
+              Porque não é. É varejo com ritmo, marca e controle. O software é só o que faz isso caber numa tela.
+            </p>
+
+            <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Link
+                href="/login"
+                className="group inline-flex h-12 items-center gap-2 rounded-full bg-[#1a1814] px-7 text-[14px] font-medium text-[#f6f3ee] transition hover:bg-[#1a1814]/90"
+              >
+                Entrar agora
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Link>
+              <Link
+                href="/loja"
+                className="inline-flex h-12 items-center gap-2 rounded-full border border-[#1a1814]/15 px-7 text-[14px] font-medium text-[#1a1814] transition hover:border-[#1a1814]/30"
+              >
+                Ver a loja ao vivo
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-[#1a1814]/8">
+          <div className="mx-auto flex max-w-[1320px] flex-col gap-6 px-6 py-8 text-[12px] text-[#1a1814]/55 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex h-5 w-5 items-center justify-center rounded bg-[#1a1814] text-[8px] font-semibold text-[#f6f3ee]">GT</div>
+              <span>GTSoftHub · Operação premium para varejo omnichannel</span>
+            </div>
+            <div className="flex flex-wrap gap-6">
+              <Link href="/loja" className="transition hover:text-[#1a1814]">Loja</Link>
+              <Link href="/pdv" className="transition hover:text-[#1a1814]">PDV</Link>
+              <Link href="/admin" className="transition hover:text-[#1a1814]">Admin</Link>
+              <Link href="/info/privacidade" className="transition hover:text-[#1a1814]">Privacidade</Link>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
-  )
+  );
 }

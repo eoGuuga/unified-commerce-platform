@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { ArrowUpRight } from 'lucide-react';
 
 export default function GlobalError({
   error,
@@ -14,30 +15,37 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 text-center">
-        <h2 className="text-xl font-bold text-gray-900 mb-2">
-          Ops! Algo deu errado
-        </h2>
-        <p className="text-gray-600 mb-6">
-          Ocorreu um erro inesperado. Tente novamente em instantes.
+    <div className="min-h-screen bg-[#f6f3ee] text-[#1a1814] flex items-center justify-center px-6">
+      <div className="max-w-md text-center">
+        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">Erro</p>
+        <h1
+          className="mt-5 text-[clamp(2.5rem,5vw,4.5rem)] font-normal leading-[0.98] tracking-[-0.04em]"
+          style={{ fontFamily: 'var(--font-display)' }}
+        >
+          Algo <em className="text-[#b8654a]" style={{ fontStyle: 'italic' }}>inesperado</em>.
+        </h1>
+        <p className="mt-6 text-[15px] leading-[1.55] text-[#1a1814]/65">
+          Ocorreu um erro. Tente novamente em instantes.
         </p>
+
         {process.env.NODE_ENV === 'development' && (
-          <pre className="text-xs text-red-600 overflow-auto mb-4 text-left bg-gray-100 p-3 rounded">
+          <pre className="mt-6 text-left text-[12px] text-[#1a1814]/70 overflow-auto border border-[#1a1814]/15 bg-white/40 p-3 rounded-[2px]">
             {error.message}
             {error.digest ? `\n\nDigest: ${error.digest}` : ''}
           </pre>
         )}
-        <div className="flex gap-3">
+
+        <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <button
             onClick={reset}
-            className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            className="group inline-flex h-12 items-center gap-2 rounded-full bg-[#1a1814] px-7 text-[14px] font-medium text-[#f6f3ee] transition hover:bg-[#1a1814]/90"
           >
             Tentar novamente
+            <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
           </button>
           <button
             onClick={() => (window.location.href = '/')}
-            className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+            className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#1a1814]/55 transition hover:text-[#1a1814]"
           >
             Voltar ao inicio
           </button>
