@@ -1,70 +1,114 @@
 'use client';
 
 import Link from 'next/link';
-import { ShoppingBag, Store } from 'lucide-react';
+import { ShoppingBag, Menu, X } from 'lucide-react';
+import { useState } from 'react';
+import { useCart } from '@/hooks/useCart';
+import { cn } from '@/lib/utils';
 
 interface StoreHeaderProps {
-  storeName: string;
-  cartCount: number;
-  /** Clique no botao "Carrinho". Se a sessao de checkout ja estiver
-   *  aberta, o caller pode rotear pro modal de checkout em vez do drawer. */
-  onCartClick: () => void;
+  variant?: 'transparent' | 'solid';
 }
 
 /**
- * Header sticky da vitrine: logo + nome da loja + atalhos de navegacao
- * (acompanhar pedido, ver catalogo) + botao do carrinho com contador.
+ * Header sticky da loja: logo + nav + cart + menu mobile.
+ * Bg com blur (glass) e borda inferior sutil.
  */
-export function StoreHeader({
-  storeName,
-  cartCount,
-  onCartClick,
-}: StoreHeaderProps) {
-  return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-3">
-          <div className="flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] shadow-[0_20px_50px_-35px_rgba(16,185,129,0.9)]">
-            <Store className="size-5 text-accent" />
-          </div>
-          <div>
-            <p className="text-[0.7rem] uppercase tracking-[0.26em] text-muted-foreground">
-              ecommerce conectado
-            </p>
-            <h1 className="text-lg font-semibold tracking-tight text-foreground">
-              {storeName}
-            </h1>
-          </div>
-        </div>
+export function StoreHeader({ variant = 'solid' }: StoreHeaderProps) {
+  const { totalItems } = useCart();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-        <div className="flex items-center gap-3">
-          <Link
-            href="/pedido"
-            className="hidden rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-accent/30 hover:bg-white/[0.08] md:inline-flex"
-          >
-            Acompanhar pedido
-          </Link>
-          <a
-            href="#catalogo"
-            className="hidden rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-accent/30 hover:bg-white/[0.08] sm:inline-flex"
-          >
-            Ver catalogo
-          </a>
+  const navItems = [
+    { href: '/', label: 'Inicio' },
+    { href: '/loja', label: 'Loja' },
+    { href: '/pdv', label: 'PDV' },
+    { href: '/admin', label: 'Admin' },
+  ];
+
+  return (
+    <header
+      className={cn(
+        'sticky top-0 z-40 border-b border-white/6',
+        variant === 'transparent'
+          ? 'bg-background/60 backdrop-blur-xl'
+          : 'bg-background/80 backdrop-blur-xl'
+      )}
+    >
+      <div className="container mx-auto flex h-16 items-center justify-between px-4">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white text-[11px] font-semibold tracking-[0.18em] text-slate-950">
+            GT
+          </div>
+          <span className="text-sm font-semibold tracking-tight text-white">
+            GTSoftHub
+          </span>
+        </Link>
+
+        {/* Nav desktop */}
+        <nav className="hidden items-center gap-1 md:flex">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'rounded-full px-3.5 py-1.5 text-sm font-medium transition',
+                item.href === '/loja'
+                  ? 'text-white'
+                  : 'text-slate-400 hover:text-white'
+              )}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        {/* Acoes */}
+        <div className="flex items-center gap-2">
+          <CartButton count={totalItems} />
           <button
-            type="button"
-            onClick={onCartClick}
-            className="relative inline-flex items-center gap-2 rounded-2xl bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition hover:opacity-90"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            className="rounded-full p-2 text-slate-400 transition hover:bg-white/5 hover:text-white md:hidden"
+            aria-label="Menu"
           >
-            <ShoppingBag className="size-4" />
-            Carrinho
-            {cartCount > 0 && (
-              <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
-                {cartCount}
-              </span>
-            )}
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
       </div>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div className="border-t border-white/6 bg-background/95 backdrop-blur-xl md:hidden">
+          <nav className="container mx-auto flex flex-col gap-1 px-4 py-3">
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className="rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      )}
     </header>
+  );
+}
+
+function CartButton({ count }: { count: number }) {
+  return (
+    <button
+      className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition hover:bg-white/10"
+      aria-label={`Carrinho (${count} ${count === 1 ? 'item' : 'itens'})`}
+    >
+      <ShoppingBag className="h-4 w-4" />
+      {count > 0 && (
+        <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-slate-950">
+          {count > 9 ? '9+' : count}
+        </span>
+      )}
+    </button>
   );
 }
