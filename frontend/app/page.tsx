@@ -3,6 +3,9 @@
 import Link from 'next/link';
 import { ArrowRight, ArrowUpRight, MessageCircle, Heart, Zap, Package, BarChart3, Users, Receipt, Check, Sparkles, Star, MousePointer2, ChevronDown, ShieldCheck, Clock4, TrendingUp, Boxes, Bell, ShoppingBag } from 'lucide-react';
 import { ScrollReveal, ScrollParallax, ScrollCountUp, WhatsAppMockup, MetricCard, MóduloVisual, TimelineStep, AvatarGradiente, PlanoDestaque, BotaoMicro, ScrollHint } from '@/components/landing/Animations';
+import { CalculadoraROI } from '@/components/landing/CalculadoraROI';
+import { ProvaSocial, VisualizadoresAoVivo, EstatisticasAoVivo, SelosConfianca } from '@/components/landing/ProvaSocial';
+import { ComparacaoAntesDepois, ComparacaoConcorrentes } from '@/components/landing/Comparacao';
 
 /**
  * Landing page GTSoftHub - 10/10.
@@ -520,6 +523,66 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ESTATÍSTICAS AO VIVO - "X clientes ativos" */}
+      <section className="border-t border-[#1a1814]/8 bg-[#efe9df]">
+        <div className="mx-auto max-w-[1320px] px-6 py-16">
+          <ScrollReveal>
+            <div className="mb-8 text-center">
+              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">
+                Números ao vivo
+              </p>
+              <h2 className="mt-3 text-[24px] font-normal leading-[1.1] tracking-[-0.02em] sm:text-[32px]" style={{ fontFamily: 'var(--font-display)' }}>
+                Não prometemos. Mostramos.
+              </h2>
+            </div>
+            <EstatisticasAoVivo />
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* COMPARAÇÃO ANTES/DEPOIS */}
+      <section className="border-t border-[#1a1814]/8 bg-[#f6f3ee] py-20 sm:py-28">
+        <div className="mx-auto max-w-[1320px] px-6">
+          <ScrollReveal>
+            <div className="mb-12 text-center">
+              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">
+                Transformação
+              </p>
+              <h2 className="mt-3 text-[clamp(2rem,4vw,3.25rem)] font-normal leading-[1.05] tracking-[-0.03em] text-[#1a1814]" style={{ fontFamily: 'var(--font-display)' }}>
+                Sua rotina, <em className="text-[#b8654a]">antes e depois</em>.
+              </h2>
+            </div>
+            <ComparacaoAntesDepois />
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* CALCULADORA DE ROI */}
+      <section className="border-t border-[#1a1814]/8 bg-[#1a1814] py-20 text-[#f6f3ee] sm:py-28">
+        <div className="mx-auto max-w-[1320px] px-6">
+          <ScrollReveal>
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#b8654a]">
+                Quanto você vai ganhar
+              </p>
+              <h2 className="mt-3 text-[clamp(2rem,4vw,3.25rem)] font-normal leading-[1.05] tracking-[-0.03em] text-[#f6f3ee]" style={{ fontFamily: 'var(--font-display)' }}>
+                A conta que <em className="text-[#b8654a]">convence</em> sozinha.
+              </h2>
+              <p className="mt-4 text-[15px] text-[#f6f3ee]/65">
+                Mexa nos sliders e veja em tempo real quanto a GTSoftHub coloca no seu bolso.
+              </p>
+            </div>
+          </ScrollReveal>
+          <ScrollReveal delay={150}>
+            <div className="mt-12">
+              <div className="rounded-[3px] border border-[#f6f3ee]/10 bg-[#f6f3ee] p-2">
+                <CalculadoraROI />
+              </div>
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
+
       {/* PLANOS E PREÇOS - DESTAQUE FORTE */}
       <section id="preços" className="border-t border-[#1a1814]/8 bg-[#f6f3ee] py-20 sm:py-28">
         <div className="mx-auto max-w-[1320px] px-6">
@@ -562,6 +625,32 @@ export default function HomePage() {
               ))}
             </div>
           </ScrollReveal>
+        </div>
+      </section>
+
+      {/* COMPARAÇÃO COM CONCORRENTES */}
+      <section className="border-t border-[#1a1814]/8 bg-[#1a1814] py-20 text-[#f6f3ee] sm:py-28">
+        <div className="mx-auto max-w-[1320px] px-6">
+          <ScrollReveal>
+            <div className="mx-auto max-w-2xl text-center">
+              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#b8654a]">
+                Comparação honesta
+              </p>
+              <h2 className="mt-3 text-[clamp(2rem,4vw,3.25rem)] font-normal leading-[1.05] tracking-[-0.03em] text-[#f6f3ee]" style={{ fontFamily: 'var(--font-display)' }}>
+                O que a gente faz de <em className="text-[#b8654a]">diferente</em>.
+              </h2>
+            </div>
+          </ScrollReveal>
+          <ScrollReveal delay={150}>
+            <div className="mt-12">
+              <ComparacaoConcorrentes />
+            </div>
+          </ScrollReveal>
+        </div>
+
+        {/* Selos de confiança */}
+        <div className="mt-16">
+          <SelosConfianca />
         </div>
       </section>
 
@@ -646,6 +735,9 @@ export default function HomePage() {
 
       {/* Espaçador para o CTA sticky não cobrir conteúdo em mobile */}
       <div className="h-20 sm:hidden" />
+
+      {/* Notificação flutuante de prova social */}
+      <ProvaSocial />
     </div>
   );
 }
