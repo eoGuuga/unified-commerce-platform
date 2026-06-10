@@ -15,7 +15,6 @@ export interface Product {
   rating?: number;
 }
 
-// Produtos placeholder realistas para demonstrar a loja
 const PRODUTOS_DEMO: Product[] = [
   {
     id: '1',
@@ -23,7 +22,6 @@ const PRODUTOS_DEMO: Product[] = [
     description: 'Caneca de cerâmica 325ml com estampa personalizada. Perfeita para presente ou uso diário.',
     price: 29.90,
     original_price: 39.90,
-    image_url: '',
     category: 'Canecas',
     stock: 47,
     rating: 4.8,
@@ -33,7 +31,6 @@ const PRODUTOS_DEMO: Product[] = [
     name: 'Camiseta Algodão Premium',
     description: 'Camiseta 100% algodão, fio 30.1, modelagem regular. Conforto para o dia a dia.',
     price: 79.90,
-    image_url: '',
     category: 'Vestuário',
     stock: 23,
     rating: 4.6,
@@ -43,7 +40,6 @@ const PRODUTOS_DEMO: Product[] = [
     name: 'Caderno Sketchbook A4',
     description: 'Caderno sketchbook 80 folhas, papel off-white 120g, encadernação costurada.',
     price: 42.00,
-    image_url: '',
     category: 'Papelaria',
     stock: 12,
     rating: 4.9,
@@ -54,7 +50,6 @@ const PRODUTOS_DEMO: Product[] = [
     description: 'Caneca térmica em aço inox, mantém temperatura por 12h. Tampa hermética.',
     price: 89.90,
     original_price: 109.90,
-    image_url: '',
     category: 'Canecas',
     stock: 8,
     rating: 4.7,
@@ -64,7 +59,6 @@ const PRODUTOS_DEMO: Product[] = [
     name: 'Mochila Urbana Antifurto',
     description: 'Mochila com zíper escondido, compartimento para notebook 15", tecido impermeável.',
     price: 249.00,
-    image_url: '',
     category: 'Acessórios',
     stock: 5,
     rating: 4.8,
@@ -75,7 +69,6 @@ const PRODUTOS_DEMO: Product[] = [
     description: 'Fone over-ear com ANC ativo, bateria 30h, conexão multipoint.',
     price: 599.00,
     original_price: 799.00,
-    image_url: '',
     category: 'Eletrônicos',
     stock: 3,
     rating: 4.5,
@@ -85,7 +78,6 @@ const PRODUTOS_DEMO: Product[] = [
     name: 'Vela Aromática Lavanda',
     description: 'Vela artesanal de cera de soja, aroma lavanda francesa, 200g, queima 40h.',
     price: 54.90,
-    image_url: '',
     category: 'Casa',
     stock: 18,
     rating: 4.9,
@@ -95,7 +87,6 @@ const PRODUTOS_DEMO: Product[] = [
     name: 'Agenda Permanente Premium',
     description: 'Agenda permanente couro sintético, 12 meses, elástico, bolso para caneta.',
     price: 89.00,
-    image_url: '',
     category: 'Papelaria',
     stock: 22,
     rating: 4.7,
@@ -103,23 +94,14 @@ const PRODUTOS_DEMO: Product[] = [
 ];
 
 /**
- * Hook para buscar produtos.
- * Por enquanto retorna produtos demo realistas.
- * Quando integrado com backend, substituirá por chamada real.
+ * Hook que retorna produtos imediatamente.
+ * Quando o backend tiver endpoint real, substituir setProducts pela chamada API.
  */
 export function useProducts() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Inicializa com produtos direto (sem loading) - landing page renderiza já com conteúdo
+  const [products] = useState<Product[]>(PRODUTOS_DEMO);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Simula carregamento
-    const timer = setTimeout(() => {
-      setProducts(PRODUTOS_DEMO);
-      setLoading(false);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, []);
-
-  return { products, loading, error, refetch: () => setProducts(PRODUTOS_DEMO) };
+  return { products, loading, error, refetch: () => {} };
 }
