@@ -500,7 +500,7 @@ export function PlanoDestaque({
 
       <div className="relative mt-auto pt-8">
         <BotaoMicro
-          href={plano.nome === 'Escalar' ? '/login' : '/login'}
+          href={`/checkout?plano=${plano.nome.toLowerCase()}`}
           variant={plano.destaque ? 'light' : 'dark'}
           size="md"
           icon="right"
