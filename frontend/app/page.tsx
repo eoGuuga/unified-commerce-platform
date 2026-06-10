@@ -1,11 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, ArrowUpRight, MessageCircle, Heart, Zap, Package, BarChart3, Users, Receipt, Check, Sparkles, Star, MousePointer2, ChevronDown, ShieldCheck, Clock4, TrendingUp, Boxes, Bell, ShoppingBag } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, MessageCircle, Heart, Zap, Package, BarChart3, Users, Receipt, Check, Sparkles, MousePointer2, ChevronDown, ShieldCheck, Clock4, TrendingUp, Boxes, Bell, ShoppingBag, X } from 'lucide-react';
 import { ScrollReveal, ScrollParallax, ScrollCountUp, WhatsAppMockup, MetricCard, MóduloVisual, TimelineStep, AvatarGradiente, PlanoDestaque, BotaoMicro, ScrollHint } from '@/components/landing/Animations';
-import { CalculadoraROI } from '@/components/landing/CalculadoraROI';
-import { ProvaSocial, VisualizadoresAoVivo, EstatisticasAoVivo, SelosConfianca } from '@/components/landing/ProvaSocial';
-import { ComparacaoAntesDepois, ComparacaoConcorrentes } from '@/components/landing/Comparacao';
 
 /**
  * Landing page GTSoftHub - 10/10.
@@ -96,30 +93,6 @@ const etapas = [
   { dia: '02', t: 'Configuração', d: 'Importamos seus produtos, configuramos o bot de WhatsApp, ligamos tudo ao seu estoque.' },
   { dia: '03', t: 'Treinamento', d: 'Ensinamos sua equipe a usar. Em vídeo, ao vivo, no ritmo deles. Sem pressa.' },
   { dia: '04', t: 'Operação', d: 'Você atende pela loja, pelo site, pelo WhatsApp. Tudo no mesmo painel.' },
-];
-
-const depoimentos = [
-  {
-    nome: 'Carla M.',
-    negocio: 'Brechó online · SP',
-    texto: 'Antes eu respondia cliente no WhatsApp até meia-noite. Hoje o bot responde por mim e eu só acordo pra embalar. Triplicou as vendas.',
-    iniciais: 'CM',
-    cor: 'from-emerald-300 to-cyan-400',
-  },
-  {
-    nome: 'Roberto A.',
-    negocio: 'Loja de cosméticos · RJ',
-    texto: 'O que mais me impressionou foi o estoque. Nunca mais vendi algo que não tinha. E o cliente percebeu.',
-    iniciais: 'RA',
-    cor: 'from-amber-300 to-rose-400',
-  },
-  {
-    nome: 'Mariana S.',
-    negocio: 'Cafeteria com e-commerce · MG',
-    texto: 'Eu achava que precisava de 3 sistemas diferentes. A GTSoftHub fez tudo num lugar só, e ainda é bonito de ver.',
-    iniciais: 'MS',
-    cor: 'from-violet-300 to-fuchsia-400',
-  },
 ];
 
 const planos = [
@@ -487,98 +460,80 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* DEPOIMENTOS - COM AVATARES GRADIENTE */}
+      {/* HONESTIDADE - o que você precisa saber antes de assinar */}
       <section id="depoimentos" className="border-t border-[#1a1814]/8 bg-[#efe9df] py-20 sm:py-28">
         <div className="mx-auto max-w-[1320px] px-6">
           <ScrollReveal>
-            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">Histórias</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">
+              Antes de você assinar
+            </p>
             <h2 className="mt-4 max-w-3xl text-[clamp(2rem,4vw,3.25rem)] font-normal leading-[1.05] tracking-[-0.03em] text-[#1a1814]" style={{ fontFamily: 'var(--font-display)' }}>
-              Quem usa, conta.
+              O que a gente <em className="text-[#b8654a]">não</em> te conta nos outros sites.
             </h2>
           </ScrollReveal>
 
-          <div className="mt-12 grid gap-px bg-[#1a1814]/8 sm:grid-cols-3">
-            {depoimentos.map((d, i) => (
-              <ScrollReveal key={d.nome} delay={i * 100}>
-                <div className="group bg-[#f6f3ee] p-8 transition-all duration-500 hover:-translate-y-1 hover:bg-[#f6f3ee] sm:p-10">
-                  <div className="flex gap-0.5 text-[#b8654a]">
-                    {Array.from({ length: 5 }).map((_, j) => (
-                      <Star key={j} className="h-3.5 w-3.5 fill-current" />
-                    ))}
-                  </div>
-                  <p className="mt-6 text-[16px] leading-[1.5] text-[#1a1814]/80">
-                    "{d.texto}"
-                  </p>
-                  <div className="mt-8 flex items-center gap-3 border-t border-[#1a1814]/8 pt-6">
-                    <AvatarGradiente iniciais={d.iniciais} cor={d.cor} />
-                    <div>
-                      <p className="text-[13px] font-medium text-[#1a1814]">{d.nome}</p>
-                      <p className="text-[11px] text-[#1a1814]/55">{d.negocio}</p>
-                    </div>
-                  </div>
+          <div className="mt-12 grid gap-px bg-[#1a1814]/8 sm:grid-cols-2">
+            {/* O que SIM fazemos */}
+            <div className="bg-[#f6f3ee] p-8 sm:p-10">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100">
+                  <Check className="h-4 w-4 text-emerald-700" strokeWidth={2.5} />
                 </div>
-              </ScrollReveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ESTATÍSTICAS AO VIVO - "X clientes ativos" */}
-      <section className="border-t border-[#1a1814]/8 bg-[#efe9df]">
-        <div className="mx-auto max-w-[1320px] px-6 py-16">
-          <ScrollReveal>
-            <div className="mb-8 text-center">
-              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">
-                Números ao vivo
-              </p>
-              <h2 className="mt-3 text-[24px] font-normal leading-[1.1] tracking-[-0.02em] sm:text-[32px]" style={{ fontFamily: 'var(--font-display)' }}>
-                Não prometemos. Mostramos.
-              </h2>
-            </div>
-            <EstatisticasAoVivo />
-          </ScrollReveal>
-        </div>
-      </section>
-
-      {/* COMPARAÇÃO ANTES/DEPOIS */}
-      <section className="border-t border-[#1a1814]/8 bg-[#f6f3ee] py-20 sm:py-28">
-        <div className="mx-auto max-w-[1320px] px-6">
-          <ScrollReveal>
-            <div className="mb-12 text-center">
-              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">
-                Transformação
-              </p>
-              <h2 className="mt-3 text-[clamp(2rem,4vw,3.25rem)] font-normal leading-[1.05] tracking-[-0.03em] text-[#1a1814]" style={{ fontFamily: 'var(--font-display)' }}>
-                Sua rotina, <em className="text-[#b8654a]">antes e depois</em>.
-              </h2>
-            </div>
-            <ComparacaoAntesDepois />
-          </ScrollReveal>
-        </div>
-      </section>
-
-      {/* CALCULADORA DE ROI */}
-      <section className="border-t border-[#1a1814]/8 bg-[#1a1814] py-20 text-[#f6f3ee] sm:py-28">
-        <div className="mx-auto max-w-[1320px] px-6">
-          <ScrollReveal>
-            <div className="mx-auto max-w-3xl text-center">
-              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#b8654a]">
-                Quanto você vai ganhar
-              </p>
-              <h2 className="mt-3 text-[clamp(2rem,4vw,3.25rem)] font-normal leading-[1.05] tracking-[-0.03em] text-[#f6f3ee]" style={{ fontFamily: 'var(--font-display)' }}>
-                A conta que <em className="text-[#b8654a]">convence</em> sozinha.
-              </h2>
-              <p className="mt-4 text-[15px] text-[#f6f3ee]/65">
-                Mexa nos sliders e veja em tempo real quanto a GTSoftHub coloca no seu bolso.
-              </p>
-            </div>
-          </ScrollReveal>
-          <ScrollReveal delay={150}>
-            <div className="mt-12">
-              <div className="rounded-[3px] border border-[#f6f3ee]/10 bg-[#f6f3ee] p-2">
-                <CalculadoraROI />
+                <h3 className="text-[20px] font-normal leading-[1.1] tracking-[-0.01em] text-[#1a1814]" style={{ fontFamily: 'var(--font-display)' }}>
+                  O que a gente faz
+                </h3>
               </div>
+
+              <ul className="space-y-3">
+                {[
+                  'Unifica estoque, PDV, loja online e WhatsApp numa operação só',
+                  'Bot de WhatsApp responde cliente 24/7 e fecha vendas sozinho',
+                  'Setup assistido em 15 dias pela nossa equipe (sem você configurar nada)',
+                  'Suporte humano em português, não chatbot',
+                  'Sem fidelidade. Cancele quando quiser, sem multa',
+                  '14 dias grátis pra você testar antes de pagar qualquer coisa',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3 text-[14px] text-[#1a1814]/80">
+                    <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" strokeWidth={2.5} />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
+
+            {/* O que NÃO fazemos / limitações */}
+            <div className="bg-[#f6f3ee] p-8 sm:p-10">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1a1814]/10">
+                  <X className="h-4 w-4 text-[#1a1814]" strokeWidth={2.5} />
+                </div>
+                <h3 className="text-[20px] font-normal leading-[1.1] tracking-[-0.01em] text-[#1a1814]" style={{ fontFamily: 'var(--font-display)' }}>
+                  O que NÃO fazemos
+                </h3>
+              </div>
+
+              <ul className="space-y-3">
+                {[
+                  'Não prometemos "triplicar suas vendas" (depende do seu negócio)',
+                  'Não temos foto de clientes no site (não usamos imagem sem autorização)',
+                  'Não exibimos números falsos de "X pessoas vendo"',
+                  'Não fabricamos depoimentos com nomes inventados',
+                  'Não garantimos resultado específico (cada negócio é único)',
+                  'Não somos para todos: se você quer só "postar produto e esquecer", não somos pra você',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3 text-[14px] text-[#1a1814]/80">
+                    <X className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#1a1814]/55" strokeWidth={2.5} />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <ScrollReveal delay={200}>
+            <p className="mt-10 text-center text-[14px] text-[#1a1814]/70">
+              A gente prefere perder uma venda por ser honesto do que ganhar uma por mentir.
+            </p>
           </ScrollReveal>
         </div>
       </section>
@@ -625,32 +580,6 @@ export default function HomePage() {
               ))}
             </div>
           </ScrollReveal>
-        </div>
-      </section>
-
-      {/* COMPARAÇÃO COM CONCORRENTES */}
-      <section className="border-t border-[#1a1814]/8 bg-[#1a1814] py-20 text-[#f6f3ee] sm:py-28">
-        <div className="mx-auto max-w-[1320px] px-6">
-          <ScrollReveal>
-            <div className="mx-auto max-w-2xl text-center">
-              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#b8654a]">
-                Comparação honesta
-              </p>
-              <h2 className="mt-3 text-[clamp(2rem,4vw,3.25rem)] font-normal leading-[1.05] tracking-[-0.03em] text-[#f6f3ee]" style={{ fontFamily: 'var(--font-display)' }}>
-                O que a gente faz de <em className="text-[#b8654a]">diferente</em>.
-              </h2>
-            </div>
-          </ScrollReveal>
-          <ScrollReveal delay={150}>
-            <div className="mt-12">
-              <ComparacaoConcorrentes />
-            </div>
-          </ScrollReveal>
-        </div>
-
-        {/* Selos de confiança */}
-        <div className="mt-16">
-          <SelosConfianca />
         </div>
       </section>
 
@@ -735,9 +664,6 @@ export default function HomePage() {
 
       {/* Espaçador para o CTA sticky não cobrir conteúdo em mobile */}
       <div className="h-20 sm:hidden" />
-
-      {/* Notificação flutuante de prova social */}
-      <ProvaSocial />
     </div>
   );
 }

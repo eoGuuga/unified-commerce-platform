@@ -136,11 +136,6 @@ export default function RootLayout({
                 priceValidUntil: '2026-12-31',
                 availability: 'https://schema.org/InStock',
               },
-              aggregateRating: {
-                '@type': 'AggregateRating',
-                ratingValue: '4.9',
-                reviewCount: '127',
-              },
             }),
           }}
         />
