@@ -256,7 +256,7 @@ export default function HomePage() {
 
           <div className="mt-12 flex flex-col gap-3 sm:flex-row sm:items-center">
             <BotaoMicro href="#preços" variant="dark" icon="right" size="lg">
-              Ver planos e preços
+              Quero isso no meu negócio
             </BotaoMicro>
             <BotaoMicro href="#whatsapp" variant="outline" icon="up-right" size="lg">
               Conhecer o bot de WhatsApp
@@ -347,7 +347,7 @@ export default function HomePage() {
           <ScrollReveal delay={300}>
             <div className="mt-12 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <BotaoMicro href="#preços" variant="accent" icon="right">
-                Quero esse bot no meu WhatsApp
+                Ativar bot no meu WhatsApp
               </BotaoMicro>
               <Link
                 href="#modulos"
@@ -627,11 +627,25 @@ export default function HomePage() {
 
             <div className="mt-10 flex flex-col gap-3 border-t border-[#f6f3ee]/10 pt-6 text-[11px] uppercase tracking-[0.16em] text-[#f6f3ee]/40 sm:flex-row sm:items-center sm:justify-between">
               <span>© 2026 GTSoftHub · Operação premium para varejo</span>
-              <span>Feito no Brasil 🇧🇷</span>
+              <span>Feito com cuidado no Brasil</span>
             </div>
           </div>
         </div>
       </section>
+
+      {/* CTA STICKY MOBILE - só aparece em telas pequenas */}
+      <div className="fixed bottom-4 left-4 right-4 z-50 sm:hidden">
+        <Link
+          href="#preços"
+          className="group flex h-14 w-full items-center justify-center gap-2 rounded-full bg-[#1a1814] text-[14px] font-medium text-[#f6f3ee] shadow-[0_12px_32px_-8px_rgba(26,24,20,0.5)] transition-all duration-300 active:scale-[0.98]"
+        >
+          Começar 14 dias grátis
+          <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+        </Link>
+      </div>
+
+      {/* Espaçador para o CTA sticky não cobrir conteúdo em mobile */}
+      <div className="h-20 sm:hidden" />
     </div>
   );
 }

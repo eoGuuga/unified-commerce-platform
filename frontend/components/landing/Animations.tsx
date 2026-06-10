@@ -6,6 +6,7 @@ import { MessageCircle, ArrowRight, ArrowUpRight, Sparkles, ChevronDown, Check }
 
 // ============================================
 // SCROLL REVEAL - fade-in com slide-up
+// Sempre visível no SSR; anima quando entra na viewport
 // ============================================
 export function ScrollReveal({
   children,
@@ -17,24 +18,32 @@ export function ScrollReveal({
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
+  // Inicia como visível para SSR + no-JS users
+  const [isVisible, setIsVisible] = useState(true);
+  const [hasAnimated, setHasAnimated] = useState(false);
 
   useEffect(() => {
+    // Reseta para invisível apenas no client (depois do hydration)
+    setIsVisible(false);
+    setHasAnimated(false);
+
     const el = ref.current;
     if (!el) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
+        if (entry.isIntersecting && !hasAnimated) {
           setIsVisible(true);
+          setHasAnimated(true);
           observer.unobserve(el);
         }
       },
-      { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
+      { threshold: 0.05, rootMargin: '0px 0px -30px 0px' }
     );
 
     observer.observe(el);
     return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -158,7 +167,7 @@ export function ScrollCountUp({
 }
 
 // ============================================
-// METRIC CARD - hover lift + count up
+// METRIC CARD - hover lift (sem count-up para evitar "0" inicial)
 // ============================================
 export function MetricCard({
   value,
@@ -169,11 +178,12 @@ export function MetricCard({
 }) {
   return (
     <div className="group transition-transform duration-500 hover:-translate-y-1">
-      <ScrollCountUp
-        value={value}
+      <div
         className="text-[36px] font-normal leading-none tracking-[-0.03em] text-[#1a1814] sm:text-[44px]"
         style={{ fontFamily: 'var(--font-display)' }}
-      />
+      >
+        {value}
+      </div>
       <div className="mt-2 text-[11px] font-medium uppercase tracking-[0.16em] text-[#1a1814]/50">
         {label}
       </div>
