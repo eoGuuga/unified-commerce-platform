@@ -264,9 +264,6 @@ export default function HomePage() {
                     <p className="text-[20px] leading-[1.15] tracking-[-0.02em] text-[#1a1814] sm:text-[26px] md:text-[32px]" style={{ fontFamily: 'var(--font-display)' }}>
                       Vendas que acontecem enquanto você <em className="text-[#b8654a]">dorme</em>, viaja ou almoça.
                     </p>
-                    <p className="mt-3 text-[13px] text-[#1a1814]/65">
-                      ↑ Demonstração real de uma conversa no WhatsApp.
-                    </p>
                   </div>
                 </div>
               </div>
@@ -358,9 +355,9 @@ export default function HomePage() {
               <ScrollReveal key={m.number} delay={i * 100}>
                 <Link
                   href={m.href}
-                  className="group relative block overflow-hidden bg-[#f6f3ee] p-8 transition-all duration-500 hover:bg-[#efe9df] sm:p-10"
+                  className="group relative block overflow-hidden rounded-[3px] border border-[#1a1814]/8 bg-[#f6f3ee] p-8 transition-all duration-500 hover:border-[#1a1814]/20 hover:bg-[#efe9df] sm:p-10"
                 >
-                  <div className="pointer-events-none absolute -right-4 -top-8 select-none text-[180px] font-normal leading-none text-[#1a1814]/[0.04] transition-all duration-700 group-hover:-translate-y-2 group-hover:text-[#1a1814]/[0.06]" style={{ fontFamily: 'var(--font-display)' }}>
+                  <div className="pointer-events-none absolute -right-2 -top-3 select-none text-[120px] font-normal leading-none text-[#1a1814]/[0.05] transition-all duration-700 ease-out group-hover:-translate-y-1 group-hover:text-[#1a1814]/[0.08]" style={{ fontFamily: 'var(--font-display)' }}>
                     {m.number}
                   </div>
 
@@ -501,28 +498,28 @@ export default function HomePage() {
               </ul>
             </div>
 
-            {/* O que NÃO fazemos / limitações */}
+            {/* Como a gente trabalha - honesto e confiante */}
             <div className="bg-[#f6f3ee] p-8 sm:p-10">
               <div className="mb-6 flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1a1814]/10">
-                  <X className="h-4 w-4 text-[#1a1814]" strokeWidth={2.5} />
+                  <Check className="h-4 w-4 text-[#1a1814]" strokeWidth={2.5} />
                 </div>
                 <h3 className="text-[20px] font-normal leading-[1.1] tracking-[-0.01em] text-[#1a1814]" style={{ fontFamily: 'var(--font-display)' }}>
-                  O que NÃO fazemos
+                  Como a gente trabalha
                 </h3>
               </div>
 
               <ul className="space-y-3">
                 {[
-                  'Não prometemos "triplicar suas vendas" (depende do seu negócio)',
-                  'Não temos foto de clientes no site (não usamos imagem sem autorização)',
-                  'Não exibimos números falsos de "X pessoas vendo"',
-                  'Não fabricamos depoimentos com nomes inventados',
-                  'Não garantimos resultado específico (cada negócio é único)',
-                  'Não somos para todos: se você quer só "postar produto e esquecer", não somos pra você',
+                  'Resultados dependem do seu negócio — a gente dá as ferramentas, você opera',
+                  'A gente só mostra foto de cliente com autorização explícita',
+                  'Os números que você vê no site são os números reais da plataforma',
+                  'Histórias que compartilhamos vêm de clientes que topam contar',
+                  'Time brasileiro te atende em horário comercial, em português',
+                  'A gente é pra quem quer construir uma operação, não pra quem quer atalhos',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3 text-[14px] text-[#1a1814]/80">
-                    <X className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#1a1814]/55" strokeWidth={2.5} />
+                    <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#1a1814]" strokeWidth={2.5} />
                     <span>{item}</span>
                   </li>
                 ))}

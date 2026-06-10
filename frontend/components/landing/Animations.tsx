@@ -192,11 +192,13 @@ export function MetricCard({
 }
 
 // ============================================
-// WHATSAPP MOCKUP - 3 bolhas animadas em sequência
+// WHATSAPP MOCKUP - simulação visual de conversa real
+// Cores oficiais do WhatsApp Web: bg #efeae2, bubble cliente #fff, bubble bot #d9fdd3
 // ============================================
 export function WhatsAppMockup({ className = '' }: { className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [visibleBubbles, setVisibleBubbles] = useState(0);
+  const [showTyping, setShowTyping] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
@@ -205,14 +207,17 @@ export function WhatsAppMockup({ className = '' }: { className?: string }) {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          const timers: NodeJS.Timeout[] = [];
-          for (let i = 0; i < 3; i++) {
-            timers.push(
-              setTimeout(() => {
-                setVisibleBubbles((v) => Math.max(v, i + 1));
-              }, 800 + i * 1200)
-            );
-          }
+          // Bolha 1 (cliente) aparece em 600ms
+          setTimeout(() => setVisibleBubbles((v) => Math.max(v, 1)), 600);
+          // Digitando em 1800ms
+          setTimeout(() => setShowTyping(true), 1800);
+          // Bolha 2 (bot) aparece em 3000ms (digitando some)
+          setTimeout(() => {
+            setShowTyping(false);
+            setVisibleBubbles((v) => Math.max(v, 2));
+          }, 3000);
+          // Bolha 3 (bot) com produto aparece em 4500ms
+          setTimeout(() => setVisibleBubbles((v) => Math.max(v, 3)), 4500);
           observer.unobserve(el);
         }
       },
@@ -224,47 +229,117 @@ export function WhatsAppMockup({ className = '' }: { className?: string }) {
   }, []);
 
   return (
-    <div ref={ref} className={`space-y-3 ${className}`}>
-      <div
-        className="ml-auto max-w-xs rounded-2xl rounded-tr-sm bg-white/95 px-4 py-3 text-[14px] text-[#1a1814] shadow-md transition-all duration-700"
-        style={{
-          opacity: visibleBubbles >= 1 ? 1 : 0,
-          transform: visibleBubbles >= 1 ? 'translateY(0) scale(1)' : 'translateY(10px) scale(0.95)',
-        }}
-      >
-        Oi! Vcs têm a caneca personalizada?
-      </div>
-
-      <div
-        className="transition-all duration-700"
-        style={{
-          opacity: visibleBubbles >= 2 ? 1 : 0,
-          transform: visibleBubbles >= 2 ? 'translateY(0)' : 'translateY(10px)',
-        }}
-      >
-        <div className="inline-flex items-center gap-2 rounded-2xl rounded-tl-sm bg-[#1a1814] px-4 py-3 shadow-md">
-          <MessageCircle className="h-3.5 w-3.5 text-[#b8654a]" />
-          <span className="text-[12px] text-[#f6f3ee]/70">Bot digitando</span>
-          <span className="flex gap-0.5">
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#f6f3ee]/60" style={{ animationDelay: '0ms' }} />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#f6f3ee]/60" style={{ animationDelay: '150ms' }} />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#f6f3ee]/60" style={{ animationDelay: '300ms' }} />
-          </span>
+    <div
+      ref={ref}
+      className={`relative overflow-hidden rounded-2xl border border-black/10 shadow-lg ${className}`}
+      style={{
+        // Fundo oficial do WhatsApp (papel de parede com textura sutil)
+        backgroundColor: '#efeae2',
+        backgroundImage:
+          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='%23d9d2c5' fill-opacity='0.15'%3E%3Cpath d='M30 10 L40 30 L30 50 L20 30 Z'/%3E%3C/g%3E%3C/svg%3E\")",
+      }}
+    >
+      {/* Header do WhatsApp */}
+      <div className="flex items-center gap-3 border-b border-black/10 bg-[#f0f2f5] px-3 py-2.5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-white">
+          <MessageCircle className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-medium text-[#111b21]">GTSoftHub Bot</p>
+          <p className="truncate text-[11px] text-emerald-600">online</p>
         </div>
       </div>
 
-      <div
-        className="max-w-xs rounded-2xl rounded-tl-sm bg-[#1a1814] px-4 py-3 text-[14px] text-[#f6f3ee] shadow-md transition-all duration-700"
-        style={{
-          opacity: visibleBubbles >= 3 ? 1 : 0,
-          transform: visibleBubbles >= 3 ? 'translateY(0) scale(1)' : 'translateY(10px) scale(0.95)',
-        }}
-      >
-        <p>Oi! Temos sim 😊</p>
-        <p className="mt-1.5">Tenho 3 modelos. Quer ver?</p>
-        <p className="mt-2 inline-block rounded bg-[#b8654a] px-2 py-0.5 text-[12px] font-medium">
-          Ver modelos →
-        </p>
+      {/* Área de mensagens */}
+      <div className="space-y-2 p-3">
+        {/* Bolha cliente (branca) */}
+        <div
+          className="ml-auto max-w-[80%] rounded-lg rounded-tr-none bg-white px-2.5 py-1.5 text-[13px] text-[#111b21] shadow-[0_1px_0.5px_rgba(0,0,0,0.13)] transition-all duration-500"
+          style={{
+            opacity: visibleBubbles >= 1 ? 1 : 0,
+            transform: visibleBubbles >= 1 ? 'translateY(0)' : 'translateY(8px)',
+          }}
+        >
+          <p>Oi! Vcs têm a caneca personalizada?</p>
+          <p className="mt-1 text-right text-[10px] text-[#667781]">14:23 ✓✓</p>
+        </div>
+
+        {/* "Bot digitando..." */}
+        {showTyping && (
+          <div className="max-w-[80%] rounded-lg rounded-tl-none bg-white px-3 py-2 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)]">
+            <div className="flex items-center gap-1">
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#667781]" style={{ animationDelay: '0ms' }} />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#667781]" style={{ animationDelay: '150ms' }} />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#667781]" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        )}
+
+        {/* Bolha bot 1 (verde claro) */}
+        <div
+          className="max-w-[80%] rounded-lg rounded-tl-none bg-[#d9fdd3] px-2.5 py-1.5 text-[13px] text-[#111b21] shadow-[0_1px_0.5px_rgba(0,0,0,0.13)] transition-all duration-500"
+          style={{
+            opacity: visibleBubbles >= 2 ? 1 : 0,
+            transform: visibleBubbles >= 2 ? 'translateY(0)' : 'translateY(8px)',
+          }}
+        >
+          <p>Oi! Temos sim 😊</p>
+          <p className="mt-1.5">Tenho 3 modelos. Quer ver?</p>
+          <p className="mt-1 text-right text-[10px] text-[#667781]">14:23 ✓✓</p>
+        </div>
+
+        {/* Bolha bot 2 (com card de produto) */}
+        <div
+          className="max-w-[85%] overflow-hidden rounded-lg rounded-tl-none bg-[#d9fdd3] shadow-[0_1px_0.5px_rgba(0,0,0,0.13)] transition-all duration-500"
+          style={{
+            opacity: visibleBubbles >= 3 ? 1 : 0,
+            transform: visibleBubbles >= 3 ? 'translateY(0)' : 'translateY(8px)',
+          }}
+        >
+          <div className="bg-emerald-600/20 px-2.5 py-1.5 text-[13px] text-[#111b21]">
+            <p className="font-medium">🛍️ 3 modelos disponíveis</p>
+          </div>
+          <div className="space-y-1.5 px-2.5 py-2">
+            <div className="flex items-center justify-between gap-2 rounded-md bg-white/60 p-1.5">
+              <div className="flex items-center gap-1.5">
+                <div className="h-6 w-6 rounded bg-emerald-200" />
+                <span className="text-[12px]">Caneca A</span>
+              </div>
+              <span className="text-[11px] font-medium text-emerald-700">R$ 29</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 rounded-md bg-white/60 p-1.5">
+              <div className="flex items-center gap-1.5">
+                <div className="h-6 w-6 rounded bg-amber-200" />
+                <span className="text-[12px]">Caneca B</span>
+              </div>
+              <span className="text-[11px] font-medium text-emerald-700">R$ 35</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 rounded-md bg-white/60 p-1.5">
+              <div className="flex items-center gap-1.5">
+                <div className="h-6 w-6 rounded bg-rose-200" />
+                <span className="text-[12px]">Caneca C</span>
+              </div>
+              <span className="text-[11px] font-medium text-emerald-700">R$ 32</span>
+            </div>
+          </div>
+          <div className="bg-emerald-600/10 px-2.5 py-1.5">
+            <button className="w-full text-[12px] font-medium text-emerald-700">
+              Ver catálogo completo →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Input do WhatsApp (visual) */}
+      <div className="flex items-center gap-2 border-t border-black/10 bg-[#f0f2f5] px-2 py-2">
+        <div className="flex-1 rounded-full bg-white px-3 py-1.5 text-[12px] text-[#667781]">
+          Mensagem
+        </div>
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-white">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M2 21l21-9L2 3v7l15 2-15 2z" />
+          </svg>
+        </div>
       </div>
     </div>
   );
