@@ -223,10 +223,27 @@ export default function HomePage() {
               A GTSoftHub une sua loja física, sua vitrine online, seu caixa e seu WhatsApp numa operação só. Estoque, vendas e atendimento conversando entre si, sem você precisar montar nada.
             </p>
 
-            <div className="grid grid-cols-3 gap-6 self-end border-t border-[#1a1814]/15 pt-6">
-              <MetricCard value="1" label="Estoque único" />
-              <MetricCard value="4" label="Canais" />
-              <MetricCard value="24/7" label="Atendendo" />
+            <div className="grid gap-4 self-end border-t border-[#1a1814]/15 pt-6 sm:grid-cols-3">
+              {[
+                { t: 'Estoque único', d: 'Loja, PDV, WhatsApp' },
+                { t: '4 canais', d: 'Físico, online, app, bot' },
+                { t: 'Bot 24/7', d: 'WhatsApp automático' },
+              ].map((m) => (
+                <div
+                  key={m.t}
+                  className="group transition-transform duration-500 hover:-translate-y-0.5"
+                >
+                  <p
+                    className="text-[20px] font-normal leading-none tracking-[-0.03em] text-[#1a1814] sm:text-[24px]"
+                    style={{ fontFamily: 'var(--font-display)' }}
+                  >
+                    {m.t}
+                  </p>
+                  <p className="mt-1.5 text-[11px] text-[#1a1814]/55">
+                    {m.d}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -340,7 +357,7 @@ export default function HomePage() {
             <ScrollReveal>
               <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#1a1814]/50">Módulos</p>
               <h2 className="mt-4 max-w-2xl text-[clamp(2rem,4vw,3.25rem)] font-normal leading-[1.05] tracking-[-0.03em] text-[#1a1814]" style={{ fontFamily: 'var(--font-display)' }}>
-                Quatro partes, um sistema só.
+                Quatro módulos que <em className="text-[#b8654a]">conversam entre si</em>.
               </h2>
             </ScrollReveal>
             <ScrollReveal delay={150}>
@@ -641,8 +658,8 @@ export default function HomePage() {
             </div>
 
             <div className="mt-10 flex flex-col gap-3 border-t border-[#f6f3ee]/10 pt-6 text-[11px] uppercase tracking-[0.16em] text-[#f6f3ee]/40 sm:flex-row sm:items-center sm:justify-between">
-              <span>© 2026 GTSoftHub · Operação premium para varejo</span>
-              <span>Feito com cuidado no Brasil</span>
+              <span>© 2026 GTSoftHub</span>
+              <span>gtsofthub.com.br</span>
             </div>
           </div>
         </div>
