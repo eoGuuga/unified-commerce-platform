@@ -347,93 +347,143 @@ export function WhatsAppMockup({ className = '' }: { className?: string }) {
 
 // ============================================
 // MÓDULO VISUAL - mini-UI SVG por módulo
+// ViewBox 200x100, padding generoso, alinhamento consistente
 // ============================================
 export function MóduloVisual({ tipo }: { tipo: 'loja' | 'pdv' | 'admin' | 'estoque' }) {
   return (
     <div className="relative mb-6 h-32 overflow-hidden rounded-[3px] border border-[#1a1814]/8 bg-gradient-to-br from-[#1a1814]/[0.04] via-[#1a1814]/[0.02] to-transparent">
       {tipo === 'loja' && (
-        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 200 100" fill="none">
-          {/* Cards de produto */}
-          <rect x="20" y="20" width="35" height="50" rx="2" fill="#1a1814" fillOpacity="0.08" />
-          <rect x="22" y="22" width="31" height="28" rx="1" fill="#1a1814" fillOpacity="0.12" />
-          <circle cx="37.5" cy="62" r="3" fill="#b8654a" />
-
-          <rect x="65" y="15" width="35" height="50" rx="2" fill="#1a1814" fillOpacity="0.08" />
-          <rect x="67" y="17" width="31" height="28" rx="1" fill="#1a1814" fillOpacity="0.12" />
-          <circle cx="82.5" cy="57" r="3" fill="#b8654a" />
-
-          <rect x="110" y="22" width="35" height="50" rx="2" fill="#1a1814" fillOpacity="0.08" />
-          <rect x="112" y="24" width="31" height="28" rx="1" fill="#1a1814" fillOpacity="0.12" />
-          <circle cx="127.5" cy="64" r="3" fill="#b8654a" />
-
-          <rect x="155" y="18" width="35" height="50" rx="2" fill="#1a1814" fillOpacity="0.05" />
-          <text x="172" y="48" textAnchor="middle" fill="#1a1814" fillOpacity="0.4" fontSize="20" fontFamily="serif" fontStyle="italic">+</text>
+        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 200 100" fill="none" preserveAspectRatio="xMidYMid meet">
+          {/* 4 cards de produto lado a lado */}
+          {[30, 70, 110, 150].map((x, i) => (
+            <g key={i}>
+              <rect x={x} y={25 + (i % 2) * 5} width="32" height="45" rx="1" fill="#1a1814" fillOpacity={0.06 + i * 0.02} />
+              <rect x={x + 2} y={27 + (i % 2) * 5} width="28" height="22" rx="0.5" fill="#1a1814" fillOpacity={0.1 + i * 0.02} />
+              <line x1={x + 4} y1={56 + (i % 2) * 5} x2={x + 20} y2={56 + (i % 2) * 5} stroke="#1a1814" strokeOpacity="0.2" strokeWidth="1" />
+              <line x1={x + 4} y1={62 + (i % 2) * 5} x2={x + 14} y2={62 + (i % 2) * 5} stroke="#1a1814" strokeOpacity="0.15" strokeWidth="1" />
+              {i === 3 && (
+                <>
+                  <circle cx={x + 26} cy={65 + (i % 2) * 5} r="2" fill="#b8654a" fillOpacity="0.7" />
+                  <text x={x + 16} y={42 + (i % 2) * 5} textAnchor="middle" fill="#1a1814" fillOpacity="0.3" fontSize="8" fontFamily="serif" fontStyle="italic">+</text>
+                </>
+              )}
+            </g>
+          ))}
         </svg>
       )}
 
       {tipo === 'pdv' && (
-        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 200 100" fill="none">
-          {/* Carrinho + recibo */}
-          <rect x="30" y="20" width="100" height="55" rx="2" fill="#1a1814" fillOpacity="0.06" />
-          <rect x="30" y="20" width="100" height="12" rx="2" fill="#1a1814" fillOpacity="0.12" />
-          <circle cx="40" cy="45" r="2" fill="#1a1814" fillOpacity="0.4" />
-          <line x1="48" y1="45" x2="120" y2="45" stroke="#1a1814" strokeOpacity="0.15" strokeWidth="1" />
-          <circle cx="40" cy="55" r="2" fill="#1a1814" fillOpacity="0.4" />
-          <line x1="48" y1="55" x2="115" y2="55" stroke="#1a1814" strokeOpacity="0.15" strokeWidth="1" />
-          <circle cx="40" cy="65" r="2" fill="#b8654a" />
-          <line x1="48" y1="65" x2="100" y2="65" stroke="#1a1814" strokeOpacity="0.3" strokeWidth="1.5" />
+        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 200 100" fill="none" preserveAspectRatio="xMidYMid meet">
+          {/* Recibo à esquerda */}
+          <rect x="20" y="20" width="90" height="60" rx="2" fill="#1a1814" fillOpacity="0.06" />
+          <rect x="20" y="20" width="90" height="10" rx="2" fill="#1a1814" fillOpacity="0.12" />
+          {/* Linhas do recibo */}
+          <rect x="26" y="38" width="2" height="2" rx="1" fill="#1a1814" fillOpacity="0.4" />
+          <line x1="32" y1="39" x2="100" y2="39" stroke="#1a1814" strokeOpacity="0.2" strokeWidth="1" />
+          <rect x="26" y="48" width="2" height="2" rx="1" fill="#1a1814" fillOpacity="0.4" />
+          <line x1="32" y1="49" x2="95" y2="49" stroke="#1a1814" strokeOpacity="0.2" strokeWidth="1" />
+          <rect x="26" y="58" width="2" height="2" rx="1" fill="#b8654a" fillOpacity="0.7" />
+          <line x1="32" y1="59" x2="80" y2="59" stroke="#1a1814" strokeOpacity="0.3" strokeWidth="1.2" />
+          <line x1="20" y1="68" x2="110" y2="68" stroke="#1a1814" strokeOpacity="0.15" strokeWidth="0.5" strokeDasharray="2 2" />
+          <rect x="26" y="72" width="2" height="2" rx="1" fill="#1a1814" fillOpacity="0.3" />
+          <line x1="32" y1="73" x2="60" y2="73" stroke="#1a1814" strokeOpacity="0.3" strokeWidth="1" />
 
-          {/* Moedas */}
-          <circle cx="150" cy="35" r="8" fill="#b8654a" fillOpacity="0.2" />
-          <text x="150" y="39" textAnchor="middle" fill="#b8654a" fontSize="10" fontWeight="600">$</text>
-          <circle cx="165" cy="55" r="6" fill="#b8654a" fillOpacity="0.15" />
-          <text x="165" y="58" textAnchor="middle" fill="#b8654a" fontSize="8" fontWeight="600">$</text>
+          {/* Cartão de crédito à direita */}
+          <rect x="125" y="32" width="55" height="32" rx="3" fill="#1a1814" fillOpacity="0.08" />
+          <rect x="125" y="38" width="55" height="6" fill="#1a1814" fillOpacity="0.15" />
+          <line x1="132" y1="56" x2="170" y2="56" stroke="#1a1814" strokeOpacity="0.2" strokeWidth="0.5" />
+          <circle cx="170" cy="60" r="3" fill="#b8654a" fillOpacity="0.6" />
         </svg>
       )}
 
       {tipo === 'admin' && (
-        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 200 100" fill="none">
-          {/* Gráfico de barras */}
-          <rect x="20" y="60" width="15" height="20" fill="#1a1814" fillOpacity="0.15" rx="1" />
-          <rect x="40" y="45" width="15" height="35" fill="#1a1814" fillOpacity="0.25" rx="1" />
-          <rect x="60" y="50" width="15" height="30" fill="#1a1814" fillOpacity="0.2" rx="1" />
-          <rect x="80" y="30" width="15" height="50" fill="#b8654a" fillOpacity="0.7" rx="1" />
-          <rect x="100" y="40" width="15" height="40" fill="#1a1814" fillOpacity="0.25" rx="1" />
-          <rect x="120" y="25" width="15" height="55" fill="#1a1814" fillOpacity="0.3" rx="1" />
-          <rect x="140" y="35" width="15" height="45" fill="#1a1814" fillOpacity="0.2" rx="1" />
-
-          {/* Linha de tendência */}
+        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 200 100" fill="none" preserveAspectRatio="xMidYMid meet">
+          {/* Gráfico de barras + linha de tendência */}
+          {[
+            { x: 20, h: 25 },
+            { x: 45, h: 38 },
+            { x: 70, h: 32 },
+            { x: 95, h: 50 },
+            { x: 120, h: 42 },
+            { x: 145, h: 58 },
+            { x: 170, h: 48 },
+          ].map((bar, i) => (
+            <rect
+              key={i}
+              x={bar.x}
+              y={80 - bar.h}
+              width="15"
+              height={bar.h}
+              fill={i === 5 ? '#b8654a' : '#1a1814'}
+              fillOpacity={i === 5 ? 0.7 : 0.15 + i * 0.02}
+              rx="1"
+            />
+          ))}
+          {/* Linha de tendência cobre */}
           <polyline
-            points="27,70 47,55 67,60 87,40 107,50 127,35 147,45"
+            points="27,75 52,65 77,68 102,40 127,50 152,30 177,38"
             fill="none"
             stroke="#b8654a"
             strokeWidth="1.5"
             strokeLinecap="round"
+            strokeDasharray="3 2"
+            strokeOpacity="0.7"
           />
+          {/* Ponto de destaque */}
+          <circle cx="152" cy="30" r="3" fill="#b8654a" />
+          <circle cx="152" cy="30" r="6" fill="#b8654a" fillOpacity="0.2" />
         </svg>
       )}
 
       {tipo === 'estoque' && (
-        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 200 100" fill="none">
-          {/* Caixas de estoque */}
-          <rect x="25" y="40" width="22" height="22" fill="#1a1814" fillOpacity="0.15" rx="1" />
-          <rect x="25" y="40" width="22" height="22" fill="none" stroke="#1a1814" strokeOpacity="0.3" strokeWidth="1" />
-          <line x1="36" y1="40" x2="36" y2="62" stroke="#1a1814" strokeOpacity="0.2" strokeWidth="0.5" />
-          <line x1="25" y1="51" x2="47" y2="51" stroke="#1a1814" strokeOpacity="0.2" strokeWidth="0.5" />
-
-          <rect x="52" y="35" width="22" height="22" fill="#1a1814" fillOpacity="0.2" rx="1" />
-          <rect x="52" y="35" width="22" height="22" fill="none" stroke="#1a1814" strokeOpacity="0.4" strokeWidth="1" />
-
-          <rect x="79" y="42" width="22" height="22" fill="#1a1814" fillOpacity="0.12" rx="1" />
-          <rect x="79" y="42" width="22" height="22" fill="none" stroke="#1a1814" strokeOpacity="0.25" strokeWidth="1" />
-
-          <rect x="106" y="38" width="22" height="22" fill="#b8654a" fillOpacity="0.7" rx="1" />
-          <rect x="106" y="38" width="22" height="22" fill="none" stroke="#b8654a" strokeOpacity="0.5" strokeWidth="1" />
-          <text x="117" y="53" textAnchor="middle" fill="#f6f3ee" fontSize="10" fontWeight="600">!</text>
-
-          <rect x="133" y="45" width="22" height="22" fill="#1a1814" fillOpacity="0.1" rx="1" />
-
-          <rect x="160" y="40" width="22" height="22" fill="#1a1814" fillOpacity="0.08" rx="1" />
+        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 200 100" fill="none" preserveAspectRatio="xMidYMid meet">
+          {/* Caixas de inventário em grid 2x3 */}
+          {[
+            { x: 30, y: 25, alert: false },
+            { x: 70, y: 25, alert: false },
+            { x: 110, y: 25, alert: false },
+            { x: 150, y: 25, alert: false },
+            { x: 30, y: 58, alert: false },
+            { x: 70, y: 58, alert: true },
+            { x: 110, y: 58, alert: false },
+            { x: 150, y: 58, alert: false },
+          ].map((box, i) => (
+            <g key={i}>
+              <rect
+                x={box.x}
+                y={box.y}
+                width="28"
+                height="22"
+                rx="1"
+                fill={box.alert ? '#b8654a' : '#1a1814'}
+                fillOpacity={box.alert ? 0.7 : 0.12}
+              />
+              {box.alert && (
+                <>
+                  <circle cx={box.x + 14} cy={box.y + 11} r="6" fill="#f6f3ee" fillOpacity="0.9" />
+                  <text x={box.x + 14} y={box.y + 14} textAnchor="middle" fill="#b8654a" fontSize="10" fontWeight="700">!</text>
+                </>
+              )}
+              <line
+                x1={box.x + 4}
+                y1={box.y + 6}
+                x2={box.x + 16}
+                y2={box.y + 6}
+                stroke={box.alert ? '#f6f3ee' : '#1a1814'}
+                strokeOpacity={box.alert ? 0.6 : 0.3}
+                strokeWidth="0.6"
+              />
+              <line
+                x1={box.x + 4}
+                y1={box.y + 10}
+                x2={box.x + 12}
+                y2={box.y + 10}
+                stroke={box.alert ? '#f6f3ee' : '#1a1814'}
+                strokeOpacity={box.alert ? 0.5 : 0.2}
+                strokeWidth="0.6"
+              />
+            </g>
+          ))}
         </svg>
       )}
     </div>

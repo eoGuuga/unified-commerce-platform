@@ -1,8 +1,10 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+@custom-variant dark (&:is(.dark *));
+
 :root {
-  /* Paleta editorial off-white / preto / cobre */
+  /* LIGHT THEME - off-white editorial */
   --background: #f6f3ee;
   --foreground: #1a1814;
   --card: #f6f3ee;
@@ -23,6 +25,30 @@
   --border-soft: rgba(26, 24, 20, 0.08);
   --input: #efe9df;
   --ring: #b8654a;
+}
+
+.dark {
+  /* DARK THEME - off-black suave (não preto puro) */
+  --background: #2a2820;
+  --foreground: #f0ebe0;
+  --card: #34312a;
+  --card-foreground: #f0ebe0;
+  --popover: #34312a;
+  --popover-foreground: #f0ebe0;
+  --primary: #f0ebe0;
+  --primary-foreground: #1a1814;
+  --secondary: #3a3730;
+  --secondary-foreground: #f0ebe0;
+  --muted: #3a3730;
+  --muted-foreground: #8a8579;
+  --accent: #d4795a;
+  --accent-foreground: #1a1814;
+  --destructive: oklch(0.58 0.12 25);
+  --destructive-foreground: #f0ebe0;
+  --border: #f0ebe0;
+  --border-soft: rgba(240, 235, 224, 0.10);
+  --input: #3a3730;
+  --ring: #d4795a;
 }
 
 @theme inline {
