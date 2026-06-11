@@ -30,6 +30,8 @@ import { ConversationManagerService } from './services/conversation-manager.serv
 import { MessageProcessorService } from './services/message-processor.service';
 import { CatalogManagerService } from './services/catalog-manager.service';
 import { ResponseBuilderService } from './services/response-builder.service';
+import { NLPService } from './services/nlp.service';
+import { SalesOrchestratorService } from './services/sales-orchestrator.service';
 
 // Entities
 import { WhatsappConversation } from '../../database/entities/WhatsappConversation.entity';
@@ -93,6 +95,8 @@ import { CommonModule } from '../common/common.module';
     MessageProcessorService,
     CatalogManagerService,
     ResponseBuilderService,
+    NLPService,
+    SalesOrchestratorService,
   ],
   exports: [
     // Services existentes
@@ -109,6 +113,8 @@ import { CommonModule } from '../common/common.module';
     MessageProcessorService,
     CatalogManagerService,
     ResponseBuilderService,
+    NLPService,
+    SalesOrchestratorService,
   ],
 })
 export class WhatsappModule {}
