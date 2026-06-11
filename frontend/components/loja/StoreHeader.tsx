@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ShoppingBag, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { useCart } from '@/hooks/useCart';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
 
 /**
@@ -53,8 +54,9 @@ export function StoreHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <button
-            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-[#1a1814]/15 bg-white/30 text-[#1a1814] transition hover:bg-white/50"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-[#1a1814]/15 bg-white/30 text-[#1a1814] transition hover:bg-white/50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
             aria-label={`Carrinho (${totalItems} ${totalItems === 1 ? 'item' : 'itens'})`}
           >
             <ShoppingBag className="h-4 w-4" />

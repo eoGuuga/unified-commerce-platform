@@ -11,14 +11,14 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TenantsService } from '../tenants/tenants.service';
 import { WhatsappWebhookDto } from './dto/whatsapp-webhook.dto';
 import {
-  WhatsappService,
-  type WhatsappOutboundResponse,
+  WhatsAppService,
+  type WhatsAppOutboundResponse,
 } from './whatsapp.service';
 
 type RawWhatsappWebhookBody = Partial<WhatsappWebhookDto> & Record<string, any>;
 
 type InteractiveListResponse = Extract<
-  WhatsappOutboundResponse,
+  WhatsAppOutboundResponse,
   { kind: 'interactive_list' }
 >;
 
@@ -311,7 +311,7 @@ function shouldDispatchOutboundResponse(response: unknown): boolean {
 @Controller('whatsapp')
 export class WhatsappController {
   constructor(
-    private readonly whatsappService: WhatsappService,
+    private readonly whatsappService: WhatsAppService,
     private readonly tenantsService: TenantsService,
   ) {}
 

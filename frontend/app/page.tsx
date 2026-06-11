@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ArrowRight, ArrowUpRight, MessageCircle, Heart, Zap, Package, BarChart3, Users, Receipt, Check, Sparkles, MousePointer2, ChevronDown, ShieldCheck, Clock4, TrendingUp, Boxes, Bell, ShoppingBag, X } from 'lucide-react';
 import { ScrollReveal, ScrollParallax, ScrollCountUp, WhatsAppMockup, MetricCard, MóduloVisual, TimelineStep, AvatarGradiente, PlanoDestaque, BotaoMicro, ScrollHint } from '@/components/landing/Animations';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 /**
  * Landing page GTSoftHub - 10/10.
@@ -188,9 +189,10 @@ export default function HomePage() {
           </nav>
 
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Link
               href="/login"
-              className="hidden h-9 items-center rounded-full px-4 text-[13px] font-medium text-[#1a1814]/80 transition-colors duration-300 hover:text-[#1a1814] sm:inline-flex"
+              className="hidden h-9 items-center rounded-full px-4 text-[13px] font-medium text-[#1a1814]/80 transition-colors duration-300 hover:text-[#1a1814] dark:text-white/70 dark:hover:text-white sm:inline-flex"
             >
               Entrar
             </Link>

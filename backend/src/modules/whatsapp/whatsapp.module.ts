@@ -1,7 +1,10 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappController } from './whatsapp.controller';
+import { WhatsAppCartController } from './whatsapp-cart.controller';
 import { WhatsappService } from './whatsapp.service';
+
+// Services existentes
 import { OpenAIService } from './services/openai.service';
 import { MessageIntelligenceService } from './services/message-intelligence.service';
 import { ConversationalIntelligenceService } from './services/conversational-intelligence.service';
@@ -16,6 +19,24 @@ import { ConversationService } from './services/conversation.service';
 import { LLMRouterService } from './services/llm-router.service';
 import { ActionExecutorService } from './services/action-executor.service';
 import { BotConfigService } from './services/bot-config.service';
+
+// NOVOS SERVICES - FASE 1
+import { CartService } from './services/cart.service';
+import { WhatsAppErrorHandler } from './services/error-handler.service';
+import { WhatsAppAnalyticsService } from './services/analytics.service';
+import { ConversationManagerService } from './services/conversation-manager.service';
+
+// NOVOS SERVICES - FASE 3 (Refatoração)
+import { MessageProcessorService } from './services/message-processor.service';
+import { CatalogManagerService } from './services/catalog-manager.service';
+import { ResponseBuilderService } from './services/response-builder.service';
+
+// Entities
+import { WhatsappConversation } from '../../database/entities/WhatsappConversation.entity';
+import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity';
+import { WhatsAppCart, WhatsAppMessageMetrics, WhatsAppConversationMetrics, WhatsAppConversionEvent, WhatsAppAbandonmentEvent } from '../../database/entities/WhatsappCart.entity';
+
+// Modules
 import { ProductsModule } from '../products/products.module';
 import { OrdersModule } from '../orders/orders.module';
 import { PaymentsModule } from '../payments/payments.module';
@@ -23,22 +44,29 @@ import { TenantsModule } from '../tenants/tenants.module';
 import { CouponsModule } from '../coupons/coupons.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CommonModule } from '../common/common.module';
-import { WhatsappConversation } from '../../database/entities/WhatsappConversation.entity';
-import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WhatsappConversation, WhatsappMessage]),
+    TypeOrmModule.forFeature([
+      WhatsappConversation,
+      WhatsappMessage,
+      WhatsAppCart,
+      WhatsAppMessageMetrics,
+      WhatsAppConversationMetrics,
+      WhatsAppConversionEvent,
+      WhatsAppAbandonmentEvent,
+    ]),
     CommonModule,
     ProductsModule,
-    TenantsModule, // Importar TenantsModule para validar tenant e número de WhatsApp
-    forwardRef(() => OrdersModule), // forwardRef para evitar dependência circular
-    forwardRef(() => PaymentsModule), // forwardRef para evitar dependência circular
+    TenantsModule,
+    forwardRef(() => OrdersModule),
+    forwardRef(() => PaymentsModule),
     NotificationsModule,
     CouponsModule,
   ],
-  controllers: [WhatsappController],
+  controllers: [WhatsappController, WhatsAppCartController],
   providers: [
+    // Services existentes
     WhatsappService,
     OpenAIService,
     MessageIntelligenceService,
@@ -54,7 +82,33 @@ import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity'
     LLMRouterService,
     ActionExecutorService,
     BotConfigService,
+
+    // NOVOS SERVICES - FASE 1 (Arquitetura)
+    CartService,
+    WhatsAppErrorHandler,
+    WhatsAppAnalyticsService,
+    ConversationManagerService,
+
+    // NOVOS SERVICES - FASE 3 (Refatoração)
+    MessageProcessorService,
+    CatalogManagerService,
+    ResponseBuilderService,
   ],
-  exports: [WhatsappService, ConversationService],
+  exports: [
+    // Services existentes
+    WhatsappService,
+    ConversationService,
+
+    // NOVOS SERVICES
+    CartService,
+    WhatsAppErrorHandler,
+    WhatsAppAnalyticsService,
+    ConversationManagerService,
+
+    // NOVOS SERVICES - FASE 3 (Refatoração)
+    MessageProcessorService,
+    CatalogManagerService,
+    ResponseBuilderService,
+  ],
 })
 export class WhatsappModule {}
