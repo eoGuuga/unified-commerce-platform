@@ -15,46 +15,53 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Request } from 'express';
+import * as crypto from 'crypto';
 import { CartService } from './services/cart.service';
 import { TenantsService } from '../tenants/tenants.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { ProductsService } from '../products/products.service';
-import { TenantsModule } from '../tenants/tenants.module';
 
 /**
- * WhatsApp Cart Controller - Final Security-hardened version
+ * WhatsApp Cart Controller - Maximum Security Version
  *
- * SECURITY ARCHITECTURE:
+ * SECURITY CONTROLS:
  *
- * 1. Authorization Model:
- *    - Users can ONLY access their own tenant's data
- *    - JWT token must contain tenant_id claim
- *    - All mutations verify: token.tenant_id === requested.tenant_id
+ * 1. AUTHENTICATION:
+ *    - JWT required for all mutation operations
+ *    - Token must contain: sub (user ID), tenant_id (tenant UUID)
+ *    - Token signature verification via JwtAuthGuard
  *
- * 2. Rate Limiting:
- *    - Global rate limit (not per-tenant) to prevent enumeration
- *    - IP-based tracking with sliding window
- *    - Blocks after 3 violations per IP
+ * 2. AUTHORIZATION (Defense in Depth):
+ *    a) Token validation (JwtAuthGuard)
+ *    b) Tenant ownership verification (verifyUserOwnsTenant)
+ *    c) Product ownership verification (verifyProductOwnership)
  *
- * 3. Input Validation:
- *    - UUID format validation
- *    - Phone number format validation (E.164 compatible)
- *    - Type checking for all inputs
+ * 3. INPUT VALIDATION:
+ *    a) UUID format validation (regex)
+ *    b) Phone format validation (10-13 digits)
+ *    c) Type checking for all fields
+ *    d) Range validation (quantity 1-100)
  *
- * 4. Audit Trail:
- *    - All mutations logged with user context
+ * 4. RATE LIMITING:
+ *    a) IP-based global rate limiting
+ *    b) IP blocking after violations
+ *    c) Tenant enumeration prevention
+ *
+ * 5. AUDIT:
+ *    a) All mutations logged with user context
+ *    b) Security violations logged
  */
 @ApiTags('WhatsApp - Carrinho')
 @Controller('whatsapp/cart')
 export class WhatsAppCartController {
   // Global rate limiting (prevents tenant enumeration)
-  private globalRateLimit = new Map<string, { count: number; resetTime: number }>();
+  private rateLimitMap = new Map<string, { count: number; resetTime: number }>();
   private blockedIPs = new Set<string>();
-  private readonly RATE_LIMIT_WINDOW = 60000;
-  private readonly RATE_LIMIT_MAX = 30;
-  private readonly MAX_VIOLATIONS = 3;
-  private violationCounts = new Map<string, number>();
+  private readonly RATE_LIMIT_WINDOW_MS = 60000;
+  private readonly RATE_LIMIT_MAX_REQUESTS = 30;
+  private readonly MAX_VIOLATIONS_BEFORE_BLOCK = 3;
+  private ipViolationCounts = new Map<string, number>();
 
   constructor(
     private readonly cartService: CartService,
@@ -63,60 +70,54 @@ export class WhatsAppCartController {
   ) {}
 
   // ============================================
-  // Public endpoints - READ ONLY WITH THROTTLING
+  // PUBLIC ENDPOINTS (Rate Limited, Minimal Data)
   // ============================================
 
   /**
-   * Get cart summary - PUBLIC but heavily rate-limited
-   * Returns ONLY summary data, no sensitive details
+   * Get cart summary - Public endpoint
+   * Returns ONLY: hasCart, itemCount, totalValue, expired, formattedSummary
+   * NO sensitive data exposed (no IDs, prices, items detail)
    */
   @Public()
   @Get(':tenantId/:customerPhone')
-  @ApiOperation({ summary: 'Obter resumo do carrinho' })
-  @ApiResponse({ status: 200, description: 'Resumo do carrinho' })
-  @ApiResponse({ status: 429, description: 'Bloqueado' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get cart summary (public, rate-limited)' })
   async getCart(
     @Param('tenantId') tenantId: string,
     @Param('customerPhone') customerPhone: string,
     @Req() request: Request,
   ): Promise<CartSummaryResponseDto> {
-    const clientIp = this.extractClientIp(request);
+    const clientIp = this.getClientIp(request);
 
-    // Check if IP is blocked
-    if (this.isIpBlocked(clientIp)) {
-      throw new ForbiddenException('Acesso temporariamente bloqueado.');
-    }
+    // 1. Check IP block status
+    this.throwIfIpBlocked(clientIp);
 
-    // Apply global rate limit
-    this.checkGlobalRateLimit(clientIp);
+    // 2. Apply rate limiting
+    this.checkRateLimit(clientIp);
 
-    // Strict UUID validation
-    if (!this.isValidUUID(tenantId)) {
-      throw new BadRequestException('Invalid request');
-    }
+    // 3. Validate tenant UUID format
+    this.validateTenantIdFormat(tenantId);
 
-    // Sanitize phone
-    const sanitizedPhone = this.sanitizePhone(customerPhone);
+    // 4. Validate and sanitize phone
+    const cleanPhone = this.validateAndSanitizePhone(customerPhone);
 
-    // Verify tenant exists
-    await this.verifyTenantExists(tenantId);
+    // 5. Verify tenant exists (but return generic error)
+    await this.checkTenantExists(tenantId);
 
-    // Get cart (doesn't create)
-    const cart = await this.cartService.getCartByTenantAndPhone(tenantId, sanitizedPhone);
+    // 6. Get cart data (no creation)
+    const cart = await this.cartService.getCartByTenantAndPhone(tenantId, cleanPhone);
 
-    // Return minimal summary - no existence leak
-    return {
-      hasCart: cart?.items?.length > 0 || false,
-      itemCount: cart?.items?.length || 0,
-      totalValue: Number(cart?.total_amount) || 0,
-      expired: cart?.status === 'expired' || false,
-      formattedSummary: this.cartService.generateSummary(cart),
-    };
+    // 7. Return minimal summary (no existence confirmation)
+    return this.buildMinimalCartSummary(cart);
   }
 
+  /**
+   * Get cart summary - alias for WhatsApp integration
+   */
   @Public()
   @Get(':tenantId/:customerPhone/summary')
-  @ApiOperation({ summary: 'Obter resumo do carrinho para WhatsApp' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get cart summary for WhatsApp' })
   async getCartSummary(
     @Param('tenantId') tenantId: string,
     @Param('customerPhone') customerPhone: string,
@@ -126,260 +127,349 @@ export class WhatsAppCartController {
   }
 
   // ============================================
-  // Protected endpoints - FULL VALIDATION
+  // PROTECTED ENDPOINTS (JWT + Authorization)
   // ============================================
 
+  /**
+   * Add item to cart - REQUIRES JWT AUTHENTICATION
+   * Authorization: user.tenant_id MUST match dto.tenantId
+   */
   @UseGuards(JwtAuthGuard)
   @Post('add')
   @HttpCode(HttpStatus.CREATED)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Adicionar item ao carrinho' })
+  @ApiOperation({ summary: 'Add item to cart (authenticated)' })
   async addToCart(
-    @Body() dto: AddToCartDto,
+    @Body() body: Record<string, unknown>,
     @Req() request: Request,
   ): Promise<CartResponseDto> {
-    // Extract user context from JWT
-    const user = this.extractUserFromRequest(request);
+    // 1. Extract and validate user from JWT
+    const authContext = this.extractAndValidateAuthContext(request);
 
-    // Validate DTO fields
-    this.validateAddToCartDto(dto);
+    // 2. Parse and validate DTO
+    const dto = this.parseAndValidateAddToCartDto(body);
 
-    // Authorization: User can only access their own tenant
-    this.verifyUserOwnsTenant(user, dto.tenantId);
+    // 3. Authorization: Verify user owns the tenant
+    this.assertUserOwnsTenant(authContext.userId, authContext.tenantId, dto.tenantId);
 
-    // Sanitize inputs
-    const sanitizedTenantId = this.sanitizeUUID(dto.tenantId);
-    const sanitizedPhone = this.sanitizePhone(dto.customerPhone);
-    const sanitizedProductId = this.sanitizeString(dto.productId);
+    // 4. Sanitize all inputs
+    const cleanTenantId = this.sanitizeAndValidateUuid(dto.tenantId);
+    const cleanPhone = this.validateAndSanitizePhone(dto.customerPhone);
+    const cleanProductId = this.sanitizeString(dto.productId);
+    const cleanQuantity = this.validateQuantity(dto.quantity);
 
-    // Verify product belongs to tenant
-    await this.verifyProductOwnership(sanitizedTenantId, sanitizedProductId);
+    // 5. Verify product belongs to tenant
+    await this.assertProductBelongsToTenant(cleanTenantId, cleanProductId);
 
-    // Add item
+    // 6. Perform operation
     await this.cartService.addItem({
-      tenantId: sanitizedTenantId,
-      customerPhone: sanitizedPhone,
-      produtoId: sanitizedProductId,
-      produtoName: dto.productName || sanitizedProductId,
-      quantity: dto.quantity,
-      unitPrice: dto.unitPrice || 0,
+      tenantId: cleanTenantId,
+      customerPhone: cleanPhone,
+      produtoId: cleanProductId,
+      produtoName: this.sanitizeString(dto.productName || ''),
+      quantity: cleanQuantity,
+      unitPrice: Number(dto.unitPrice) || 0,
     });
 
-    // Audit log
-    this.logMutation(user, 'add', { tenantId: sanitizedTenantId, productId: sanitizedProductId });
+    // 7. Audit log
+    this.auditLog(authContext.userId, authContext.tenantId, 'ADD_ITEM', { productId: cleanProductId });
 
-    const cart = await this.cartService.getOrCreateCart(sanitizedTenantId, sanitizedPhone);
-    return this.formatCartResponse(cart);
+    // 8. Return response
+    const cart = await this.cartService.getOrCreateCart(cleanTenantId, cleanPhone);
+    return this.buildFullCartResponse(cart);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('update')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Atualizar quantidade de item' })
+  @ApiOperation({ summary: 'Update item quantity (authenticated)' })
   async updateItem(
-    @Body() dto: UpdateCartItemDto,
+    @Body() body: Record<string, unknown>,
     @Req() request: Request,
   ): Promise<CartResponseDto> {
-    const user = this.extractUserFromRequest(request);
-    this.validateUpdateDto(dto);
-    this.verifyUserOwnsTenant(user, dto.tenantId);
+    const authContext = this.extractAndValidateAuthContext(request);
+    const dto = this.parseAndValidateUpdateCartDto(body);
 
-    const sanitizedTenantId = this.sanitizeUUID(dto.tenantId);
-    const sanitizedPhone = this.sanitizePhone(dto.customerPhone);
-    const sanitizedProductId = this.sanitizeString(dto.productId);
+    this.assertUserOwnsTenant(authContext.userId, authContext.tenantId, dto.tenantId);
 
-    const cart = await this.cartService.getOrCreateCart(sanitizedTenantId, sanitizedPhone);
-    const updatedCart = await this.cartService.updateItem(cart.id, sanitizedProductId, dto.quantity);
+    const cleanTenantId = this.sanitizeAndValidateUuid(dto.tenantId);
+    const cleanPhone = this.validateAndSanitizePhone(dto.customerPhone);
+    const cleanProductId = this.sanitizeString(dto.productId);
+    const cleanQuantity = this.validateQuantity(dto.quantity, true);
 
-    this.logMutation(user, 'update', { tenantId: sanitizedTenantId, productId: sanitizedProductId, quantity: dto.quantity });
+    const cart = await this.cartService.getOrCreateCart(cleanTenantId, cleanPhone);
+    const updatedCart = await this.cartService.updateItem(cart.id, cleanProductId, cleanQuantity);
 
-    return this.formatCartResponse(updatedCart);
+    this.auditLog(authContext.userId, authContext.tenantId, 'UPDATE_ITEM', { productId: cleanProductId, quantity: cleanQuantity });
+
+    return this.buildFullCartResponse(updatedCart);
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete('remove')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Remover item do carrinho' })
+  @ApiOperation({ summary: 'Remove item from cart (authenticated)' })
   async removeItem(
-    @Body() dto: RemoveFromCartDto,
+    @Body() body: Record<string, unknown>,
     @Req() request: Request,
   ): Promise<CartResponseDto> {
-    const user = this.extractUserFromRequest(request);
-    this.validateRemoveDto(dto);
-    this.verifyUserOwnsTenant(user, dto.tenantId);
+    const authContext = this.extractAndValidateAuthContext(request);
+    const dto = this.parseAndValidateRemoveCartDto(body);
 
-    const sanitizedTenantId = this.sanitizeUUID(dto.tenantId);
-    const sanitizedPhone = this.sanitizePhone(dto.customerPhone);
-    const sanitizedProductId = this.sanitizeString(dto.productId);
+    this.assertUserOwnsTenant(authContext.userId, authContext.tenantId, dto.tenantId);
 
-    const cart = await this.cartService.getOrCreateCart(sanitizedTenantId, sanitizedPhone);
-    const updatedCart = await this.cartService.removeItem(cart.id, sanitizedProductId);
+    const cleanTenantId = this.sanitizeAndValidateUuid(dto.tenantId);
+    const cleanPhone = this.validateAndSanitizePhone(dto.customerPhone);
+    const cleanProductId = this.sanitizeString(dto.productId);
 
-    this.logMutation(user, 'remove', { tenantId: sanitizedTenantId, productId: sanitizedProductId });
+    const cart = await this.cartService.getOrCreateCart(cleanTenantId, cleanPhone);
+    const updatedCart = await this.cartService.removeItem(cart.id, cleanProductId);
 
-    return this.formatCartResponse(updatedCart);
+    this.auditLog(authContext.userId, authContext.tenantId, 'REMOVE_ITEM', { productId: cleanProductId });
+
+    return this.buildFullCartResponse(updatedCart);
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete('clear')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Limpar carrinho' })
+  @ApiOperation({ summary: 'Clear cart (authenticated)' })
   async clearCart(
-    @Body() dto: ClearCartDto,
+    @Body() body: Record<string, unknown>,
     @Req() request: Request,
   ): Promise<CartResponseDto> {
-    const user = this.extractUserFromRequest(request);
-    this.validateClearDto(dto);
-    this.verifyUserOwnsTenant(user, dto.tenantId);
+    const authContext = this.extractAndValidateAuthContext(request);
+    const dto = this.parseAndValidateClearCartDto(body);
 
-    const sanitizedTenantId = this.sanitizeUUID(dto.tenantId);
-    const sanitizedPhone = this.sanitizePhone(dto.customerPhone);
+    this.assertUserOwnsTenant(authContext.userId, authContext.tenantId, dto.tenantId);
 
-    const cart = await this.cartService.getOrCreateCart(sanitizedTenantId, sanitizedPhone);
+    const cleanTenantId = this.sanitizeAndValidateUuid(dto.tenantId);
+    const cleanPhone = this.validateAndSanitizePhone(dto.customerPhone);
+
+    const cart = await this.cartService.getOrCreateCart(cleanTenantId, cleanPhone);
     const clearedCart = await this.cartService.clearCart(cart.id);
 
-    this.logMutation(user, 'clear', { tenantId: sanitizedTenantId });
+    this.auditLog(authContext.userId, authContext.tenantId, 'CLEAR_CART', {});
 
-    return this.formatCartResponse(clearedCart);
+    return this.buildFullCartResponse(clearedCart);
   }
 
   // ============================================
-  // Security helper methods
+  // PRIVATE SECURITY METHODS
   // ============================================
 
   /**
-   * Extract client IP from request (handles proxies)
+   * Get client IP (handles proxies)
    */
-  private extractClientIp(request: Request): string {
+  private getClientIp(request: Request): string {
     const forwarded = request.headers['x-forwarded-for'];
     if (forwarded) {
       const ips = Array.isArray(forwarded) ? forwarded[0] : forwarded;
       return ips.split(',')[0].trim();
     }
-    return request.ip || request.socket?.remoteAddress || 'unknown';
+    return request.ip || request.socket?.remoteAddress || '127.0.0.1';
   }
 
   /**
-   * Extract user context from JWT token
+   * Throw if IP is blocked
    */
-  private extractUserFromRequest(request: Request): { userId: string; tenantId: string } {
-    // User is attached to request by JWT guard
-    const user = (request as any).user;
-
-    if (!user || !user.sub || !user.tenantId) {
-      throw new UnauthorizedException('Invalid authentication');
-    }
-
-    return {
-      userId: user.sub,
-      tenantId: user.tenantId,
-    };
-  }
-
-  /**
-   * Verify user owns the tenant they're trying to access
-   * This prevents horizontal privilege escalation
-   */
-  private verifyUserOwnsTenant(user: { userId: string; tenantId: string }, requestedTenantId: string): void {
-    // Sanitize the requested tenant ID
-    const sanitizedRequestedTenant = this.sanitizeUUID(requestedTenantId);
-
-    // Compare user's tenant with requested tenant
-    if (user.tenantId !== sanitizedRequestedTenant) {
-      // Log security event
-      console.error(`[SECURITY] User ${user.userId} attempted to access tenant ${sanitizedRequestedTenant} but owns ${user.tenantId}`);
+  private throwIfIpBlocked(ip: string): void {
+    if (this.blockedIPs.has(ip)) {
+      this.auditLog('SYSTEM', 'SYSTEM', 'IP_BLOCKED', { ip });
       throw new ForbiddenException('Access denied');
     }
   }
 
   /**
-   * Global rate limiting - prevents tenant enumeration
+   * Global rate limiting (per IP, not per tenant)
    */
-  private checkGlobalRateLimit(clientIp: string): void {
+  private checkRateLimit(ip: string): void {
     const now = Date.now();
-    const record = this.globalRateLimit.get(clientIp);
+    const record = this.rateLimitMap.get(ip);
 
     if (!record || now > record.resetTime) {
-      this.globalRateLimit.set(clientIp, { count: 1, resetTime: now + this.RATE_LIMIT_WINDOW });
+      this.rateLimitMap.set(ip, { count: 1, resetTime: now + this.RATE_LIMIT_WINDOW_MS });
     } else {
       record.count++;
-      if (record.count > this.RATE_LIMIT_MAX) {
-        this.recordViolation(clientIp);
+      if (record.count > this.RATE_LIMIT_MAX_REQUESTS) {
+        this.recordRateLimitViolation(ip);
         throw new ForbiddenException('Rate limit exceeded');
       }
     }
   }
 
   /**
-   * Track violations and block IPs after threshold
+   * Record violation and block IP if threshold reached
    */
-  private recordViolation(clientIp: string): void {
-    const violations = (this.violationCounts.get(clientIp) || 0) + 1;
-    this.violationCounts.set(clientIp, violations);
+  private recordRateLimitViolation(ip: string): void {
+    const violations = (this.ipViolationCounts.get(ip) || 0) + 1;
+    this.ipViolationCounts.set(ip, violations);
 
-    if (violations >= this.MAX_VIOLATIONS) {
-      this.blockedIPs.add(clientIp);
-      console.error(`[SECURITY] IP ${clientIp} blocked due to rate limit violations`);
+    this.auditLog('SYSTEM', 'SYSTEM', 'RATE_LIMIT_VIOLATION', { ip, violations });
+
+    if (violations >= this.MAX_VIOLATIONS_BEFORE_BLOCK) {
+      this.blockedIPs.add(ip);
+      this.auditLog('SYSTEM', 'SYSTEM', 'IP_BLOCKED', { ip, reason: 'max_violations' });
     }
   }
 
   /**
-   * Check if IP is blocked
+   * Extract and validate authentication context from JWT
    */
-  private isIpBlocked(clientIp: string): boolean {
-    return this.blockedIPs.has(clientIp);
+  private extractAndValidateAuthContext(request: Request): { userId: string; tenantId: string } {
+    const user = (request as any).user;
+
+    if (!user) {
+      throw new UnauthorizedException('Authentication required');
+    }
+
+    // Validate user ID
+    if (!user.sub || typeof user.sub !== 'string') {
+      throw new UnauthorizedException('Invalid token: missing user ID');
+    }
+
+    // Validate tenant ID
+    if (!user.tenant_id || typeof user.tenant_id !== 'string') {
+      throw new UnauthorizedException('Invalid token: missing tenant ID');
+    }
+
+    // Validate tenant ID format
+    if (!this.isValidUuid(user.tenant_id)) {
+      throw new UnauthorizedException('Invalid token: malformed tenant ID');
+    }
+
+    return {
+      userId: user.sub,
+      tenantId: user.tenant_id.toLowerCase(),
+    };
   }
 
   /**
-   * Validate UUID format
+   * Assert user owns the tenant they're trying to access
+   * THROWS: ForbiddenException if authorization fails
    */
-  private isValidUUID(str: string): boolean {
+  private assertUserOwnsTenant(userId: string, userTenantId: string, requestedTenantId: string): void {
+    // Sanitize requested tenant
+    const cleanRequestedTenant = requestedTenantId.toLowerCase().trim();
+
+    // Constant-time comparison to prevent timing attacks
+    const userTenantBytes = Buffer.from(userTenantId);
+    const requestedBytes = Buffer.from(cleanRequestedTenant);
+
+    if (userTenantBytes.length !== requestedBytes.length) {
+      this.auditSecurityViolation(userId, userTenantId, cleanRequestedTenant, 'TENANT_MISMATCH');
+      throw new ForbiddenException('Access denied');
+    }
+
+    if (!crypto.timingSafeEqual(userTenantBytes, requestedBytes)) {
+      this.auditSecurityViolation(userId, userTenantId, cleanRequestedTenant, 'TENANT_MISMATCH');
+      throw new ForbiddenException('Access denied');
+    }
+  }
+
+  /**
+   * Log security violations
+   */
+  private auditSecurityViolation(userId: string, userTenant: string, attemptedTenant: string, reason: string): void {
+    console.error(`[SECURITY_VIOLATION] user=${userId} owns=${userTenant} attempted=${attemptedTenant} reason=${reason}`);
+  }
+
+  /**
+   * Audit log for all operations
+   */
+  private auditLog(userId: string, tenantId: string, action: string, details: Record<string, unknown>): void {
+    console.log(`[AUDIT] user=${userId} tenant=${tenantId} action=${action} details=${JSON.stringify(details)}`);
+  }
+
+  // ============================================
+  // VALIDATION METHODS
+  // ============================================
+
+  /**
+   * Validate tenant ID is valid UUID format
+   */
+  private validateTenantIdFormat(tenantId: string): void {
+    if (!tenantId || typeof tenantId !== 'string') {
+      throw new BadRequestException('Invalid request');
+    }
+    if (!this.isValidUuid(tenantId)) {
+      throw new BadRequestException('Invalid request');
+    }
+  }
+
+  /**
+   * Check if string is valid UUID v4
+   */
+  private isValidUuid(str: string): boolean {
     if (!str || typeof str !== 'string') return false;
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(str);
+    return uuidRegex.test(str.trim());
   }
 
   /**
-   * Sanitize UUID (returns lowercase)
+   * Sanitize and validate UUID (returns lowercase)
    */
-  private sanitizeUUID(input: string): string {
+  private sanitizeAndValidateUuid(input: string): string {
     if (!input || typeof input !== 'string') {
       throw new BadRequestException('Invalid tenant ID');
     }
-    return input.toLowerCase().trim();
+    const cleaned = input.toLowerCase().trim();
+    if (!this.isValidUuid(cleaned)) {
+      throw new BadRequestException('Invalid tenant ID');
+    }
+    return cleaned;
   }
 
   /**
-   * Sanitize string
+   * Validate and sanitize phone number
    */
-  private sanitizeString(input: string): string {
-    if (!input || typeof input !== 'string') return '';
-    return input.replace(/[<>'"`;]/g, '').trim().substring(0, 255);
-  }
-
-  /**
-   * Sanitize phone number (E.164 compatible)
-   */
-  private sanitizePhone(phone: string): string {
+  private validateAndSanitizePhone(phone: unknown): string {
     if (!phone || typeof phone !== 'string') {
       throw new BadRequestException('Phone number required');
     }
-    // Keep only digits, +, and spaces
-    const sanitized = phone.replace(/[^\d\+ ]/g, '').trim().substring(0, 20);
-    const digitsOnly = sanitized.replace(/\D/g, '');
-    if (digitsOnly.length < 10 || digitsOnly.length > 13) {
+
+    const cleaned = phone.replace(/[^\d\+]/g, '').trim().substring(0, 20);
+
+    if (cleaned.length < 10 || cleaned.length > 13) {
       throw new BadRequestException('Invalid phone format');
     }
-    return sanitized;
+
+    return cleaned;
+  }
+
+  /**
+   * Sanitize general string input
+   */
+  private sanitizeString(input: unknown): string {
+    if (!input || typeof input !== 'string') return '';
+    return input.replace(/[<>'"`;\\]/g, '').trim().substring(0, 255);
+  }
+
+  /**
+   * Validate quantity (with optional allowZero)
+   */
+  private validateQuantity(quantity: unknown, allowZero = false): number {
+    if (typeof quantity !== 'number' || !Number.isFinite(quantity)) {
+      throw new BadRequestException('Invalid quantity');
+    }
+
+    const min = allowZero ? 0 : 1;
+    const max = 100;
+
+    if (quantity < min || quantity > max) {
+      throw new BadRequestException(`Quantity must be ${min}-${max}`);
+    }
+
+    return Math.floor(quantity);
   }
 
   /**
    * Verify tenant exists
    */
-  private async verifyTenantExists(tenantId: string): Promise<void> {
+  private async checkTenantExists(tenantId: string): Promise<void> {
     try {
       await this.tenantsService.findOneById(tenantId);
     } catch {
@@ -388,77 +478,127 @@ export class WhatsAppCartController {
   }
 
   /**
-   * Verify product belongs to tenant
+   * Assert product belongs to tenant
    */
-  private async verifyProductOwnership(tenantId: string, productId: string): Promise<void> {
+  private async assertProductBelongsToTenant(tenantId: string, productId: string): Promise<void> {
     const product = await this.productsService.findOne(productId);
+
     if (!product) {
       throw new BadRequestException('Product not found');
     }
+
     if (product.tenant_id !== tenantId) {
+      this.auditLog('SYSTEM', tenantId, 'PRODUCT_ACCESS_VIOLATION', { productId });
       throw new ForbiddenException('Access denied');
     }
   }
 
-  /**
-   * Validate DTOs
-   */
-  private validateAddToCartDto(dto: AddToCartDto): void {
-    if (!dto?.tenantId || !this.isValidUUID(dto.tenantId)) {
-      throw new BadRequestException('Invalid tenant ID');
+  // ============================================
+  // DTO PARSING METHODS
+  // ============================================
+
+  private parseAndValidateAddToCartDto(body: Record<string, unknown>): {
+    tenantId: string;
+    customerPhone: string;
+    productId: string;
+    productName?: string;
+    quantity: number;
+    unitPrice?: number;
+  } {
+    if (!body || typeof body !== 'object') {
+      throw new BadRequestException('Invalid request body');
     }
-    if (!dto?.customerPhone) {
-      throw new BadRequestException('Phone required');
-    }
-    if (!dto?.productId) {
-      throw new BadRequestException('Product ID required');
-    }
-    if (typeof dto?.quantity !== 'number' || dto.quantity < 1 || dto.quantity > 100) {
-      throw new BadRequestException('Quantity must be 1-100');
-    }
+
+    const tenantId = body.tenantId as string;
+    const customerPhone = body.customerPhone as string;
+    const productId = body.productId as string;
+    const productName = body.productName as string | undefined;
+    const quantity = body.quantity;
+    const unitPrice = body.unitPrice as number | undefined;
+
+    if (!tenantId) throw new BadRequestException('Tenant ID required');
+    if (!customerPhone) throw new BadRequestException('Customer phone required');
+    if (!productId) throw new BadRequestException('Product ID required');
+    if (quantity === undefined || quantity === null) throw new BadRequestException('Quantity required');
+
+    return { tenantId, customerPhone, productId, productName, quantity, unitPrice };
   }
 
-  private validateUpdateDto(dto: UpdateCartItemDto): void {
-    if (!dto?.tenantId || !this.isValidUUID(dto.tenantId)) {
-      throw new BadRequestException('Invalid tenant ID');
+  private parseAndValidateUpdateCartDto(body: Record<string, unknown>): {
+    tenantId: string;
+    customerPhone: string;
+    productId: string;
+    quantity: number;
+  } {
+    if (!body || typeof body !== 'object') {
+      throw new BadRequestException('Invalid request body');
     }
-    if (!dto?.customerPhone || !dto?.productId) {
-      throw new BadRequestException('Missing required fields');
-    }
-    if (typeof dto?.quantity !== 'number' || dto.quantity < 0 || dto.quantity > 100) {
-      throw new BadRequestException('Invalid quantity');
-    }
+
+    const tenantId = body.tenantId as string;
+    const customerPhone = body.customerPhone as string;
+    const productId = body.productId as string;
+    const quantity = body.quantity;
+
+    if (!tenantId) throw new BadRequestException('Tenant ID required');
+    if (!customerPhone) throw new BadRequestException('Customer phone required');
+    if (!productId) throw new BadRequestException('Product ID required');
+    if (quantity === undefined || quantity === null) throw new BadRequestException('Quantity required');
+
+    return { tenantId, customerPhone, productId, quantity };
   }
 
-  private validateRemoveDto(dto: RemoveFromCartDto): void {
-    if (!dto?.tenantId || !this.isValidUUID(dto.tenantId)) {
-      throw new BadRequestException('Invalid tenant ID');
+  private parseAndValidateRemoveCartDto(body: Record<string, unknown>): {
+    tenantId: string;
+    customerPhone: string;
+    productId: string;
+  } {
+    if (!body || typeof body !== 'object') {
+      throw new BadRequestException('Invalid request body');
     }
-    if (!dto?.customerPhone || !dto?.productId) {
-      throw new BadRequestException('Missing required fields');
-    }
+
+    const tenantId = body.tenantId as string;
+    const customerPhone = body.customerPhone as string;
+    const productId = body.productId as string;
+
+    if (!tenantId) throw new BadRequestException('Tenant ID required');
+    if (!customerPhone) throw new BadRequestException('Customer phone required');
+    if (!productId) throw new BadRequestException('Product ID required');
+
+    return { tenantId, customerPhone, productId };
   }
 
-  private validateClearDto(dto: ClearCartDto): void {
-    if (!dto?.tenantId || !this.isValidUUID(dto.tenantId)) {
-      throw new BadRequestException('Invalid tenant ID');
+  private parseAndValidateClearCartDto(body: Record<string, unknown>): {
+    tenantId: string;
+    customerPhone: string;
+  } {
+    if (!body || typeof body !== 'object') {
+      throw new BadRequestException('Invalid request body');
     }
-    if (!dto?.customerPhone) {
-      throw new BadRequestException('Phone required');
-    }
+
+    const tenantId = body.tenantId as string;
+    const customerPhone = body.customerPhone as string;
+
+    if (!tenantId) throw new BadRequestException('Tenant ID required');
+    if (!customerPhone) throw new BadRequestException('Customer phone required');
+
+    return { tenantId, customerPhone };
   }
 
-  /**
-   * Audit logging
-   */
-  private logMutation(user: { userId: string; tenantId: string }, action: string, details: object): void {
-    console.log(`[AUDIT] user=${user.userId} tenant=${user.tenantId} action=${action} details=${JSON.stringify(details)}`);
+  // ============================================
+  // RESPONSE BUILDERS
+  // ============================================
+
+  private buildMinimalCartSummary(cart: any): CartSummaryResponseDto {
+    return {
+      hasCart: cart?.items?.length > 0 || false,
+      itemCount: cart?.items?.length || 0,
+      totalValue: Number(cart?.total_amount) || 0,
+      expired: cart?.status === 'expired' || false,
+      formattedSummary: this.cartService.generateSummary(cart),
+    };
   }
 
-  /**
-   * Format cart response
-   */
-  private formatCartResponse(cart: any): CartResponseDto {
+  private buildFullCartResponse(cart: any): CartResponseDto {
     return {
       id: cart.id,
       tenantId: cart.tenant_id,
@@ -477,30 +617,27 @@ export class WhatsAppCartController {
   }
 }
 
-// Type definitions
-interface AddToCartDto {
+// Type definitions (for documentation)
+interface CartResponseDto {
+  id: string;
   tenantId: string;
   customerPhone: string;
-  productId: string;
-  productName?: string;
-  quantity: number;
-  unitPrice?: number;
+  items: any[];
+  subtotal: number;
+  couponCode: string | null;
+  discountAmount: number;
+  shippingAmount: number;
+  totalAmount: number;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-interface UpdateCartItemDto {
-  tenantId: string;
-  customerPhone: string;
-  productId: string;
-  quantity: number;
-}
-
-interface RemoveFromCartDto {
-  tenantId: string;
-  customerPhone: string;
-  productId: string;
-}
-
-interface ClearCartDto {
-  tenantId: string;
-  customerPhone: string;
+interface CartSummaryResponseDto {
+  hasCart: boolean;
+  itemCount: number;
+  totalValue: number;
+  expired: boolean;
+  formattedSummary: string;
 }
