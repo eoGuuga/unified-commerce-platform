@@ -31,6 +31,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write  # Required for OIDC authentication
 
     steps:
       - name: Checkout
@@ -44,7 +45,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Extract metadata for Backend
         id: meta
@@ -74,36 +75,50 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          timeout: 5m
+          command_timeout: 10m
+          envs: GITHUB_SHA,GHCR_TOKEN
           script: |
+            set -e
             echo "🚀 Starting backend deployment..."
 
-            # Login to GHCR
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            # Login to GHCR with token
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
             # Pull latest image
-            docker pull ${{ env.IMAGE_NAME_BACKEND }}:sha-${{ github.sha }}
+            docker pull ${{ env.IMAGE_NAME_BACKEND }}:sha-$GITHUB_SHA
 
-            # Stop and remove old container (keep network)
-            docker stop ucm-backend || true
-            docker rm ucm-backend || true
+            # Stop and remove old container
+            docker stop ucm-backend 2>/dev/null || true
+            docker rm ucm-backend 2>/dev/null || true
 
-            # Run new container
+            # Run new container with health check
             docker run -d \
               --name ucm-backend \
               --network deploy_ucm-net \
+              --restart unless-stopped \
               -e DATABASE_URL=${{ secrets.DATABASE_URL }} \
               -e REDIS_URL=${{ secrets.REDIS_URL }} \
               -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
               -e NODE_ENV=production \
               -e CORS_ORIGINS=${{ secrets.CORS_ORIGINS }} \
               -e FRONTEND_URL=${{ secrets.FRONTEND_URL }} \
-              ${{ env.IMAGE_NAME_BACKEND }}:sha-${{ github.sha }}
+              ${{ env.IMAGE_NAME_BACKEND }}:sha-$GITHUB_SHA
 
-            # Wait for container to be healthy
-            sleep 10
+            # Wait and verify container is running
+            echo "⏳ Waiting for container to start..."
+            sleep 15
 
-            # Verify
-            docker logs ucm-backend --tail 20
+            # Check if container is running
+            if ! docker ps | grep -q ucm-backend; then
+              echo "❌ Container failed to start!"
+              docker logs ucm-backend
+              exit 1
+            fi
+
+            # Verify health
+            echo "🔍 Verifying deployment..."
+            docker logs ucm-backend --tail 30
 
             # Cleanup old images
             docker image prune -f
@@ -133,7 +148,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Extract metadata for Frontend
         id: meta
@@ -163,30 +178,41 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          timeout: 5m
+          command_timeout: 10m
+          envs: GITHUB_SHA,GHCR_TOKEN
           script: |
+            set -e
             echo "🚀 Starting frontend deployment..."
 
             # Login to GHCR
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
             # Pull latest image
-            docker pull ${{ env.IMAGE_NAME_FRONTEND }}:sha-${{ github.sha }}
+            docker pull ${{ env.IMAGE_NAME_FRONTEND }}:sha-$GITHUB_SHA
 
             # Stop and remove old container
-            docker stop ucm-frontend || true
-            docker rm ucm-frontend || true
+            docker stop ucm-frontend 2>/dev/null || true
+            docker rm ucm-frontend 2>/dev/null || true
 
             # Run new container
             docker run -d \
               --name ucm-frontend \
               --network deploy_ucm-net \
+              --restart unless-stopped \
               -p 3000:3000 \
-              ${{ env.IMAGE_NAME_FRONTEND }}:sha-${{ github.sha }}
+              ${{ env.IMAGE_NAME_FRONTEND }}:sha-$GITHUB_SHA
 
             # Wait for container
-            sleep 5
+            sleep 10
 
             # Verify
+            if ! docker ps | grep -q ucm-frontend; then
+              echo "❌ Container failed to start!"
+              docker logs ucm-frontend
+              exit 1
+            fi
+
             docker logs ucm-frontend --tail 10
 
             echo "✅ Frontend deployment complete!"
@@ -206,33 +232,76 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          timeout: 2m
           script: |
+            set -e
             echo "🔄 Restarting nginx..."
-            docker restart ucm-nginx || true
-            sleep 3
 
-            # Test health endpoint
-            curl -f https://${{ secrets.VPS_HOST }}/api/v1/health || echo "Health check pending..."
+            docker restart ucm-nginx
+
+            sleep 5
+
+            # Verify nginx is running
+            if ! docker ps | grep -q ucm-nginx; then
+              echo "❌ Nginx failed to start!"
+              docker logs ucm-nginx
+              exit 1
+            fi
 
             echo "✅ Nginx restarted!"
 
   # ============================================
-  # JOB 4: Notify on Success
+  # JOB 4: Verify Deployment
   # ============================================
-  notify:
-    name: Notify Success
+  verify:
+    name: Verify Deployment
     runs-on: ubuntu-latest
-    needs: [deploy-backend, deploy-frontend, restart-nginx]
+    needs: [deploy-backend, restart-nginx]
     if: always()
 
     steps:
-      - name: Deployment Summary
+      - name: Verify Health Endpoint
         run: |
-          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "🔍 Verifying deployment on VPS..."
+          echo "Attempting to reach health endpoint..."
+
+          # Retry logic for health check
+          MAX_ATTEMPTS=5
+          ATTEMPT=0
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
+
+            RESPONSE=$(curl -s -k -w "\n%{http_code}" https://${{ secrets.VPS_HOST }}/api/v1/health || echo "000")
+
+            if echo "$RESPONSE" | grep -q "200"; then
+              echo "✅ Health check passed!"
+              echo "$RESPONSE" | head -1
+              exit 0
+            fi
+
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+              echo "⏳ Waiting 10 seconds before retry..."
+              sleep 10
+            fi
+          done
+
+          echo "❌ Health check failed after $MAX_ATTEMPTS attempts"
+          echo "Response: $RESPONSE"
+          exit 1
+
+      - name: Deployment Summary
+        if: success()
+        run: |
+          echo "## 🚀 Deployment Successful" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Author:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
           echo "**Message:** ${{ github.event.head_commit.message }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** ${{ needs.deploy-backend.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Backend: Running" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Nginx: Running" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Health Check: Passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "**VPS:** ${{ secrets.VPS_HOST }}" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** https://${{ secrets.VPS_HOST }}/api/v1/health" >> $GITHUB_STEP_SUMMARY
