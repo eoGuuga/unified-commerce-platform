@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { useCart } from '@/hooks/useCart';
 import { api } from '@/lib/api-client';
+import { TENANT_ID } from '@/lib/config';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'react-hot-toast';
 
@@ -46,7 +47,7 @@ export default function CheckoutPage() {
       const orderResponse = await api.createOrder({
         channel: 'ecommerce',
         items: items.map(item => ({
-          product_id: item.id,
+          produto_id: item.id,
           quantity: item.quantity,
           unit_price: item.price,
         })),
@@ -60,7 +61,7 @@ export default function CheckoutPage() {
           zipcode: cep || '',
         } : undefined,
         payment_method: 'pix',
-      });
+      }, TENANT_ID);
 
       if (orderResponse.order_no) {
         // Se for PIX, gerar pagamento
@@ -70,7 +71,7 @@ export default function CheckoutPage() {
             pedido_id: orderResponse.id,
             method: 'pix',
             amount: total,
-          });
+          }, TENANT_ID);
 
           if (paymentResponse.pagamento && paymentResponse.qr_code) {
             toast.success('Pedido criado! Pagamento PIX gerado.');

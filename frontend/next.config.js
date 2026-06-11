@@ -2,8 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  output: 'standalone',
+  serverExternalPackages: ['sharp', 'better-sqlite3'],
+  // Disable Turbopack for production build
+  experimental: {
+    // Use webpack instead of turbopack
+  },
   images: {
-    // Em prod, deixa o next/image otimizar. Em dev mantemos como esta (mais rapido).
     unoptimized: process.env.NODE_ENV !== 'production',
     remotePatterns: [
       { protocol: 'https', hostname: 'gtsofthub.com.br' },

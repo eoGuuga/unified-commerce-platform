@@ -16,10 +16,18 @@ export interface Product {
   name: string;
   description?: string;
   price: Decimal;
+  original_price?: Decimal;
   cost_price?: Decimal;
   unit: string;
   is_active: boolean;
   metadata?: Record<string, unknown>;
+  image_url?: string;
+  additional_images?: string[];
+  category?: string;
+  rating?: number;
+  review_count?: number;
+  discount?: number;
+  features?: string[];
   /** Pode vir agregado dependendo do endpoint (stock summary, etc). */
   stock?: number;
   min_stock?: number;

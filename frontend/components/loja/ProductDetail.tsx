@@ -18,16 +18,20 @@ export function ProductDetail({ product, onAddToCart }: ProductDetailProps) {
   const [quantity, setQuantity] = useState(1);
   const { addItem } = useCart();
 
-  const stockStatus = product.stock === 0 ? 'indisponivel' :
-                     product.stock < 10 ? 'baixo' : 'disponivel';
+  const stock = product.stock ?? 0;
+
+  const stockStatus = stock === 0 ? 'indisponivel' :
+                     stock < 10 ? 'baixo' : 'disponivel';
 
   const stockBadgeVariant = stockStatus === 'indisponivel' ? 'destructive' :
                            stockStatus === 'baixo' ? 'secondary' : 'default';
 
-  const maxQuantity = Math.min(product.stock, 99);
+  const maxQuantity = Math.min(stock, 99);
 
   const handleAddToCart = () => {
-    addItem(product, quantity);
+    // Converter Decimal para number se necessário
+    const price = typeof product.price === 'string' ? parseFloat(product.price) : product.price;
+    addItem({ ...product, price }, quantity);
     onAddToCart?.(product, quantity);
   };
 
@@ -125,11 +129,11 @@ export function ProductDetail({ product, onAddToCart }: ProductDetailProps) {
           <div className="space-y-2">
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-bold text-primary">
-                {formatCurrency(product.price)}
+                {formatCurrency(typeof product.price === 'string' ? parseFloat(product.price) : product.price)}
               </span>
-              {product.original_price && product.original_price > product.price && (
+              {product.original_price && (typeof product.original_price === 'number' ? product.original_price : parseFloat(product.original_price as string)) > (typeof product.price === 'number' ? product.price : parseFloat(product.price as string)) && (
                 <span className="text-lg text-muted-foreground line-through">
-                  {formatCurrency(product.original_price)}
+                  {formatCurrency(typeof product.original_price === 'string' ? parseFloat(product.original_price) : product.original_price)}
                 </span>
               )}
               {product.discount && (
@@ -146,13 +150,13 @@ export function ProductDetail({ product, onAddToCart }: ProductDetailProps) {
               <Package className="h-4 w-4" />
               <span className="font-medium">Estoque:</span>
               <Badge variant={stockBadgeVariant}>
-                {product.stock === 0 ? 'Indisponível' :
-                 product.stock < 10 ? `Apenas ${product.stock} unidade${product.stock > 1 ? 's' : ''}` :
-                 `${product.stock} unidades disponíveis`}
+                {stock === 0 ? 'Indisponível' :
+                 stock < 10 ? `Apenas ${stock} unidade${stock > 1 ? 's' : ''}` :
+                 `${stock} unidades disponíveis`}
               </Badge>
             </div>
 
-            {product.stock > 0 && (
+            {stock > 0 && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Truck className="h-4 w-4" />
                 <span>Entrega estimada: 2-3 dias úteis</span>

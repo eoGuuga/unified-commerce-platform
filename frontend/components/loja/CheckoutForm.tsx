@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { useCart } from '@/hooks/useCart';
 import { api } from '@/lib/api-client';
+import { TENANT_ID } from '@/lib/config';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'react-hot-toast';
 
@@ -48,25 +49,33 @@ export function CheckoutForm({ onSuccess }: CheckoutFormProps) {
     try {
       // Criar pedido
       const orderResponse = await api.createOrder({
+        channel: 'ecommerce',
         items: items.map(item => ({
-          product_id: item.id,
+          produto_id: item.id,
           quantity: item.quantity,
-          price: item.price,
+          unit_price: item.price,
         })),
         delivery_type: deliveryType,
-        delivery_address: deliveryType === 'delivery' ? address : undefined,
-        payment_method: 'pix', // Default para PIX
-      });
+        delivery_address: deliveryType === 'delivery' ? {
+          street: address || '',
+          number: '',
+          neighborhood: '',
+          city: '',
+          state: '',
+          zipcode: cep || '',
+        } : undefined,
+        payment_method: 'pix',
+      }, TENANT_ID);
 
       if (orderResponse.order_no) {
         // Se for PIX, gerar pagamento
         if (deliveryType === 'delivery' && subtotal < 30) {
           // Adicionar taxa de entrega se valor mínimo não atingido
           const paymentResponse = await api.createPayment({
-            pedidoId: orderResponse.id,
+            pedido_id: orderResponse.id,
             method: 'pix',
             amount: total,
-          });
+          }, TENANT_ID);
 
           if (paymentResponse.transaction_id) {
             toast.success('Pedido criado! Pagamento PIX gerado.');

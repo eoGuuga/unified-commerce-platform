@@ -14,6 +14,11 @@ import {
 } from '@/components/ui/select';
 import { Product } from '@/lib/types/product';
 
+const toNumber = (value: number | string | undefined | null): number => {
+  if (value === undefined || value === null) return 0;
+  return typeof value === 'string' ? parseFloat(value) || 0 : value;
+};
+
 interface ProductFiltersProps {
   products: Product[];
   onFiltersChange: (filteredProducts: Product[]) => void;
@@ -32,7 +37,7 @@ export function ProductFilters({ products, onFiltersChange, className }: Product
 
   // Extract unique categories
   const categories = useMemo(() => {
-    const uniqueCategories = [...new Set(products.map(p => p.category).filter(Boolean))];
+    const uniqueCategories = [...new Set(products.map(p => p.category).filter(Boolean) as string[])];
     return uniqueCategories.sort();
   }, [products]);
 
@@ -49,10 +54,10 @@ export function ProductFilters({ products, onFiltersChange, className }: Product
       const matchesCategory = !selectedCategory || product.category === selectedCategory;
 
       // Price range filter
-      const matchesPrice = product.price >= priceRange.min && product.price <= priceRange.max;
+      const matchesPrice = toNumber(product.price) >= priceRange.min && toNumber(product.price) <= priceRange.max;
 
       // Stock filter (only show in-stock products)
-      const matchesStock = product.stock > 0;
+      const matchesStock = toNumber(product.stock) > 0;
 
       return matchesSearch && matchesCategory && matchesPrice && matchesStock;
     });
@@ -66,10 +71,10 @@ export function ProductFilters({ products, onFiltersChange, className }: Product
           compareValue = a.name.localeCompare(b.name);
           break;
         case 'price':
-          compareValue = a.price - b.price;
+          compareValue = toNumber(a.price) - toNumber(b.price);
           break;
         case 'stock':
-          compareValue = b.stock - a.stock;
+          compareValue = toNumber(b.stock) - toNumber(a.stock);
           break;
         case 'rating':
           compareValue = (b.rating || 0) - (a.rating || 0);
