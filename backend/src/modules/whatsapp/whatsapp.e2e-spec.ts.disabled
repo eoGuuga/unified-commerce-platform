@@ -1,0 +1,245 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import * as request from 'supertest';
+import { AppModule } from '../../app.module';
+import { DataSource } from 'typeorm';
+
+describe('WhatsApp Bot E2E', () => {
+  let app: INestApplication;
+  let dataSource: DataSource;
+
+  const testTenantId = 'e2e-test-tenant-whatsapp';
+  const testPhone = '5511999999999';
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+
+    dataSource = moduleFixture.get<DataSource>(DataSource);
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(async () => {
+    // Limpar dados de teste antes de cada teste
+    try {
+      await dataSource.query(`
+        DELETE FROM whatsapp_carts WHERE customer_phone = '${testPhone}'
+      `);
+      await dataSource.query(`
+        DELETE FROM whatsapp_conversations WHERE customer_phone = '${testPhone}'
+      `);
+    } catch (error) {
+      // Ignorar erros de limpeza
+    }
+  });
+
+  describe('Webhook Endpoint', () => {
+    it('POST /whatsapp/webhook - deve processar mensagem de texto', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/whatsapp/webhook')
+        .send({
+          tenantId: testTenantId,
+          body: 'Olá',
+          From: testPhone,
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('success', true);
+    });
+
+    it('POST /whatsapp/webhook - deve ignorar mensagens de grupos', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/whatsapp/webhook')
+        .send({
+          tenantId: testTenantId,
+          body: 'Mensagem do grupo',
+          From: '5511999999999-123456@g.us',
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('ignored', true);
+    });
+
+    it('POST /whatsapp/webhook - deve rejeitar mensagem sem tenantId', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/whatsapp/webhook')
+        .send({
+          body: 'Olá',
+          From: testPhone,
+        })
+        .expect(400);
+
+      expect(response.body.message).toContain('tenantId');
+    });
+  });
+
+  describe('Test Endpoint', () => {
+    it('POST /whatsapp/test - deve testar bot sem webhook real', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/whatsapp/test')
+        .send({
+          message: 'Olá',
+          tenantId: testTenantId,
+          phoneNumber: testPhone,
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('request', 'Olá');
+      expect(response.body).toHaveProperty('response');
+    });
+  });
+
+  describe('Cart Endpoints', () => {
+    it('GET /whatsapp/cart/:tenantId/:customerPhone - deve obter carrinho vazio', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/whatsapp/cart/${testTenantId}/${testPhone}`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('items');
+      expect(Array.isArray(response.body.items)).toBe(true);
+      expect(response.body.items.length).toBe(0);
+    });
+
+    it('GET /whatsapp/cart/:tenantId/:customerPhone/summary - deve obter resumo do carrinho', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/whatsapp/cart/${testTenantId}/${testPhone}/summary`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('hasCart');
+      expect(response.body).toHaveProperty('itemCount');
+      expect(response.body).toHaveProperty('formattedSummary');
+      expect(response.body.formattedSummary).toContain('Carrinho vazio');
+    });
+
+    it('POST /whatsapp/cart/clear - deve limpar carrinho', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/whatsapp/cart/clear')
+        .send({
+          tenantId: testTenantId,
+          customerPhone: testPhone,
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('status', 'abandoned');
+      expect(response.body.items.length).toBe(0);
+    });
+
+    it('POST /whatsapp/cart/extend-ttl - deve estender TTL do carrinho', async () => {
+      // Primeiro criar carrinho
+      await request(app.getHttpServer())
+        .get(`/whatsapp/cart/${testTenantId}/${testPhone}`);
+
+      const response = await request(app.getHttpServer())
+        .post(`/whatsapp/cart/extend-ttl/${testTenantId}/${testPhone}`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('expiresAt');
+    });
+  });
+
+  describe('Health Endpoint', () => {
+    it('GET /whatsapp/health - deve retornar status ok', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/whatsapp/health')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('status', 'ok');
+      expect(response.body).toHaveProperty('bot');
+    });
+  });
+
+  describe('Carrinho Persistence', () => {
+    it('deve criar carrinho e persistir no banco', async () => {
+      // Obter carrinho
+      const cartResponse = await request(app.getHttpServer())
+        .get(`/whatsapp/cart/${testTenantId}/${testPhone}`)
+        .expect(200);
+
+      expect(cartResponse.body).toHaveProperty('id');
+      expect(cartResponse.body).toHaveProperty('status', 'active');
+
+      // Verificar no banco
+      const dbCart = await dataSource.query(`
+        SELECT * FROM whatsapp_carts
+        WHERE customer_phone = '${testPhone}'
+        AND status = 'active'
+        LIMIT 1
+      `);
+
+      expect(dbCart.length).toBeGreaterThan(0);
+      expect(dbCart[0].id).toBe(cartResponse.body.id);
+    });
+
+    it('deve expirar carrinhos velhos', async () => {
+      // Inserir carrinho expirado diretamente no banco
+      const expiredDate = new Date(Date.now() - 60 * 60 * 1000); // 1 hora atrás
+      await dataSource.query(`
+        INSERT INTO whatsapp_carts (id, tenant_id, customer_phone, items, subtotal, shipping_amount, total_amount, status, expires_at, created_at, updated_at)
+        VALUES ('expired-cart-123', '${testTenantId}', '${testPhone}', '[]', 0, 10, 10, 'active', '${expiredDate.toISOString()}', NOW(), NOW())
+      `);
+
+      // Obter carrinho - deve criar novo, não retornar o expirado
+      const cartResponse = await request(app.getHttpServer())
+        .get(`/whatsapp/cart/${testTenantId}/${testPhone}`)
+        .expect(200);
+
+      // O carrinho retornado não deve ser o expirado
+      expect(cartResponse.body.id).not.toBe('expired-cart-123');
+    });
+  });
+
+  describe('Conversation Flow', () => {
+    it('deve criar conversa ao receber mensagem', async () => {
+      // Enviar mensagem
+      await request(app.getHttpServer())
+        .post('/whatsapp/webhook')
+        .send({
+          tenantId: testTenantId,
+          body: 'Quero brigadeiros',
+          From: testPhone,
+        })
+        .expect(200);
+
+      // Verificar conversa criada no banco
+      const conversations = await dataSource.query(`
+        SELECT * FROM whatsapp_conversations
+        WHERE customer_phone = '${testPhone}'
+        AND tenant_id = '${testTenantId}'
+        LIMIT 1
+      `);
+
+      expect(conversations.length).toBeGreaterThan(0);
+    });
+
+    it('deve salvar mensagens na conversa', async () => {
+      // Enviar mensagem
+      await request(app.getHttpServer())
+        .post('/whatsapp/webhook')
+        .send({
+          tenantId: testTenantId,
+          body: 'Teste de mensagem',
+          From: testPhone,
+        })
+        .expect(200);
+
+      // Verificar mensagem no banco
+      const messages = await dataSource.query(`
+        SELECT * FROM whatsapp_messages
+        WHERE direction = 'inbound'
+        AND body = 'Teste de mensagem'
+        LIMIT 1
+      `);
+
+      expect(messages.length).toBeGreaterThan(0);
+    });
+  });
+});
