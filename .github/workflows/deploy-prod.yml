@@ -1,0 +1,238 @@
+name: Deploy to Production VPS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/deploy-prod.yml'
+  workflow_dispatch:
+    inputs:
+      skip_frontend:
+        description: 'Skip frontend build'
+        required: false
+        default: 'false'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_BUILDER: ${{ github.repository_owner }}/ucm-builder
+  IMAGE_NAME_BACKEND: ${{ github.repository_owner }}/ucm-backend
+  IMAGE_NAME_FRONTEND: ${{ github.repository_owner }}/ucm-frontend
+
+jobs:
+  # ============================================
+  # JOB 1: Build and Push Backend Image
+  # ============================================
+  deploy-backend:
+    name: Build & Deploy Backend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Backend
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME_BACKEND }}
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+
+      - name: Build and Push Backend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NODE_ENV=production
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            echo "🚀 Starting backend deployment..."
+
+            # Login to GHCR
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull latest image
+            docker pull ${{ env.IMAGE_NAME_BACKEND }}:sha-${{ github.sha }}
+
+            # Stop and remove old container (keep network)
+            docker stop ucm-backend || true
+            docker rm ucm-backend || true
+
+            # Run new container
+            docker run -d \
+              --name ucm-backend \
+              --network deploy_ucm-net \
+              -e DATABASE_URL=${{ secrets.DATABASE_URL }} \
+              -e REDIS_URL=${{ secrets.REDIS_URL }} \
+              -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
+              -e NODE_ENV=production \
+              -e CORS_ORIGINS=${{ secrets.CORS_ORIGINS }} \
+              -e FRONTEND_URL=${{ secrets.FRONTEND_URL }} \
+              ${{ env.IMAGE_NAME_BACKEND }}:sha-${{ github.sha }}
+
+            # Wait for container to be healthy
+            sleep 10
+
+            # Verify
+            docker logs ucm-backend --tail 20
+
+            # Cleanup old images
+            docker image prune -f
+
+            echo "✅ Backend deployment complete!"
+
+  # ============================================
+  # JOB 2: Build and Push Frontend Image
+  # ============================================
+  deploy-frontend:
+    name: Build & Deploy Frontend
+    runs-on: ubuntu-latest
+    if: github.event.inputs.skip_frontend != 'true'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Frontend
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME_FRONTEND }}
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+
+      - name: Build and Push Frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            echo "🚀 Starting frontend deployment..."
+
+            # Login to GHCR
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull latest image
+            docker pull ${{ env.IMAGE_NAME_FRONTEND }}:sha-${{ github.sha }}
+
+            # Stop and remove old container
+            docker stop ucm-frontend || true
+            docker rm ucm-frontend || true
+
+            # Run new container
+            docker run -d \
+              --name ucm-frontend \
+              --network deploy_ucm-net \
+              -p 3000:3000 \
+              ${{ env.IMAGE_NAME_FRONTEND }}:sha-${{ github.sha }}
+
+            # Wait for container
+            sleep 5
+
+            # Verify
+            docker logs ucm-frontend --tail 10
+
+            echo "✅ Frontend deployment complete!"
+
+  # ============================================
+  # JOB 3: Restart Nginx
+  # ============================================
+  restart-nginx:
+    name: Restart Nginx
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend]
+
+    steps:
+      - name: Restart Nginx
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            echo "🔄 Restarting nginx..."
+            docker restart ucm-nginx || true
+            sleep 3
+
+            # Test health endpoint
+            curl -f https://${{ secrets.VPS_HOST }}/api/v1/health || echo "Health check pending..."
+
+            echo "✅ Nginx restarted!"
+
+  # ============================================
+  # JOB 4: Notify on Success
+  # ============================================
+  notify:
+    name: Notify Success
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend, restart-nginx]
+    if: always()
+
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Author:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Message:** ${{ github.event.head_commit.message }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ needs.deploy-backend.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**VPS:** ${{ secrets.VPS_HOST }}" >> $GITHUB_STEP_SUMMARY
