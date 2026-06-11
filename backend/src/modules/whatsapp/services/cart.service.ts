@@ -56,6 +56,29 @@ export class CartService {
   }
 
   /**
+   * Busca carrinho ativo para o cliente (NÃO cria se não existir)
+   * Retorna null se não encontrar carrinho
+   */
+  async getCartByTenantAndPhone(tenantId: string, customerPhone: string): Promise<WhatsAppCart | null> {
+    const repo = this.getRepository();
+
+    // Primeiro, expirar carrinhos antigos
+    await this.expireOldCarts(tenantId, customerPhone);
+
+    // Buscar carrinho ativo
+    const cart = await repo.findOne({
+      where: {
+        tenant_id: tenantId,
+        customer_phone: customerPhone,
+        status: 'active',
+      },
+      order: { updated_at: 'DESC' },
+    });
+
+    return cart;
+  }
+
+  /**
    * Busca ou cria carrinho ativo para o cliente
    */
   async getOrCreateCart(tenantId: string, customerPhone: string): Promise<WhatsAppCart> {
