@@ -1,0 +1,597 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { ConversationService } from './conversation.service';
+import { CartService } from './cart.service';
+import { ProductsService } from '../../products/products.service';
+import { OrdersService } from '../../orders/orders.service';
+import { TypedConversation, ConversationState, PendingOrder, CustomerData } from '../types/whatsapp.types';
+import { ProductWithStock } from '../../products/types/product.types';
+
+export interface OrderAdjustmentResult {
+  adjusted: boolean;
+  message: string;
+  pendingOrder?: PendingOrder;
+  requiresConfirmation: boolean;
+}
+
+export interface OrderConfirmationResult {
+  success: boolean;
+  pedidoId?: string;
+  message: string;
+}
+
+export interface CollectionStageResult {
+  needsMoreInfo: boolean;
+  message: string;
+  nextState?: ConversationState;
+  collectedData?: Partial<CustomerData>;
+}
+
+const DEFAULT_SHIPPING_AMOUNT = 10;
+
+@Injectable()
+export class OrderFlowManagerService {
+  private readonly logger = new Logger(OrderFlowManagerService.name);
+
+  constructor(
+    private readonly conversationService: ConversationService,
+    private readonly cartService: CartService,
+    private readonly productsService: ProductsService,
+    private readonly ordersService: OrdersService,
+    private readonly config: ConfigService,
+  ) {}
+
+  /**
+   * Processa ajuste no pedido pendente
+   */
+  async tryAdjustPendingOrder(
+    tenantId: string,
+    customerPhone: string,
+    message: string,
+    conversation: TypedConversation,
+  ): Promise<OrderAdjustmentResult> {
+    const pendingOrder = conversation.context?.pending_order as PendingOrder | undefined;
+
+    if (!pendingOrder || !pendingOrder.items.length) {
+      return {
+        adjusted: false,
+        message: '',
+        requiresConfirmation: false,
+      };
+    }
+
+    // Parse adjustment intent
+    const adjustment = this.parseOrderAdjustmentIntent(message);
+
+    if (!adjustment) {
+      return {
+        adjusted: false,
+        message: '',
+        requiresConfirmation: false,
+      };
+    }
+
+    // Find matching item
+    const itemIndex = pendingOrder.items.findIndex(
+      (item) =>
+        item.produto_name.toLowerCase().includes(adjustment.productName.toLowerCase()) ||
+        item.produto_id === adjustment.productId,
+    );
+
+    if (itemIndex === -1) {
+      return {
+        adjusted: false,
+        message: `Não encontrei "${adjustment.productName}" no pedido.`,
+        requiresConfirmation: false,
+      };
+    }
+
+    const item = pendingOrder.items[itemIndex];
+
+    if (adjustment.action === 'remove') {
+      // Remove item
+      const newItems = pendingOrder.items.filter((_, i) => i !== itemIndex);
+      const newPendingOrder: PendingOrder = {
+        ...pendingOrder,
+        items: newItems,
+        subtotal: newItems.reduce((sum, i) => sum + i.quantity * i.unit_price, 0),
+        total_amount: newItems.reduce((sum, i) => sum + i.quantity * i.unit_price, 0) + pendingOrder.shipping_amount,
+      };
+
+      await this.conversationService.savePendingOrder(conversation.id, newPendingOrder as any);
+
+      return {
+        adjusted: true,
+        message: `Removido "${item.produto_name}" do pedido.`,
+        pendingOrder: newPendingOrder,
+        requiresConfirmation: false,
+      };
+    }
+
+    if (adjustment.action === 'update_quantity') {
+      // Update quantity
+      if (adjustment.quantity <= 0) {
+        // Remove item
+        const newItems = pendingOrder.items.filter((_, i) => i !== itemIndex);
+        const newPendingOrder: PendingOrder = {
+          ...pendingOrder,
+          items: newItems,
+          subtotal: newItems.reduce((sum, i) => sum + i.quantity * i.unit_price, 0),
+          total_amount: newItems.reduce((sum, i) => sum + i.quantity * i.unit_price, 0) + pendingOrder.shipping_amount,
+        };
+
+        await this.conversationService.savePendingOrder(conversation.id, newPendingOrder as any);
+
+        return {
+          adjusted: true,
+          message: `Removido "${item.produto_name}" do pedido (quantidade 0).`,
+          pendingOrder: newPendingOrder,
+          requiresConfirmation: false,
+        };
+      }
+
+      // Check stock
+      const product = await this.productsService.findOne(item.produto_id, tenantId);
+      if (product && adjustment.quantity > product.estoque) {
+        return {
+          adjusted: true,
+          message: `Só temos ${product.estoque} unidades de "${item.produto_name}". Quer ajustar?`,
+          requiresConfirmation: false,
+        };
+      }
+
+      const newItems = [...pendingOrder.items];
+      newItems[itemIndex] = { ...item, quantity: adjustment.quantity };
+
+      const newPendingOrder: PendingOrder = {
+        ...pendingOrder,
+        items: newItems,
+        subtotal: newItems.reduce((sum, i) => sum + i.quantity * i.unit_price, 0),
+        total_amount: newItems.reduce((sum, i) => sum + i.quantity * i.unit_price, 0) + pendingOrder.shipping_amount,
+      };
+
+      await this.conversationService.savePendingOrder(conversation.id, newPendingOrder as any);
+
+      return {
+        adjusted: true,
+        message: `Quantidade de "${item.produto_name}" atualizada para ${adjustment.quantity}.`,
+        pendingOrder: newPendingOrder,
+        requiresConfirmation: false,
+      };
+    }
+
+    return {
+      adjusted: false,
+      message: '',
+      requiresConfirmation: false,
+    };
+  }
+
+  /**
+   * Adiciona produto ao pedido
+   */
+  async addProductToOrder(
+    tenantId: string,
+    customerPhone: string,
+    productId: string,
+    quantity: number,
+    conversation: TypedConversation,
+  ): Promise<{ success: boolean; message: string; pendingOrder?: PendingOrder }> {
+    try {
+      // Get product
+      const product = await this.productsService.findOne(productId, tenantId);
+
+      if (!product) {
+        return { success: false, message: 'Produto não encontrado.' };
+      }
+
+      if (product.estoque === 0) {
+        return { success: false, message: `Desculpe, "${product.nome}" está fora de estoque.` };
+      }
+
+      // Check quantity against stock
+      const adjustedQuantity = Math.min(quantity, product.estoque);
+
+      // Get or create pending order
+      let pendingOrder = conversation.context?.pending_order as PendingOrder | undefined;
+
+      if (!pendingOrder) {
+        pendingOrder = {
+          items: [],
+          subtotal: 0,
+          discount_amount: 0,
+          shipping_amount: this.getDefaultShippingAmount(),
+          total_amount: this.getDefaultShippingAmount(),
+        };
+      }
+
+      // Check if item already exists
+      const existingIndex = pendingOrder.items.findIndex((i) => i.produto_id === productId);
+
+      if (existingIndex >= 0) {
+        // Update quantity
+        const newQuantity = pendingOrder.items[existingIndex].quantity + adjustedQuantity;
+        const limitedQuantity = Math.min(newQuantity, product.estoque);
+
+        pendingOrder.items[existingIndex].quantity = limitedQuantity;
+      } else {
+        // Add new item
+        pendingOrder.items.push({
+          produto_id: productId,
+          produto_name: product.nome,
+          quantity: adjustedQuantity,
+          unit_price: Number(product.preco),
+        });
+      }
+
+      // Recalculate totals
+      pendingOrder.subtotal = pendingOrder.items.reduce(
+        (sum, item) => sum + item.quantity * item.unit_price,
+        0,
+      );
+      pendingOrder.total_amount = pendingOrder.subtotal - pendingOrder.discount_amount + pendingOrder.shipping_amount;
+
+      // Save to conversation
+      await this.conversationService.savePendingOrder(conversation.id, pendingOrder as any);
+
+      return {
+        success: true,
+        message: `Adicionado ${adjustedQuantity}x ${product.nome} (R$ ${(adjustedQuantity * Number(product.preco)).toFixed(2)})`,
+        pendingOrder,
+      };
+    } catch (error) {
+      this.logger.error('Failed to add product to order', { error, productId, tenantId });
+      return { success: false, message: 'Erro ao adicionar produto ao pedido.' };
+    }
+  }
+
+  /**
+   * Coleta dados do cliente
+   */
+  async collectCustomerData(
+    conversation: TypedConversation,
+    message: string,
+    currentState: ConversationState,
+  ): Promise<CollectionStageResult> {
+    const customerData = conversation.context?.customer_data as CustomerData | undefined;
+
+    switch (currentState) {
+      case 'collecting_name':
+        return this.collectName(conversation, message, customerData);
+
+      case 'collecting_address':
+        return this.collectAddress(conversation, message, customerData);
+
+      case 'collecting_phone':
+        return this.collectPhone(conversation, message, customerData);
+
+      case 'collecting_notes':
+        return this.collectNotes(conversation, message, customerData);
+
+      default:
+        return { needsMoreInfo: false, message: '' };
+    }
+  }
+
+  /**
+   * Confirma pedido
+   */
+  async confirmOrder(
+    tenantId: string,
+    customerPhone: string,
+    conversation: TypedConversation,
+  ): Promise<OrderConfirmationResult> {
+    const pendingOrder = conversation.context?.pending_order as PendingOrder | undefined;
+    const customerData = conversation.context?.customer_data as CustomerData | undefined;
+
+    if (!pendingOrder || pendingOrder.items.length === 0) {
+      return { success: false, message: 'Não há itens no pedido para confirmar.' };
+    }
+
+    if (!customerData?.name) {
+      return { success: false, message: 'Preciso do seu nome para confirmar o pedido.' };
+    }
+
+    if (!customerData?.phone) {
+      return { success: false, message: 'Preciso do seu telefone para confirmar o pedido.' };
+    }
+
+    try {
+      // Create order
+      const pedido = await this.ordersService.create({
+        tenant_id: tenantId,
+        customer_phone: customerPhone,
+        customer_name: customerData.name,
+        customer_address: customerData.address,
+        items: pendingOrder.items.map((item) => ({
+          produto_id: item.produto_id,
+          produto_name: item.produto_name,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+        })),
+        subtotal: pendingOrder.subtotal,
+        shipping_amount: pendingOrder.shipping_amount,
+        total_amount: pendingOrder.total_amount,
+        coupon_code: pendingOrder.coupon_code,
+        discount_amount: pendingOrder.discount_amount,
+        delivery_type: customerData.delivery_type || 'delivery',
+        notes: customerData.notes,
+      });
+
+      // Update conversation
+      await this.conversationService.setPedidoId(conversation.id, pedido.id);
+      await this.conversationService.clearPendingOrder(conversation.id);
+
+      // Mark cart as converted if exists
+      const cart = await this.cartService.getOrCreateCart(tenantId, customerPhone);
+      await this.cartService.markAsConverted(cart.id);
+
+      return {
+        success: true,
+        pedidoId: pedido.id,
+        message: `Pedido ${pedido.order_no || pedido.id} confirmado com sucesso!`,
+      };
+    } catch (error) {
+      this.logger.error('Failed to confirm order', { error, tenantId, customerPhone });
+      return { success: false, message: 'Erro ao confirmar o pedido. Tente novamente.' };
+    }
+  }
+
+  /**
+   * Gera resumo do pedido pendente
+   */
+  buildPendingOrderSummary(pendingOrder: PendingOrder, customerData?: CustomerData): string {
+    const lines: string[] = [];
+
+    lines.push('📋 *Resumo do Pedido:*\n');
+
+    // Items
+    pendingOrder.items.forEach((item, index) => {
+      const itemTotal = item.quantity * item.unit_price;
+      lines.push(`${index + 1}. ${item.produto_name}`);
+      lines.push(`   ${item.quantity}x R$ ${item.unit_price.toFixed(2).replace('.', ',')} = R$ ${itemTotal.toFixed(2).replace('.', ',')}`);
+    });
+
+    lines.push('');
+    lines.push(`📦 Subtotal: R$ ${pendingOrder.subtotal.toFixed(2).replace('.', ',')}`);
+
+    if (pendingOrder.coupon_code) {
+      lines.push(`🎟️ Cupom: ${pendingOrder.coupon_code} (-R$ ${pendingOrder.discount_amount.toFixed(2).replace('.', ',')})`);
+    }
+
+    lines.push(`🚚 Frete: R$ ${pendingOrder.shipping_amount.toFixed(2).replace('.', ',')}`);
+    lines.push('');
+    lines.push(`💰 *TOTAL: R$ ${pendingOrder.total_amount.toFixed(2).replace('.', ',')}*`);
+
+    // Customer info
+    if (customerData) {
+      lines.push('\n📍 *Dados:*');
+      if (customerData.name) lines.push(`   Nome: ${customerData.name}`);
+      if (customerData.phone) lines.push(`   Telefone: ${customerData.phone}`);
+      if (customerData.address) {
+        lines.push(`   Endereço: ${customerData.address.street}, ${customerData.address.number}`);
+      }
+      if (customerData.delivery_type) {
+        lines.push(`   Entrega: ${customerData.delivery_type === 'pickup' ? 'Retirada' : 'Entrega'}`);
+      }
+    }
+
+    lines.push('\nConfirma? (sim/não)');
+
+    return lines.join('\n');
+  }
+
+  // ============== MÉTODOS PRIVADOS ==============
+
+  private parseOrderAdjustmentIntent(message: string): {
+    action: 'remove' | 'update_quantity';
+    productName?: string;
+    productId?: string;
+    quantity?: number;
+  } | null {
+    const lower = message.toLowerCase().trim();
+
+    // Remove patterns
+    if (lower.startsWith('remover') || lower.startsWith('tirar') || lower.startsWith('delete')) {
+      const match = lower.match(/^(?:remover|tirar|delete)\s+(.+)$/);
+      return {
+        action: 'remove',
+        productName: match ? match[1].trim() : undefined,
+      };
+    }
+
+    // Update quantity patterns
+    if (lower.startsWith('quantidade') || lower.startsWith('qtd')) {
+      const match = lower.match(/^(?:quantidade|qtd)\s+(.+?)\s+(\d+)$/);
+      return {
+        action: 'update_quantity',
+        productName: match ? match[1].trim() : undefined,
+        quantity: match ? parseInt(match[2], 10) : undefined,
+      };
+    }
+
+    // Direct quantity like "2 brigadeiros" or "brigadeiros 2"
+    const directMatch = lower.match(/^(\d+)\s+(.+)$/);
+    if (directMatch) {
+      return {
+        action: 'update_quantity',
+        productName: directMatch[2].trim(),
+        quantity: parseInt(directMatch[1], 10),
+      };
+    }
+
+    return null;
+  }
+
+  private async collectName(
+    conversation: TypedConversation,
+    message: string,
+    customerData?: CustomerData,
+  ): Promise<CollectionStageResult> {
+    const name = this.extractName(message);
+
+    if (!name || !this.isValidName(name)) {
+      return {
+        needsMoreInfo: true,
+        message: 'Qual é o seu nome? (para o pedido)',
+      };
+    }
+
+    await this.conversationService.saveCustomerData(conversation.id, { name });
+
+    return {
+      needsMoreInfo: true,
+      message: `Prazer, ${name}! Qual é o endereço de entrega?`,
+      nextState: 'collecting_address',
+      collectedData: { name },
+    };
+  }
+
+  private async collectAddress(
+    conversation: TypedConversation,
+    message: string,
+    customerData?: CustomerData,
+  ): Promise<CollectionStageResult> {
+    const lower = message.toLowerCase().trim();
+
+    // Check for pickup
+    if (lower.includes('retirada') || lower.includes('buscar') || lower.includes('pegar')) {
+      await this.conversationService.saveCustomerData(conversation.id, {
+        delivery_type: 'pickup',
+      });
+
+      return {
+        needsMoreInfo: true,
+        message: 'Perfeito! Qual é o telefone para contato?',
+        nextState: 'collecting_phone',
+        collectedData: { delivery_type: 'pickup' },
+      };
+    }
+
+    // Parse address
+    const address = this.parseAddress(message);
+
+    if (!address) {
+      return {
+        needsMoreInfo: true,
+        message: 'Qual é o endereço de entrega? (rua, número, bairro, cidade)',
+      };
+    }
+
+    await this.conversationService.saveCustomerData(conversation.id, {
+      address,
+      delivery_type: 'delivery',
+    });
+
+    return {
+      needsMoreInfo: true,
+      message: 'Perfeito! Qual é o telefone para contato?',
+      nextState: 'collecting_phone',
+      collectedData: { address, delivery_type: 'delivery' },
+    };
+  }
+
+  private async collectPhone(
+    conversation: TypedConversation,
+    message: string,
+    customerData?: CustomerData,
+  ): Promise<CollectionStageResult> {
+    const phone = this.extractPhone(message);
+
+    if (!phone || !this.isValidPhone(phone)) {
+      return {
+        needsMoreInfo: true,
+        message: 'Qual é o seu telefone para contato?',
+      };
+    }
+
+    await this.conversationService.saveCustomerData(conversation.id, { phone });
+
+    return {
+      needsMoreInfo: true,
+      message: 'Tudo certo! Vamos ver seu pedido:',
+      nextState: 'confirming_order',
+      collectedData: { phone },
+    };
+  }
+
+  private async collectNotes(
+    conversation: TypedConversation,
+    message: string,
+    customerData?: CustomerData,
+  ): Promise<CollectionStageResult> {
+    await this.conversationService.saveCustomerData(conversation.id, { notes: message });
+
+    return {
+      needsMoreInfo: true,
+      message: 'Anotado! Vamos confirmar o pedido:',
+      nextState: 'confirming_order',
+      collectedData: { notes: message },
+    };
+  }
+
+  private extractName(message: string): string | null {
+    // Simple extraction - take the whole message as name if it looks valid
+    const candidate = message.trim();
+
+    if (candidate.length >= 2 && candidate.length <= 100) {
+      // Check for obvious non-name patterns
+      if (/^\d+$/.test(candidate)) return null;
+      if (candidate.includes('@')) return null;
+
+      return candidate;
+    }
+
+    return null;
+  }
+
+  private isValidName(name: string): boolean {
+    return name.length >= 2 && name.length <= 100;
+  }
+
+  private parseAddress(message: string): {
+    street: string;
+    number: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+  } | null {
+    // Simple address parsing
+    // Format: "Rua X, 123, Bairro, Cidade"
+    const parts = message.split(',').map((p) => p.trim());
+
+    if (parts.length < 2) return null;
+
+    const street = parts[0];
+    const numberMatch = parts[1].match(/^(\d+)/);
+    const number = numberMatch ? numberMatch[1] : parts[1];
+
+    return {
+      street,
+      number,
+      neighborhood: parts[2],
+      city: parts[3],
+    };
+  }
+
+  private extractPhone(message: string): string | null {
+    const digitsOnly = message.replace(/\D/g, '');
+
+    if (digitsOnly.length >= 10 && digitsOnly.length <= 11) {
+      return digitsOnly;
+    }
+
+    return null;
+  }
+
+  private isValidPhone(phone: string): boolean {
+    return phone.length >= 10 && phone.length <= 11;
+  }
+
+  private getDefaultShippingAmount(): number {
+    const raw = (this.config.get<string>('WHATSAPP_DEFAULT_SHIPPING_AMOUNT') || '').trim();
+    if (!raw) return DEFAULT_SHIPPING_AMOUNT;
+    const parsed = Number(raw.replace(',', '.'));
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_SHIPPING_AMOUNT;
+  }
+}

@@ -1,0 +1,589 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { CartService } from './cart.service';
+import { WhatsAppErrorHandler, ErrorContext } from './error-handler.service';
+import { ConversationService } from './conversation.service';
+import { ProductsService } from '../../products/products.service';
+import { TypedConversation, CustomerData } from '../types/whatsapp.types';
+
+export interface CartCommandResult {
+  handled: boolean;
+  response: string;
+  cartSummary?: string;
+}
+
+export interface CartContext {
+  hasCart: boolean;
+  itemCount: number;
+  totalValue: number;
+  expired: boolean;
+}
+
+const CART_COMMANDS = [
+  'carrinho',
+  'ver carrinho',
+  'mostrar carrinho',
+  'meu carrinho',
+  'remover',
+  'adicionar',
+  'add',
+  'tirar',
+  'limpar',
+  'esvaziar',
+  'confirmar',
+  'finalizar',
+  'pedir',
+];
+
+const ADD_INTENTS = [
+  'manda',
+  'quero',
+  'preciso',
+  'pedir',
+  'gostaria',
+  'me vê',
+  'me da',
+  'bota',
+  'coloca',
+];
+
+@Injectable()
+export class CartIntegrationService {
+  private readonly logger = new Logger(CartIntegrationService.name);
+
+  constructor(
+    private readonly cartService: CartService,
+    private readonly errorHandler: WhatsAppErrorHandler,
+    private readonly conversationService: ConversationService,
+    private readonly productsService: ProductsService,
+  ) {}
+
+  /**
+   * Verifica se a mensagem é um comando de carrinho
+   */
+  isCartCommand(message: string): boolean {
+    const lower = message.toLowerCase().trim();
+
+    // Verificar comandos diretos
+    for (const cmd of CART_COMMANDS) {
+      if (lower.includes(cmd)) {
+        return true;
+      }
+    }
+
+    // Verificar intenções de adicionar
+    for (const intent of ADD_INTENTS) {
+      if (lower.startsWith(intent)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Processa mensagem relacionada ao carrinho
+   */
+  async processCartCommand(
+    tenantId: string,
+    customerPhone: string,
+    message: string,
+    conversation?: TypedConversation,
+  ): Promise<CartCommandResult> {
+    const context: ErrorContext = { tenantId, customerPhone, action: 'cartCommand' };
+
+    try {
+      // Parse do comando
+      const parsed = this.parseCartCommand(message);
+
+      // Obter carrinho atual
+      const cart = await this.cartService.getOrCreateCart(tenantId, customerPhone);
+
+      // Processar baseado no tipo de comando
+      switch (parsed.action) {
+        case 'show':
+          return this.handleShowCart(cart);
+
+        case 'add':
+          if (!parsed.productName) {
+            return { handled: true, response: 'Qual produto você quer adicionar?' };
+          }
+          return await this.handleAddToCart(tenantId, customerPhone, parsed, cart);
+
+        case 'remove':
+          return this.handleRemoveFromCart(cart, parsed.productName);
+
+        case 'update':
+          return this.handleUpdateQuantity(cart, parsed.productName, parsed.quantity);
+
+        case 'clear':
+          return await this.handleClearCart(cart);
+
+        case 'confirm':
+          return this.handleConfirmOrder(cart, conversation);
+
+        case 'checkout':
+          return this.handleCheckout(cart, conversation);
+
+        default:
+          // Verificar se é uma intenção de adicionar produto
+          if (this.isAddProductIntent(message)) {
+            return await this.handleAddToCartFromIntent(tenantId, customerPhone, message, cart);
+          }
+
+          // Não é comando de carrinho
+          return { handled: false, response: '' };
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      const fallback = this.errorHandler.handleError(err, context);
+      return {
+        handled: true,
+        response: fallback.message,
+      };
+    }
+  }
+
+  /**
+   * Adiciona produto ao carrinho a partir do nome
+   */
+  async addProductByName(
+    tenantId: string,
+    customerPhone: string,
+    productName: string,
+    quantity: number = 1,
+  ): Promise<{ success: boolean; response: string; cart?: any }> {
+    try {
+      // Buscar produto
+      const product = await this.productsService.findByName(tenantId, productName);
+
+      if (!product) {
+        return {
+          success: false,
+          response: `Não encontrei "${productName}". Quer ver o cardápio?`,
+        };
+      }
+
+      // Verificar estoque
+      if (product.estoque === 0) {
+        return {
+          success: false,
+          response: `Desculpe, "${product.nome}" está fora de estoque no momento. Posso mostrar outras opções?`,
+        };
+      }
+
+      // Adicionar ao carrinho
+      const cart = await this.cartService.addItem({
+        tenantId,
+        customerPhone,
+        produtoId: product.id,
+        produtoName: product.nome,
+        quantity,
+        unitPrice: Number(product.preco),
+      });
+
+      // Gerar resposta
+      const response = this.buildAddedToCartMessage(product.nome, quantity, cart);
+
+      return {
+        success: true,
+        response,
+        cart,
+      };
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      const context: ErrorContext = { tenantId, customerPhone, action: 'addProduct' };
+      const fallback = this.errorHandler.handleError(err, context);
+      return {
+        success: false,
+        response: fallback.message,
+      };
+    }
+  }
+
+  /**
+   * Obtém contexto do carrinho para exibição
+   */
+  async getCartContext(tenantId: string, customerPhone: string): Promise<CartContext> {
+    try {
+      const cart = await this.cartService.getOrCreateCart(tenantId, customerPhone);
+      const now = new Date();
+
+      return {
+        hasCart: cart.items.length > 0,
+        itemCount: cart.items.length,
+        totalValue: Number(cart.total_amount),
+        expired: cart.expires_at < now,
+      };
+    } catch {
+      return {
+        hasCart: false,
+        itemCount: 0,
+        totalValue: 0,
+        expired: true,
+      };
+    }
+  }
+
+  /**
+   * Verifica se o cliente tem carrinho ativo
+   */
+  async hasActiveCart(tenantId: string, customerPhone: string): Promise<boolean> {
+    try {
+      const cart = await this.cartService.getOrCreateCart(tenantId, customerPhone);
+      return cart.items.length > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  // ============== HANDLERS DE COMANDOS ==============
+
+  private handleShowCart(cart: any): CartCommandResult {
+    const summary = this.cartService.generateSummary(cart);
+    return {
+      handled: true,
+      response: summary,
+      cartSummary: summary,
+    };
+  }
+
+  private async handleAddToCart(
+    tenantId: string,
+    customerPhone: string,
+    parsed: { productName?: string; quantity?: number },
+    cart: any,
+  ): Promise<CartCommandResult> {
+    const productName = parsed.productName;
+    const quantity = parsed.quantity ?? 1;
+
+    if (!productName) {
+      return {
+        handled: true,
+        response: 'Qual produto você quer adicionar?',
+      };
+    }
+
+    // Buscar produto
+    const products = await this.productsService.search(tenantId, productName);
+    const product = products.length > 0 ? products[0] : null;
+
+    if (!product) {
+      return {
+        handled: true,
+        response: `Não encontrei "${productName}". Quer ver o cardápio?`,
+      };
+    }
+
+    // Adicionar ao carrinho (assumindo estoque disponível)
+    await this.cartService.addItem({
+      tenantId,
+      customerPhone,
+      produtoId: product.id,
+      produtoName: product.name,
+      quantity: quantity,
+      unitPrice: Number(product.price),
+    });
+
+    // Atualizar carrinho e mostrar resumo
+    const updatedCart = await this.cartService.getOrCreateCart(tenantId, customerPhone);
+    const summary = this.cartService.generateSummary(updatedCart);
+
+    return {
+      handled: true,
+      response: this.buildAddedToCartMessage(product.name, quantity, updatedCart),
+      cartSummary: summary,
+    };
+  }
+
+  private handleRemoveFromCart(cart: any, productName?: string): CartCommandResult {
+    if (!productName) {
+      return {
+        handled: true,
+        response: 'Qual produto você quer remover?',
+      };
+    }
+
+    // Encontrar item no carrinho
+    const item = cart.items.find(
+      (i: any) => i.produto_name.toLowerCase().includes(productName.toLowerCase()),
+    );
+
+    if (!item) {
+      return {
+        handled: true,
+        response: `Não encontrei "${productName}" no carrinho.`,
+      };
+    }
+
+    // Remover item
+    this.cartService.removeItem(cart.id, item.produto_id);
+
+    return {
+      handled: true,
+      response: `Removido "${item.produto_name}" do carrinho.`,
+      cartSummary: this.cartService.generateSummary(cart),
+    };
+  }
+
+  private handleUpdateQuantity(
+    cart: any,
+    productName?: string,
+    quantity?: number,
+  ): CartCommandResult {
+    if (!productName) {
+      return {
+        handled: true,
+        response: 'Qual produto você quer alterar?',
+      };
+    }
+
+    if (quantity === undefined || quantity <= 0) {
+      return {
+        handled: true,
+        response: 'Qual quantidade você quer? (número positivo)',
+      };
+    }
+
+    const item = cart.items.find(
+      (i: any) => i.produto_name.toLowerCase().includes(productName.toLowerCase()),
+    );
+
+    if (!item) {
+      return {
+        handled: true,
+        response: `Não encontrei "${productName}" no carrinho.`,
+      };
+    }
+
+    this.cartService.updateItem(cart.id, item.produto_id, quantity);
+
+    return {
+      handled: true,
+      response: `Quantidade de "${item.produto_name}" atualizada para ${quantity}.`,
+    };
+  }
+
+  private async handleClearCart(cart: any): Promise<CartCommandResult> {
+    await this.cartService.clearCart(cart.id);
+
+    return {
+      handled: true,
+      response: '🛒 Carrinho esvaziado!\n\nQuando quiser adicionar algo, é só me dizer.',
+    };
+  }
+
+  private handleConfirmOrder(cart: any, conversation?: TypedConversation): CartCommandResult {
+    if (cart.items.length === 0) {
+      return {
+        handled: true,
+        response: '🛒 Seu carrinho está vazio! Adicione itens primeiro.',
+      };
+    }
+
+    // Verificar dados do cliente
+    const customerData = conversation?.context?.customer_data as CustomerData | undefined;
+
+    if (!customerData?.name) {
+      return {
+        handled: true,
+        response: 'Para confirmar o pedido, preciso do seu nome. Qual é?',
+      };
+    }
+
+    if (!customerData?.phone) {
+      return {
+        handled: true,
+        response: 'Qual é o seu telefone para contato?',
+      };
+    }
+
+    // Gerar resumo para confirmação
+    const summary = this.cartService.generateSummary(cart);
+
+    return {
+      handled: true,
+      response: `📋 *Confirme seu pedido:*\n\n${summary}\n\n` +
+        `👤 Cliente: ${customerData.name}\n` +
+        `📱 Telefone: ${customerData.phone}\n\n` +
+        `Confirma? (sim/não)`,
+    };
+  }
+
+  private handleCheckout(cart: any, conversation?: TypedConversation): CartCommandResult {
+    if (cart.items.length === 0) {
+      return {
+        handled: true,
+        response: '🛒 Seu carrinho está vazio!',
+      };
+    }
+
+    const summary = this.cartService.generateSummary(cart);
+
+    return {
+      handled: true,
+      response: `💳 *Pagamento:*\n\n${summary}\n\n` +
+        `Formas de pagamento:\n` +
+        `• PIX (à vista)\n` +
+        `• Cartão (à vista ou parcelado)\n` +
+        `• Dinheiro (precisa informar se tem troco)\n\n` +
+        `Como prefere pagar?`,
+    };
+  }
+
+  private async handleAddToCartFromIntent(
+    tenantId: string,
+    customerPhone: string,
+    message: string,
+    cart: any,
+  ): Promise<CartCommandResult> {
+    // Parse mensagem tipo "manda 2 brigadeiros"
+    const parsed = this.parseAddIntent(message);
+
+    if (!parsed.productName) {
+      return { handled: false, response: '' };
+    }
+
+    // Buscar produto
+    const products = await this.productsService.search(tenantId, parsed.productName);
+    const product = products.length > 0 ? products[0] : null;
+
+    if (!product) {
+      return {
+        handled: true,
+        response: `Não entendi. Quer ver o cardápio?`,
+      };
+    }
+
+    // Adicionar
+    await this.cartService.addItem({
+      tenantId,
+      customerPhone,
+      produtoId: product.id,
+      produtoName: product.name,
+      quantity: parsed.quantity,
+      unitPrice: Number(product.price),
+    });
+
+    const updatedCart = await this.cartService.getOrCreateCart(tenantId, customerPhone);
+
+    return {
+      handled: true,
+      response: this.buildAddedToCartMessage(product.name, parsed.quantity, updatedCart),
+    };
+  }
+
+  // ============== PARSERS ==============
+
+  private parseCartCommand(message: string): {
+    action: 'show' | 'add' | 'remove' | 'update' | 'clear' | 'confirm' | 'checkout' | 'unknown';
+    productName?: string;
+    quantity?: number;
+  } {
+    const lower = message.toLowerCase().trim();
+
+    // Comandos de mostrar
+    if (lower.includes('carrinho') && !lower.includes('adicionar') && !lower.includes('remover')) {
+      return { action: 'show' };
+    }
+
+    // Comandos de adicionar
+    if (lower.startsWith('adicionar') || lower.startsWith('add ') || lower.startsWith('addicionar ')) {
+      const match = lower.match(/^(?:adicionar|add|addicionar)\s+(?:(\d+)\s+)?(.+)$/);
+      return {
+        action: 'add',
+        productName: match ? match[2].trim() : undefined,
+        quantity: match && match[1] ? parseInt(match[1], 10) : 1,
+      };
+    }
+
+    // Comandos de remover
+    if (lower.startsWith('remover') || lower.startsWith('tirar') || lower.startsWith('delete ')) {
+      const match = lower.match(/^(?:remover|tirar|delete)\s+(.+)$/);
+      return {
+        action: 'remove',
+        productName: match ? match[1].trim() : undefined,
+      };
+    }
+
+    // Comandos de quantidade
+    if (lower.startsWith('quantidade') || lower.startsWith('qtd ')) {
+      const match = lower.match(/^(?:quantidade|qtd)\s+(.+?)\s+(\d+)$/);
+      return {
+        action: 'update',
+        productName: match ? match[1].trim() : undefined,
+        quantity: match ? parseInt(match[2], 10) : undefined,
+      };
+    }
+
+    // Comandos de limpar
+    if (lower.includes('limpar') || lower.includes('esvaziar')) {
+      return { action: 'clear' };
+    }
+
+    // Comandos de confirmar
+    if (lower === 'confirmar' || lower === 'finalizar' || lower === 'confirmo') {
+      return { action: 'confirm' };
+    }
+
+    // Comandos de checkout
+    if (lower === 'checkout' || lower === 'pagar' || lower === 'pagamento') {
+      return { action: 'checkout' };
+    }
+
+    return { action: 'unknown' };
+  }
+
+  private parseAddIntent(message: string): { productName: string; quantity: number } {
+    const lower = message.toLowerCase().trim();
+
+    // Padrão: "manda 2 brigadeiros"
+    const match1 = lower.match(/^(?:manda|quero|preciso|gostaria|bota|coloca)\s+(\d+)?\s*(.+)$/);
+    if (match1) {
+      return {
+        quantity: match1[1] ? parseInt(match1[1], 10) : 1,
+        productName: match1[2].trim(),
+      };
+    }
+
+    // Padrão: "2 brigadeiros"
+    const match2 = lower.match(/^(\d+)\s+(.+)$/);
+    if (match2) {
+      return {
+        quantity: parseInt(match2[1], 10),
+        productName: match2[2].trim(),
+      };
+    }
+
+    return { productName: message, quantity: 1 };
+  }
+
+  private isAddProductIntent(message: string): boolean {
+    const lower = message.toLowerCase().trim();
+
+    for (const intent of ADD_INTENTS) {
+      if (lower.startsWith(intent)) {
+        return true;
+      }
+    }
+
+    // Também aceitar padrões como "2 brigadeiros"
+    const match = lower.match(/^\d+\s+.+$/);
+    if (match) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // ============== HELPERS ==============
+
+  private buildAddedToCartMessage(productName: string, quantity: number, cart: any): string {
+    const itemTotal = quantity * cart.items.find((i: any) => i.produto_name === productName)?.unit_price || 0;
+
+    let response = `✅ Adicionado ${quantity}x ${productName} (R$ ${itemTotal.toFixed(2)})\n\n`;
+
+    response += this.cartService.generateSummary(cart);
+
+    return response;
+  }
+}
