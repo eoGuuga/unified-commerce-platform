@@ -32,12 +32,11 @@ async function bootstrap() {
   });
 
   console.log('[Bootstrap] Criando aplicação NestJS...');
-  try {
-    const app = await NestFactory.create(AppModule, {
-      logger: new StructuredLogger(),
-    });
-    console.log('[Bootstrap] Aplicação criada com sucesso!');
-    console.log('[Bootstrap] Continuando inicialização...');
+  const app = await NestFactory.create(AppModule, {
+    logger: new StructuredLogger(),
+  });
+  console.log('[Bootstrap] Aplicação criada com sucesso!');
+  console.log('[Bootstrap] Continuando inicialização...');
 
   const isProd = process.env.NODE_ENV === 'production';
   const enableSwagger = !isProd || process.env.ENABLE_SWAGGER === 'true';
