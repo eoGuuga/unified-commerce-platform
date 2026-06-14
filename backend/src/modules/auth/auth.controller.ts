@@ -5,7 +5,7 @@ import { RegisterDto } from './dto/register.dto';
 import { SendConfirmationDto, ConfirmEmailDto } from './dto/email-confirmation.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtAuthGuardProd } from './guards/jwt-auth-prod.guard';
-import { Public } from '../../../common/decorators/public.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from './decorators/user.decorator';
 import { Usuario } from '../../database/entities/Usuario.entity';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
