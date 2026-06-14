@@ -13,7 +13,6 @@ import { DbContextService } from '../common/services/db-context.service';
 export interface SendConfirmationResponse {
   success: boolean;
   message: string;
-  code?: string;
 }
 
 export interface ConfirmEmailResponse {
@@ -219,8 +218,15 @@ export class AuthService {
       });
 
       if (!user) {
-        return { success: false, message: 'Usuario nao encontrado' };
+        // Mesma mensagem para evitar enumeração de usuários
+        return { success: false, message: 'Codigo enviado' };
       }
+
+      // Invalidar códigos anteriores não usados
+      await this.usuariosRepository.query(
+        'UPDATE email_confirmations SET used=true WHERE user_id=$1 AND used=false',
+        [user.id],
+      );
 
       // Inserir no banco
       await this.usuariosRepository.query(
@@ -228,9 +234,9 @@ export class AuthService {
         [user.id, code, expiresAt],
       );
 
-      this.logger.log(`[EMAIL] Codigo para ${email}: ${code}`);
+      this.logger.log(`[EMAIL] Codigo enviado para ${email}`);
 
-      return { success: true, message: 'Codigo enviado', code };
+      return { success: true, message: 'Codigo enviado' };
     } catch (error) {
       this.logger.error('Erro ao enviar codigo de confirmacao', {
         error: error instanceof Error ? error.message : String(error),
@@ -246,7 +252,8 @@ export class AuthService {
       });
 
       if (!user) {
-        return { success: false, message: 'Usuario nao encontrado' };
+        // Mesma mensagem para evitar enumeração de usuários
+        return { success: false, message: 'Codigo invalido ou expirado' };
       }
 
       const confirmations = await this.usuariosRepository.query(

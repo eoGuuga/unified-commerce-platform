@@ -481,7 +481,7 @@ export class WhatsAppCartController {
    * Assert product belongs to tenant
    */
   private async assertProductBelongsToTenant(tenantId: string, productId: string): Promise<void> {
-    const product = await this.productsService.findOne(productId);
+    const product = await this.productsService.findOne(productId, tenantId);
 
     if (!product) {
       throw new BadRequestException('Product not found');
@@ -513,8 +513,8 @@ export class WhatsAppCartController {
     const customerPhone = body.customerPhone as string;
     const productId = body.productId as string;
     const productName = body.productName as string | undefined;
-    const quantity = body.quantity;
-    const unitPrice = body.unitPrice as number | undefined;
+    const quantity = body.quantity as number;
+    const unitPrice = typeof body.unitPrice === 'number' ? body.unitPrice as number : undefined;
 
     if (!tenantId) throw new BadRequestException('Tenant ID required');
     if (!customerPhone) throw new BadRequestException('Customer phone required');
@@ -537,7 +537,7 @@ export class WhatsAppCartController {
     const tenantId = body.tenantId as string;
     const customerPhone = body.customerPhone as string;
     const productId = body.productId as string;
-    const quantity = body.quantity;
+    const quantity = body.quantity as number;
 
     if (!tenantId) throw new BadRequestException('Tenant ID required');
     if (!customerPhone) throw new BadRequestException('Customer phone required');
