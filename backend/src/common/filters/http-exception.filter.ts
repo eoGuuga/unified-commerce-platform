@@ -13,6 +13,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
 
   catch(exception: unknown, host: ArgumentsHost) {
+    console.log('[HttpExceptionFilter] ===== EXCEPTION CAUGHT =====');
+    console.log('[HttpExceptionFilter] Exception type:', typeof exception);
+    console.log('[HttpExceptionFilter] Exception:', JSON.stringify(exception, null, 2));
+    if (exception instanceof Error) {
+      console.log('[HttpExceptionFilter] Stack:', exception.stack);
+    }
+    console.log('[HttpExceptionFilter] ==============================');
+
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
