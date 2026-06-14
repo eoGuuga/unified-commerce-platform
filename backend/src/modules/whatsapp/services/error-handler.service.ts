@@ -71,32 +71,43 @@ export class WhatsAppErrorHandler {
   private readonly retryConfig: RetryConfig;
 
   constructor(retryConfig?: Partial<RetryConfig>) {
+    console.log('[WhatsAppErrorHandler] Constructor called with:', retryConfig);
     this.retryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
+    console.log('[WhatsAppErrorHandler] Initialized successfully');
   }
 
   /**
    * Trata erro e retorna resposta apropriada
    */
   handleError(error: Error, context: ErrorContext): FallbackResponse {
-    const errorType = this.classifyError(error);
-    const errorMessage = ERROR_MESSAGES[errorType] || ERROR_MESSAGES.UNKNOWN_ERROR;
+    console.log('[WhatsAppErrorHandler] handleError called', { error: error?.message, context });
+    try {
+      const errorType = this.classifyError(error);
+      const errorMessage = ERROR_MESSAGES[errorType] || ERROR_MESSAGES.UNKNOWN_ERROR;
 
-    // Log do erro com contexto
-    this.logError(error, context, errorType);
+      // Log do erro com contexto
+      this.logError(error, context, errorType);
 
-    // Determinar se deve fazer retry
-    const shouldRetry = this.shouldRetry(error);
-    const retryAfterMs = shouldRetry ? this.calculateRetryDelay(error) : undefined;
+      // Determinar se deve fazer retry
+      const shouldRetry = this.shouldRetry(error);
+      const retryAfterMs = shouldRetry ? this.calculateRetryDelay(error) : undefined;
 
-    // Determinar se deve escalar para humano
-    const shouldEscalate = this.shouldEscalate(error);
+      // Determinar se deve escalar para humano
+      const shouldEscalate = this.shouldEscalate(error);
 
-    return {
-      message: errorMessage,
-      shouldRetry,
-      retryAfterMs,
-      escalate: shouldEscalate,
-    };
+      return {
+        message: errorMessage,
+        shouldRetry,
+        retryAfterMs,
+        escalate: shouldEscalate,
+      };
+    } catch (e) {
+      console.error('[WhatsAppErrorHandler] Error in handleError:', e);
+      return {
+        message: ERROR_MESSAGES.UNKNOWN_ERROR,
+        shouldRetry: false,
+      };
+    }
   }
 
   /**
