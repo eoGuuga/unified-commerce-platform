@@ -9,9 +9,7 @@ import { databaseConfig } from './config/database.config';
 import { ProductsModule } from './modules/products/products.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { AuthModule } from './modules/auth/auth.module';
-// IMPORTANTE: WhatsAppModule comentarios temporariamente para debug
-// TODO: Restaurar apos corrigir problema de inicializacao
-// import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
+import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { HealthModule } from './modules/health/health.module';
@@ -50,8 +48,7 @@ import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
     ProductsModule,
     OrdersModule,
     AuthModule,
-    // WhatsAppModule desabilitado temporariamente
-    // WhatsAppModule,
+    WhatsappModule,
     PaymentsModule,
     NotificationsModule,
     HealthModule,
