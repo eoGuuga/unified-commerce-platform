@@ -4,10 +4,22 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
+import { EmailConfirmation } from '../../database/entities/EmailConfirmation.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { DbContextService } from '../common/services/db-context.service';
+
+export interface SendConfirmationResponse {
+  success: boolean;
+  message: string;
+  code?: string;
+}
+
+export interface ConfirmEmailResponse {
+  success: boolean;
+  message: string;
+}
 
 export interface JwtPayload {
   sub: string; // user id
@@ -195,5 +207,79 @@ export class AuthService {
     }
 
     return usuario;
+  }
+
+  async sendConfirmationEmail(email: string): Promise<SendConfirmationResponse> {
+    try {
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+
+      const user = await this.usuariosRepository.findOne({
+        where: { email },
+      });
+
+      if (!user) {
+        return { success: false, message: 'Usuario nao encontrado' };
+      }
+
+      // Inserir no banco
+      await this.usuariosRepository.query(
+        'INSERT INTO email_confirmations (user_id, code, expires_at) VALUES ($1, $2, $3)',
+        [user.id, code, expiresAt],
+      );
+
+      this.logger.log(`[EMAIL] Codigo para ${email}: ${code}`);
+
+      return { success: true, message: 'Codigo enviado', code };
+    } catch (error) {
+      this.logger.error('Erro ao enviar codigo de confirmacao', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { success: false, message: 'Erro ao enviar codigo' };
+    }
+  }
+
+  async confirmEmailCode(email: string, code: string): Promise<ConfirmEmailResponse> {
+    try {
+      const user = await this.usuariosRepository.findOne({
+        where: { email },
+      });
+
+      if (!user) {
+        return { success: false, message: 'Usuario nao encontrado' };
+      }
+
+      const confirmations = await this.usuariosRepository.query(
+        'SELECT * FROM email_confirmations WHERE user_id=$1 AND code=$2 AND used=false AND expires_at>NOW() ORDER BY created_at DESC LIMIT 1',
+        [user.id, code],
+      );
+
+      if (!confirmations || confirmations.length === 0) {
+        return { success: false, message: 'Codigo invalido ou expirado' };
+      }
+
+      const confirmation = confirmations[0];
+
+      // Marcar como usado
+      await this.usuariosRepository.query(
+        'UPDATE email_confirmations SET used=true WHERE id=$1',
+        [confirmation.id],
+      );
+
+      // Marcar email como confirmado
+      await this.usuariosRepository.query(
+        'UPDATE usuarios SET email_confirmed=true WHERE id=$1',
+        [user.id],
+      );
+
+      this.logger.log(`[EMAIL] Email ${email} confirmado com sucesso`);
+
+      return { success: true, message: 'Email confirmado com sucesso' };
+    } catch (error) {
+      this.logger.error('Erro ao confirmar email', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { success: false, message: 'Erro ao confirmar email' };
+    }
   }
 }

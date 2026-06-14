@@ -15,6 +15,7 @@ import { WhatsappMessage } from '../database/entities/WhatsappMessage.entity';
 import { AuditLog } from '../database/entities/AuditLog.entity';
 import { Pagamento } from '../database/entities/Pagamento.entity';
 import { CupomDesconto } from '../database/entities/CupomDesconto.entity';
+import { EmailConfirmation } from '../database/entities/EmailConfirmation.entity';
 
 export const databaseConfig: TypeOrmModuleAsyncOptions = {
   inject: [ConfigService],
@@ -37,6 +38,7 @@ export const databaseConfig: TypeOrmModuleAsyncOptions = {
       AuditLog,
       Pagamento,
       CupomDesconto,
+      EmailConfirmation,
     ],
     synchronize: false, // Desabilitado - usar migrations
     logging: config.get('NODE_ENV') === 'development',

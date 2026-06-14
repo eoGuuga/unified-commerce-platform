@@ -1,9 +1,11 @@
 import { Controller, Post, Body, UseGuards, Get, Request, BadRequestException } from '@nestjs/common';
-import { AuthService, LoginResponse } from './auth.service';
+import { AuthService, LoginResponse, SendConfirmationResponse, ConfirmEmailResponse } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { SendConfirmationDto, ConfirmEmailDto } from './dto/email-confirmation.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtAuthGuardProd } from './guards/jwt-auth-prod.guard';
+import { Public } from '../../../common/decorators/public.decorator';
 import { CurrentUser } from './decorators/user.decorator';
 import { Usuario } from '../../database/entities/Usuario.entity';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
@@ -35,7 +37,7 @@ export class AuthController {
   }
 
   @Post('register')
-  @UseGuards(JwtAuthGuardProd)
+  @Public()
   // Evita criacao massiva de contas.
   @Throttle({ strict: { ttl: 60000, limit: 3 } })
   @ApiOperation({
@@ -61,6 +63,28 @@ export class AuthController {
     }
 
     return this.authService.register(registerDto, tenantId);
+  }
+
+  @Post('send-confirmation')
+  @Public()
+  @Throttle({ strict: { ttl: 60000, limit: 3 } })
+  @ApiOperation({ summary: 'Enviar codigo de confirmacao de email' })
+  @ApiResponse({ status: 200, description: 'Codigo enviado' })
+  @ApiResponse({ status: 400, description: 'Erro ao enviar codigo' })
+  async sendConfirmationCode(
+    @Body() dto: SendConfirmationDto,
+  ): Promise<SendConfirmationResponse> {
+    return this.authService.sendConfirmationEmail(dto.email);
+  }
+
+  @Post('confirm-email')
+  @Public()
+  @Throttle({ strict: { ttl: 60000, limit: 10 } })
+  @ApiOperation({ summary: 'Confirmar email com codigo' })
+  @ApiResponse({ status: 200, description: 'Email confirmado' })
+  @ApiResponse({ status: 400, description: 'Codigo invalido ou expirado' })
+  async confirmEmailCode(@Body() dto: ConfirmEmailDto): Promise<ConfirmEmailResponse> {
+    return this.authService.confirmEmailCode(dto.email, dto.code);
   }
 
   @Get('me')
