@@ -273,22 +273,72 @@ export class WhatsAppService {
 
   /**
    * Envia resposta de saída (para o provider WhatsApp)
+   * Suporta mensagens de texto, botões interativos e listas
    */
   async sendOutboundResponse(to: string, response: WhatsAppOutboundResponse): Promise<void> {
     try {
-      const messageContent = typeof response === 'string'
-        ? response
-        : response.previewText || '';
-
-      if (!messageContent.trim()) {
+      // Caso 1: Resposta é texto simples
+      if (typeof response === 'string') {
+        if (!response.trim()) return;
+        this.logger.log('Enviando mensagem de texto', { to, preview: response.substring(0, 50) });
+        // TODO: Usar EvolutionApiProvider.sendMessage() quando configurado
         return;
       }
 
-      // TODO: Integrar com Evolution API / Twilio
-      this.logger.log('Sending outbound response', {
-        to,
-        preview: messageContent.substring(0, 50),
-      });
+      // Caso 2: Resposta com botões interativos
+      if (response.kind === 'interactive_with_buttons') {
+        this.logger.log('Enviando mensagem com botões', {
+          to,
+          preview: response.previewText,
+          buttonsCount: response.buttons.length,
+        });
+        // TODO: Usar EvolutionApiProvider.sendInteractiveButtons()
+        return;
+      }
+
+      // Caso 3: Resposta com lista interativa
+      if (response.kind === 'interactive_list') {
+        this.logger.log('Enviando lista interativa', {
+          to,
+          preview: response.previewText,
+          sectionsCount: response.list.sections?.length || 0,
+        });
+        // TODO: Usar EvolutionApiProvider.sendInteractiveList()
+        return;
+      }
+
+      // Caso 4: Resposta de pedido
+      if (response.kind === 'interactive_order') {
+        this.logger.log('Enviando detalhes do pedido', {
+          to,
+          orderId: response.orderId,
+        });
+        return;
+      }
+
+      // Caso 5: Resposta de produto
+      if (response.kind === 'interactive_product') {
+        this.logger.log('Enviando card de produto', {
+          to,
+          product: response.product?.name,
+        });
+        return;
+      }
+
+      // Caso 6: Resposta de boas-vindas
+      if (response.kind === 'interactive_welcome') {
+        this.logger.log('Enviando mensagem de boas-vindas', {
+          to,
+          preview: response.previewText,
+        });
+        return;
+      }
+
+      // Fallback: texto
+      const preview = (response as any).previewText || '';
+      if (preview.trim()) {
+        this.logger.log('Enviando resposta (fallback)', { to, preview: preview.substring(0, 50) });
+      }
 
     } catch (error) {
       this.logger.error('Failed to send outbound response', { error, to });

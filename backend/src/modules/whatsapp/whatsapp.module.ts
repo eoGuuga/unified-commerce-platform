@@ -33,6 +33,8 @@ import { ResponseBuilderService } from './services/response-builder.service';
 import { NLPService } from './services/nlp.service';
 import { SalesOrchestratorService } from './services/sales-orchestrator.service';
 import { InteractiveMessageService } from './services/interactive-message.service';
+import { EvolutionApiProvider } from './providers/evolution-api.provider';
+import { MockWhatsappProvider } from './providers/mock-whatsapp.provider';
 
 // Entities
 import { WhatsappConversation } from '../../database/entities/WhatsappConversation.entity';
@@ -98,6 +100,10 @@ import { CommonModule } from '../common/common.module';
     NLPService,
     SalesOrchestratorService,
     InteractiveMessageService,
+
+    // WhatsApp Providers (botões interativos)
+    EvolutionApiProvider,
+    MockWhatsappProvider,
 
     // Service principal
     WhatsappService,

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   IWhatsappProvider,
   SendMessageOptions,
+  SendListOptions,
   ReceivedMessage,
 } from './whatsapp-provider.interface';
 
@@ -40,6 +41,56 @@ export class MockWhatsappProvider implements IWhatsappProvider {
     });
 
     this.logger.debug(`[MOCK] Message ID: ${messageId}`);
+
+    return messageId;
+  }
+
+  /**
+   * Envia mensagem com botões interativos (mock)
+   */
+  async sendInteractiveButtons(options: SendMessageOptions): Promise<string> {
+    const messageId = `mock_buttons_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    this.logger.log(
+      `[MOCK] WhatsApp Buttons → ${options.to}: ${options.body.substring(0, 50)}...`
+    );
+
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    const buttonsText = options.buttons
+      ?.map(b => `[${b.title}]`)
+      .join(' ') || '';
+
+    this.sentMessages.push({
+      to: options.to,
+      message: `${options.body}\n\nBotões: ${buttonsText}`,
+      timestamp: new Date(),
+    });
+
+    return messageId;
+  }
+
+  /**
+   * Envia mensagem com lista interativa (mock)
+   */
+  async sendInteractiveList(options: SendListOptions): Promise<string> {
+    const messageId = `mock_list_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    this.logger.log(
+      `[MOCK] WhatsApp List → ${options.to}: ${options.body.substring(0, 50)}...`
+    );
+
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    const sectionsText = options.listSections.sections
+      .map(s => `\n${s.title}:\n${s.rows.map(r => `  • ${r.title} - ${r.description || ''}`).join('\n')}`)
+      .join('');
+
+    this.sentMessages.push({
+      to: options.to,
+      message: `${options.body}\n\nLista:${sectionsText}`,
+      timestamp: new Date(),
+    });
 
     return messageId;
   }

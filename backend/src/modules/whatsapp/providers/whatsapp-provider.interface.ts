@@ -5,6 +5,24 @@ export interface SendMessageOptions {
   buttons?: Array<{ id: string; title: string }>;
 }
 
+export interface ListSection {
+  title: string;
+  rows: Array<{
+    id: string;
+    title: string;
+    description?: string;
+  }>;
+}
+
+export interface SendListOptions extends SendMessageOptions {
+  listSections: {
+    title?: string;
+    footer?: string;
+    buttonText?: string;
+    sections: ListSection[];
+  };
+}
+
 export interface ReceivedMessage {
   from: string;
   body: string;
@@ -19,6 +37,16 @@ export interface IWhatsappProvider {
    * Envia mensagem de texto
    */
   sendMessage(options: SendMessageOptions): Promise<string>;
+
+  /**
+   * Envia mensagem com botões interativos (Reply Buttons)
+   */
+  sendInteractiveButtons(options: SendMessageOptions): Promise<string>;
+
+  /**
+   * Envia mensagem com lista interativa (Interactive List)
+   */
+  sendInteractiveList(options: SendListOptions): Promise<string>;
 
   /**
    * Envia mensagem com mídia (imagem, QR Code, etc)
