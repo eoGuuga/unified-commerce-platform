@@ -421,6 +421,44 @@ export class WhatsAppService {
       return this.handleCheckout(tenantId, customerPhone);
     }
 
+    // Verificar intenção de ver preço
+    if (lower.includes('quanto') || lower.includes('preço') || lower.includes('valor')) {
+      const productName = lower
+        .replace(/quanto[cs]?/gi, '')
+        .replace(/custa/gi, '')
+        .replace(/preço/gi, '')
+        .replace(/valor/gi, '')
+        .replace(/do[s]?\s*/gi, '')
+        .replace(/da[s]?\s*/gi, '')
+        .trim();
+
+      if (productName && productName.length > 2) {
+        const products = await this.productsService.search(tenantId, productName);
+        if (products.length > 0) {
+          const product = products[0];
+          return `💰 *${product.name}*\n\nPreço: R$ ${Number(product.price).toFixed(2)}\n\nQuer adicionar ao carrinho?`;
+        }
+      }
+    }
+
+    // Verificar intenção de disponibilidade ("tem", "tem disponível")
+    if (lower.includes('tem') || lower.includes('disponível') || lower.includes('disponivel')) {
+      const productName = lower
+        .replace(/tem\s*/gi, '')
+        .replace(/dispon[íi]vel/gi, '')
+        .replace(/voc[êe]\s*/gi, '')
+        .trim();
+
+      if (productName && productName.length > 2) {
+        const products = await this.productsService.search(tenantId, productName);
+        if (products.length > 0) {
+          const product = products[0];
+          return `✅ Sim! Temos *${product.name}* disponível por R$ ${Number(product.price).toFixed(2)}!\n\nQuer adicionar ao carrinho?`;
+        }
+        return `😕 Não encontramos "${productName}" no momento. Que tal ver nosso cardápio?`;
+      }
+    }
+
     // Verificar se é intenção de adicionar produto
     const addKeywords = ['adicionar', 'colocar', 'add', 'quero esse', 'quero este', 'comprar'];
     const isAddIntent = addKeywords.some(k => lower.includes(k));
@@ -448,9 +486,9 @@ export class WhatsAppService {
               quantity: 1,
               unitPrice: Number(product.price),
             });
-            return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao seu carrinho!`;
+            return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao seu carrinho!\n\nDigite "carrinho" para ver ou "finalizar" para confirmar.`;
           } else {
-            return `😕 Não encontrei nenhum produto chamado "${productName}". Tente "ver produtos" para ver o cardápio.`;
+            return `😕 Não encontrei "${productName}". Digite "ver produtos" para ver o cardápio!`;
           }
         }
       } catch (error) {
@@ -693,13 +731,25 @@ export class WhatsAppService {
     message: string,
     conversation: TypedConversation,
   ): Promise<WhatsAppOutboundResponse> {
-    if (this.isProductIntent(message)) {
-      return await this.handleCart(
-        tenantId,
-        conversation.customer_phone,
-        message,
-        conversation,
-      );
+    const lower = message.toLowerCase().trim();
+
+    // Tentar encontrar produto se a mensagem parecer ser sobre um
+    if (this.isProductIntent(message) || lower.length > 3) {
+      try {
+        const products = await this.productsService.search(tenantId, message);
+        if (products.length > 0) {
+          const product = products[0];
+          return [
+            `🍫 *${product.name}* - R$ ${Number(product.price).toFixed(2)}`,
+            '',
+            product.description || '',
+            '',
+            'Digite "adicionar ' + product.name.split(' ')[0] + '" para colocar no carrinho!',
+          ].join('\n');
+        }
+      } catch (e) {
+        // Continua para fallback
+      }
     }
 
     try {
@@ -725,7 +775,19 @@ export class WhatsAppService {
       return executionResult.response;
     } catch (error) {
       this.logger.warn('LLM fallback failed', { error, message });
-      return this.responseBuilder.buildHelpMessage();
+
+      // Resposta amigável quando não entende
+      const suggestions = [
+        '🛒 Digite "ver produtos" para ver o cardápio',
+        '❓ Digite "ajuda" para ver todos os comandos',
+        '🛍️ Ou me diga o que você quer!',
+      ];
+
+      return [
+        '🤔 Não entendi bem...',
+        '',
+        suggestions[Math.floor(Math.random() * suggestions.length)],
+      ].join('\n');
     }
   }
 
