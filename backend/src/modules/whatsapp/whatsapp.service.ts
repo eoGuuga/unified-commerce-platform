@@ -949,6 +949,73 @@ export class WhatsAppService {
       this.logger.warn('Failed to track message metrics', { error });
     }
   }
+
+  /**
+   * Retorna métricas do bot para um tenant
+   */
+  async getAnalytics(tenantId: string, startDate: Date): Promise<any> {
+    try {
+      // Buscar métricas básicas do banco
+      const repo = this.analytics['db'].getRepository('WhatsappMessageMetrics');
+      const totalMessages = await repo.count({
+        where: {
+          tenant_id: tenantId,
+          created_at: startDate as any,
+        },
+      });
+
+      // Buscar pedidos do período
+      const ordersRepo = this.ordersService['pedidosRepository'];
+      const totalOrders = await ordersRepo?.count({
+        where: {
+          tenant_id: tenantId,
+          created_at: startDate as any,
+        },
+      }) || 0;
+
+      // Buscar carrinhos
+      const cartRepo = this.cartService['dataSource'].getRepository('WhatsAppCart');
+      const totalCarts = await cartRepo?.count({
+        where: {
+          tenant_id: tenantId,
+        },
+      }) || 0;
+
+      const convertedCarts = await cartRepo?.count({
+        where: {
+          tenant_id: tenantId,
+          status: 'converted',
+        },
+      }) || 0;
+
+      return {
+        period: {
+          start: startDate.toISOString(),
+          end: new Date().toISOString(),
+        },
+        conversations: {
+          total_messages: totalMessages || 0,
+          unique_customers: 0,
+        },
+        sales: {
+          total_orders: totalOrders || 0,
+          total_carts: totalCarts || 0,
+          converted_carts: convertedCarts || 0,
+          conversion_rate: totalCarts > 0 ? ((convertedCarts / totalCarts) * 100).toFixed(2) + '%' : '0%',
+        },
+        status: 'analytics_enabled',
+      };
+    } catch (error) {
+      this.logger.error('Error fetching analytics', { error, tenantId });
+      return {
+        error: 'Failed to fetch analytics',
+        period: {
+          start: startDate.toISOString(),
+          end: new Date().toISOString(),
+        },
+      };
+    }
+  }
 }
 
 // Alias para compatibilidade com código legacy

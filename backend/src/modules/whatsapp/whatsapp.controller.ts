@@ -470,4 +470,28 @@ export class WhatsappController {
   health() {
     return { status: 'ok', bot: 'WhatsApp Bot is running' };
   }
+
+  @Get('metrics')
+  @ApiOperation({ summary: 'Métricas do bot WhatsApp' })
+  @ApiResponse({ status: 200, description: 'Métricas retornadas com sucesso' })
+  async getMetrics(
+    @Query('tenantId') tenantId: string,
+    @Query('days') days: string = '7',
+  ) {
+    if (!tenantId) {
+      throw new BadRequestException('tenantId é obrigatório');
+    }
+
+    const daysNum = parseInt(days, 10) || 7;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysNum);
+
+    const metrics = await this.whatsappService.getAnalytics(tenantId, startDate);
+
+    return {
+      success: true,
+      period_days: daysNum,
+      metrics,
+    };
+  }
 }
