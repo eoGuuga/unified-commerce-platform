@@ -69,34 +69,18 @@ import { CommonModule } from '../common/common.module';
   controllers: [WhatsappController, WhatsAppCartController],
   providers: [
     // Services existentes
-    WhatsappService,
-    OpenAIService,
-    MessageIntelligenceService,
-    ConversationalIntelligenceService,
-    ConversationPlannerService,
-    SalesIntelligenceService,
-    SalesPlaybookService,
-    SalesSegmentStrategyService,
-    SalesVerticalPackService,
-    CatalogSalesContextService,
-    ProductOfferIntelligenceService,
-    ConversationService,
-    LLMRouterService,
-    ActionExecutorService,
-    BotConfigService,
-
-    // NOVOS SERVICES - FASE 1 (Arquitetura)
-    CartService,
-    WhatsAppErrorHandler,
-    WhatsAppAnalyticsService,
-    ConversationManagerService,
+    // TODO: Restaurar apos debug
+    // WhatsappService,
+    // WhatsAppErrorHandler,
+    // WhatsAppAnalyticsService,
+    // ConversationManagerService,
 
     // NOVOS SERVICES - FASE 3 (Refatoração)
-    MessageProcessorService,
-    CatalogManagerService,
-    ResponseBuilderService,
-    NLPService,
-    SalesOrchestratorService,
+    // MessageProcessorService,
+    // CatalogManagerService,
+    // ResponseBuilderService,
+    // NLPService,
+    // SalesOrchestratorService,
   ],
   exports: [
     // Services existentes
