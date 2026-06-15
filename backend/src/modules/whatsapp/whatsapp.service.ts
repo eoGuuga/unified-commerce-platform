@@ -159,6 +159,33 @@ export class WhatsAppService {
         message.from,
       );
 
+      // 6.1 Verificar timeout de conversa (5 minutos de inatividade)
+      const TIMEOUT_MINUTES = 5;
+      const lastMessageTime = conversation.last_message_at;
+      const now = new Date();
+      const minutesSinceLastMessage = (now.getTime() - new Date(lastMessageTime).getTime()) / (1000 * 60);
+
+      if (minutesSinceLastMessage > TIMEOUT_MINUTES && conversation.context?.state !== 'idle') {
+        // Conversa expirou - reiniciar com mensagem amigável
+        await this.conversationService.updateContext(conversation.id, {
+          state: 'idle',
+          customer_data: conversation.context?.customer_data,
+        });
+
+        const greeting = this.responseBuilder.buildGreeting(conversation.customer_name);
+        return [
+          greeting,
+          '',
+          '👋 Parece que faz um tempo que você saiu... Não se preocupe, estamos aqui para ajudar!',
+          '',
+          'O que você gostaria de fazer?',
+          '',
+          '• Digite "ver produtos" para ver o cardápio',
+          '• Digite "carrinho" para ver seu carrinho',
+          '• Ou me diga o que você precisa! 😊',
+        ].join('\n');
+      }
+
       // 7. Salvar mensagem de entrada
       await this.conversationService.saveMessage(
         conversation.id,
