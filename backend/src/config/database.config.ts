@@ -16,6 +16,14 @@ import { AuditLog } from '../database/entities/AuditLog.entity';
 import { Pagamento } from '../database/entities/Pagamento.entity';
 import { CupomDesconto } from '../database/entities/CupomDesconto.entity';
 import { EmailConfirmation } from '../database/entities/EmailConfirmation.entity';
+// WhatsApp entities
+import {
+  WhatsAppCart,
+  WhatsAppMessageMetrics,
+  WhatsAppConversationMetrics,
+  WhatsAppConversionEvent,
+  WhatsAppAbandonmentEvent,
+} from '../database/entities/WhatsappCart.entity';
 
 export const databaseConfig: TypeOrmModuleAsyncOptions = {
   inject: [ConfigService],
@@ -39,6 +47,12 @@ export const databaseConfig: TypeOrmModuleAsyncOptions = {
       Pagamento,
       CupomDesconto,
       EmailConfirmation,
+      // WhatsApp entities
+      WhatsAppCart,
+      WhatsAppMessageMetrics,
+      WhatsAppConversationMetrics,
+      WhatsAppConversionEvent,
+      WhatsAppAbandonmentEvent,
     ],
     synchronize: false, // Desabilitado - usar migrations
     logging: config.get('NODE_ENV') === 'development',
