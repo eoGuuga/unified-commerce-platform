@@ -7,6 +7,7 @@ import { PaymentsService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CouponsService } from '../coupons/coupons.service';
 import { DbContextService } from '../common/services/db-context.service';
+import { CanalVenda } from '../../database/entities/Pedido.entity';
 
 // Services de inteligência (mantidos para recursos avançados)
 import { OpenAIService } from './services/openai.service';
@@ -414,6 +415,11 @@ export class WhatsAppService {
       return this.handleCartCommand(tenantId, customerPhone, message);
     }
 
+    // Verificar intenção de finalizar/confirmar pedido
+    if (lower.includes('finalizar') || lower.includes('confirmar') || lower.includes('fechar pedido')) {
+      return this.handleCheckout(tenantId, customerPhone);
+    }
+
     // Verificar se é intenção de adicionar produto
     const addKeywords = ['adicionar', 'colocar', 'add', 'quero esse', 'quero este', 'comprar'];
     const isAddIntent = addKeywords.some(k => lower.includes(k));
@@ -492,6 +498,56 @@ export class WhatsAppService {
     }
 
     return 'Não encontrei pedidos recentes. Quer ver o cardápio?';
+  }
+
+  private async handleCheckout(
+    tenantId: string,
+    customerPhone: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    try {
+      const cart = await this.cartService.getOrCreateCart(tenantId, customerPhone);
+
+      if (cart.items.length === 0) {
+        return '🛒 Seu carrinho está vazio! Adicione itens primeiro.';
+      }
+
+      // Criar pedido
+      const order = await this.ordersService.create(
+        {
+          channel: CanalVenda.WHATSAPP,
+          customer_phone: customerPhone,
+          customer_name: undefined,
+          items: cart.items.map((item: any) => ({
+            produto_id: item.produto_id,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+          })),
+          shipping_amount: Number(cart.shipping_amount) || 10,
+          discount_amount: Number(cart.discount_amount) || 0,
+          coupon_code: cart.coupon_code,
+        },
+        tenantId,
+      );
+
+      // Atualizar status do carrinho para convertido
+      await this.cartService.markAsConverted(cart.id);
+
+      return [
+        `✅ *Pedido #${order.id.substring(0, 8).toUpperCase()} confirmado!*`,
+        '',
+        `📦 *Resumo:*`,
+        cart.items.map((item: any, i: number) =>
+          `${i + 1}. ${item.produto_name} x${item.quantity}`
+        ).join('\n'),
+        '',
+        `💰 *Total: R$ ${Number(order.total_amount).toFixed(2)}*`,
+        '',
+        'Agora preciso do endereço de entrega. Qual seu endereço completo?',
+      ].join('\n');
+    } catch (error) {
+      this.logger.error('Error during checkout', { error, tenantId, customerPhone });
+      return '😕 Houve um erro ao processar seu pedido. Tente novamente.';
+    }
   }
 
   private async handleOrderAdjustment(
@@ -745,6 +801,7 @@ export class WhatsAppService {
       'carrinho', 'ver carrinho', 'mostrar carrinho', 'meu carrinho',
       'adicionar', 'remover', 'tirar', 'limpar', 'esvaziar',
       'add', 'delete', 'clear',
+      'finalizar', 'confirmar', 'fechar pedido', 'encerrar',
     ];
     return commands.some((cmd) => message.includes(cmd));
   }
