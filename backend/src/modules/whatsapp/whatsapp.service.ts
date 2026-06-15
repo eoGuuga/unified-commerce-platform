@@ -554,6 +554,7 @@ export class WhatsAppService {
         if (productName && productName.length > 1) {
           const products = await this.productsService.search(tenantId, productName);
           if (products.length > 0) {
+            const product = products[0];
             await this.cartService.addItem({
               tenantId,
               customerPhone,
@@ -567,7 +568,6 @@ export class WhatsAppService {
             return `😕 Não encontrei "${productName}". Digite "ver produtos" para ver o cardápio!`;
           }
         } else {
-          console.log('[DEBUG handleCart] productName muito curto, indo para handleCartCommand');
         }
       } catch (error) {
         this.logger.error('Error adding product to cart', { error, message });
