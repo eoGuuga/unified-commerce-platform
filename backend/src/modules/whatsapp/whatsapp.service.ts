@@ -32,6 +32,7 @@ import { WhatsAppAnalyticsService } from './services/analytics.service';
 import { ConversationManagerService } from './services/conversation-manager.service';
 
 import { TypedConversation, ConversationState, CustomerData, PendingOrder } from './types/whatsapp.types';
+import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
 
 export type WhatsAppOutboundResponse = string | { kind: 'interactive_list'; previewText: string; list: any };
 
@@ -511,6 +512,7 @@ export class WhatsAppService {
         return '🛒 Seu carrinho está vazio! Adicione itens primeiro.';
       }
 
+      // Criar pedido
       const order = await this.ordersService.create(
         {
           channel: CanalVenda.WHATSAPP,
@@ -528,20 +530,41 @@ export class WhatsAppService {
         tenantId,
       );
 
+      // Criar pagamento PIX
+      let pixMessage = '';
+      try {
+        const paymentResult = await this.paymentsService.createPayment(tenantId, {
+          pedido_id: order.id,
+          method: MetodoPagamento.PIX,
+          amount: Number(order.total_amount),
+          metadata: { customerPhone, orderId: order.id },
+        });
+
+        if (paymentResult.qr_code) {
+          pixMessage = `\n\n📱 *Pagamento PIX*\n\nEscaneie o QR Code abaixo ou copie a chave:\n\n\`${paymentResult.copy_paste || 'Chave PIX'}\``;
+        }
+      } catch (paymentError) {
+        this.logger.warn('Erro ao criar pagamento PIX, continuando sem PIX', { error: paymentError });
+        pixMessage = '\n\n💳 *Forma de pagamento:* PIX (à vista)\nAguarde o link de pagamento.';
+      }
+
       // Atualizar status do carrinho para convertido
       await this.cartService.markAsConverted(cart.id);
+
+      const itemsList = cart.items.map((item: any, i: number) =>
+        `${i + 1}. ${item.produto_name} x${item.quantity}`
+      ).join('\n');
 
       return [
         `✅ *Pedido #${order.id.substring(0, 8).toUpperCase()} confirmado!*`,
         '',
         `📦 *Resumo:*`,
-        cart.items.map((item: any, i: number) =>
-          `${i + 1}. ${item.produto_name} x${item.quantity}`
-        ).join('\n'),
+        itemsList,
         '',
         `💰 *Total: R$ ${Number(order.total_amount).toFixed(2)}*`,
+        pixMessage,
         '',
-        'Agora preciso do endereço de entrega. Qual seu endereço completo?',
+        '📍 Agora me diga seu endereço de entrega completo:',
       ].join('\n');
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
