@@ -357,7 +357,17 @@ export class WhatsappController {
   async webhook(
     @Body() body: RawWhatsappWebhookBody,
     @Query('tenantId') tenantIdFromQuery?: string,
+    @Headers('x-hub-signature-256') signature?: string,
   ) {
+    // Verificar assinatura do webhook se configurado
+    const webhookSecret = process.env.WHATSAPP_WEBHOOK_SECRET;
+    if (webhookSecret && signature) {
+      const bodyStr = JSON.stringify(body);
+      if (!verifyWebhookSignature(bodyStr, signature, webhookSecret)) {
+        throw new ForbiddenException('Assinatura do webhook inválida');
+      }
+    }
+
     const ignoreDecision = shouldIgnoreWebhook(body);
     if (ignoreDecision.ignore) {
       return {
@@ -508,6 +518,7 @@ export class WhatsappController {
   @ApiOperation({ summary: 'Métricas do bot WhatsApp (requer API key)' })
   @ApiResponse({ status: 200, description: 'Métricas retornadas com sucesso' })
   @ApiResponse({ status: 401, description: 'API key inválida' })
+  @ApiResponse({ status: 500, description: 'Servidor mal configurado' })
   async getMetrics(
     @Query('tenantId') tenantId: string,
     @Query('days') days: string = '7',
@@ -515,8 +526,16 @@ export class WhatsappController {
   ) {
     // Verificar API key para proteger o endpoint
     const validApiKey = process.env.WHATSAPP_METRICS_API_KEY;
-    if (validApiKey && apiKey !== validApiKey) {
-      throw new UnauthorizedException('API key inválida');
+
+    // Se API key está configurada, é obrigatória
+    if (validApiKey) {
+      if (!apiKey || apiKey !== validApiKey) {
+        throw new UnauthorizedException('API key inválida');
+      }
+    }
+    // Se não está configurada, logar aviso mas permitir acesso (dev mode)
+    else if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('Endpoint não configurado: WHATSAPP_METRICS_API_KEY não definido');
     }
 
     if (!tenantId) {
