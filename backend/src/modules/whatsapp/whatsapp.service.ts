@@ -160,19 +160,31 @@ export class WhatsAppService {
       );
 
       // 6.1 Verificar timeout de conversa (5 minutos de inatividade)
+      // IMPORTANTE: buscar o timestamp ANTES de qualquer atualização
       const TIMEOUT_MINUTES = 5;
-      const lastMessageTime = conversation.last_message_at;
-      const now = new Date();
-      const minutesSinceLastMessage = (now.getTime() - new Date(lastMessageTime).getTime()) / (1000 * 60);
-      const currentState = conversation.context?.state;
 
-      console.log('[DEBUG TIMEOUT] lastMessage:', lastMessageTime, 'minutes:', minutesSinceLastMessage.toFixed(1), 'state:', currentState);
+      // Buscar conversa ativa para verificar timeout (sem atualizar timestamp)
+      const conversationRepo = (this.conversationService as any)['db'].getRepository('WhatsappConversation');
+      const activeConversation = await conversationRepo.findOne({
+        where: {
+          tenant_id: message.tenantId,
+          customer_phone: message.from,
+          status: 'active',
+        },
+        order: { last_message_at: 'DESC' },
+      });
+
+      const lastMessageTime = activeConversation?.last_message_at;
+      const currentState = activeConversation?.context?.state;
+      const minutesSinceLastMessage = lastMessageTime
+        ? (new Date().getTime() - new Date(lastMessageTime).getTime()) / (1000 * 60)
+        : 999;
 
       if (minutesSinceLastMessage > TIMEOUT_MINUTES && currentState && currentState !== 'idle') {
         // Conversa expirou - reiniciar com mensagem amigável
         await this.conversationService.updateContext(conversation.id, {
           state: 'idle',
-          customer_data: conversation.context?.customer_data,
+          customer_data: activeConversation?.context?.customer_data,
         });
 
         const greeting = this.responseBuilder.buildGreeting(conversation.customer_name);
