@@ -533,10 +533,12 @@ export class WhatsAppService {
           .replace(/^levar\s*/gi, '')
           .replace(/^bora\s*/gi, '')
           .replace(/^manda\s*/gi, '')
-          .replace(/^um\s+/gi, '')
+          .replace(/\bum\s+/gi, '')  // Remove 'um' que pode estar no meio
+          .replace(/^um\s+/gi, '')   // Remove 'um' do início
           .replace(/^esse\s+/gi, '')
           .replace(/^este\s+/gi, '')
           .replace(/^aquele\s+/gi, '')
+          .replace(/^um\s+/gi, '')   // Remove 'um' que ficou após outras substituições
           .trim();
 
         if (productName && productName.length > 1) {
