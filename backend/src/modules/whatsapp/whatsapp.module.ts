@@ -68,8 +68,36 @@ import { CommonModule } from '../common/common.module';
   ],
   controllers: [],
   providers: [
-    // Services existentes - testando um por um
-    // 1. WhatsAppService
+    // Services existentes
+    OpenAIService,
+    MessageIntelligenceService,
+    ConversationalIntelligenceService,
+    ConversationPlannerService,
+    SalesIntelligenceService,
+    SalesPlaybookService,
+    SalesSegmentStrategyService,
+    SalesVerticalPackService,
+    CatalogSalesContextService,
+    ProductOfferIntelligenceService,
+    ConversationService,
+    LLMRouterService,
+    ActionExecutorService,
+    BotConfigService,
+
+    // NOVOS SERVICES - FASE 1
+    CartService,
+    WhatsAppErrorHandler,
+    WhatsAppAnalyticsService,
+    ConversationManagerService,
+
+    // NOVOS SERVICES - FASE 3 (Refatoração)
+    MessageProcessorService,
+    CatalogManagerService,
+    ResponseBuilderService,
+    NLPService,
+    SalesOrchestratorService,
+
+    // Service principal
     WhatsappService,
   ],
   exports: [
