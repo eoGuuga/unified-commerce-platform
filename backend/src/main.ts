@@ -15,35 +15,21 @@ import { Usuario, UserRole } from './database/entities/Usuario.entity';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
-  console.log('[Bootstrap] ===== INICIANDO APLICAÇÃO =====');
-
   process.on('uncaughtException', (error: Error) => {
-    console.log('[Bootstrap] UNCAUGHT EXCEPTION:', error.message, error.stack);
     logger.error(`UNCAUGHT EXCEPTION: ${error.message}`, error.stack);
     process.exit(1);
   });
 
   process.on('unhandledRejection', (reason: any) => {
-    console.log('[Bootstrap] UNHANDLED REJECTION:', reason);
     const msg = reason instanceof Error ? reason.message : String(reason);
     const stack = reason instanceof Error ? reason.stack : undefined;
     logger.error(`UNHANDLED REJECTION: ${msg}`, stack);
     process.exit(1);
   });
 
-  console.log('[Bootstrap] Criando aplicação NestJS...');
-  let app: any;
-  try {
-    app = await NestFactory.create(AppModule, {
-      logger: new StructuredLogger(),
-    });
-    console.log('[Bootstrap] Aplicação criada com sucesso!');
-    console.log('[Bootstrap] Continuando inicialização...');
-  } catch (error: any) {
-    console.log('[Bootstrap] ERRO ao criar aplicação:', error);
-    console.log('[Bootstrap] Stack:', error && error.stack);
-    process.exit(1);
-  }
+  const app = await NestFactory.create(AppModule, {
+    logger: new StructuredLogger(),
+  });
 
   const isProd = process.env.NODE_ENV === 'production';
   const enableSwagger = !isProd || process.env.ENABLE_SWAGGER === 'true';

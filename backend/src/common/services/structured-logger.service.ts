@@ -12,11 +12,6 @@ interface LogEntry {
 export class StructuredLogger extends ConsoleLogger {
   private readonly isProduction = process.env.NODE_ENV === 'production';
 
-  constructor() {
-    super();
-    console.log('[StructuredLogger] ===== LOGGER INITIALIZED =====');
-  }
-
   private formatJson(level: string, message: unknown, context?: string, ...meta: unknown[]): string {
     const entry: LogEntry = {
       level,
@@ -49,9 +44,6 @@ export class StructuredLogger extends ConsoleLogger {
   error(message: unknown, stack?: string, context?: string): void;
   error(message: unknown, ...optionalParams: unknown[]): void;
   error(message: unknown, ...optionalParams: unknown[]): void {
-    console.log('[StructuredLogger] ===== ERROR LOG =====');
-    console.log('[StructuredLogger] Message:', message);
-    console.log('[StructuredLogger] Params:', optionalParams);
     if (!this.isProduction) {
       super.error(message, ...optionalParams);
       return;

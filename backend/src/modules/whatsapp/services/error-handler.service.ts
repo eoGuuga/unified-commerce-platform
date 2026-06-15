@@ -71,16 +71,13 @@ export class WhatsAppErrorHandler {
   private readonly retryConfig: RetryConfig;
 
   constructor() {
-    console.log('[WhatsAppErrorHandler] Constructor called');
     this.retryConfig = { ...DEFAULT_RETRY_CONFIG };
-    console.log('[WhatsAppErrorHandler] Initialized successfully');
   }
 
   /**
    * Trata erro e retorna resposta apropriada
    */
   handleError(error: Error, context: ErrorContext): FallbackResponse {
-    console.log('[WhatsAppErrorHandler] handleError called', { error: error?.message, context });
     try {
       const errorType = this.classifyError(error);
       const errorMessage = ERROR_MESSAGES[errorType] || ERROR_MESSAGES.UNKNOWN_ERROR;
@@ -102,7 +99,6 @@ export class WhatsAppErrorHandler {
         escalate: shouldEscalate,
       };
     } catch (e) {
-      console.error('[WhatsAppErrorHandler] Error in handleError:', e);
       return {
         message: ERROR_MESSAGES.UNKNOWN_ERROR,
         shouldRetry: false,
