@@ -70,9 +70,9 @@ export class WhatsAppErrorHandler {
   private readonly logger = new Logger(WhatsAppErrorHandler.name);
   private readonly retryConfig: RetryConfig;
 
-  constructor(retryConfig?: Partial<RetryConfig>) {
-    console.log('[WhatsAppErrorHandler] Constructor called with:', retryConfig);
-    this.retryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
+  constructor() {
+    console.log('[WhatsAppErrorHandler] Constructor called');
+    this.retryConfig = { ...DEFAULT_RETRY_CONFIG };
     console.log('[WhatsAppErrorHandler] Initialized successfully');
   }
 
