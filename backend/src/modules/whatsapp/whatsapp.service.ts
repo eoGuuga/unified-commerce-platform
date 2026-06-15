@@ -406,23 +406,48 @@ export class WhatsAppService {
     message: string,
     conversation: TypedConversation,
   ): Promise<WhatsAppOutboundResponse> {
-    // Verificar se é comando direto ou intenção de adicionar
-    try {
-      const products = await this.productsService.search(tenantId, message);
-      if (products.length > 0) {
-        const product = products[0];
-        await this.cartService.addItem({
-          tenantId,
-          customerPhone,
-          produtoId: product.id,
-          produtoName: product.name,
-          quantity: 1,
-          unitPrice: Number(product.price),
-        });
-        return `✅ Adicionado 1x ${product.name}`;
+    const lower = message.toLowerCase().trim();
+
+    // Verificar comandos diretos de carrinho primeiro
+    if (lower === 'carrinho' || lower === 'ver carrinho' || lower === 'meu carrinho') {
+      return this.handleCartCommand(tenantId, customerPhone, message);
+    }
+
+    // Verificar se é intenção de adicionar produto
+    const addKeywords = ['adicionar', 'colocar', 'add', 'quero esse', 'quero este', 'comprar'];
+    const isAddIntent = addKeywords.some(k => lower.includes(k));
+
+    if (isAddIntent) {
+      try {
+        // Extrair nome do produto da mensagem
+        const productName = lower
+          .replace(/adicionar\s*/gi, '')
+          .replace(/colocar\s*/gi, '')
+          .replace(/add\s*/gi, '')
+          .replace(/^quero\s+(esse|este)\s*/gi, '')
+          .replace(/comprar\s*/gi, '')
+          .trim();
+
+        if (productName && productName.length > 1) {
+          const products = await this.productsService.search(tenantId, productName);
+          if (products.length > 0) {
+            const product = products[0];
+            await this.cartService.addItem({
+              tenantId,
+              customerPhone,
+              produtoId: product.id,
+              produtoName: product.name,
+              quantity: 1,
+              unitPrice: Number(product.price),
+            });
+            return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao seu carrinho!`;
+          } else {
+            return `😕 Não encontrei nenhum produto chamado "${productName}". Tente "ver produtos" para ver o cardápio.`;
+          }
+        }
+      } catch (error) {
+        this.logger.error('Error adding product to cart', { error, message });
       }
-    } catch (error) {
-      // Fall through to cart command
     }
 
     return this.handleCartCommand(tenantId, customerPhone, message);
