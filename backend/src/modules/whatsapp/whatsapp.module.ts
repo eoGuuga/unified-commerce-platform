@@ -66,7 +66,7 @@ import { CommonModule } from '../common/common.module';
     NotificationsModule,
     CouponsModule,
   ],
-  controllers: [WhatsappController, WhatsAppCartController],
+  controllers: [],
   providers: [
     // Services existentes
     // TODO: Restaurar apos debug
