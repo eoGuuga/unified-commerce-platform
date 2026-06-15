@@ -169,7 +169,6 @@ export class WhatsAppService {
 
       // 8. Detectar intent
       const intent = this.detectIntent(processed.sanitizedBody, conversation);
-      console.log('[DEBUG] Intent detected:', intent, 'message:', processed.sanitizedBody);
 
       // 9. Processar intent
       const response = await this.processByIntent(intent, {
@@ -178,7 +177,6 @@ export class WhatsAppService {
         conversation,
         tenant,
       });
-      console.log('[DEBUG] Response from intent:', response);
 
       // 10. Salvar mensagem de saída
       if (response) {
@@ -200,7 +198,6 @@ export class WhatsAppService {
 
     } catch (error) {
       const errorObj = error instanceof Error ? error : new Error(String(error));
-      console.error('[WhatsAppService] ERROR:', errorObj.message, errorObj.stack);
 
       this.logger.error('Error processing message', {
         error: errorObj.message,
@@ -555,12 +552,8 @@ export class WhatsAppService {
         console.log('[DEBUG handleCart] productName extraído:', productName, 'original:', lower);
 
         if (productName && productName.length > 1) {
-          console.log('[DEBUG handleCart] Buscando produto:', productName);
           const products = await this.productsService.search(tenantId, productName);
-          console.log('[DEBUG handleCart] Produtos encontrados:', products.length);
           if (products.length > 0) {
-            const product = products[0];
-            console.log('[DEBUG handleCart] Produto encontrado:', product.name);
             await this.cartService.addItem({
               tenantId,
               customerPhone,
@@ -582,7 +575,6 @@ export class WhatsAppService {
     }
 
     // Se chegou até aqui, chamar handleCartCommand como fallback
-    console.log('[DEBUG handleCart] Chamando handleCartCommand');
     return this.handleCartCommand(tenantId, customerPhone, message);
   }
 
@@ -930,10 +922,8 @@ export class WhatsAppService {
         let searchTerm = message.toLowerCase();
         for (const term of searchTerms) {
           if (searchTerm.includes(term)) {
-            console.log('[DEBUG fallback] Buscando com termo:', term);
             // Encontrou um termo de produto, buscar produtos
             const products = await this.productsService.search(tenantId, term);
-            console.log('[DEBUG fallback] Produtos encontrados:', products.length);
             if (products.length > 0) {
               const product = products[0];
 
