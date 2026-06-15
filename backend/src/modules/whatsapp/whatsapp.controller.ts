@@ -4,10 +4,13 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Headers,
   Post,
   Query,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { TenantsService } from '../tenants/tenants.service';
 import { WhatsappWebhookDto } from './dto/whatsapp-webhook.dto';
 import {
@@ -16,6 +19,36 @@ import {
 } from './whatsapp.service';
 
 type RawWhatsappWebhookBody = Partial<WhatsappWebhookDto> & Record<string, any>;
+
+/**
+ * Verifica assinatura do webhook para garantir autenticidade
+ */
+function verifyWebhookSignature(
+  body: string,
+  signature: string | undefined,
+  secret: string,
+): boolean {
+  if (!signature || !secret) {
+    return false;
+  }
+
+  const expectedSignature = createHmac('sha256', secret)
+    .update(body)
+    .digest('hex');
+
+  try {
+    const sigBuffer = Buffer.from(signature.replace(/^sha256=/, ''), 'hex');
+    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+
+    if (sigBuffer.length !== expectedBuffer.length) {
+      return false;
+    }
+
+    return timingSafeEqual(sigBuffer, expectedBuffer);
+  } catch {
+    return false;
+  }
+}
 
 type InteractiveListResponse = Extract<
   WhatsAppOutboundResponse,
@@ -472,12 +505,20 @@ export class WhatsappController {
   }
 
   @Get('metrics')
-  @ApiOperation({ summary: 'Métricas do bot WhatsApp' })
+  @ApiOperation({ summary: 'Métricas do bot WhatsApp (requer API key)' })
   @ApiResponse({ status: 200, description: 'Métricas retornadas com sucesso' })
+  @ApiResponse({ status: 401, description: 'API key inválida' })
   async getMetrics(
     @Query('tenantId') tenantId: string,
     @Query('days') days: string = '7',
+    @Headers('x-api-key') apiKey?: string,
   ) {
+    // Verificar API key para proteger o endpoint
+    const validApiKey = process.env.WHATSAPP_METRICS_API_KEY;
+    if (validApiKey && apiKey !== validApiKey) {
+      throw new UnauthorizedException('API key inválida');
+    }
+
     if (!tenantId) {
       throw new BadRequestException('tenantId é obrigatório');
     }
