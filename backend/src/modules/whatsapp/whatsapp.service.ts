@@ -153,19 +153,10 @@ export class WhatsAppService {
         return this.responseBuilder.buildErrorMessage('abuse', false);
       }
 
-      // 6. Obter ou criar conversa
-      const conversation = await this.conversationService.getOrCreateConversation(
-        message.tenantId,
-        message.from,
-      );
-
-      // 6.1 Verificar timeout de conversa (5 minutos de inatividade)
-      // IMPORTANTE: buscar o timestamp ANTES de qualquer atualização
+      // 5.1 ANTES de tudo: verificar timeout de conversa (5 minutos de inatividade)
       const TIMEOUT_MINUTES = 5;
-
-      // Buscar conversa ativa para verificar timeout (sem atualizar timestamp)
       const conversationRepo = (this.conversationService as any)['db'].getRepository('WhatsappConversation');
-      const activeConversation = await conversationRepo.findOne({
+      let conversationForTimeout = await conversationRepo.findOne({
         where: {
           tenant_id: message.tenantId,
           customer_phone: message.from,
@@ -174,34 +165,42 @@ export class WhatsAppService {
         order: { last_message_at: 'DESC' },
       });
 
-      const lastMessageTime = activeConversation?.last_message_at;
-      const currentState = activeConversation?.context?.state;
-      const minutesSinceLastMessage = lastMessageTime
-        ? (new Date().getTime() - new Date(lastMessageTime).getTime()) / (1000 * 60)
-        : 999;
+      if (conversationForTimeout) {
+        const lastMessageTime = conversationForTimeout.last_message_at;
+        const currentState = conversationForTimeout.context?.state;
+        const minutesSinceLastMessage = lastMessageTime
+          ? (new Date().getTime() - new Date(lastMessageTime).getTime()) / (1000 * 60)
+          : 999;
 
-      if (minutesSinceLastMessage > TIMEOUT_MINUTES && currentState && currentState !== 'idle') {
-        // Conversa expirou - reiniciar com mensagem amigável
-        await this.conversationService.updateContext(conversation.id, {
-          state: 'idle',
-          customer_data: activeConversation?.context?.customer_data,
-        });
+        if (minutesSinceLastMessage > TIMEOUT_MINUTES && currentState && currentState !== 'idle') {
+          // Conversa expirou - reiniciar com mensagem amigável
+          await this.conversationService.updateContext(conversationForTimeout.id, {
+            state: 'idle',
+            customer_data: conversationForTimeout.context?.customer_data,
+          });
 
-        const greeting = this.responseBuilder.buildGreeting(conversation.customer_name);
-        return [
-          greeting,
-          '',
-          '👋 *Que bom que você voltou!*',
-          '',
-          'Parece que faz um tempinho... Mas estamos aqui para ajudar! 😊',
-          '',
-          'O que você gostaria de fazer?',
-          '',
-          '• "ver produtos" - ver o cardápio',
-          '• "carrinho" - ver seu carrinho',
-          '• Ou me diga o que precisa!',
-        ].join('\n');
+          const greeting = this.responseBuilder.buildGreeting(conversationForTimeout.customer_name);
+          return [
+            greeting,
+            '',
+            '👋 *Que bom que você voltou!*',
+            '',
+            'Parece que faz um tempinho... Mas estamos aqui para ajudar! 😊',
+            '',
+            'O que você gostaria de fazer?',
+            '',
+            '• "ver produtos" - ver o cardápio',
+            '• "carrinho" - ver seu carrinho',
+            '• Ou me diga o que precisa!',
+          ].join('\n');
+        }
       }
+
+      // 6. Obter ou criar conversa (agora sem conflitar com timeout)
+      const conversation = await this.conversationService.getOrCreateConversation(
+        message.tenantId,
+        message.from,
+      );
 
       // 7. Salvar mensagem de entrada
       await this.conversationService.saveMessage(
