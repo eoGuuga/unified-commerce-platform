@@ -509,18 +509,34 @@ export class WhatsAppService {
     }
 
     // Verificar se é intenção de adicionar produto
-    const addKeywords = ['adicionar', 'colocar', 'add', 'quero esse', 'quero este', 'comprar'];
+    const addKeywords = [
+      'adicionar', 'colocar', 'add', 'comprar',
+      'quero', 'queria', 'preciso', 'me vê', 'me vê',
+      'pedir', 'pegar', 'levar', 'bora', 'manda'
+    ];
     const isAddIntent = addKeywords.some(k => lower.includes(k));
 
     if (isAddIntent) {
       try {
         // Extrair nome do produto da mensagem
-        const productName = lower
+        let productName = lower
           .replace(/adicionar\s*/gi, '')
           .replace(/colocar\s*/gi, '')
           .replace(/add\s*/gi, '')
-          .replace(/^quero\s+(esse|este)\s*/gi, '')
           .replace(/comprar\s*/gi, '')
+          .replace(/^quero\s*/gi, '')
+          .replace(/^queria\s*/gi, '')
+          .replace(/^preciso\s*/gi, '')
+          .replace(/me\s+v[êe]\s*/gi, '')
+          .replace(/^pedir\s*/gi, '')
+          .replace(/^pegar\s*/gi, '')
+          .replace(/^levar\s*/gi, '')
+          .replace(/^bora\s*/gi, '')
+          .replace(/^manda\s*/gi, '')
+          .replace(/^um\s+/gi, '')
+          .replace(/^esse\s+/gi, '')
+          .replace(/^este\s+/gi, '')
+          .replace(/^aquele\s+/gi, '')
           .trim();
 
         if (productName && productName.length > 1) {
