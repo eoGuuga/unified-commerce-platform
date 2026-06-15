@@ -552,10 +552,15 @@ export class WhatsAppService {
             .trim();
         }
 
+        console.log('[DEBUG handleCart] productName extraído:', productName, 'original:', lower);
+
         if (productName && productName.length > 1) {
+          console.log('[DEBUG handleCart] Buscando produto:', productName);
           const products = await this.productsService.search(tenantId, productName);
+          console.log('[DEBUG handleCart] Produtos encontrados:', products.length);
           if (products.length > 0) {
             const product = products[0];
+            console.log('[DEBUG handleCart] Produto encontrado:', product.name);
             await this.cartService.addItem({
               tenantId,
               customerPhone,
@@ -568,12 +573,16 @@ export class WhatsAppService {
           } else {
             return `😕 Não encontrei "${productName}". Digite "ver produtos" para ver o cardápio!`;
           }
+        } else {
+          console.log('[DEBUG handleCart] productName muito curto, indo para handleCartCommand');
         }
       } catch (error) {
         this.logger.error('Error adding product to cart', { error, message });
       }
     }
 
+    // Se chegou até aqui, chamar handleCartCommand como fallback
+    console.log('[DEBUG handleCart] Chamando handleCartCommand');
     return this.handleCartCommand(tenantId, customerPhone, message);
   }
 
