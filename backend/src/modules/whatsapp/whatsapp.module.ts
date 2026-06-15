@@ -66,7 +66,7 @@ import { CommonModule } from '../common/common.module';
     NotificationsModule,
     CouponsModule,
   ],
-  controllers: [],
+  controllers: [WhatsappController, WhatsAppCartController],
   providers: [
     // Services existentes
     OpenAIService,
@@ -101,19 +101,21 @@ import { CommonModule } from '../common/common.module';
     WhatsappService,
   ],
   exports: [
-    // TODO: Restaurar apos debug
-    // ConversationService,
-    // CartService,
-    // WhatsAppErrorHandler,
-    // WhatsAppAnalyticsService,
-    // ConversationManagerService,
+    // Services existentes
+    ConversationService,
+
+    // NOVOS SERVICES
+    CartService,
+    WhatsAppErrorHandler,
+    WhatsAppAnalyticsService,
+    ConversationManagerService,
 
     // NOVOS SERVICES - FASE 3 (Refatoração)
-    // MessageProcessorService,
-    // CatalogManagerService,
-    // ResponseBuilderService,
-    // NLPService,
-    // SalesOrchestratorService,
+    MessageProcessorService,
+    CatalogManagerService,
+    ResponseBuilderService,
+    NLPService,
+    SalesOrchestratorService,
   ],
 })
 export class WhatsappModule {}
