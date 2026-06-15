@@ -526,20 +526,31 @@ export class WhatsAppService {
           .replace(/comprar\s*/gi, '')
           .replace(/^quero\s*/gi, '')
           .replace(/^queria\s*/gi, '')
-          .replace(/^preciso\s*/gi, '')
+          .replace(/^preciso\s*(de\s*)?/gi, '')
           .replace(/me\s+v[êe]\s*/gi, '')
           .replace(/^pedir\s*/gi, '')
           .replace(/^pegar\s*/gi, '')
           .replace(/^levar\s*/gi, '')
-          .replace(/^bora\s*/gi, '')
-          .replace(/^manda\s*/gi, '')
-          .replace(/\bum\s+/gi, '')  // Remove 'um' que pode estar no meio
-          .replace(/^um\s+/gi, '')   // Remove 'um' do início
+          .replace(/^bora\s*(pegar\s*|levar\s*|um\s*)?/gi, '')
+          .replace(/^manda\s*(um\s*)?/gi, '')
+          .replace(/\bum\s+/gi, '')
+          .replace(/^um\s+/gi, '')
           .replace(/^esse\s+/gi, '')
           .replace(/^este\s+/gi, '')
           .replace(/^aquele\s+/gi, '')
-          .replace(/^um\s+/gi, '')   // Remove 'um' que ficou após outras substituições
           .trim();
+
+        // Se productName está vazio ou muito curto, usar mensagem original limpa
+        if (!productName || productName.length < 2) {
+          productName = lower
+            .replace(/^quero\s*/gi, '')
+            .replace(/^queria\s*/gi, '')
+            .replace(/^preciso\s*de\s*/gi, '')
+            .replace(/^bora\s*/gi, '')
+            .replace(/^manda\s*/gi, '')
+            .replace(/\bum\s*/gi, '')
+            .trim();
+        }
 
         if (productName && productName.length > 1) {
           const products = await this.productsService.search(tenantId, productName);
