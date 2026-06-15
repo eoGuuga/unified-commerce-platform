@@ -164,8 +164,11 @@ export class WhatsAppService {
       const lastMessageTime = conversation.last_message_at;
       const now = new Date();
       const minutesSinceLastMessage = (now.getTime() - new Date(lastMessageTime).getTime()) / (1000 * 60);
+      const currentState = conversation.context?.state;
 
-      if (minutesSinceLastMessage > TIMEOUT_MINUTES && conversation.context?.state !== 'idle') {
+      console.log('[DEBUG TIMEOUT] lastMessage:', lastMessageTime, 'minutes:', minutesSinceLastMessage.toFixed(1), 'state:', currentState);
+
+      if (minutesSinceLastMessage > TIMEOUT_MINUTES && currentState && currentState !== 'idle') {
         // Conversa expirou - reiniciar com mensagem amigável
         await this.conversationService.updateContext(conversation.id, {
           state: 'idle',
@@ -176,13 +179,15 @@ export class WhatsAppService {
         return [
           greeting,
           '',
-          '👋 Parece que faz um tempo que você saiu... Não se preocupe, estamos aqui para ajudar!',
+          '👋 *Que bom que você voltou!*',
+          '',
+          'Parece que faz um tempinho... Mas estamos aqui para ajudar! 😊',
           '',
           'O que você gostaria de fazer?',
           '',
-          '• Digite "ver produtos" para ver o cardápio',
-          '• Digite "carrinho" para ver seu carrinho',
-          '• Ou me diga o que você precisa! 😊',
+          '• "ver produtos" - ver o cardápio',
+          '• "carrinho" - ver seu carrinho',
+          '• Ou me diga o que precisa!',
         ].join('\n');
       }
 
