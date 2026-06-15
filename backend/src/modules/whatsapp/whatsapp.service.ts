@@ -169,6 +169,7 @@ export class WhatsAppService {
 
       // 8. Detectar intent
       const intent = this.detectIntent(processed.sanitizedBody, conversation);
+      console.log('[DEBUG] Intent detected:', intent, 'message:', processed.sanitizedBody);
 
       // 9. Processar intent
       const response = await this.processByIntent(intent, {
@@ -177,6 +178,7 @@ export class WhatsAppService {
         conversation,
         tenant,
       });
+      console.log('[DEBUG] Response from intent:', response);
 
       // 10. Salvar mensagem de saída
       if (response) {
