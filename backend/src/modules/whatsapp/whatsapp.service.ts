@@ -931,11 +931,28 @@ export class WhatsAppService {
         for (const term of searchTerms) {
           if (searchTerm.includes(term)) {
             console.log('[DEBUG fallback] Buscando com termo:', term);
-            // Encontrou um termo de produto, usar ele para buscar
+            // Encontrou um termo de produto, buscar produtos
             const products = await this.productsService.search(tenantId, term);
             console.log('[DEBUG fallback] Produtos encontrados:', products.length);
             if (products.length > 0) {
               const product = products[0];
+
+              // Se tem intenção de compra, adicionar direto
+              const buyKeywords = ['quero', 'queria', 'preciso', 'me vê', 'pedir', 'pegar', 'levar', 'bora', 'manda'];
+              const hasBuyIntent = buyKeywords.some(k => lower.includes(k));
+
+              if (hasBuyIntent) {
+                await this.cartService.addItem({
+                  tenantId,
+                  customerPhone: conversation.customer_phone,
+                  produtoId: product.id,
+                  produtoName: product.name,
+                  quantity: 1,
+                  unitPrice: Number(product.price),
+                });
+                return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao carrinho!\n\nDigite "carrinho" para ver ou "finalizar" para confirmar.`;
+              }
+
               return [
                 `🍫 *${product.name}* - R$ ${Number(product.price).toFixed(2)}`,
                 '',
