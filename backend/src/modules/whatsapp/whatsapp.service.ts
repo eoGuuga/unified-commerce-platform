@@ -421,6 +421,53 @@ export class WhatsAppService {
       return this.handleCheckout(tenantId, customerPhone);
     }
 
+    // Verificar intenção de remover item
+    if (lower.includes('remover') || lower.includes('tirar') || lower.includes('excluir')) {
+      const productName = lower
+        .replace(/remover\s*/gi, '')
+        .replace(/tirar\s*/gi, '')
+        .replace(/excluir\s*/gi, '')
+        .trim();
+
+      if (productName) {
+        try {
+          const cart = await this.cartService.getOrCreateCart(tenantId, customerPhone);
+          if (cart.items.length === 0) {
+            return '🛒 Seu carrinho está vazio!';
+          }
+
+          const item = cart.items.find(i =>
+            i.produto_name.toLowerCase().includes(productName.toLowerCase())
+          );
+
+          if (item) {
+            await this.cartService.removeItem(cart.id, item.produto_id);
+            return `✅ Removido "${item.produto_name}" do carrinho!`;
+          }
+          return `😕 Não encontrei "${productName}" no seu carrinho.`;
+        } catch (error) {
+          this.logger.error('Error removing from cart', { error, message });
+          return '😕 Erro ao remover item. Tente novamente.';
+        }
+      }
+    }
+
+    // Verificar intenção de limpar carrinho
+    if (lower.includes('limpar') || lower.includes('esvaziar') || lower === 'clear') {
+      try {
+        const cart = await this.cartService.getOrCreateCart(tenantId, customerPhone);
+        if (cart.items.length === 0) {
+          return '🛒 Seu carrinho já está vazio!';
+        }
+
+        await this.cartService.clearCart(cart.id);
+        return '🧹 Carrinho esvaziado! Quer adicionar algo novo?';
+      } catch (error) {
+        this.logger.error('Error clearing cart', { error, message });
+        return '😕 Erro ao limpar carrinho. Tente novamente.';
+      }
+    }
+
     // Verificar intenção de ver preço
     if (lower.includes('quanto') || lower.includes('preço') || lower.includes('valor')) {
       const productName = lower
