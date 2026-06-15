@@ -83,22 +83,19 @@ import { CommonModule } from '../common/common.module';
     // SalesOrchestratorService,
   ],
   exports: [
-    // Services existentes
-    WhatsappService,
-    ConversationService,
-
-    // NOVOS SERVICES
-    CartService,
-    WhatsAppErrorHandler,
-    WhatsAppAnalyticsService,
-    ConversationManagerService,
+    // TODO: Restaurar apos debug
+    // ConversationService,
+    // CartService,
+    // WhatsAppErrorHandler,
+    // WhatsAppAnalyticsService,
+    // ConversationManagerService,
 
     // NOVOS SERVICES - FASE 3 (Refatoração)
-    MessageProcessorService,
-    CatalogManagerService,
-    ResponseBuilderService,
-    NLPService,
-    SalesOrchestratorService,
+    // MessageProcessorService,
+    // CatalogManagerService,
+    // ResponseBuilderService,
+    // NLPService,
+    // SalesOrchestratorService,
   ],
 })
 export class WhatsappModule {}
