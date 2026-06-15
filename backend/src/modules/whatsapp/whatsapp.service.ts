@@ -197,6 +197,7 @@ export class WhatsAppService {
     } catch (error) {
       this.logger.error('Error processing message', {
         error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
         message,
       });
 
