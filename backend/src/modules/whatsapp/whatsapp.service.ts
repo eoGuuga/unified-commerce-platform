@@ -921,16 +921,30 @@ export class WhatsAppService {
     // Tentar encontrar produto se a mensagem parecer ser sobre um
     if (this.isProductIntent(message) || lower.length > 3) {
       try {
-        const products = await this.productsService.search(tenantId, message);
-        if (products.length > 0) {
-          const product = products[0];
-          return [
-            `🍫 *${product.name}* - R$ ${Number(product.price).toFixed(2)}`,
-            '',
-            product.description || '',
-            '',
-            'Digite "adicionar ' + product.name.split(' ')[0] + '" para colocar no carrinho!',
-          ].join('\n');
+        // Primeiro tenta extrair o nome do produto da mensagem
+        const searchTerms = [
+          'brigadeiro', 'bolo', 'torta', 'doce', 'sobremesa', 'caixa',
+          'brigadeiros', 'doces', 'sobremesas'
+        ];
+
+        let searchTerm = message.toLowerCase();
+        for (const term of searchTerms) {
+          if (searchTerm.includes(term)) {
+            console.log('[DEBUG fallback] Buscando com termo:', term);
+            // Encontrou um termo de produto, usar ele para buscar
+            const products = await this.productsService.search(tenantId, term);
+            console.log('[DEBUG fallback] Produtos encontrados:', products.length);
+            if (products.length > 0) {
+              const product = products[0];
+              return [
+                `🍫 *${product.name}* - R$ ${Number(product.price).toFixed(2)}`,
+                '',
+                product.description || '',
+                '',
+                'Digite "adicionar ' + product.name.split(' ')[0] + '" para colocar no carrinho!',
+              ].join('\n');
+            }
+          }
         }
       } catch (e) {
         // Continua para fallback
