@@ -782,6 +782,104 @@ export class WhatsAppService {
   ): Promise<WhatsAppOutboundResponse> {
     const lower = message.toLowerCase().trim();
 
+    // Verificar se é intenção de comprar/querer produto
+    const buyKeywords = ['quero', 'queria', 'preciso', 'me vê', 'me vê', 'pedir', 'pegar', 'levar', 'bora', 'manda'];
+    const hasBuyIntent = buyKeywords.some(k => lower.includes(k));
+
+    // Verificar se menciona produto do cardápio
+    const productKeywords = ['brigadeiro', 'bolo', 'torta', 'doce', 'brigadeiro', 'sobremesa', 'caixa'];
+    const hasProductMention = productKeywords.some(k => lower.includes(k));
+
+    // Verificar se pergunta sobre disponibilidade ("tem", "tem disponível")
+    const hasAvailabilityIntent = lower.includes('tem ') || lower.includes('tem?') || lower.includes('vocês têm');
+
+    // Verificar se pergunta sobre preço ("quanto", "preço", "valor")
+    const hasPriceIntent = lower.includes('quanto') || lower.includes('preço') || lower.includes('valor') || lower.includes('custa');
+
+    // Se tem intent de preço, buscar produto
+    if (hasPriceIntent && hasProductMention) {
+      try {
+        const productName = lower
+          .replace(/quanto[cs]?/gi, '')
+          .replace(/custa/gi, '')
+          .replace(/preço/gi, '')
+          .replace(/valor/gi, '')
+          .replace(/do[s]?\s*/gi, '')
+          .replace(/da[s]?\s*/gi, '')
+          .replace(/tá\s*/gi, '')
+          .trim();
+
+        const products = await this.productsService.search(tenantId, productName);
+        if (products.length > 0) {
+          const product = products[0];
+          return `💰 *${product.name}*\n\nPreço: R$ ${Number(product.price).toFixed(2)}\n\nQuer adicionar ao carrinho? Digite "adicionar ${product.name.split(' ')[0]}"`;
+        }
+      } catch (error) {
+        this.logger.error('Error in price intent', { error, message });
+      }
+    }
+
+    // Se tem intent de disponibilidade, buscar produto
+    if (hasAvailabilityIntent && hasProductMention) {
+      try {
+        const productName = lower
+          .replace(/tem\s*/gi, '')
+          .replace(/vocês\s*têm\s*/gi, '')
+          .replace(/dispon[íi]vel/gi, '')
+          .trim();
+
+        if (productName && productName.length > 2) {
+          const products = await this.productsService.search(tenantId, productName);
+          if (products.length > 0) {
+            const product = products[0];
+            return `✅ Sim! Temos *${product.name}* disponível por R$ ${Number(product.price).toFixed(2)}!\n\nQuer adicionar ao carrinho?`;
+          }
+          return `😕 Não encontramos "${productName}" no momento. Que tal ver nosso cardápio? Digite "ver produtos"`;
+        }
+      } catch (error) {
+        this.logger.error('Error in availability intent', { error, message });
+      }
+    }
+
+    // Se tem intent de comprar, adicionar ao carrinho
+    if (hasBuyIntent && hasProductMention) {
+      try {
+        // Extrair nome do produto
+        let productName = lower
+          .replace(/quero\s*/gi, '')
+          .replace(/queria\s*/gi, '')
+          .replace(/preciso\s*/gi, '')
+          .replace(/me\s+v[êe]\s*/gi, '')
+          .replace(/pedir\s*/gi, '')
+          .replace(/pegar\s*/gi, '')
+          .replace(/levar\s*/gi, '')
+          .replace(/bora\s*/gi, '')
+          .replace(/manda\s*/gi, '')
+          .trim();
+
+        // Se não extraiu nada, usar a mensagem inteira
+        if (!productName || productName.length < 2) {
+          productName = lower;
+        }
+
+        const products = await this.productsService.search(tenantId, productName);
+        if (products.length > 0) {
+          const product = products[0];
+          await this.cartService.addItem({
+            tenantId,
+            customerPhone: conversation.customer_phone,
+            produtoId: product.id,
+            produtoName: product.name,
+            quantity: 1,
+            unitPrice: Number(product.price),
+          });
+          return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao carrinho!\n\nDigite "carrinho" para ver ou "finalizar" para confirmar.`;
+        }
+      } catch (error) {
+        this.logger.error('Error in buy intent fallback', { error, message });
+      }
+    }
+
     // Tentar encontrar produto se a mensagem parecer ser sobre um
     if (this.isProductIntent(message) || lower.length > 3) {
       try {
