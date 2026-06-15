@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DbContextService } from '../../common/services/db-context.service';
-import { In, LessThan, MoreThan } from 'typeorm';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource, In, LessThan, MoreThan } from 'typeorm';
 import { WhatsAppCart, CartItem } from '../../../database/entities/WhatsappCart.entity';
 
 export interface AddToCartInput {
@@ -34,7 +34,7 @@ export class CartService {
   private readonly logger = new Logger(CartService.name);
 
   constructor(
-    private readonly db: DbContextService,
+    @InjectDataSource() private readonly dataSource: DataSource,
     private readonly config: ConfigService,
   ) {}
 
@@ -52,7 +52,7 @@ export class CartService {
   }
 
   private getRepository() {
-    return this.db.getRepository(WhatsAppCart);
+    return this.dataSource.getRepository(WhatsAppCart);
   }
 
   /**
