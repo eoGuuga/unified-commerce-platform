@@ -68,19 +68,9 @@ import { CommonModule } from '../common/common.module';
   ],
   controllers: [],
   providers: [
-    // Services existentes
-    // TODO: Restaurar apos debug
-    // WhatsappService,
-    // WhatsAppErrorHandler,
-    // WhatsAppAnalyticsService,
-    // ConversationManagerService,
-
-    // NOVOS SERVICES - FASE 3 (Refatoração)
-    // MessageProcessorService,
-    // CatalogManagerService,
-    // ResponseBuilderService,
-    // NLPService,
-    // SalesOrchestratorService,
+    // Services existentes - testando um por um
+    // 1. WhatsAppService
+    WhatsappService,
   ],
   exports: [
     // TODO: Restaurar apos debug
