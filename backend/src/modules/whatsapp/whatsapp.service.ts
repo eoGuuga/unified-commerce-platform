@@ -195,20 +195,20 @@ export class WhatsAppService {
       return response || '';
 
     } catch (error) {
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      console.error('[WhatsAppService] ERROR:', errorObj.message, errorObj.stack);
+
       this.logger.error('Error processing message', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+        error: errorObj.message,
+        stack: errorObj.stack,
         message,
       });
 
-      const fallback = this.errorHandler.handleError(
-        error instanceof Error ? error : new Error(String(error)),
-        {
-          tenantId: message.tenantId,
-          customerPhone: message.from,
-          action: 'processMessage',
-        },
-      );
+      const fallback = this.errorHandler.handleError(errorObj, {
+        tenantId: message.tenantId,
+        customerPhone: message.from,
+        action: 'processMessage',
+      });
 
       await this.trackMessageMetrics(
         message,
