@@ -30,11 +30,18 @@ import { CartService } from './services/cart.service';
 import { WhatsAppErrorHandler } from './services/error-handler.service';
 import { WhatsAppAnalyticsService } from './services/analytics.service';
 import { ConversationManagerService } from './services/conversation-manager.service';
+import { InteractiveMessageService } from './services/interactive-message.service';
 
 import { TypedConversation, ConversationState, CustomerData, PendingOrder } from './types/whatsapp.types';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
 
-export type WhatsAppOutboundResponse = string | { kind: 'interactive_list'; previewText: string; list: any };
+export type WhatsAppOutboundResponse =
+  | string
+  | { kind: 'interactive_list'; previewText: string; list: any }
+  | { kind: 'interactive_with_buttons'; previewText: string; cartContent: string; buttons: Array<{ id: string; title: string }> }
+  | { kind: 'interactive_order'; previewText: string; orderId: string; items: string; subtotal: number; shipping: number; total: number; buttons: Array<{ id: string; title: string }> }
+  | { kind: 'interactive_product'; previewText: string; product: any; buttons: Array<{ id: string; title: string }> }
+  | { kind: 'interactive_welcome'; previewText: string; greeting: string; message: string; options: Array<{ id: string; title: string }> };
 
 export interface WhatsAppMessage {
   from: string;
@@ -90,6 +97,7 @@ export class WhatsAppService {
     private readonly errorHandler: WhatsAppErrorHandler,
     private readonly analytics: WhatsAppAnalyticsService,
     private readonly conversationManager: ConversationManagerService,
+    private readonly interactiveMessages: InteractiveMessageService,
     private readonly db: DbContextService,
   ) {}
 
@@ -1260,6 +1268,265 @@ export class WhatsAppService {
           end: new Date().toISOString(),
         },
       };
+    }
+  }
+
+  // ============== INTERACTIVE MESSAGES (WhatsApp Business API) ==============
+
+  /**
+   * Cria mensagem interativa de carrinho com botões
+   */
+  async createInteractiveCartMessage(
+    tenantId: string,
+    customerPhone: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    const cart = await this.cartService.getOrCreateCart(tenantId, customerPhone);
+
+    if (cart.items.length === 0) {
+      return this.responseBuilder.buildEmptyCartResponse();
+    }
+
+    // Calcular totais
+    const subtotal = cart.items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+    const shipping = 10; // Frete fixo por enquanto
+    const total = subtotal + shipping;
+
+    // Criar conteúdo do carrinho em texto
+    const cartItems = cart.items.map((item, idx) =>
+      `${idx + 1}. ${item.produto_name}\n   Qtd: ${item.quantity} × R$ ${item.unit_price.toFixed(2)} = R$ ${(item.unit_price * item.quantity).toFixed(2)}`
+    ).join('\n');
+
+    const cartContent = [
+      '🛒 *Seu Carrinho:*',
+      '',
+      cartItems,
+      '',
+      `📦 Subtotal: R$ ${subtotal.toFixed(2)}`,
+      `🚚 Frete: R$ ${shipping.toFixed(2)}`,
+      '',
+      `💰 *TOTAL: R$ ${total.toFixed(2)}*`,
+    ].join('\n');
+
+    // Retornar com botões interativos
+    return {
+      kind: 'interactive_with_buttons',
+      previewText: '🛒 Seu carrinho',
+      cartContent,
+      buttons: [
+        { id: 'add_more', title: '➕ Adicionar mais' },
+        { id: 'finalize', title: '✅ Finalizar' },
+        { id: 'clear', title: '🗑️ Limpar' },
+      ],
+    };
+  }
+
+  /**
+   * Cria mensagem de confirmação de pedido com estrutura profissional
+   */
+  createOrderConfirmationMessage(
+    orderId: string,
+    items: Array<{ name: string; quantity: number; price: number }>,
+    subtotal: number,
+    shipping: number,
+    total: number,
+  ): WhatsAppOutboundResponse {
+    // Criar mensagem estruturada com botões
+    const itemsText = items.map(item =>
+      `• ${item.quantity}x ${item.name} - R$ ${(item.price * item.quantity).toFixed(2)}`
+    ).join('\n');
+
+    return {
+      kind: 'interactive_order',
+      previewText: `Pedido #${orderId} confirmado!`,
+      orderId,
+      items: itemsText,
+      subtotal,
+      shipping,
+      total,
+      buttons: [
+        { id: `pay_${orderId}`, title: '💳 Pagar com PIX' },
+        { id: `status_${orderId}`, title: '📦 Status' },
+        { id: 'help', title: '❓ Ajuda' },
+      ],
+    };
+  }
+
+  /**
+   * Cria mensagem de produto com botões de ação
+   */
+  createProductMessage(
+    product: {
+      id: string;
+      name: string;
+      price: number;
+      description?: string;
+    },
+    tenantId: string,
+  ): WhatsAppOutboundResponse {
+    return {
+      kind: 'interactive_product',
+      previewText: `${product.name} - R$ ${product.price.toFixed(2)}`,
+      product,
+      buttons: [
+        { id: `add_${product.id}`, title: '🛒 Adicionar' },
+        { id: `details_${product.id}`, title: '📝 Detalhes' },
+        { id: 'catalog', title: '📋 Cardápio' },
+      ],
+    };
+  }
+
+  /**
+   * Cria lista interativa de produtos com preços visíveis
+   */
+  async createProductListMessage(
+    tenantId: string,
+    searchTerm?: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    let products: any[] = [];
+
+    if (searchTerm) {
+      products = await this.productsService.search(tenantId, searchTerm);
+    } else {
+      const result: any = await this.productsService.findAll(tenantId, { limit: 10 });
+      if (result && result.data) {
+        products = result.data;
+      } else if (Array.isArray(result)) {
+        products = result;
+      }
+    }
+
+    if (!products || products.length === 0) {
+      return '😕 Não encontramos produtos no momento. Tente novamente mais tarde!';
+    }
+
+    // Criar seções de produtos
+    const sections = [{
+      title: '🍫 Nossos Produtos',
+      rows: products.map((p) => ({
+        id: `prod_${p.id}`,
+        title: p.name,
+        description: `R$ ${Number(p.price).toFixed(2)}`,
+      })),
+    }];
+
+    return {
+      kind: 'interactive_list',
+      previewText: '📋 Cardápio',
+      list: {
+        title: '📋 Cardápio',
+        description: 'Escolha um produto:',
+        buttonText: 'Ver opções',
+        sections,
+      },
+    };
+  }
+
+  /**
+   * Cria mensagem de boas-vindas com menu rápido
+   */
+  createWelcomeMessage(): WhatsAppOutboundResponse {
+    return {
+      kind: 'interactive_welcome',
+      previewText: 'Olá! Como posso ajudar?',
+      greeting: 'Olá! 👋 Bem-vindo(a)!',
+      message: 'Sou seu assistente virtual e posso te ajudar com:',
+      options: [
+        { id: 'catalog', title: '📋 Ver cardápio' },
+        { id: 'cart', title: '🛒 Meu carrinho' },
+        { id: 'help', title: '❓ Ajuda' },
+      ],
+    };
+  }
+
+  /**
+   * Processa clique em botão interativo
+   */
+  async processInteractiveButton(
+    buttonId: string,
+    tenantId: string,
+    customerPhone: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    const [action, ...rest] = buttonId.split('_');
+    const value = rest.join('_');
+
+    switch (action) {
+      case 'add':
+        // Adicionar produto ao carrinho
+        const products = await this.productsService.search(tenantId, value);
+        if (products.length > 0) {
+          const product = products[0];
+          await this.cartService.addItem({
+            tenantId,
+            customerPhone,
+            produtoId: product.id,
+            produtoName: product.name,
+            quantity: 1,
+            unitPrice: Number(product.price),
+          });
+          return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao carrinho!`;
+        }
+        return '😕 Produto não encontrado.';
+
+      case 'finalize':
+        return this.handleCheckout(tenantId, customerPhone);
+
+      case 'clear':
+        const cart = await this.cartService.getOrCreateCart(tenantId, customerPhone);
+        if (cart.items.length === 0) {
+          return '🛒 Seu carrinho já está vazio!';
+        }
+        await this.cartService.clearCart(cart.id);
+        return '🧹 Carrinho esvaziado! Quer adicionar algo novo?';
+
+      case 'add_more':
+        return this.createProductListMessage(tenantId);
+
+      case 'catalog':
+        return this.createProductListMessage(tenantId);
+
+      case 'cart':
+        const cartMsg2 = await this.cartService.getOrCreateCart(tenantId, customerPhone);
+        if (cartMsg2.items.length === 0) {
+          return '🛒 Seu carrinho está vazio!';
+        }
+        const items = cartMsg2.items.map((item: any, idx: number) =>
+          `${idx + 1}. ${item.produto_name}\n   Qtd: ${item.quantity} × R$ ${item.unit_price.toFixed(2)}`
+        ).join('\n');
+        return [
+          '🛒 *Seu Carrinho:*',
+          '',
+          items,
+          '',
+          'Digite "finalizar" para confirmar ou "limpar" para esvaziar.',
+        ].join('\n');
+
+      case 'pay':
+        return '💳 Para pagar, finalize seu pedido e escolha a forma de pagamento!';
+
+      case 'status':
+        return '📦 Para acompanhar seu pedido, me diga o número do pedido!';
+
+      case 'help':
+        return this.responseBuilder.buildHelpMessage();
+
+      case 'details':
+        const detailProducts = await this.productsService.search(tenantId, value);
+        if (detailProducts.length > 0) {
+          const product = detailProducts[0];
+          return [
+            `🍫 *${product.name}*`,
+            '',
+            `💰 *Preço: R$ ${Number(product.price).toFixed(2)}*`,
+            '',
+            product.description || 'Delicioso!',
+            '',
+            'Digite "adicionar ' + product.name.split(' ')[0] + '" para comprar!',
+          ].join('\n');
+        }
+        return '😕 Produto não encontrado.';
+
+      default:
+        return '❌ Opção não reconhecida. Digite "ajuda" para ver os comandos.';
     }
   }
 }

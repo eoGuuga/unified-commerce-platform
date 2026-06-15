@@ -32,6 +32,7 @@ import { CatalogManagerService } from './services/catalog-manager.service';
 import { ResponseBuilderService } from './services/response-builder.service';
 import { NLPService } from './services/nlp.service';
 import { SalesOrchestratorService } from './services/sales-orchestrator.service';
+import { InteractiveMessageService } from './services/interactive-message.service';
 
 // Entities
 import { WhatsappConversation } from '../../database/entities/WhatsappConversation.entity';
@@ -96,6 +97,7 @@ import { CommonModule } from '../common/common.module';
     ResponseBuilderService,
     NLPService,
     SalesOrchestratorService,
+    InteractiveMessageService,
 
     // Service principal
     WhatsappService,
