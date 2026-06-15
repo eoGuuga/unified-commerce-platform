@@ -179,10 +179,7 @@ export class WhatsAppService {
             customer_data: conversationForTimeout.context?.customer_data,
           });
 
-          const greeting = this.responseBuilder.buildGreeting(conversationForTimeout.customer_name);
           return [
-            greeting,
-            '',
             '👋 *Que bom que você voltou!*',
             '',
             'Parece que faz um tempinho... Mas estamos aqui para ajudar! 😊',
