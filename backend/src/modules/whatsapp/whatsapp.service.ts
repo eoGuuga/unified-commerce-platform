@@ -506,13 +506,11 @@ export class WhatsAppService {
   ): Promise<WhatsAppOutboundResponse> {
     try {
       const cart = await this.cartService.getOrCreateCart(tenantId, customerPhone);
-      console.log('[Checkout] Cart:', JSON.stringify(cart, null, 2));
 
       if (cart.items.length === 0) {
         return '🛒 Seu carrinho está vazio! Adicione itens primeiro.';
       }
 
-      console.log('[Checkout] Creating order with items:', cart.items);
       const order = await this.ordersService.create(
         {
           channel: CanalVenda.WHATSAPP,
@@ -547,10 +545,8 @@ export class WhatsAppService {
       ].join('\n');
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      console.error('[Checkout] ERROR:', err.message, err.stack);
       this.logger.error('Error during checkout', {
         error: err.message,
-        stack: err.stack,
         tenantId,
         customerPhone
       });
