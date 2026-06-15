@@ -545,7 +545,12 @@ export class WhatsAppService {
         'Agora preciso do endereço de entrega. Qual seu endereço completo?',
       ].join('\n');
     } catch (error) {
-      this.logger.error('Error during checkout', { error, tenantId, customerPhone });
+      this.logger.error('Error during checkout', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        tenantId,
+        customerPhone
+      });
       return '😕 Houve um erro ao processar seu pedido. Tente novamente.';
     }
   }
