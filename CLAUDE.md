@@ -1,7 +1,7 @@
 # CLAUDE.md — Guia operacional (UCM / GTSoftHub)
 
 Leitura obrigatoria antes de tocar codigo. SaaS comercial real em producao com PII e pagamentos.
-Este arquivo e otimizado para **eficiencia**: te dar o mapa exato evita exploracao cega e retrabalho — essa e a maior economia de tokens que existe. Detalhe longo fica em docs referenciados (carregados sob demanda).
+**Vai mexer em codigo? Pule para o Mapa (sec. 6) primeiro** — saber onde fica cada coisa evita exploracao cega, que e o maior gasto de token. Detalhe longo (seguranca/LGPD) fica em docs referenciados, carregados sob demanda.
 
 ---
 
@@ -15,11 +15,12 @@ Erro aqui = prejuizo financeiro, vazamento de dados de cliente, ou processo judi
 3. **Profissionalismo.** Codigo que se parece com o vizinho. Sem giria, sem "provisorio" que vira divida. Achou erro na base? Diga — nao replique.
 4. **Honestidade de resultado.** Teste falhou: diga com a saida. Pulou passo: diga. "Funciona" so apos verificar.
 
-**Definition of Done (rodar antes de declarar tarefa pronta):**
+**Definition of Done (checklist canonico — rodar antes de declarar tarefa pronta E antes de PR/deploy):**
 - [ ] `cd backend && npm run build` passa (e `npm run lint` sem novo erro nos arquivos tocados).
 - [ ] Mexeu no frontend? `npm run type-check` e `npm run lint` passam.
+- [ ] Mexeu em migration? Rodou em dev (`npm run migration:run`)?
 - [ ] Zero secret/PII/credencial/IP em codigo, commit, log.
-- [ ] Rota publica/webhook tocada? Continua idempotente + fail-closed.
+- [ ] Rota publica/webhook tocada? Continua idempotente + fail-closed (retry testado).
 - [ ] Comportamento publico mudou? Refletido em `docs/CONSOLIDADO/`.
 
 **Confirmar com o usuario ANTES de** (acoes dificeis de reverter): deploy em prod, migration destrutiva, apagar/sobrescrever dados, push forcado, expor algo novo na internet, enviar dados a servico externo. Aprovacao em um contexto nao vale para o proximo.
@@ -37,7 +38,7 @@ GTSoftHub e um **SaaS multi-tenant que o dono VENDE para clientes**. Cada client
 
 ## 2. Stack
 
-Backend: **NestJS 11 + TypeORM 0.3 + Postgres 15 (RLS) + Redis 7**, class-validator + zod, JWT + bcryptjs + CSRF. `tsconfig` **strict:true** (mas `strictPropertyInitialization:false`). Path aliases: `@modules/* @common/* @config/* @database/*`.
+Backend: **NestJS 11 + TypeORM 0.3 + Postgres 15 (RLS) + Redis 7**, class-validator + zod, JWT + bcryptjs + CSRF. `tsconfig` **strict:true** (mas `strictPropertyInitialization:false`). Path aliases: `@/*` (raiz src), `@modules/* @common/* @config/* @database/*`.
 Frontend: **Next.js 16 (App Router) + React 19 + Tailwind 4 + Radix**. Testes em **vitest**.
 Pagamentos: **Mercado Pago SDK 2.x** + mock PIX (so dev). WhatsApp: **Twilio ou Evolution** (`WHATSAPP_PROVIDER`). IA: **OpenAI ou Ollama** (`OPENAI_BASE_URL`).
 
@@ -113,7 +114,7 @@ docs/CONSOLIDADO/ .................. doc oficial (use) | docs/LEGADO/ historico 
 - **`whatsapp.service.legacy.ts` (14.817 linhas) e CODIGO MORTO.** Nao e importado por nada em `src/` (so existe `.d.ts` no `dist/` antigo). NUNCA leia, edite ou use como referencia. O ativo e `whatsapp.service.ts` (1584L).
 - **Arquivos `*.service.ts.disabled`** em `whatsapp/services/` (cart-integration, message-handler, order-flow, payment-flow) estao desativados de proposito. Ignore.
 - **Edits no Edit tool falham silenciosamente as vezes** nesta sessao (param "missing"). Se acontecer, reenvie o mesmo Edit — nao reescreva o arquivo inteiro.
-- **Multi-tenant:** nunca escreva `WHERE tenant_id=?` achando que isola. O isolamento e RLS. Query fora do contexto de tenant = retorna vazio ou vaza. Veja `DbContextService`.
+- **Multi-tenant (ver invariante 3.1):** query fora do contexto de tenant retorna vazio silenciosamente (nao da erro) — sintoma comum de "sumiu dado". E falta de contexto RLS, nao bug de dados.
 - **Estoque** mora em `movimentacoes_estoque` (colunas `current_stock`, `reserved_stock`, `min_stock`), nao numa coluna em `produtos`.
 - **Deploy:** build local NAO atualiza prod. Prod = Docker na VPS via SSH. Veja sec. 8.
 - **Shell:** ambiente e Windows. Bash tool existe (POSIX), mas PowerShell e o shell primario. `Date.now()`/`Math.random()` nao existem em scripts de Workflow.
@@ -148,7 +149,8 @@ bash deploy/scripts/backup-postgres.sh
 | `POST /api/v1/payments/webhook/mercadopago` | Mercado Pago | `x-signature` (HMAC) + `?token=` |
 | `POST /api/v1/whatsapp/webhook` | Twilio / Evolution | assinatura do provider |
 
-Ambos: `@Public()`, `@Throttle({ webhook:{ttl:60s,limit:60} })`, nginx `api_webhook` (5 r/s, burst 10), **idempotentes**, **fail-closed** se secret faltar em prod.
+Ambos: `@Public()`, nginx `api_webhook` (5 r/s, burst 10), **idempotentes**, e DEVEM ser **fail-closed** se o secret faltar em prod.
+Estado real (verificar antes de confiar): so o webhook MercadoPago tem `@Throttle({ webhook:{ttl:60000,limit:60} })`; o de WhatsApp (`whatsapp.controller.ts:351`) NAO tem o decorator (cai no throttle `default` 100/min em prod) **e hoje e fail-open** (`if (webhookSecret && signature)` — pendencia critica no backlog de seguranca).
 
 ---
 
@@ -174,6 +176,4 @@ Exemplos: `deploy/env.prod.example`, `deploy/env.dev.example`.
 - **Novo endpoint:** controller no modulo -> DTO com class-validator -> service -> registrar no module. Publico? `@Public()` + rate limit. Toca PII? Audit log.
 - **Mudanca de schema:** editar entity -> `migration:generate` -> revisar SQL gerado -> `migration:run` em dev -> testar. Nunca `synchronize`.
 - **Bug de pagamento:** `payments.service.ts` + webhook handler. Verifique idempotencia e fail-closed antes de "corrigir".
-- **Antes de PR/deploy:** rodar Definition of Done (sec. 0) + os 6 checks do final.
-
-**Checklist pre-deploy:** (1) backend lint+build+test:unit; (2) frontend lint+type-check+build; (3) migration rodada em dev?; (4) webhook idempotente+fail-closed+retry testado?; (5) zero secret/PII em diff/commit/log?; (6) `docs/CONSOLIDADO/` atualizado?
+- **Antes de PR/deploy:** rodar a **Definition of Done (sec. 0)** — ela ja cobre build, lint, type-check, secrets, webhook idempotente/fail-closed, migration e docs. Nao ha segundo checklist; este e o canonico.
