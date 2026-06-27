@@ -85,7 +85,7 @@ export default function LoginExperience({ redirectTarget }: { redirectTarget: st
             A operação que <em className="text-[#b8654a]" style={{ fontStyle: 'italic' }}>respira</em> em uníssono.
           </h1>
           <p className="mt-6 max-w-md text-[16px] leading-[1.55] text-[#1a1814]/70">
-            Estoque, PDV, loja online e atendimento compartilhando a mesma fonte de verdade. A plataforma que devolve ritmo e serenidade.
+            Estoque, PDV, bot de WhatsApp e atendimento compartilhando a mesma fonte de verdade. A plataforma que devolve ritmo e serenidade.
           </p>
 
           <div className="mt-12 space-y-3">

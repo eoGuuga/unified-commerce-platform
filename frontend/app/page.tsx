@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, ArrowUpRight, MessageCircle, Heart, Zap, Package, BarChart3, Users, Receipt, Check, Sparkles, MousePointer2, ChevronDown, ShieldCheck, Clock4, TrendingUp, Boxes, Bell, ShoppingBag, X } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, MessageCircle, Heart, Zap, Package, BarChart3, Users, Receipt, Check, Sparkles, MousePointer2, ChevronDown, ShieldCheck, Clock4, TrendingUp, Boxes, X } from 'lucide-react';
 import { ScrollReveal, ScrollParallax, ScrollCountUp, WhatsAppMockup, MetricCard, MóduloVisual, TimelineStep, AvatarGradiente, PlanoDestaque, BotaoMicro, ScrollHint } from '@/components/landing/Animations';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
@@ -106,7 +106,7 @@ const planos = [
     cta: 'Começar 14 dias grátis',
     ctaIcon: ArrowRight,
     features: [
-      'Loja online com até 100 produtos',
+      'Catálogo com até 100 produtos',
       'PDV com 1 caixa',
       'Bot de WhatsApp (100 conversas/mês)',
       'Painel admin básico',
@@ -123,7 +123,7 @@ const planos = [
     cta: 'Assinar Crescer',
     ctaIcon: Sparkles,
     features: [
-      'Loja online com produtos ilimitados',
+      'Catálogo com produtos ilimitados',
       'PDV com até 5 caixas',
       'Bot de WhatsApp ilimitado',
       'Painel admin avançado com relatórios',
@@ -222,13 +222,13 @@ export default function HomePage() {
 
           <div className="mt-12 grid gap-12 lg:grid-cols-[1.2fr_1fr] lg:gap-16">
             <p className="max-w-2xl text-[18px] leading-[1.55] text-[#1a1814]/75 sm:text-[20px]">
-              A GTSoftHub une sua loja física, sua vitrine online, seu caixa e seu WhatsApp numa operação só. Estoque, vendas e atendimento conversando entre si, sem você precisar montar nada.
+              A GTSoftHub une seu WhatsApp, seu caixa e seu estoque numa operação só. Vendas e atendimento conversando entre si, sem você precisar montar nada.
             </p>
 
             <div className="grid gap-4 self-end border-t border-[#1a1814]/15 pt-6 sm:grid-cols-3">
               {[
-                { t: 'Estoque único', d: 'Loja, PDV, WhatsApp' },
-                { t: '4 canais', d: 'Físico, online, app, bot' },
+                { t: 'Estoque único', d: 'WhatsApp e PDV' },
+                { t: '4 módulos', d: 'Bot, PDV, admin, estoque' },
                 { t: 'Bot 24/7', d: 'WhatsApp automático' },
               ].map((m) => (
                 <div
@@ -502,7 +502,7 @@ export default function HomePage() {
 
               <ul className="space-y-3">
                 {[
-                  'Unifica estoque, PDV, loja online e WhatsApp numa operação só',
+                  'Unifica estoque, PDV e WhatsApp numa operação só',
                   'Bot de WhatsApp responde cliente 24/7 e fecha vendas sozinho',
                   'Setup assistido em 15 dias pela nossa equipe (sem você configurar nada)',
                   'Suporte humano em português, não chatbot',
@@ -634,7 +634,7 @@ export default function HomePage() {
                   <span className="text-[15px] font-medium tracking-[-0.01em] text-[#f6f3ee]" style={{ fontFamily: 'var(--font-display)' }}>GTSoftHub</span>
                 </div>
                 <p className="mt-4 max-w-sm text-[13px] leading-[1.55] text-[#f6f3ee]/60">
-                  Plataforma premium para varejo omnichannel. Estoque, PDV, loja online e atendimento num só ecossistema.
+                  Plataforma premium para varejo. Bot de WhatsApp, PDV, estoque e atendimento num só ecossistema.
                 </p>
               </div>
 
