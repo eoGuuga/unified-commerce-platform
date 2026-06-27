@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { RefreshCw, Package, Search, Bell } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -32,6 +32,13 @@ export function OrdersManager() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'todos'>('todos');
   const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+
+  // Feedback de sucesso some sozinho apos 6s; erro fica ate o proximo clique.
+  useEffect(() => {
+    if (feedback?.kind !== 'ok') return;
+    const id = setTimeout(() => setFeedback(null), 6000);
+    return () => clearTimeout(id);
+  }, [feedback]);
 
   const filtered = useMemo(() => {
     return orders.filter((o) => {

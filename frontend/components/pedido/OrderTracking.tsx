@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { CheckCircle2, Circle, Loader2, XCircle, Package } from 'lucide-react';
 import api from '@/lib/api-client';
 import {
   TIMELINE_SEQUENCE,
   getStatusMeta,
   getTimelineIndex,
+  isTerminalStatus,
 } from '@/lib/order-status';
 import type { PublicOrderTrackingResponse } from '@/lib/types/order';
 
@@ -47,16 +48,19 @@ export function OrderTracking({ orderNo }: { orderNo: string | null }) {
   );
 
   // Auto-atualiza o status a cada 30s enquanto o pedido nao for terminal.
+  // Guarda o contato num ref para nao recriar o intervalo a cada tecla digitada.
+  const contactRef = useRef(contact);
+  contactRef.current = contact;
+
+  const orderStatus = order?.status;
   useEffect(() => {
-    if (!order || !orderNo) return;
-    const meta = getStatusMeta(order.status);
-    if (order.status === 'entregue' || order.status === 'cancelado') return;
+    if (!orderStatus || !orderNo) return;
+    if (isTerminalStatus(orderStatus)) return;
     const id = setInterval(() => {
-      void fetchOrder(orderNo, contact);
+      void fetchOrder(orderNo, contactRef.current);
     }, 30000);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order?.status, orderNo, contact]);
+  }, [orderStatus, orderNo, fetchOrder]);
 
   if (!orderNo) {
     return (
@@ -194,11 +198,11 @@ export function OrderTracking({ orderNo }: { orderNo: string | null }) {
           </div>
           <ul className="space-y-2">
             {order.items?.map((item) => (
-              <li key={item.id} className="flex items-center justify-between text-[14px] text-[#1a1814]/80">
-                <span>
+              <li key={item.id} className="flex items-center justify-between gap-3 text-[14px] text-[#1a1814]/80">
+                <span className="min-w-0 truncate">
                   {item.quantity}× {item.product_name}
                 </span>
-                <span>{formatMoney(item.subtotal)}</span>
+                <span className="flex-shrink-0">{formatMoney(item.subtotal)}</span>
               </li>
             ))}
           </ul>

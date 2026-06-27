@@ -16,6 +16,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { TrackPublicOrderDto } from './dto/track-public-order.dto';
 import { CanalVenda, PedidoStatus } from '../../database/entities/Pedido.entity';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/user.decorator';
@@ -118,6 +119,9 @@ export class OrdersController {
 
   @Post('public/track')
   @Public()
+  // Rate limit estrito: o order_no tem so 16 bits de aleatoriedade; sem isto
+  // um atacante poderia enumerar pedidos por forca bruta (privacidade do cliente).
+  @Throttle({ strict: { ttl: 60000, limit: 10 } })
   @ApiOperation({ summary: 'Consultar pedido publicamente por codigo e contato' })
   @ApiResponse({
     status: 200,
