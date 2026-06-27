@@ -1,13 +1,18 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   output: 'standalone',
   serverExternalPackages: ['sharp', 'better-sqlite3'],
-  // Disable Turbopack for production build
-  experimental: {
-    // Use webpack instead of turbopack
+  // Fixa o root do Turbopack/Next neste diretorio. Sem isto, em monorepo
+  // (backend ao lado) o Next 16 infere o workspace root errado e PULA rotas
+  // silenciosamente no build (ex.: /loja sumia no build do servidor).
+  turbopack: {
+    root: __dirname,
   },
+  outputFileTracingRoot: path.join(__dirname),
   images: {
     unoptimized: process.env.NODE_ENV !== 'production',
     remotePatterns: [
