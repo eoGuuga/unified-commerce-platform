@@ -32,10 +32,11 @@ O projeto **funciona em partes, mas NAO esta vendavel hoje** — e a causa nao e
 ### Remocao do storefront (decisao de produto 2026-06-27)
 - [x] **STORE-1. Remover vitrine /loja.** FEITO (branch `refactor/remove-storefront`, NAO mergeada): removidas rotas `/loja`, `/loja/checkout`, `/loja/produto`, components/loja, hooks useProducts/useCart. Links ajustados (landing/footer/sitemap/admin/pdv/pedido). `/pedido` MANTIDO. Build verde, 85 testes. Cliente final compra so via WhatsApp/PDV.
 
-### Fluxo de pedido / acompanhamento (visao confirmada 2026-06-27 — NOVO, P0 para plano completo)
-- [ ] **PED-1. Gestao de pedidos no /admin.** Tela onde o lojista ve pedidos (do bot E do PDV) e avanca status: Recebido → Preparando → Saiu p/ entrega → Entregue.
-- [ ] **PED-2. Notificacao de status no WhatsApp.** Cada mudanca de status no admin dispara mensagem automatica ao cliente (o coracao do acompanhamento).
-- [ ] **PED-3. Pagina /pedido conectada de verdade.** Hoje e template estatico; ligar ao pedido real (`/pedido?order=X`) mostrando a timeline. Bot ja envia esse link (`tracking-url.ts`).
+### Fluxo de pedido / acompanhamento (visao confirmada 2026-06-27 — P0 para plano completo)
+- [x] **PED-1. Gestao de pedidos no /admin.** FEITO 2026-06-27 (branch `feat/order-fulfillment`): tela `/admin/pedidos` (lista pedidos do bot+PDV, filtro por status/busca, avanca status com 1 clique). Reusa o backend existente.
+- [x] **PED-2. Notificacao de status no WhatsApp.** JA EXISTIA no backend: `updateStatus` -> `notifyOrderStatusChange` notifica o cliente a cada mudanca. A tela do admin so aciona o endpoint.
+- [x] **PED-3. Pagina /pedido conectada de verdade.** FEITO 2026-06-27: `/pedido?order=X` busca o pedido real via tracking publico (verifica identidade por email/telefone, mascara PII), mostra timeline de status com auto-refresh 30s. Camada `lib/order-status.ts` (espelha state machine, 11 testes).
+- NOTA: backend ja tinha state machine (`assertStatusTransition`), `PATCH /orders/:id/status` e notificacao. Trabalho foi 90% frontend. Bug corrigido: api-client apontava para `/orders/:id` em vez de `/orders/:id/status`.
 
 ### Seguranca / fraude (verificado no codigo)
 - [x] **S1. Webhook WhatsApp fail-open.** FEITO 2026-06-26 (Sprint Cofre): fail-closed em prod — exige secret + assinatura valida; sem isso, rejeita. Testado.
