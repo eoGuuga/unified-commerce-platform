@@ -6,12 +6,10 @@ const nextConfig = {
   poweredByHeader: false,
   output: 'standalone',
   serverExternalPackages: ['sharp', 'better-sqlite3'],
-  // Fixa o root do Turbopack/Next neste diretorio. Sem isto, em monorepo
-  // (backend ao lado) o Next 16 infere o workspace root errado e PULA rotas
-  // silenciosamente no build (ex.: /loja sumia no build do servidor).
-  turbopack: {
-    root: __dirname,
-  },
+  // Build usa webpack (script "build": "next build --webpack"), nao Turbopack:
+  // o Turbopack mascarava erros de tipo do Next 16 PULANDO rotas silenciosamente
+  // (ex.: /loja sumia no build do servidor sem erro). Webpack falha honestamente.
+  // outputFileTracingRoot fixa o root em monorepo (backend ao lado).
   outputFileTracingRoot: path.join(__dirname),
   images: {
     unoptimized: process.env.NODE_ENV !== 'production',

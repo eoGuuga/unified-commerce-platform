@@ -4,10 +4,6 @@ type SearchParams = {
   redirect?: string | string[];
 };
 
-type LoginPageProps = {
-  searchParams?: Promise<SearchParams> | SearchParams;
-};
-
 function resolveRedirectTarget(target?: string | string[]) {
   if (typeof target === 'string' && target.startsWith('/')) {
     return target;
@@ -16,8 +12,12 @@ function resolveRedirectTarget(target?: string | string[]) {
   return '/admin';
 }
 
-export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const params = searchParams ? await searchParams : undefined;
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const params = await searchParams;
 
   return <LoginExperience redirectTarget={resolveRedirectTarget(params?.redirect)} />;
 }

@@ -16,8 +16,9 @@ const labels: Record<string, string> = {
   cookies: "Cookies",
 }
 
-export default function InfoPage({ params }: { params: { slug: string } }) {
-  const title = labels[params.slug] ?? "Conteúdo"
+export default async function InfoPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const title = labels[slug] ?? "Conteúdo"
 
   return (
     <div className="min-h-screen bg-background text-foreground">
