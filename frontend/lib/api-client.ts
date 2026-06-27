@@ -137,9 +137,10 @@ class ApiClient {
     return this.request<Product[]>('/products');
   }
 
-  async getPublicStoreProducts(tenantId: string): Promise<Product[]> {
+  async getPublicStoreProducts(tenantId?: string): Promise<Product[]> {
+    const tid = resolveTenantId(tenantId);
     return this.request<Product[]>('/products/public/catalog', {
-      headers: tenantId ? { 'x-tenant-id': tenantId } : undefined,
+      headers: tid ? { 'x-tenant-id': tid } : undefined,
     });
   }
 
