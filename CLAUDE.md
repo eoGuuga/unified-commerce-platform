@@ -38,7 +38,7 @@ GTSoftHub e um **SaaS multi-tenant que o dono VENDE para clientes**. Cada client
 
 ## 2. Stack
 
-Backend: **NestJS 11 + TypeORM 0.3 + Postgres 15 (RLS) + Redis 7**, class-validator + zod, JWT + bcryptjs + CSRF. `tsconfig` **strict:true** (mas `strictPropertyInitialization:false`). Path aliases: `@/*` (raiz src), `@modules/* @common/* @config/* @database/*`.
+Backend: **NestJS 11 + TypeORM 0.3 + Postgres 15 (RLS) + Redis 7**, validacao com **class-validator** (zod esta no package mas NAO e usado em DTOs — nao introduza sem motivo), JWT + bcryptjs + CSRF. `tsconfig` **strict:true** (mas `strictPropertyInitialization:false`). Path aliases: `@/*` (raiz src), `@modules/* @common/* @config/* @database/*`.
 Frontend: **Next.js 16 (App Router) + React 19 + Tailwind 4 + Radix**. Testes em **vitest**.
 Pagamentos: **Mercado Pago SDK 2.x** + mock PIX (so dev). WhatsApp: **Twilio ou Evolution** (`WHATSAPP_PROVIDER`). IA: **OpenAI ou Ollama** (`OPENAI_BASE_URL`).
 
@@ -101,11 +101,15 @@ docs/CONSOLIDADO/ .................. doc oficial (use) | docs/LEGADO/ historico 
 ```
 
 **Bot WhatsApp — arquitetura HIBRIDA (entenda antes de mexer):**
-- Entrada: `whatsapp.service.ts` (1584L). NAO e monolito de if/else — orquestra servicos.
-- Caminho rapido: handlers diretos (carrinho, catalogo) para comandos obvios.
-- **Caminho de IA (o coracao):** `llm-router.service.ts` decide a acao -> `action-executor.service.ts` executa. `openai.service.ts` classifica intencao + entende giria PT-BR. Tudo em `whatsapp/services/` (~30 servicos: sales-intelligence, conversation-manager, message-intelligence, etc.).
-- Provider de envio: `whatsapp/providers/` (`evolution-api.provider.ts` com botoes/listas, `mock-whatsapp.provider.ts`). **`sendOutboundResponse` ainda so loga — falta ligar o provider de verdade.**
-- Tipos interativos: `whatsapp/types/whatsapp-interactive.types.ts`.
+`whatsapp.service.ts` (1584L) e orquestrador, NAO monolito de if/else. Fluxo real de uma mensagem:
+1. `processIncomingMessage()` (L107) — ignora grupo/broadcast/bloqueado, exige `tenantId`, valida tenant.
+2. `messageProcessor.processMessage()` (L139) — sanitiza, detecta tipo/limite de tamanho.
+3. **Fast-path:** handlers diretos (carrinho, catalogo, comando de bot) para comandos obvios.
+4. **Caminho de IA (o coracao):** `handleFallback()` (L906) -> `llmRouterService.route()` (L1062) decide a acao -> `actionExecutorService.execute()` (L1071) executa (busca estoque, cria pedido). `openai.service.ts` classifica intencao + entende giria PT-BR.
+5. `sendOutboundResponse()` (L278) — **hoje so loga; falta ligar `evolution-api.provider`.**
+
+- ~30 servicos em `whatsapp/services/` (sales-intelligence, conversation-manager, message-intelligence...). Providers em `whatsapp/providers/` (`evolution-api` com botoes/listas, `mock`). Tipos em `whatsapp/types/whatsapp-interactive.types.ts`.
+- Frontend tem `lib/api-client.ts` (axios) para chamar a API — relevante so se mexer no front.
 
 ---
 
@@ -118,6 +122,18 @@ docs/CONSOLIDADO/ .................. doc oficial (use) | docs/LEGADO/ historico 
 - **Estoque** mora em `movimentacoes_estoque` (colunas `current_stock`, `reserved_stock`, `min_stock`), nao numa coluna em `produtos`.
 - **Deploy:** build local NAO atualiza prod. Prod = Docker na VPS via SSH. Veja sec. 8.
 - **Shell:** ambiente e Windows. Bash tool existe (POSIX), mas PowerShell e o shell primario. `Date.now()`/`Math.random()` nao existem em scripts de Workflow.
+
+---
+
+## 7.5. Padroes de codigo (siga o existente)
+
+- **DTO + validacao:** input de endpoint sempre via DTO com `class-validator` (ex.: `auth/dto/login.dto.ts`). O `ValidationPipe` global (`main.ts:141`) faz whitelist + rejeita campo desconhecido. Validator custom = decorator em `common/decorators/`.
+- **Erros:** use excecoes Nest (`BadRequestException`, `NotFoundException`, `ConflictException`), **nunca `throw new Error`**. O `common/filters/http-exception.filter.ts` mascara mensagem de >=500 em prod. Logar com objeto sanitizado (`this.logger.error(msg, { campoSeguro })`), nunca payload/telefone/token cru.
+- **Contexto RLS em codigo (webhook/job fora do request):** o `TenantDbContextInterceptor` cobre requests normais. Fora dele, abra transacao e seta o tenant manualmente ANTES de qualquer query:
+  ```ts
+  await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [tenantId]);
+  ```
+  Padrao replicado em `auth.service.ts:57`, `orders.service.ts:472`, `payments.service.ts:796`, `tenants.service.ts:74`. Sem isso, a query retorna vazio (nao da erro).
 
 ---
 
@@ -173,7 +189,7 @@ Exemplos: `deploy/env.prod.example`, `deploy/env.dev.example`.
 ## 11. Receitas de tarefa (caminho mais curto comprovado)
 
 - **Mexer no bot WhatsApp:** comece em `whatsapp.service.ts` (orquestrador) -> siga para o servico especifico em `whatsapp/services/`. Logica de IA = `llm-router` + `action-executor` + `openai`. Nunca o `.legacy`.
-- **Novo endpoint:** controller no modulo -> DTO com class-validator -> service -> registrar no module. Publico? `@Public()` + rate limit. Toca PII? Audit log.
+- **Novo endpoint:** controller no modulo -> DTO com class-validator (padrao em sec. 7.5) -> service -> registrar no module. Publico? `@Public()` + rate limit. Toca PII? Audit log.
 - **Mudanca de schema:** editar entity -> `migration:generate` -> revisar SQL gerado -> `migration:run` em dev -> testar. Nunca `synchronize`.
 - **Bug de pagamento:** `payments.service.ts` + webhook handler. Verifique idempotencia e fail-closed antes de "corrigir".
 - **Antes de PR/deploy:** rodar a **Definition of Done (sec. 0)** — ela ja cobre build, lint, type-check, secrets, webhook idempotente/fail-closed, migration e docs. Nao ha segundo checklist; este e o canonico.
