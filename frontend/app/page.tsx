@@ -11,7 +11,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
  * mockup WhatsApp como protagonista, ícones visuais, micro-interações.
  */
 
-type VisualType = 'loja' | 'pdv' | 'admin' | 'estoque';
+type VisualType = 'whatsapp' | 'pdv' | 'admin' | 'estoque';
 
 const modules: Array<{
   number: string;
@@ -25,13 +25,13 @@ const modules: Array<{
 }> = [
   {
     number: '01',
-    icon: Package,
-    visual: 'loja',
-    title: 'Loja',
-    headline: 'Sua vitrine na internet, aberta 24 horas.',
-    description: 'O cliente vê o que tem, escolhe, paga, recebe. Sem ligar, sem esperar. Funciona enquanto você dorme.',
-    href: '/loja',
-    tags: ['Vitrine online', 'Vendas automáticas'],
+    icon: MessageCircle,
+    visual: 'whatsapp',
+    title: 'Bot de WhatsApp',
+    headline: 'Seu vendedor no WhatsApp, 24 horas por dia.',
+    description: 'O cliente chama, escolhe, informa o endereço e paga — tudo na conversa. O bot atende sozinho enquanto você produz.',
+    href: '#whatsapp',
+    tags: ['Atendimento automático', 'Vendas no chat'],
   },
   {
     number: '02',
@@ -39,7 +39,7 @@ const modules: Array<{
     visual: 'pdv',
     title: 'PDV',
     headline: 'O caixa que entende o que está acontecendo.',
-    description: 'Quando o cliente chega na loja, você sabe o que vendeu online, o que entrou, o que precisa repor. Tudo junto.',
+    description: 'Atenda na loja física e registre a venda na hora. O que vende no WhatsApp e no caixa conversa entre si, sem divergência.',
     href: '/pdv',
     tags: ['Atendimento', 'Controle em tempo real'],
   },
@@ -49,7 +49,7 @@ const modules: Array<{
     visual: 'admin',
     title: 'Admin',
     headline: 'A visão geral do seu negócio, numa tela só.',
-    description: 'Vendas, clientes, produtos, canais. Sem planilha, sem montagem. Você abre, entende, decide.',
+    description: 'Vendas, pedidos, clientes, produtos. Sem planilha, sem montagem. Você abre, entende, decide.',
     href: '/admin',
     tags: ['Relatórios', 'Decisão com dados'],
   },
@@ -616,8 +616,8 @@ export default function HomePage() {
                 <BotaoMicro href="#preços" variant="dark" icon="right" size="lg">
                   Começar 14 dias grátis
                 </BotaoMicro>
-                <BotaoMicro href="/loja" variant="outline" icon="up-right" size="lg">
-                  Ver a loja funcionando
+                <BotaoMicro href="/pdv" variant="outline" icon="up-right" size="lg">
+                  Conhecer o PDV
                 </BotaoMicro>
               </div>
             </div>
@@ -641,7 +641,6 @@ export default function HomePage() {
               <div>
                 <h4 className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#f6f3ee]/50">Plataforma</h4>
                 <ul className="mt-4 space-y-2 text-[13px]">
-                  <li><Link href="/loja" className="text-[#f6f3ee]/75 transition-colors duration-300 hover:text-[#f6f3ee]">Loja</Link></li>
                   <li><Link href="/pdv" className="text-[#f6f3ee]/75 transition-colors duration-300 hover:text-[#f6f3ee]">PDV</Link></li>
                   <li><Link href="/admin" className="text-[#f6f3ee]/75 transition-colors duration-300 hover:text-[#f6f3ee]">Admin</Link></li>
                   <li><Link href="/admin/estoque" className="text-[#f6f3ee]/75 transition-colors duration-300 hover:text-[#f6f3ee]">Estoque</Link></li>

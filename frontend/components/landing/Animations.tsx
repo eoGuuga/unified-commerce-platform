@@ -349,10 +349,10 @@ export function WhatsAppMockup({ className = '' }: { className?: string }) {
 // MÓDULO VISUAL - mini-UI SVG por módulo
 // ViewBox 200x100, padding generoso, alinhamento consistente
 // ============================================
-export function MóduloVisual({ tipo }: { tipo: 'loja' | 'pdv' | 'admin' | 'estoque' }) {
+export function MóduloVisual({ tipo }: { tipo: 'whatsapp' | 'pdv' | 'admin' | 'estoque' }) {
   return (
     <div className="relative mb-6 h-32 overflow-hidden rounded-[3px] border border-[#1a1814]/8 bg-gradient-to-br from-[#1a1814]/[0.04] via-[#1a1814]/[0.02] to-transparent">
-      {tipo === 'loja' && (
+      {tipo === 'whatsapp' && (
         <svg className="absolute inset-0 h-full w-full" viewBox="0 0 200 100" fill="none" preserveAspectRatio="xMidYMid meet">
           {/* 4 cards de produto lado a lado */}
           {[30, 70, 110, 150].map((x, i) => (
