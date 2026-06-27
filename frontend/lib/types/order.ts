@@ -123,13 +123,36 @@ export interface SalesReport {
   [key: string]: unknown;
 }
 
+export interface PublicOrderTrackingItem {
+  id: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+}
+
+/**
+ * Resposta do endpoint publico GET-via-POST /orders/public/track.
+ * Campos diretos e mascarados (o backend mascara email/telefone por privacidade).
+ */
 export interface PublicOrderTrackingResponse {
-  order?: Order;
-  status?: OrderStatus;
-  status_history?: Array<{
-    status: OrderStatus;
-    changed_at: string;
-    note?: string;
-  }>;
+  id: string;
+  order_no: string;
+  status: OrderStatus;
+  channel: SalesChannel;
+  customer_name?: string;
+  customer_email_masked?: string;
+  customer_phone_masked?: string;
+  subtotal: number;
+  discount_amount: number;
+  shipping_amount: number;
+  total_amount: number;
+  coupon_code?: string;
+  delivery_type?: string;
+  delivery_address?: DeliveryAddress;
+  created_at?: string;
+  updated_at?: string;
+  items: PublicOrderTrackingItem[];
   [key: string]: unknown;
 }

@@ -222,9 +222,11 @@ class ApiClient {
   async updateOrderStatus(
     id: string,
     status: OrderStatus | string,
-    _tenantId: string,
+    _tenantId?: string,
   ): Promise<Order> {
-    return this.request<Order>(`/orders/${id}`, {
+    // Backend expoe PATCH /orders/:id/status (state machine valida a transicao
+    // e dispara a notificacao WhatsApp ao cliente automaticamente).
+    return this.request<Order>(`/orders/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     });
