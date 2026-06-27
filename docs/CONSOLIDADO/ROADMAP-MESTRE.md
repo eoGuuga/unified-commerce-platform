@@ -26,8 +26,16 @@ O projeto **funciona em partes, mas NAO esta vendavel hoje** — e a causa nao e
 ### Receita / fluxo central
 - [x] **R1. Bot nao envia mensagem nenhuma.** FEITO 2026-06-26 (merged main): `sendOutboundResponse` despacha pelo provider; 6 testes.
 - [ ] **R2. WhatsApp e config GLOBAL, nao por-tenant.** `evolution-api.provider.ts:25` le credenciais de env unicas. Impossivel 2 clientes com numeros diferentes. → Provider tenant-aware: buscar credenciais do tenant antes de enviar. (BLOQUEIA 2o cliente)
-- [x] **R3. Loja mostra produtos FALSOS.** FEITO 2026-06-26 (branch `feat/store-real-products`): `useProducts` busca o catalogo real via `GET /products/public/catalog`; LojaView ja tinha loading/error/empty. Frontend builda. (Decisao de produto: catalogo vazio mostra empty state — landing nao usa mais os 8 demos.)
+- [~] **R3. Loja mostra produtos FALSOS.** OBSOLETO/REVERTIDO 2026-06-27: a vitrine `/loja` foi REMOVIDA (nao faz parte do produto — ver [[product-vision]]). O fix de catalogo real foi feito, mas a loja inteira saiu. O cadastro do catalogo serve agora ao BOT e ao PDV, nao a uma vitrine web.
 - [ ] **R4. Sem provisionamento de tenant self-service.** Checkout (`frontend/app/checkout`) promete "equipe entra em contato em 24h" — setup manual. → Onboarding que cria tenant, gera secrets, coleta numero WhatsApp + chave MercadoPago do cliente.
+
+### Remocao do storefront (decisao de produto 2026-06-27)
+- [x] **STORE-1. Remover vitrine /loja.** FEITO (branch `refactor/remove-storefront`, NAO mergeada): removidas rotas `/loja`, `/loja/checkout`, `/loja/produto`, components/loja, hooks useProducts/useCart. Links ajustados (landing/footer/sitemap/admin/pdv/pedido). `/pedido` MANTIDO. Build verde, 85 testes. Cliente final compra so via WhatsApp/PDV.
+
+### Fluxo de pedido / acompanhamento (visao confirmada 2026-06-27 — NOVO, P0 para plano completo)
+- [ ] **PED-1. Gestao de pedidos no /admin.** Tela onde o lojista ve pedidos (do bot E do PDV) e avanca status: Recebido → Preparando → Saiu p/ entrega → Entregue.
+- [ ] **PED-2. Notificacao de status no WhatsApp.** Cada mudanca de status no admin dispara mensagem automatica ao cliente (o coracao do acompanhamento).
+- [ ] **PED-3. Pagina /pedido conectada de verdade.** Hoje e template estatico; ligar ao pedido real (`/pedido?order=X`) mostrando a timeline. Bot ja envia esse link (`tracking-url.ts`).
 
 ### Seguranca / fraude (verificado no codigo)
 - [x] **S1. Webhook WhatsApp fail-open.** FEITO 2026-06-26 (Sprint Cofre): fail-closed em prod — exige secret + assinatura valida; sem isso, rejeita. Testado.

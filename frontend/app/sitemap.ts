@@ -15,12 +15,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1.0,
     },
     {
-      url: `${base}/loja`,
-      lastModified: now,
-      changeFrequency: 'daily',
-      priority: 0.9,
-    },
-    {
       url: `${base}/login`,
       lastModified: now,
       changeFrequency: 'monthly',

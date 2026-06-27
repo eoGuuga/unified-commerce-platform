@@ -34,9 +34,9 @@ export default function TermosPage() {
           <section>
             <h2 className="text-base font-medium text-foreground mb-2">2. Descrição do serviço</h2>
             <p>
-              GTSoftHub é uma plataforma SaaS de comércio unificado que permite a lojistas
-              gerenciar vendas via WhatsApp, PDV e loja online com estoque integrado,
-              pagamentos e logística em um único painel.
+              GTSoftHub é uma plataforma SaaS de comércio que permite a lojistas
+              gerenciar vendas via bot de WhatsApp e PDV, com controle de estoque integrado,
+              pagamentos e gestão em um único painel.
             </p>
           </section>
 
