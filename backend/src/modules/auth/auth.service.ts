@@ -4,11 +4,11 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
-import { EmailConfirmation } from '../../database/entities/EmailConfirmation.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { DbContextService } from '../common/services/db-context.service';
+import { PRIVACY_POLICY_VERSION } from '../common/constants/lgpd.constants';
 
 export interface SendConfirmationResponse {
   success: boolean;
@@ -157,11 +157,16 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
+    // Registra o consentimento LGPD no momento do aceite (Art. 7/8) — prova com data + versao.
     const usuario = this.db.getRepository(Usuario).create({
-      ...registerDto,
+      email: registerDto.email,
+      full_name: registerDto.full_name,
+      phone: registerDto.phone,
       encrypted_password: hashedPassword,
       tenant_id: tenantId,
       role: registerDto.role || UserRole.SELLER,
+      consent_at: new Date(),
+      consent_policy_version: PRIVACY_POLICY_VERSION,
     });
 
     const savedUser = await this.db.getRepository(Usuario).save(usuario);

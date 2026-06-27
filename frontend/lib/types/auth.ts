@@ -30,4 +30,7 @@ export interface RegisterInput {
   email: string;
   password: string;
   full_name: string;
+  phone?: string;
+  /** Consentimento LGPD obrigatorio: aceite dos Termos de Uso e Politica de Privacidade. */
+  accept_terms: boolean;
 }

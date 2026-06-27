@@ -162,6 +162,7 @@ describe('AuthService', () => {
       password: 'password123',
       full_name: 'New User',
       role: UserRole.SELLER,
+      accept_terms: true,
     };
 
     const mockNewUsuario: Partial<Usuario> = {

@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -80,5 +81,47 @@ export class LgpdController {
     }
 
     return request;
+  }
+
+  @Get('meus-dados')
+  @ApiOperation({
+    summary: 'Exportar meus dados pessoais (Art. 18, II)',
+    description:
+      'Retorna todos os dados pessoais que o sistema guarda sobre o titular autenticado ' +
+      '(direito de acesso e portabilidade).',
+  })
+  @ApiResponse({ status: 200, description: 'Dados pessoais do titular' })
+  async exportMyData(@CurrentUser() user: Usuario): Promise<Record<string, unknown>> {
+    return this.lgpdService.exportPersonalData(user.tenant_id, user.id, user.email);
+  }
+
+  @Delete('meus-dados')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Excluir meus dados pessoais (Art. 18, VI)',
+    description:
+      'Executa a exclusao (anonimizacao) dos dados pessoais do titular autenticado. ' +
+      'Pedidos sao mantidos por obrigacao fiscal, mas o dado pessoal e removido. ' +
+      'Acao registrada em trilha de auditoria como prova de cumprimento.',
+  })
+  @ApiResponse({ status: 200, description: 'Dados anonimizados com sucesso' })
+  async deleteMyData(@CurrentUser() user: Usuario): Promise<{
+    success: boolean;
+    message: string;
+    result: Awaited<ReturnType<LgpdService['processDeletion']>>;
+  }> {
+    const result = await this.lgpdService.processDeletion(
+      user.tenant_id,
+      user.id,
+      user.email,
+    );
+
+    return {
+      success: true,
+      message:
+        'Seus dados pessoais foram anonimizados. Pedidos foram mantidos sem dados pessoais ' +
+        'por obrigacao fiscal, conforme a LGPD.',
+      result,
+    };
   }
 }

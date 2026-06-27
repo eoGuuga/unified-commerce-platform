@@ -50,6 +50,13 @@ export class Usuario {
   @Column({ length: 20, nullable: true })
   phone?: string;
 
+  // Consentimento LGPD (Art. 7/8): prova de aceite dos termos e politica de privacidade.
+  @Column({ type: 'timestamp', nullable: true })
+  consent_at?: Date;
+
+  @Column({ length: 20, nullable: true })
+  consent_policy_version?: string;
+
   @Column({ default: true })
   is_active: boolean;
 

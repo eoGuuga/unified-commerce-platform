@@ -1,4 +1,12 @@
-import { IsEmail, IsString, MinLength, IsOptional, IsEnum } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsOptional,
+  IsEnum,
+  IsBoolean,
+  Equals,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserRole } from '../../../database/entities/Usuario.entity';
 
@@ -26,4 +34,13 @@ export class RegisterDto {
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
+
+  // Consentimento LGPD obrigatorio (Art. 7/8): registro exige aceite explicito.
+  @ApiProperty({
+    example: true,
+    description: 'Aceite dos Termos de Uso e Politica de Privacidade. Obrigatorio.',
+  })
+  @IsBoolean()
+  @Equals(true, { message: 'E necessario aceitar os Termos de Uso e a Politica de Privacidade.' })
+  accept_terms: boolean;
 }
