@@ -32,6 +32,11 @@ import { WhatsAppAnalyticsService } from './services/analytics.service';
 import { ConversationManagerService } from './services/conversation-manager.service';
 import { InteractiveMessageService } from './services/interactive-message.service';
 
+// Providers de envio (WhatsApp real)
+import { EvolutionApiProvider } from './providers/evolution-api.provider';
+import { MockWhatsappProvider } from './providers/mock-whatsapp.provider';
+import { IWhatsappProvider } from './providers/whatsapp-provider.interface';
+
 import { TypedConversation, ConversationState, CustomerData, PendingOrder } from './types/whatsapp.types';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
 
@@ -99,7 +104,25 @@ export class WhatsAppService {
     private readonly conversationManager: ConversationManagerService,
     private readonly interactiveMessages: InteractiveMessageService,
     private readonly db: DbContextService,
+
+    // Providers de envio
+    private readonly evolutionProvider: EvolutionApiProvider,
+    private readonly mockProvider: MockWhatsappProvider,
   ) {}
+
+  /**
+   * Seleciona o provider de envio de mensagens.
+   * Usa Evolution API quando configurada (WHATSAPP_PROVIDER=evolution e credenciais presentes);
+   * caso contrario cai no MockProvider (apenas registra, nao envia de verdade).
+   * Fail-safe: nunca lanca — se a Evolution nao estiver pronta, degrada para mock.
+   */
+  private getOutboundProvider(): IWhatsappProvider {
+    const providerName = (this.config.get<string>('WHATSAPP_PROVIDER') || '').toLowerCase();
+    if (providerName === 'evolution' && this.evolutionProvider.isConfigured()) {
+      return this.evolutionProvider;
+    }
+    return this.mockProvider;
+  }
 
   /**
    * ENTRY POINT - Processa mensagem de entrada
@@ -277,71 +300,106 @@ export class WhatsAppService {
    */
   async sendOutboundResponse(to: string, response: WhatsAppOutboundResponse): Promise<void> {
     try {
-      // Caso 1: Resposta é texto simples
-      if (typeof response === 'string') {
-        if (!response.trim()) return;
-        this.logger.log('Enviando mensagem de texto', { to, preview: response.substring(0, 50) });
-        // TODO: Usar EvolutionApiProvider.sendMessage() quando configurado
+      const provider = this.getOutboundProvider();
+      const { body, buttons } = this.flattenOutboundResponse(response);
+
+      if (!body.trim()) {
         return;
       }
 
-      // Caso 2: Resposta com botões interativos
-      if (response.kind === 'interactive_with_buttons') {
-        this.logger.log('Enviando mensagem com botões', {
-          to,
-          preview: response.previewText,
-          buttonsCount: response.buttons.length,
-        });
-        // TODO: Usar EvolutionApiProvider.sendInteractiveButtons()
-        return;
+      // Quando ha botoes e o provider suporta, tenta enviar interativo;
+      // se falhar, degrada para texto puro (o cliente nunca fica sem resposta).
+      if (buttons.length > 0) {
+        try {
+          await provider.sendInteractiveButtons({ to, body, buttons });
+          this.logger.log('Resposta interativa enviada', {
+            to,
+            provider: provider.getProviderType(),
+            buttonsCount: buttons.length,
+            preview: body.substring(0, 50),
+          });
+          return;
+        } catch (interactiveError) {
+          this.logger.warn('Falha ao enviar interativo, degradando para texto', {
+            to,
+            error: interactiveError instanceof Error ? interactiveError.message : interactiveError,
+          });
+        }
       }
 
-      // Caso 3: Resposta com lista interativa
-      if (response.kind === 'interactive_list') {
-        this.logger.log('Enviando lista interativa', {
-          to,
-          preview: response.previewText,
-          sectionsCount: response.list.sections?.length || 0,
-        });
-        // TODO: Usar EvolutionApiProvider.sendInteractiveList()
-        return;
-      }
-
-      // Caso 4: Resposta de pedido
-      if (response.kind === 'interactive_order') {
-        this.logger.log('Enviando detalhes do pedido', {
-          to,
-          orderId: response.orderId,
-        });
-        return;
-      }
-
-      // Caso 5: Resposta de produto
-      if (response.kind === 'interactive_product') {
-        this.logger.log('Enviando card de produto', {
-          to,
-          product: response.product?.name,
-        });
-        return;
-      }
-
-      // Caso 6: Resposta de boas-vindas
-      if (response.kind === 'interactive_welcome') {
-        this.logger.log('Enviando mensagem de boas-vindas', {
-          to,
-          preview: response.previewText,
-        });
-        return;
-      }
-
-      // Fallback: texto
-      const preview = (response as any).previewText || '';
-      if (preview.trim()) {
-        this.logger.log('Enviando resposta (fallback)', { to, preview: preview.substring(0, 50) });
-      }
-
+      await provider.sendMessage({ to, body });
+      this.logger.log('Resposta de texto enviada', {
+        to,
+        provider: provider.getProviderType(),
+        preview: body.substring(0, 50),
+      });
     } catch (error) {
-      this.logger.error('Failed to send outbound response', { error, to });
+      this.logger.error('Failed to send outbound response', {
+        error: error instanceof Error ? error.message : error,
+        to,
+      });
+    }
+  }
+
+  /**
+   * Converte qualquer tipo de WhatsAppOutboundResponse em { body, buttons } enviavel.
+   * Para tipos interativos, monta o corpo textual completo (preview + conteudo) para que,
+   * mesmo sem suporte a botoes, o cliente receba a informacao toda em texto.
+   */
+  private flattenOutboundResponse(
+    response: WhatsAppOutboundResponse,
+  ): { body: string; buttons: Array<{ id: string; title: string }> } {
+    if (typeof response === 'string') {
+      return { body: response, buttons: [] };
+    }
+
+    switch (response.kind) {
+      case 'interactive_with_buttons':
+        return {
+          body: response.cartContent || response.previewText,
+          buttons: response.buttons || [],
+        };
+
+      case 'interactive_order': {
+        const lines = [
+          response.previewText,
+          response.items,
+          '',
+          `Subtotal: R$ ${response.subtotal.toFixed(2)}`,
+          `Frete: R$ ${response.shipping.toFixed(2)}`,
+          `Total: R$ ${response.total.toFixed(2)}`,
+        ].filter((l) => l !== undefined && l !== null);
+        return { body: lines.join('\n'), buttons: response.buttons || [] };
+      }
+
+      case 'interactive_product':
+        return {
+          body: response.previewText,
+          buttons: response.buttons || [],
+        };
+
+      case 'interactive_welcome': {
+        const lines = [response.greeting, response.message].filter(Boolean);
+        return { body: lines.join('\n\n') || response.previewText, buttons: response.options || [] };
+      }
+
+      case 'interactive_list': {
+        // Lista textual: cabecalho + itens de cada secao (botoes nativos de lista nao suportados aqui)
+        const sections = response.list?.sections || [];
+        const sectionLines: string[] = [];
+        for (const section of sections) {
+          if (section?.title) sectionLines.push(`*${section.title}*`);
+          for (const row of section?.rows || []) {
+            const desc = row?.description ? ` - ${row.description}` : '';
+            sectionLines.push(`• ${row?.title || ''}${desc}`);
+          }
+        }
+        const body = [response.previewText, '', ...sectionLines].join('\n').trim();
+        return { body, buttons: [] };
+      }
+
+      default:
+        return { body: (response as any).previewText || '', buttons: [] };
     }
   }
 
