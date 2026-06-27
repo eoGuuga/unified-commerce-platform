@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { api } from '@/lib/api-client';
 
 export interface Product {
   id: string;
@@ -15,93 +16,67 @@ export interface Product {
   rating?: number;
 }
 
-const PRODUTOS_DEMO: Product[] = [
-  {
-    id: '1',
-    name: 'Caneca de Cerâmica Personalizada',
-    description: 'Caneca de cerâmica 325ml com estampa personalizada. Perfeita para presente ou uso diário.',
-    price: 29.90,
-    original_price: 39.90,
-    category: 'Canecas',
-    stock: 47,
-    rating: 4.8,
-  },
-  {
-    id: '2',
-    name: 'Camiseta Algodão Premium',
-    description: 'Camiseta 100% algodão, fio 30.1, modelagem regular. Conforto para o dia a dia.',
-    price: 79.90,
-    category: 'Vestuário',
-    stock: 23,
-    rating: 4.6,
-  },
-  {
-    id: '3',
-    name: 'Caderno Sketchbook A4',
-    description: 'Caderno sketchbook 80 folhas, papel off-white 120g, encadernação costurada.',
-    price: 42.00,
-    category: 'Papelaria',
-    stock: 12,
-    rating: 4.9,
-  },
-  {
-    id: '4',
-    name: 'Caneca Térmica Inox 500ml',
-    description: 'Caneca térmica em aço inox, mantém temperatura por 12h. Tampa hermética.',
-    price: 89.90,
-    original_price: 109.90,
-    category: 'Canecas',
-    stock: 8,
-    rating: 4.7,
-  },
-  {
-    id: '5',
-    name: 'Mochila Urbana Antifurto',
-    description: 'Mochila com zíper escondido, compartimento para notebook 15", tecido impermeável.',
-    price: 249.00,
-    category: 'Acessórios',
-    stock: 5,
-    rating: 4.8,
-  },
-  {
-    id: '6',
-    name: 'Fone Bluetooth Cancelamento Ruído',
-    description: 'Fone over-ear com ANC ativo, bateria 30h, conexão multipoint.',
-    price: 599.00,
-    original_price: 799.00,
-    category: 'Eletrônicos',
-    stock: 3,
-    rating: 4.5,
-  },
-  {
-    id: '7',
-    name: 'Vela Aromática Lavanda',
-    description: 'Vela artesanal de cera de soja, aroma lavanda francesa, 200g, queima 40h.',
-    price: 54.90,
-    category: 'Casa',
-    stock: 18,
-    rating: 4.9,
-  },
-  {
-    id: '8',
-    name: 'Agenda Permanente Premium',
-    description: 'Agenda permanente couro sintético, 12 meses, elástico, bolso para caneta.',
-    price: 89.00,
-    category: 'Papelaria',
-    stock: 22,
-    rating: 4.7,
-  },
-];
+/**
+ * Formato cru vindo do backend (GET /products/public/catalog).
+ * A entidade Produto e espalhada + campos de estoque adicionados pelo service.
+ */
+interface RawProduct {
+  id: string;
+  name: string;
+  description?: string;
+  price: number | string;
+  categoria?: { name?: string } | null;
+  image_url?: string;
+  stock?: number;
+  available_stock?: number;
+}
 
 /**
- * Hook que retorna produtos imediatamente.
- * Quando o backend tiver endpoint real, substituir setProducts pela chamada API.
+ * Converte o produto do backend para o formato usado pela loja.
+ */
+function mapProduct(raw: RawProduct): Product {
+  return {
+    id: raw.id,
+    name: raw.name,
+    description: raw.description || '',
+    price: typeof raw.price === 'string' ? parseFloat(raw.price) : raw.price,
+    image_url: raw.image_url,
+    category: raw.categoria?.name || 'Geral',
+    stock: raw.available_stock ?? raw.stock ?? 0,
+  };
+}
+
+/**
+ * Hook que carrega os produtos REAIS do catalogo publico da loja (por tenant).
+ * Estados: loading enquanto busca, error em falha, lista vazia tratada pela UI.
  */
 export function useProducts() {
-  // Inicializa com produtos direto (sem loading) - landing page renderiza já com conteúdo
-  const [products] = useState<Product[]>(PRODUTOS_DEMO);
-  const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  return { products, loading, error, refetch: () => {} };
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const raw = (await api.getPublicStoreProducts()) as unknown as RawProduct[];
+      const list = Array.isArray(raw) ? raw : [];
+      setProducts(list.map(mapProduct));
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Nao foi possivel carregar o cardapio. Tente novamente.',
+      );
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  return { products, loading, error, refetch: fetchProducts };
 }

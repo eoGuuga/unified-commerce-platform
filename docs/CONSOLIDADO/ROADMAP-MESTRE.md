@@ -24,9 +24,9 @@ O projeto **funciona em partes, mas NAO esta vendavel hoje** — e a causa nao e
 ## P0 — BLOQUEADORES DE VENDA (nada vende sem isto)
 
 ### Receita / fluxo central
-- [ ] **R1. Bot nao envia mensagem nenhuma.** `whatsapp.service.ts:278` `sendOutboundResponse` so loga; `EvolutionApiProvider` existe mas nao esta injetado nem chamado. Sem isso o cliente manda msg e o bot fica mudo. → Injetar provider e despachar cada tipo de resposta. (FIX RAPIDO, alto impacto)
+- [x] **R1. Bot nao envia mensagem nenhuma.** FEITO 2026-06-26 (merged main): `sendOutboundResponse` despacha pelo provider; 6 testes.
 - [ ] **R2. WhatsApp e config GLOBAL, nao por-tenant.** `evolution-api.provider.ts:25` le credenciais de env unicas. Impossivel 2 clientes com numeros diferentes. → Provider tenant-aware: buscar credenciais do tenant antes de enviar. (BLOQUEIA 2o cliente)
-- [ ] **R3. Loja mostra produtos FALSOS.** `frontend/hooks/useProducts.ts:102` retorna `PRODUTOS_DEMO` hardcoded, nunca chama a API. → Conectar a `getPublicStoreProducts(tenantId)` com loading/error.
+- [x] **R3. Loja mostra produtos FALSOS.** FEITO 2026-06-26 (branch `feat/store-real-products`): `useProducts` busca o catalogo real via `GET /products/public/catalog`; LojaView ja tinha loading/error/empty. Frontend builda. (Decisao de produto: catalogo vazio mostra empty state — landing nao usa mais os 8 demos.)
 - [ ] **R4. Sem provisionamento de tenant self-service.** Checkout (`frontend/app/checkout`) promete "equipe entra em contato em 24h" — setup manual. → Onboarding que cria tenant, gera secrets, coleta numero WhatsApp + chave MercadoPago do cliente.
 
 ### Seguranca / fraude (verificado no codigo)
