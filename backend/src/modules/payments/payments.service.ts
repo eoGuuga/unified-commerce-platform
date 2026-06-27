@@ -11,6 +11,7 @@ import {
   NotFoundException,
   BadRequestException,
   UnauthorizedException,
+  InternalServerErrorException,
   Inject,
   forwardRef,
 } from '@nestjs/common';
@@ -414,7 +415,20 @@ export class PaymentsService {
   }
 
   private generatePixData(pedido: Pedido, pagamento: Pagamento): string {
-    const chavePix = this.configService.get<string>('PIX_KEY') || 'mock-chave-pix-123456789';
+    const configuredPixKey = (this.configService.get<string>('PIX_KEY') || '').trim();
+
+    // FAIL-CLOSED em producao: nunca gerar PIX com chave mock.
+    // QR code com chave invalida = cliente paga e o dinheiro nao chega ao lojista.
+    if (process.env.NODE_ENV === 'production' && !configuredPixKey) {
+      this.logger.error(
+        '[SEGURANCA] PIX_KEY ausente em producao. Geracao de PIX bloqueada (fail-closed).',
+      );
+      throw new InternalServerErrorException(
+        'Pagamento PIX indisponivel: chave PIX nao configurada. Contate o administrador.',
+      );
+    }
+
+    const chavePix = configuredPixKey || 'mock-chave-pix-123456789';
     const valor = Number(pagamento.amount).toFixed(2);
     const descricao = `Pedido ${pedido.order_no}`;
     const merchantName = this.configService.get<string>('MERCHANT_NAME') || 'Loja';
@@ -738,7 +752,17 @@ export class PaymentsService {
       return { status: 'ignored' };
     }
 
+    // FAIL-CLOSED em producao: token de webhook obrigatorio.
+    // Sem isso, um atacante poderia confirmar pagamentos falsos.
+    const isProduction = process.env.NODE_ENV === 'production';
     const expectedToken = (this.configService.get<string>('MERCADOPAGO_WEBHOOK_TOKEN') || '').trim();
+
+    if (isProduction && !expectedToken) {
+      this.logger.error(
+        '[SEGURANCA] MERCADOPAGO_WEBHOOK_TOKEN ausente em producao. Webhook bloqueado (fail-closed).',
+      );
+      throw new UnauthorizedException('Webhook de pagamento nao configurado com seguranca.');
+    }
     if (expectedToken && expectedToken !== (opts.token || '').trim()) {
       throw new UnauthorizedException('Webhook token invalido');
     }
@@ -761,9 +785,18 @@ export class PaymentsService {
       (this.configService.get<string>('MERCADOPAGO_WEBHOOK_ALLOW_UNSIGNED') || '').toLowerCase() === 'true';
     const isLiveMode = Boolean(payload?.live_mode);
 
+    // FAIL-CLOSED em producao: secret de assinatura obrigatorio e unsigned proibido.
+    if (isProduction && !secret) {
+      this.logger.error(
+        '[SEGURANCA] MERCADOPAGO_WEBHOOK_SECRET ausente em producao. Webhook bloqueado (fail-closed).',
+      );
+      throw new UnauthorizedException('Webhook de pagamento nao configurado com seguranca.');
+    }
+
     if (secret) {
       if (!signature || !requestId) {
-        if (!allowUnsigned || isLiveMode) {
+        // Em producao nunca aceitar sem assinatura, ignorando a flag allowUnsigned.
+        if (isProduction || !allowUnsigned || isLiveMode) {
           throw new UnauthorizedException('Assinatura de webhook invalida');
         }
         this.logger.warn('Webhook Mercado Pago sem assinatura (modo teste) - validacao ignorada');
@@ -796,11 +829,23 @@ export class PaymentsService {
       await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [tenantId]);
 
       return await this.db.runWithManager(manager, async () => {
-        const pagamentoRepo = this.db.getRepository(Pagamento);
-        const pagamento = await pagamentoRepo.findOne({
-          where: { transaction_id: String(dataId), tenant_id: tenantId },
-          relations: ['pedido'],
-        });
+        // Lock pessimista (FOR UPDATE) na linha do pagamento: serializa webhooks
+        // concorrentes do mesmo pagamento (Mercado Pago reenvia em timeout),
+        // evitando dupla confirmacao. O lock e feito sem relations (join + FOR UPDATE
+        // pode falhar no Postgres); o pedido e carregado em seguida.
+        const pagamentoLock = await manager
+          .createQueryBuilder(Pagamento, 'p')
+          .setLock('pessimistic_write')
+          .where('p.transaction_id = :dataId', { dataId: String(dataId) })
+          .andWhere('p.tenant_id = :tenantId', { tenantId })
+          .getOne();
+
+        const pagamento = pagamentoLock
+          ? await this.db.getRepository(Pagamento).findOne({
+              where: { id: pagamentoLock.id, tenant_id: tenantId },
+              relations: ['pedido'],
+            })
+          : null;
 
         if (!pagamento) {
           this.logger.warn('Pagamento nao encontrado para webhook Mercado Pago', {
@@ -833,7 +878,7 @@ export class PaymentsService {
           ...providerMeta,
         };
 
-        await pagamentoRepo.save(pagamento);
+        await this.db.getRepository(Pagamento).save(pagamento);
         return { status: 'ok' };
       });
     });

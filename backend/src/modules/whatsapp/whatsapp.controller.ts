@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Get,
   Headers,
+  Logger,
   Post,
   Query,
   UnauthorizedException,
@@ -343,10 +344,25 @@ function shouldDispatchOutboundResponse(response: unknown): boolean {
 @ApiTags('WhatsApp')
 @Controller('whatsapp')
 export class WhatsappController {
+  private readonly logger = new Logger(WhatsappController.name);
+
   constructor(
     private readonly whatsappService: WhatsAppService,
     private readonly tenantsService: TenantsService,
   ) {}
+
+  /**
+   * Comparacao de chaves resistente a timing attack.
+   * Retorna false se os tamanhos diferirem (sem vazar o tamanho via tempo).
+   */
+  private safeKeyEquals(a: string, b: string): boolean {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) {
+      return false;
+    }
+    return timingSafeEqual(bufA, bufB);
+  }
 
   @Post('webhook')
   @ApiOperation({
@@ -359,12 +375,31 @@ export class WhatsappController {
     @Query('tenantId') tenantIdFromQuery?: string,
     @Headers('x-hub-signature-256') signature?: string,
   ) {
-    // Verificar assinatura do webhook se configurado
+    // Verificacao de assinatura do webhook — FAIL-CLOSED em producao.
+    // Em prod, o secret e obrigatorio e a assinatura tem que ser valida;
+    // sem isso, qualquer um poderia injetar mensagens para qualquer tenant.
     const webhookSecret = process.env.WHATSAPP_WEBHOOK_SECRET;
-    if (webhookSecret && signature) {
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    if (isProduction) {
+      if (!webhookSecret) {
+        this.logger.error(
+          '[SEGURANCA] WHATSAPP_WEBHOOK_SECRET ausente em producao. Webhook bloqueado (fail-closed).',
+        );
+        throw new ForbiddenException('Webhook nao configurado com seguranca.');
+      }
+      if (!signature) {
+        throw new ForbiddenException('Assinatura do webhook ausente.');
+      }
       const bodyStr = JSON.stringify(body);
       if (!verifyWebhookSignature(bodyStr, signature, webhookSecret)) {
-        throw new ForbiddenException('Assinatura do webhook inválida');
+        throw new ForbiddenException('Assinatura do webhook invalida.');
+      }
+    } else if (webhookSecret && signature) {
+      // Dev/test: se houver secret e assinatura, ainda assim valida (defesa em profundidade).
+      const bodyStr = JSON.stringify(body);
+      if (!verifyWebhookSignature(bodyStr, signature, webhookSecret)) {
+        throw new ForbiddenException('Assinatura do webhook invalida.');
       }
     }
 
@@ -482,6 +517,11 @@ export class WhatsappController {
     mediaUrl?: string;
     metadata?: Record<string, unknown>;
   }) {
+    // Endpoint de teste — bloqueado em producao (acionaria o bot com tenantId arbitrario).
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('Endpoint de teste indisponivel em producao.');
+    }
+
     if (!body.tenantId) {
       throw new BadRequestException('tenantId e obrigatorio. Use um tenant valido.');
     }
@@ -527,15 +567,16 @@ export class WhatsappController {
     // Verificar API key para proteger o endpoint
     const validApiKey = process.env.WHATSAPP_METRICS_API_KEY;
 
-    // Se API key está configurada, é obrigatória
-    if (validApiKey) {
-      if (!apiKey || apiKey !== validApiKey) {
-        throw new UnauthorizedException('API key inválida');
-      }
+    // API key SEMPRE obrigatoria (fail-closed) — em qualquer ambiente.
+    // Sem ela configurada, o endpoint fica indisponivel; nunca aberto.
+    if (!validApiKey) {
+      this.logger.error(
+        '[SEGURANCA] WHATSAPP_METRICS_API_KEY nao definido. Endpoint de metricas bloqueado (fail-closed).',
+      );
+      throw new ForbiddenException('Endpoint nao configurado: WHATSAPP_METRICS_API_KEY ausente.');
     }
-    // Se não está configurada, logar aviso mas permitir acesso (dev mode)
-    else if (process.env.NODE_ENV === 'production') {
-      throw new ForbiddenException('Endpoint não configurado: WHATSAPP_METRICS_API_KEY não definido');
+    if (!apiKey || !this.safeKeyEquals(apiKey, validApiKey)) {
+      throw new UnauthorizedException('API key invalida');
     }
 
     if (!tenantId) {
