@@ -43,9 +43,10 @@ O projeto **funciona em partes, mas NAO esta vendavel hoje** — e a causa nao e
 - [ ] **F3. Checkout confia no total do carrinho.** `whatsapp.service.ts:~754` usa `total_amount` do carrinho. → recalcular do banco no checkout. (orders.service ja recalcula; fechar a ponte)
 
 ### LGPD / juridico (cliente real = PII real)
-- [ ] **L1. Exclusao de dados e stub.** `lgpd.service.ts` so registra em memoria; nao apaga PII (Art. 18). → exclusao real em cascata (pedidos, conversas, cliente) + trilha.
-- [ ] **L2. Sem captura de consentimento.** Registro/checkout nao registram consentimento + versao da politica (Art. 7/8). → checkbox obrigatorio + persistir `consent_at`/`policy_version`.
-- [ ] **L3. PII em texto puro no banco.** `customer_name/phone/email` em pedidos e conversas sem criptografia; `EncryptionService` so cobre chaves de API. → criptografar campos sensiveis OU decisao documentada de risco aceito para o MVP.
+- [x] **L1. Exclusao de dados.** FEITO 2026-06-26 (branch `feat/lgpd-compliance`): `processDeletion` anonimiza PII em cascata (pedidos/conversas/usuario) preservando registro fiscal, + audit log + endpoints `DELETE`/`GET /lgpd/meus-dados`. 9 testes.
+- [x] **L2. Captura de consentimento.** FEITO 2026-06-26: registro exige `accept_terms`; grava `consent_at`+`consent_policy_version` (migration `AddLgpdConsentToUsuarios`). Tipo do frontend atualizado.
+- [x] **L3. PII em texto puro.** DECISAO DOCUMENTADA 2026-06-26 (risco aceito para MVP — ver `05-SEGURANCA-COMPLIANCE.md` secao Postura LGPD). RLS + acesso restrito + TLS + backup cripto mitigam; criptografia de coluna fica para fase de escala.
+- [ ] **L4 (P1, novo). Persistir solicitacoes LGPD em tabela.** Hoje as SOLICITACOES ficam em memoria (a exclusao em si ja e real/persistida). Criar entidade + migration.
 
 ---
 

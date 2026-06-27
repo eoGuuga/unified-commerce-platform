@@ -1,6 +1,25 @@
 # Seguranca e Compliance (Consolidado)
 
-Ultima atualizacao: 2026-03-08
+Ultima atualizacao: 2026-06-26
+
+## Postura LGPD (implementada 2026-06-26)
+
+Estado: minimamente defensavel para um SaaS pequeno que processa PII de clientes de comercio.
+
+**Implementado:**
+- **Direito de exclusao (Art. 18, VI)** — `LgpdService.processDeletion`: ANONIMIZA o PII do titular (nome/telefone/email/endereco viram marcador "REMOVIDO (LGPD)"), preservando o registro do pedido por obrigacao fiscal (nota fiscal 5 anos). Abordagem padrao para comercio. Endpoint `DELETE /lgpd/meus-dados`. Acao registrada no audit log como prova de cumprimento.
+- **Direito de acesso/portabilidade (Art. 18, II)** — `GET /lgpd/meus-dados` exporta os dados pessoais do titular.
+- **Consentimento (Art. 7/8)** — registro exige `accept_terms=true`; grava `consent_at` + `consent_policy_version` no usuario (migration `AddLgpdConsentToUsuarios`). Versao da politica em `common/constants/lgpd.constants.ts` (atualizar quando o texto legal mudar).
+- **Paginas legais** — Politica de Privacidade, Termos e Cookies em `frontend/app/info/` (ja existiam, conteudo real).
+- **Audit log** — trilha de operacoes criticas, incluindo a exclusao LGPD.
+
+**Decisao consciente — criptografia de PII em repouso (L3): RISCO ACEITO para o MVP.**
+- Hoje nome/telefone/email de clientes ficam em texto puro no Postgres. O `EncryptionService` so cobre chaves de API de terceiros.
+- **Por que aceitar:** a base ja e protegida por (a) RLS multi-tenant, (b) usuario de app sem superuser, (c) acesso ao banco restrito a rede interna, (d) TLS em transito, (e) backups offsite criptografados. Para o volume e o perfil de risco atual (poucos clientes de comercio local), criptografia de coluna adiciona complexidade de gestao de chave e quebra busca/ordenacao sem reduzir materialmente o risco dominante (que e vazamento de credencial de acesso, nao leitura fisica do disco).
+- **Quando revisitar:** antes de escalar para muitos clientes, ou se passar a processar dado sensivel (saude, cartao completo, documento). Marcado como item P1/P2 no roadmap.
+- Esta decisao e revisavel e esta documentada para fins de accountability (LGPD Art. 6, X).
+
+**Pendente (P1, nao bloqueia o 1o cliente):** persistir solicitacoes LGPD em tabela (hoje as solicitacoes ficam em memoria; a EXCLUSAO em si ja e real e persistida). Retencao automatica de conversas. Re-aceite de consentimento para usuarios pre-migration.
 
 ## Modelo de seguranca (aplicacao)
 - Auth via JWT.
