@@ -12,7 +12,7 @@ Erro aqui = prejuizo financeiro, vazamento de dados de cliente, ou processo judi
 **Principios (em ordem):**
 1. **Seguranca e conformidade legal > velocidade.** Nunca introduza fail-open, secret hardcoded, ou endpoint sem auth. Em duvida, caminho mais seguro + avise.
 2. **Eficiencia de tokens = acertar de primeira.** O custo nao esta no tamanho deste arquivo; esta em explorar a toa, errar caminho e refazer. Use o Mapa (sec. 6). Leia so o trecho necessario (`offset`/`limit`, Grep com escopo). Varredura ampla -> subagente `Explore`, fique com a conclusao. Nao releia arquivo que acabou de editar. Nao narre o que nao vai fazer.
-3. **Profissionalismo.** Codigo que se parece com o vizinho. Sem giria, sem "provisorio" que vira divida. Achou erro na base? Diga — nao replique.
+3. **Profissionalismo.** Codigo que se parece com o vizinho. Sem giria, sem "provisorio" que vira divida. Achou erro na base? Diga — nao replique. **Commits sempre em ingles, Conventional Commits, profissionais (regra detalhada na sec. 5).**
 4. **Honestidade de resultado.** Teste falhou: diga com a saida. Pulou passo: diga. "Funciona" so apos verificar.
 
 **Definition of Done (checklist canonico — rodar antes de declarar tarefa pronta E antes de PR/deploy):**
@@ -71,9 +71,15 @@ Processa PII e pagamento de terceiros. Conformidade protege de multa (LGPD ate 2
 
 - Tarefas pequenas e verificaveis; use **TodoWrite** para quebrar e rastrear.
 - **Branch por tarefa** (`feat/`, `fix/`, `chore/`, `security/`, `refactor/`). Nada nao-trivial direto na `main`.
-- **Commits: Conventional Commits, INGLES, curtos, atomicos** — `tipo(escopo): imperativo`. Ex.: `fix(payments): make mercadopago webhook fail-closed`. Sem secret/PII/IP na mensagem.
-- **Codigo e comentarios em PORTUGUES** (base inteira e PT; reescrever = churn e risco). So commit/PR em ingles.
-- PR description (ingles): o que muda, por que, como testar, riscos.
+- **Commits SEMPRE em INGLES, profissionais — regra inegociavel** (mesmo conversando em portugues com o usuario):
+  - Formato Conventional Commits: `tipo(escopo): imperativo curto` (<=72 chars no titulo). Ex.: `fix(payments): make mercadopago webhook fail-closed`.
+  - Tipos: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `security`, `perf`.
+  - **Atomico**: 1 commit = 1 mudanca logica. Nao misturar refactor com feature.
+  - Corpo (quando nao-trivial): explicar o **porque**, nao so o **o que**. Bullets em ingles.
+  - **NUNCA** secret, PII, telefone, token, IP de servidor ou URL interna na mensagem.
+  - Trailer obrigatorio em commits feitos pelo agente: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
+- **Codigo e comentarios permanecem em PORTUGUES** (base inteira e PT; reescrever = churn e risco). So commit, PR e branch em ingles.
+- PR description em ingles: o que muda, por que, como testar, riscos.
 
 ---
 
