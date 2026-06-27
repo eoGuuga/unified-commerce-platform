@@ -1,17 +1,9 @@
 'use client';
 
-import { Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { OrderTracking } from '@/components/pedido/OrderTracking';
+import { OrdersManager } from '@/components/admin/OrdersManager';
 
-function PedidoContent() {
-  const searchParams = useSearchParams();
-  const orderNo = searchParams.get('order');
-  return <OrderTracking orderNo={orderNo} />;
-}
-
-export default function PedidoPage() {
+export default function AdminPedidosPage() {
   return (
     <div className="min-h-screen bg-[#f6f3ee] text-[#1a1814]">
       <header className="border-b border-[#1a1814]/8">
@@ -20,13 +12,11 @@ export default function PedidoPage() {
             <div className="flex h-7 w-7 items-center justify-center rounded-[3px] bg-[#1a1814] text-[10px] font-semibold text-[#f6f3ee]">GT</div>
             <span className="text-[15px] font-medium tracking-[-0.01em]" style={{ fontFamily: 'var(--font-display)' }}>GTSoftHub</span>
           </Link>
-          <Link href="/" className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#1a1814]/55 transition hover:text-[#1a1814]">Início</Link>
+          <Link href="/admin" className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#1a1814]/55 transition hover:text-[#1a1814]">Admin</Link>
         </div>
       </header>
 
-      <Suspense fallback={<div className="mx-auto max-w-[1320px] px-6 py-16 text-[#1a1814]/50">Carregando…</div>}>
-        <PedidoContent />
-      </Suspense>
+      <OrdersManager />
     </div>
   );
 }
