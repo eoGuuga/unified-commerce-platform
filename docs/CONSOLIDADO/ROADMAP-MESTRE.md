@@ -30,16 +30,16 @@ O projeto **funciona em partes, mas NAO esta vendavel hoje** — e a causa nao e
 - [ ] **R4. Sem provisionamento de tenant self-service.** Checkout (`frontend/app/checkout`) promete "equipe entra em contato em 24h" — setup manual. → Onboarding que cria tenant, gera secrets, coleta numero WhatsApp + chave MercadoPago do cliente.
 
 ### Seguranca / fraude (verificado no codigo)
-- [ ] **S1. Webhook WhatsApp fail-open.** `whatsapp.controller.ts:363` `if (webhookSecret && signature)` — sem secret, aceita qualquer um. → fail-closed em prod.
-- [ ] **S2. Webhook MercadoPago fail-open com token vazio.** `payments.service.ts:741`. → exigir token em prod; revisar flag `MERCADOPAGO_WEBHOOK_ALLOW_UNSIGNED` (logica suspeita na L766).
-- [ ] **S3. `/whatsapp/test` sem guard.** `whatsapp.controller.ts:467` aciona o bot com tenantId arbitrario. → guard de auth ou remover do build de prod.
-- [ ] **S4. `/whatsapp/metrics` auth opcional em dev.** `whatsapp.controller.ts:~528`. → exigir API key sempre.
-- [ ] **S5. PIX cai em chave mock se `PIX_KEY` ausente.** `payments.service.ts:417` `|| 'mock-chave-pix-123456789'`. → falhar boot em prod, nunca usar mock.
-- [ ] **S6. Fallback de senha real no compose.** `docker-compose.prod.yml:13/64` `${VAR:-password123}` / `:-super-secret-jwt-key...`. → trocar por `${VAR:?obrigatorio}`. (defesa em profundidade; prod hoje define as vars)
+- [x] **S1. Webhook WhatsApp fail-open.** FEITO 2026-06-26 (Sprint Cofre): fail-closed em prod — exige secret + assinatura valida; sem isso, rejeita. Testado.
+- [x] **S2. Webhook MercadoPago fail-open com token vazio.** FEITO 2026-06-26: exige token E secret em prod; unsigned proibido em prod (ignora flag `MERCADOPAGO_WEBHOOK_ALLOW_UNSIGNED`).
+- [x] **S3. `/whatsapp/test` sem guard.** FEITO 2026-06-26: bloqueado em producao (`ForbiddenException`); permanece util em dev/test. Testado.
+- [x] **S4. `/whatsapp/metrics` auth opcional em dev.** FEITO 2026-06-26 (commit Sprint Cofre): API key sempre obrigatoria (fail-closed) + comparacao timing-safe.
+- [x] **S5. PIX cai em chave mock se `PIX_KEY` ausente.** FEITO 2026-06-26: lanca em prod se `PIX_KEY` ausente; nunca gera QR com chave mock.
+- [x] **S6. Fallback de senha real no compose.** VERIFICADO 2026-06-26: `docker-compose.prod.yml` JA usa `${POSTGRES_PASSWORD}`/`${JWT_SECRET}` puros (sem fallback). Auditor viu versao antiga. Nada a fazer.
 
 ### Integridade financeira
-- [ ] **F1. Race condition de estoque.** `orders.service.ts:~225` — check de estoque fora do escopo do lock; 2 pedidos simultaneos podem vender o mesmo ultimo item. → mover check para dentro do `FOR UPDATE`.
-- [ ] **F2. Webhook de pagamento sem dedup por request_id.** `payments.service.ts:~795` — retry do MercadoPago pode reprocessar. → aplicar `IdempotencyService` no webhook.
+- [x] **F1. Race condition de estoque.** VERIFICADO 2026-06-26: codigo JA seguro — `orders.service.ts:144` usa `setLock('pessimistic_write')` (FOR UPDATE) + decremento atomico condicional (`current_stock >= quantity`, checa `affected`). Auditor superestimou. Nada a fazer.
+- [x] **F2. Webhook de pagamento sem dedup.** FEITO 2026-06-26: lock pessimista (FOR UPDATE) na linha do Pagamento serializa retries concorrentes do MercadoPago, evitando dupla confirmacao.
 - [ ] **F3. Checkout confia no total do carrinho.** `whatsapp.service.ts:~754` usa `total_amount` do carrinho. → recalcular do banco no checkout. (orders.service ja recalcula; fechar a ponte)
 
 ### LGPD / juridico (cliente real = PII real)
