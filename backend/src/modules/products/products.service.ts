@@ -47,15 +47,19 @@ export class ProductsService {
     private readonly stockEngine: StockEngineService,
   ) {}
 
-  async findAll(tenantId: string, pagination?: PaginationDto): Promise<ProductWithStock[] | PaginatedResult<ProductWithStock>> {
+  async findAll(
+    tenantId: string,
+    pagination?: PaginationDto,
+    includeInactive = false,
+  ): Promise<ProductWithStock[] | PaginatedResult<ProductWithStock>> {
     const page = pagination?.page || 1;
     const limit = pagination?.limit || 50;
     const skip = (page - 1) * limit;
     const produtosRepository = this.db.getRepository(Produto);
     const estoqueRepository = this.db.getRepository(MovimentacaoEstoque);
 
-    // ✅ CACHE: Tentar buscar do cache primeiro (apenas sem paginação) — não-fatal
-    if (!pagination) {
+    // ✅ CACHE: Tentar buscar do cache primeiro (apenas sem paginação e sem inativos) — não-fatal
+    if (!pagination && !includeInactive) {
       try {
         const cached = await this.cacheService.getCachedProducts(tenantId);
         if (cached) {
@@ -79,8 +83,12 @@ export class ProductsService {
         { tenantId },
       )
       .where('produto.tenant_id = :tenantId', { tenantId })
-      .andWhere('produto.is_active = :isActive', { isActive: true })
       .orderBy('produto.name', 'ASC');
+
+    // Filtrar apenas ativos quando não for requisição admin (compatibilidade retroativa)
+    if (!includeInactive) {
+      queryBuilder.andWhere('produto.is_active = :isActive', { isActive: true });
+    }
 
     // Se paginação foi solicitada, aplicar skip/take e retornar resultado paginado
     if (pagination) {
@@ -152,13 +160,15 @@ export class ProductsService {
       };
     });
 
-    // ✅ CACHE: Salvar no cache (TTL: 5 minutos) — não-fatal
-    try {
-      await this.cacheService.cacheProducts(tenantId, produtosComEstoque, 300);
-    } catch (error) {
-      this.logger.warn('Cache write falhou em findAll (não-fatal)', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+    // ✅ CACHE: Salvar no cache (TTL: 5 minutos) — não-fatal; apenas para listagem de ativos
+    if (!includeInactive) {
+      try {
+        await this.cacheService.cacheProducts(tenantId, produtosComEstoque, 300);
+      } catch (error) {
+        this.logger.warn('Cache write falhou em findAll (não-fatal)', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     return produtosComEstoque;

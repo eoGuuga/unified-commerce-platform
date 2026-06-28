@@ -1,4 +1,4 @@
-import { IsOptional, IsInt, Min, Max } from 'class-validator';
+import { IsOptional, IsInt, Min, Max, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -31,4 +31,17 @@ export class PaginationDto {
   @Min(1)
   @Max(100)
   limit?: number = 50;
+
+  /**
+   * Quando 'true', inclui produtos inativos na listagem (uso exclusivo do admin).
+   * Mantido no DTO de paginação para que o ValidationPipe (forbidNonWhitelisted)
+   * não rejeite o parâmetro como desconhecido.
+   */
+  @ApiPropertyOptional({
+    description: 'Incluir produtos inativos na listagem (somente admin)',
+    example: 'true',
+  })
+  @IsOptional()
+  @IsString()
+  include_inactive?: string;
 }

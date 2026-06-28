@@ -370,6 +370,117 @@ describe('Products Integration Tests (e2e)', () => {
     });
   });
 
+  describe('GET /products?include_inactive — filtro Ativos/Inativos/Todos', () => {
+    let produtoAtivoId: string;
+    let produtoInativoId: string;
+
+    beforeEach(async () => {
+      if (!app) return;
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+
+      // Criar um produto ativo e um inativo diretamente no banco
+      const ativo = await queryRunner.query(
+        `INSERT INTO produtos (id, tenant_id, name, price, is_active, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, 'Produto Ativo FilterTest', 10.0, true, now(), now())
+         RETURNING id`,
+        [tenantId],
+      );
+      produtoAtivoId = ativo[0].id;
+
+      const inativo = await queryRunner.query(
+        `INSERT INTO produtos (id, tenant_id, name, price, is_active, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, 'Produto Inativo FilterTest', 7.0, false, now(), now())
+         RETURNING id`,
+        [tenantId],
+      );
+      produtoInativoId = inativo[0].id;
+
+      await queryRunner.release();
+    });
+
+    it('GET /products sem include_inactive NÃO retorna produto inativo', async () => {
+      if (!app) return;
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/products')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .expect(200);
+
+      const ids: string[] = Array.isArray(res.body)
+        ? res.body.map((p: any) => p.id)
+        : (res.body.data ?? []).map((p: any) => p.id);
+
+      expect(ids).toContain(produtoAtivoId);
+      expect(ids).not.toContain(produtoInativoId);
+    });
+
+    it('GET /products?include_inactive=true retorna ativo E inativo', async () => {
+      if (!app) return;
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/products?include_inactive=true')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .expect(200);
+
+      const ids: string[] = Array.isArray(res.body)
+        ? res.body.map((p: any) => p.id)
+        : (res.body.data ?? []).map((p: any) => p.id);
+
+      expect(ids).toContain(produtoAtivoId);
+      expect(ids).toContain(produtoInativoId);
+    });
+
+    it('produto desativado via PATCH is_active=false pode ser reativado (reaparece em include_inactive)', async () => {
+      if (!app) return;
+      // Desativar via PATCH
+      await request(app.getHttpServer())
+        .patch(`/api/v1/products/${produtoAtivoId}`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ is_active: false })
+        .expect(200);
+
+      // Sem flag: não aparece
+      const semFlag = await request(app.getHttpServer())
+        .get('/api/v1/products')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .expect(200);
+
+      const idsSemFlag: string[] = Array.isArray(semFlag.body)
+        ? semFlag.body.map((p: any) => p.id)
+        : (semFlag.body.data ?? []).map((p: any) => p.id);
+      expect(idsSemFlag).not.toContain(produtoAtivoId);
+
+      // Com flag: aparece mesmo inativo
+      const comFlag = await request(app.getHttpServer())
+        .get('/api/v1/products?include_inactive=true')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .expect(200);
+
+      const idsComFlag: string[] = Array.isArray(comFlag.body)
+        ? comFlag.body.map((p: any) => p.id)
+        : (comFlag.body.data ?? []).map((p: any) => p.id);
+      expect(idsComFlag).toContain(produtoAtivoId);
+
+      // Reativar via PATCH
+      await request(app.getHttpServer())
+        .patch(`/api/v1/products/${produtoAtivoId}`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ is_active: true })
+        .expect(200);
+
+      // Sem flag: reativado volta a aparecer
+      const reativado = await request(app.getHttpServer())
+        .get('/api/v1/products')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .expect(200);
+
+      const idsReativado: string[] = Array.isArray(reativado.body)
+        ? reativado.body.map((p: any) => p.id)
+        : (reativado.body.data ?? []).map((p: any) => p.id);
+      expect(idsReativado).toContain(produtoAtivoId);
+    });
+  });
+
   describe('Admin estoque — extrato (stock-history) e categories', () => {
     let produtoId: string;
 

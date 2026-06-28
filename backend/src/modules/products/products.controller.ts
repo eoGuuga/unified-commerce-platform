@@ -39,18 +39,20 @@ export class ProductsController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Listar produtos',
-    description: 'Lista produtos com paginação opcional. Sem parâmetros de paginação, retorna todos os produtos (compatibilidade).',
+    description: 'Lista produtos com paginação opcional. Sem parâmetros de paginação, retorna todos os produtos (compatibilidade). Passar include_inactive=true retorna também produtos inativos (uso exclusivo do admin).',
   })
   findAll(
     @CurrentTenant() tenantId: string,
     @Query() pagination: PaginationDto,
+    @Query('include_inactive') includeInactiveRaw: string,
     @Request() req: TypedRequest,
   ) {
     const hasPagination =
       typeof req?.query?.page !== 'undefined' || typeof req?.query?.limit !== 'undefined';
-    return this.productsService.findAll(tenantId, hasPagination ? pagination : undefined);
+    const includeInactive = includeInactiveRaw === 'true';
+    return this.productsService.findAll(tenantId, hasPagination ? pagination : undefined, includeInactive);
   }
 
   @Get('search')

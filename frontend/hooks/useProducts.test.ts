@@ -28,6 +28,57 @@ describe('useProducts', () => {
     ]);
   });
 
+  describe('getProducts — include_inactive', () => {
+    it('chama getProducts com includeInactive:true para que inativos apareçam na lista', async () => {
+      const { result } = renderHook(() => useProducts());
+      await act(async () => { await Promise.resolve(); });
+
+      // Verifica que o hook passou a flag ao api-client
+      expect(apiMock.getProducts).toHaveBeenCalledWith('', { includeInactive: true });
+
+      // Ambos os produtos (ativo + inativo) devem estar na lista
+      expect(result.current.products).toHaveLength(2);
+      expect(result.current.products.find((p) => p.id === '2')?.is_active).toBe(false);
+    });
+
+    it('filtro Inativos: produto inativo está na lista retornada pelo hook', async () => {
+      const { result } = renderHook(() => useProducts());
+      await act(async () => { await Promise.resolve(); });
+
+      // Simula lógica do filtro "Inativos" do ProductsManager
+      const inativos = result.current.products.filter((p) => !p.is_active);
+      expect(inativos).toHaveLength(1);
+      expect(inativos[0].name).toBe('Trufa');
+    });
+
+    it('filtro Todos: retorna ativo + inativo', async () => {
+      const { result } = renderHook(() => useProducts());
+      await act(async () => { await Promise.resolve(); });
+
+      const todos = result.current.products;
+      expect(todos).toHaveLength(2);
+    });
+
+    it('toggle de reativação: produto inativo pode ser reativado (não some da lista)', async () => {
+      apiMock.updateProduct.mockResolvedValue({ id: '2', name: 'Trufa', price: 8, is_active: true });
+
+      const { result } = renderHook(() => useProducts());
+      await act(async () => { await Promise.resolve(); });
+
+      // Produto inativo presente antes do toggle
+      expect(result.current.products.find((p) => p.id === '2')?.is_active).toBe(false);
+
+      await act(async () => {
+        await result.current.toggleActive('2', true);
+      });
+
+      // Após reativação, produto permanece na lista com is_active=true
+      const produto = result.current.products.find((p) => p.id === '2');
+      expect(produto).toBeDefined();
+      expect(produto?.is_active).toBe(true);
+    });
+  });
+
   describe('toggleActive — optimistic', () => {
     it('aplica is_active imediatamente antes da resposta da API', async () => {
       // Usar uma promise pendente para capturar o estado intermediário (optimistic)

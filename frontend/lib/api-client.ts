@@ -133,8 +133,14 @@ class ApiClient {
   // Products
   // ---------------------------------------------------------------------------
 
-  async getProducts(_tenantId: string): Promise<Product[]> {
-    return this.request<Product[]>('/products');
+  async getProducts(_tenantId: string, options?: { includeInactive?: boolean }): Promise<Product[]> {
+    // Quando includeInactive=true o admin recebe todos os produtos (ativos + inativos),
+    // permitindo que os filtros Ativos/Inativos/Todos e o toggle de reativação funcionem.
+    const params: Record<string, string> = {};
+    if (options?.includeInactive) {
+      params.include_inactive = 'true';
+    }
+    return this.request<Product[]>('/products', Object.keys(params).length ? { params } : undefined);
   }
 
   async getPublicStoreProducts(tenantId?: string): Promise<Product[]> {

@@ -35,7 +35,9 @@ export function useProducts(): UseProductsResult {
     setLoading(true);
     setError(null);
     try {
-      const raw = await api.getProducts('');
+      // O admin precisa de todos os produtos (ativos + inativos) para que os filtros
+      // Ativos/Inativos/Todos funcionem e produtos desativados possam ser reativados.
+      const raw = await api.getProducts('', { includeInactive: true });
       const list = Array.isArray(raw) ? raw : ((raw as { data?: Product[] })?.data ?? []);
       setProducts(list);
     } catch (err) {
