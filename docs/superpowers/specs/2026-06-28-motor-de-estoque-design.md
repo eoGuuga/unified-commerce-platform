@@ -86,6 +86,21 @@ Marcam que a reserva daquele registro já foi devolvida — base do *compare-and
 
 Para honrar "ledger soma a `current_stock` desde o dia zero": migration que, para cada linha de `movimentacao_estoque` com `current_stock > 0`, insere **uma** linha `INVENTARIO_INICIAL` no ledger com `delta = current_stock`, `saldo_resultante = current_stock`. Idempotente (não insere se já houver `INVENTARIO_INICIAL` para o produto).
 
+**Concorrência no backfill (salvaguarda).** Se a migration rodar com o sistema ativo, um produto pode ter o `current_stock` alterado entre a leitura e a inserção. **Não** ler em JS e inserir depois. Usar **uma única `INSERT INTO ... SELECT ...`** atômica, para que o `current_stock` lido seja exatamente o `delta`/`saldo_resultante` gravado no mesmo comando:
+```sql
+INSERT INTO movimentacao_estoque_historico
+  (id, tenant_id, produto_id, tipo, delta, saldo_resultante, created_at)
+SELECT gen_random_uuid(), me.tenant_id, me.produto_id,
+       'INVENTARIO_INICIAL', me.current_stock, me.current_stock, now()
+FROM movimentacao_estoque me
+WHERE me.current_stock > 0
+  AND NOT EXISTS (
+    SELECT 1 FROM movimentacao_estoque_historico h
+    WHERE h.produto_id = me.produto_id AND h.tipo = 'INVENTARIO_INICIAL'
+  );
+```
+Idealmente rodar na janela de deploy (tráfego chaveado), mas o `INSERT ... SELECT` mantém o invariante mesmo sob escrita concorrente.
+
 ---
 
 ## 4. O ciclo de vida do estoque (a costura)
@@ -219,3 +234,19 @@ Lotes, validade, múltiplos depósitos/locais, custo médio móvel, tabela dedic
 - TTL por sweeper `@nestjs/schedule` a **60s** + fast-path preguiçoso + webhook.
 - Colisão webhook×sweeper resolvida por **compare-and-set** na linha do pedido (sem corrida).
 - `MovimentacaoEstoque` (saldo) **não** será renomeada; papéis documentados.
+
+---
+
+## 12. Salvaguardas de implementação (armadilhas conhecidas)
+
+Anotadas para nascerem blindadas no plano e na codificação.
+
+### 12.1 Estado de entidade no TypeORM (Entity State Mismatch)
+
+A regra de ouro usa `UPDATE ... SET current_stock = current_stock + :delta` via QueryBuilder/SQL bruto. **Perigo:** instâncias de entidade já carregadas em memória naquela mesma requisição (ex.: um `Produto`/saldo lido no início do caso de uso) **não** refletem a mutação — o atributo em memória fica defasado.
+
+**Diretriz:** após `commitSale`/`reserve`/`release`/qualquer mutação por expressão matemática, se o fluxo precisar **ler ou retornar** o saldo, ou (a) confiar **estritamente** no valor da cláusula `RETURNING` do próprio `UPDATE`, ou (b) **recarregar** do banco (`manager.findOneBy`). **Nunca** usar o estado em memória pré-`UPDATE`. Preferir `RETURNING` (uma ida ao banco a menos) e expor esse valor como retorno do método do `StockEngineService`.
+
+### 12.2 Concorrência no backfill da migration
+
+Detalhado em §3.4: usar `INSERT INTO ... SELECT ...` atômico (nunca ler-em-JS-e-inserir), garantindo que `current_stock` lido == `saldo_resultante` gravado no mesmo comando, mesmo sob escrita concorrente. Idealmente na janela de deploy com tráfego chaveado.
