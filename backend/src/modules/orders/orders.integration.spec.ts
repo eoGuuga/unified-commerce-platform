@@ -716,8 +716,14 @@ describe('Orders Integration Tests (e2e)', () => {
         `SELECT 1 FROM movimentacoes_estoque_historico WHERE produto_id = $1 AND tipo = 'VENDA'`,
         [produtoId],
       ) as Array<unknown>;
+      // Rollback total: nenhuma linha de pagamento deve ter sido criada para este produto/tenant.
+      const pags = await qr.query(
+        `SELECT 1 FROM pagamentos WHERE pedido_id IN (SELECT id FROM pedidos WHERE tenant_id = $1 AND status = 'entregue' AND channel = 'pdv' AND id IN (SELECT pedido_id FROM itens_pedido WHERE produto_id = $2))`,
+        [tenantId, produtoId],
+      ) as Array<unknown>;
       await qr.release();
       expect(ledger).toHaveLength(0);
+      expect(pags).toHaveLength(0);
     });
   });
 

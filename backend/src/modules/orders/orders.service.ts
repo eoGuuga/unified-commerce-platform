@@ -405,9 +405,8 @@ export class OrdersService {
       });
     }
 
-    // ✅ NOVO: Notificar cliente sobre criação do pedido (especialmente para WhatsApp)
-    // PDV nao notifica — venda atomica de balcao nao requer confirmacao externa.
-    if (createOrderDto.channel !== CanalVenda.PDV && createOrderDto.channel === CanalVenda.WHATSAPP) {
+    // Notificacao especifica de WhatsApp; PDV (entregue, pago) e demais canais nao disparam aqui.
+    if (createOrderDto.channel === CanalVenda.WHATSAPP) {
       try {
         // Notificar mudança de status (de null para PENDENTE_PAGAMENTO)
         await this.notificationsService.notifyOrderStatusChange(
