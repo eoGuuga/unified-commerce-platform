@@ -28,6 +28,11 @@ export class Tenant {
   @Column('jsonb', { default: {} })
   settings: Record<string, any>;
 
+  // Access token da WhatsApp Cloud API (Meta), criptografado em repouso (AES-256-GCM).
+  // Dados nao-secretos (phoneNumberId, provider) ficam em settings.whatsapp.
+  @Column({ type: 'text', nullable: true })
+  whatsapp_cloud_token_encrypted?: string;
+
   @Column({ default: true })
   is_active: boolean;
 

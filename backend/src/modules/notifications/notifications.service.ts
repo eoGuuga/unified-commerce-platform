@@ -5,6 +5,7 @@ import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity'
 import { Pedido, PedidoStatus, CanalVenda } from '../../database/entities/Pedido.entity';
 import { Pagamento, MetodoPagamento } from '../../database/entities/Pagamento.entity';
 import { DbContextService } from '../common/services/db-context.service';
+import { WhatsappSender } from '../whatsapp/config/whatsapp-sender.service';
 
 export interface NotificationMessage {
   to: string; // numero do WhatsApp
@@ -34,6 +35,7 @@ export class NotificationsService {
   constructor(
     private readonly db: DbContextService,
     private readonly configService: ConfigService,
+    private readonly whatsappSender: WhatsappSender,
   ) {}
 
   async notifyPaymentConfirmed(
@@ -368,10 +370,23 @@ export class NotificationsService {
       });
       await messageRepository.save(whatsappMessage);
 
-      await this.sendWhatsAppMessage({
-        ...notification,
-        to: conversation.customer_phone,
-      });
+      // R2: envia pelo canal DO TENANT (provider/credencial proprios do cliente).
+      // conversation.tenant_id garante o isolamento. O sender ja degrada/loga em falha.
+      // Preserva o QR Code do PIX (imageUrl) — senao o cliente nao consegue pagar.
+      if (notification.imageUrl) {
+        await this.whatsappSender.sendImage(
+          conversation.tenant_id,
+          conversation.customer_phone,
+          notification.imageUrl,
+          notification.message,
+        );
+      } else {
+        await this.whatsappSender.sendText(
+          conversation.tenant_id,
+          conversation.customer_phone,
+          notification.message,
+        );
+      }
 
       this.logger.log(`WhatsApp notification sent to ${conversation.customer_phone}`);
       return true;

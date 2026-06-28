@@ -486,7 +486,7 @@ export class WhatsappController {
     const shouldDispatchResponse = shouldDispatchOutboundResponse(response);
 
     if (shouldDispatchResponse) {
-      await this.whatsappService.sendOutboundResponse(message.from, response);
+      await this.whatsappService.sendOutboundResponse(message.from, response, message.tenantId);
     }
 
     return {

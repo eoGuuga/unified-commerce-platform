@@ -80,7 +80,11 @@ describe('WhatsappController', () => {
         }),
       }),
     );
-    expect(whatsappService.sendOutboundResponse).toHaveBeenCalledWith('5511991234567', 'ok');
+    expect(whatsappService.sendOutboundResponse).toHaveBeenCalledWith(
+      '5511991234567',
+      'ok',
+      'tenant-loucas',
+    );
     expect(response).toEqual({
       success: true,
       response: 'ok',
@@ -162,6 +166,7 @@ describe('WhatsappController', () => {
     expect(whatsappService.sendOutboundResponse).toHaveBeenCalledWith(
       '5511991234567',
       interactiveResponse,
+      'tenant-loucas',
     );
     expect(response).toEqual({
       success: true,

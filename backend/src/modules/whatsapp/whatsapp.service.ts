@@ -36,6 +36,7 @@ import { InteractiveMessageService } from './services/interactive-message.servic
 import { EvolutionApiProvider } from './providers/evolution-api.provider';
 import { MockWhatsappProvider } from './providers/mock-whatsapp.provider';
 import { IWhatsappProvider } from './providers/whatsapp-provider.interface';
+import { WhatsappSender } from './config/whatsapp-sender.service';
 
 import { TypedConversation, ConversationState, CustomerData, PendingOrder } from './types/whatsapp.types';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
@@ -108,6 +109,9 @@ export class WhatsAppService {
     // Providers de envio
     private readonly evolutionProvider: EvolutionApiProvider,
     private readonly mockProvider: MockWhatsappProvider,
+
+    // Envio tenant-aware (R2): resolve provider/credencial por tenant
+    private readonly whatsappSender: WhatsappSender,
   ) {}
 
   /**
@@ -298,26 +302,34 @@ export class WhatsAppService {
    * Envia resposta de saída (para o provider WhatsApp)
    * Suporta mensagens de texto, botões interativos e listas
    */
-  async sendOutboundResponse(to: string, response: WhatsAppOutboundResponse): Promise<void> {
+  async sendOutboundResponse(
+    to: string,
+    response: WhatsAppOutboundResponse,
+    tenantId?: string,
+  ): Promise<void> {
     try {
-      const provider = this.getOutboundProvider();
       const { body, buttons } = this.flattenOutboundResponse(response);
 
       if (!body.trim()) {
         return;
       }
 
-      // Quando ha botoes e o provider suporta, tenta enviar interativo;
-      // se falhar, degrada para texto puro (o cliente nunca fica sem resposta).
+      // R2: com tenantId, envia pelo canal DO TENANT (provider/credencial proprios).
+      // O WhatsappSender resolve a config e ja degrada interativo -> texto internamente.
+      if (tenantId) {
+        if (buttons.length > 0) {
+          await this.whatsappSender.sendButtons(tenantId, to, body, buttons);
+        } else {
+          await this.whatsappSender.sendText(tenantId, to, body);
+        }
+        return;
+      }
+
+      // Fallback legado (sem tenantId): provider global. Mantido para compatibilidade.
+      const provider = this.getOutboundProvider();
       if (buttons.length > 0) {
         try {
           await provider.sendInteractiveButtons({ to, body, buttons });
-          this.logger.log('Resposta interativa enviada', {
-            to,
-            provider: provider.getProviderType(),
-            buttonsCount: buttons.length,
-            preview: body.substring(0, 50),
-          });
           return;
         } catch (interactiveError) {
           this.logger.warn('Falha ao enviar interativo, degradando para texto', {
@@ -326,13 +338,7 @@ export class WhatsAppService {
           });
         }
       }
-
       await provider.sendMessage({ to, body });
-      this.logger.log('Resposta de texto enviada', {
-        to,
-        provider: provider.getProviderType(),
-        preview: body.substring(0, 50),
-      });
     } catch (error) {
       this.logger.error('Failed to send outbound response', {
         error: error instanceof Error ? error.message : error,

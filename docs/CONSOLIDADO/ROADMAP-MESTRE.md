@@ -25,7 +25,7 @@ O projeto **funciona em partes, mas NAO esta vendavel hoje** — e a causa nao e
 
 ### Receita / fluxo central
 - [x] **R1. Bot nao envia mensagem nenhuma.** FEITO 2026-06-26 (merged main): `sendOutboundResponse` despacha pelo provider; 6 testes.
-- [ ] **R2. WhatsApp e config GLOBAL, nao por-tenant.** `evolution-api.provider.ts:25` le credenciais de env unicas. Impossivel 2 clientes com numeros diferentes. → Provider tenant-aware: buscar credenciais do tenant antes de enviar. (BLOQUEIA 2o cliente)
+- [~] **R2. WhatsApp por-tenant — BASE FEITA 2026-06-27** (branch `feat/whatsapp-per-tenant`, NAO mergeada). Construida a tubulacao agnostica: `TenantWhatsappConfig`, `CloudApiProvider` (Meta oficial, tenant-aware), `WhatsappConfigResolver` (settings+token cripto, fallback env global), `WhatsappSender` (ponto unico), `WhatsappSendingModule` (sem ciclo). tenantId propagado nos 2 paths de envio. Migration do token cripto. 7 testes de isolamento. **FALTA p/ fechar R2:** (a) UI para o cliente cadastrar credencial Cloud API no /admin, (b) guiar Gustavo no cadastro Meta Business + numero de teste. Evolution DESCARTADO (so legado).
 - [~] **R3. Loja mostra produtos FALSOS.** OBSOLETO/REVERTIDO 2026-06-27: a vitrine `/loja` foi REMOVIDA (nao faz parte do produto — ver [[product-vision]]). O fix de catalogo real foi feito, mas a loja inteira saiu. O cadastro do catalogo serve agora ao BOT e ao PDV, nao a uma vitrine web.
 - [ ] **R4. Sem provisionamento de tenant self-service.** Checkout (`frontend/app/checkout`) promete "equipe entra em contato em 24h" — setup manual. → Onboarding que cria tenant, gera secrets, coleta numero WhatsApp + chave MercadoPago do cliente.
 
