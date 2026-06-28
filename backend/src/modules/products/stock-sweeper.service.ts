@@ -27,14 +27,10 @@ export class StockSweeperService {
 
   @Cron(CronExpression.EVERY_MINUTE, { name: 'stock-sweeper' })
   async run(): Promise<void> {
-    try {
-      await this.sweepExpiredCarts();
-      await this.sweepExpiredPendingOrders();
-    } catch (err) {
-      this.logger.error('Sweeper de estoque falhou', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+    try { await this.sweepExpiredCarts(); }
+    catch (err) { this.logger.error('sweepExpiredCarts falhou', { error: err instanceof Error ? err.message : String(err) }); }
+    try { await this.sweepExpiredPendingOrders(); }
+    catch (err) { this.logger.error('sweepExpiredPendingOrders falhou', { error: err instanceof Error ? err.message : String(err) }); }
   }
 
   /**
@@ -42,6 +38,15 @@ export class StockSweeperService {
    * Delega a liberação ao CartService.releaseExpiredCart (compare-and-set).
    */
   async sweepExpiredCarts(): Promise<void> {
+    // AVISO RLS: este SELECT varre TODOS os tenants sem contexto de tenant definido.
+    // Funciona corretamente hoje porque a aplicação conecta como superusuário postgres,
+    // que ignora Row Level Security (RLS). Se futuramente for adotada uma role de
+    // aplicação não-superusuário com RLS habilitado, este SELECT retornará zero linhas
+    // silenciosamente (falha silent no-op). Nesse cenário será necessário:
+    //   (a) usar uma role com atributo BYPASSRLS exclusiva para o sweeper, OU
+    //   (b) iterar por tenant: SELECT DISTINCT tenant_id FROM tenants WHERE is_active,
+    //       depois set_config('app.tenant_id', ...) por iteração antes do SELECT.
+    // NÃO alterar a lógica agora — apenas documentar a suposição.
     const rows: Array<{ id: string }> = await this.dataSource.query(
       `SELECT id FROM whatsapp_carts
        WHERE status = 'active'
@@ -71,6 +76,12 @@ export class StockSweeperService {
   async sweepExpiredPendingOrders(): Promise<void> {
     const ttlMin = Number(this.config.get('ORDER_PAYMENT_TTL_MINUTES')) || 60;
 
+    // AVISO RLS: mesma suposição do sweepExpiredCarts — varredura cross-tenant sem
+    // contexto de tenant. Depende da conexão como superusuário postgres (BYPASSRLS
+    // implícito). Se RLS for ativado com role não-superusuário, retornará zero linhas
+    // silenciosamente. Solução futura: role BYPASSRLS para o sweeper ou iteração
+    // explícita por tenant via set_config('app.tenant_id', ...) antes do SELECT.
+    // NÃO alterar a lógica agora — apenas documentar a suposição.
     const rows: Array<{ id: string }> = await this.dataSource.query(
       `SELECT id FROM pedidos
        WHERE status = 'pendente_pagamento'
