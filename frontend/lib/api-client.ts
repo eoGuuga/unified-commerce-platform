@@ -178,6 +178,11 @@ class ApiClient {
     });
   }
 
+  async getCategories(): Promise<string[]> {
+    // Retorna lista de categorias disponíveis para os produtos do tenant.
+    return this.request<string[]>('/products/categories');
+  }
+
   // ---------------------------------------------------------------------------
   // Orders
   // ---------------------------------------------------------------------------
