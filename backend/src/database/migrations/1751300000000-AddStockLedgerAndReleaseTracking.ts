@@ -27,7 +27,7 @@ export class AddStockLedgerAndReleaseTracking1751300000000
         "motivo" text,
         "order_id" uuid,
         "usuario_id" uuid,
-        "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+        "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         CONSTRAINT "PK_movimentacoes_estoque_historico" PRIMARY KEY ("id")
       )
     `);
@@ -64,7 +64,7 @@ export class AddStockLedgerAndReleaseTracking1751300000000
       WHERE me.current_stock > 0
         AND NOT EXISTS (
           SELECT 1 FROM "movimentacoes_estoque_historico" h
-          WHERE h.produto_id = me.produto_id AND h.tipo = 'INVENTARIO_INICIAL'
+          WHERE h.produto_id = me.produto_id AND h.tenant_id = me.tenant_id AND h.tipo = 'INVENTARIO_INICIAL'
         )
     `);
   }

@@ -62,6 +62,6 @@ export class MovimentacaoEstoqueHistorico {
   @Column('uuid', { nullable: true })
   usuario_id: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 }
