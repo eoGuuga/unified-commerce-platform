@@ -568,13 +568,26 @@ export class OrdersService {
     this.assertStatusTransition(oldStatus, status);
 
     const updatedPedido = await this.db.runInTransaction(async (manager) => {
-      // Lock pessimista para serializar transições concorrentes
-      await manager
+      // Lock pessimista para serializar transições concorrentes.
+      // Capturamos a linha bloqueada para usar dentro da transação — nunca o snapshot
+      // pré-lock (pedido), que pode estar desatualizado em caso de corrida.
+      const lockedPedido = await manager
         .createQueryBuilder(Pedido, 'p')
         .setLock('pessimistic_write')
         .where('p.id = :id', { id })
         .andWhere('p.tenant_id = :tenantId', { tenantId })
         .getOne();
+
+      if (!lockedPedido) {
+        throw new NotFoundException(`Pedido ${id} nao encontrado`);
+      }
+
+      // Defesa contra transição já aplicada por request concorrente:
+      // se outro processo aplicou exatamente esta transição enquanto
+      // esperávamos o lock, retornamos sem reprocessar estoque.
+      if (lockedPedido.status === status) {
+        return lockedPedido;
+      }
 
       // Carregar itens do pedido para o commit/release
       const itens = await manager.find(ItemPedido, { where: { pedido_id: id } });
@@ -588,16 +601,20 @@ export class OrdersService {
         await this.stockEngine.commitSale(manager, tenantId, id, stockItems);
       }
 
-      // RELEASE da reserva ao cancelar pré-PRONTO (apenas uma vez, guarda via stock_released_at)
-      if (status === PedidoStatus.CANCELADO && pedido.stock_released_at == null) {
+      // RELEASE da reserva ao cancelar pré-PRONTO (apenas uma vez).
+      // Lemos stock_released_at do lockedPedido (linha bloqueada) para evitar
+      // o TOCTOU: dois cancels concorrentes veriam o snapshot pré-lock como null
+      // e ambos liberariam a reserva (double-release). Com o lock adquirido, apenas
+      // o vencedor vê null; o perdedor aguarda e encontra a data já preenchida.
+      if (status === PedidoStatus.CANCELADO && lockedPedido.stock_released_at == null) {
         for (const it of stockItems) {
           await this.stockEngine.release(manager, tenantId, it.produto_id, it.quantity);
         }
-        pedido.stock_released_at = new Date();
+        lockedPedido.stock_released_at = new Date();
       }
 
-      pedido.status = status;
-      return manager.getRepository(Pedido).save(pedido);
+      lockedPedido.status = status;
+      return manager.getRepository(Pedido).save(lockedPedido);
     });
 
     // Notificação FORA da transação (sem I/O externo sob lock)
