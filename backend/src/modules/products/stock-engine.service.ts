@@ -152,6 +152,7 @@ export class StockEngineService {
     if (tipo === LedgerTipo.PERDA && delta >= 0) {
       throw new BadRequestException('PERDA exige delta negativo.');
     }
+    // AJUSTE: bidirecional (qualquer sinal); o delta != 0 ja e garantido pelo guard acima.
     // manager.query() com RETURNING retorna tupla [[linhas], rowCount] neste TypeORM+pg; unwrap obrigatorio antes de ler campos.
     const rawUpdate = await manager.query(
       `UPDATE movimentacoes_estoque
