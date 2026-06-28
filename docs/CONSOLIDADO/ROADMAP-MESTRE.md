@@ -49,7 +49,7 @@ O projeto **funciona em partes, mas NAO esta vendavel hoje** — e a causa nao e
 ### Integridade financeira
 - [x] **F1. Race condition de estoque.** VERIFICADO 2026-06-26: codigo JA seguro — `orders.service.ts:144` usa `setLock('pessimistic_write')` (FOR UPDATE) + decremento atomico condicional (`current_stock >= quantity`, checa `affected`). Auditor superestimou. Nada a fazer.
 - [x] **F2. Webhook de pagamento sem dedup.** FEITO 2026-06-26: lock pessimista (FOR UPDATE) na linha do Pagamento serializa retries concorrentes do MercadoPago, evitando dupla confirmacao.
-- [ ] **F3. Checkout confia no total do carrinho.** `whatsapp.service.ts:~754` usa `total_amount` do carrinho. → recalcular do banco no checkout. (orders.service ja recalcula; fechar a ponte)
+- [x] **F3. Checkout confia no total do carrinho.** VERIFICADO 2026-06-28 — NAO e bug. `handleCheckout` passa os ITENS; `orders.service.ts:170-183` pega o preco do BANCO, REJEITA se o `unit_price` enviado divergir >1 centavo do real, e recalcula o subtotal. Total nunca confiado do carrinho. Auditor superestimou (como F1/S6). Nada a fazer.
 
 ### LGPD / juridico (cliente real = PII real)
 - [x] **L1. Exclusao de dados.** FEITO 2026-06-26 (branch `feat/lgpd-compliance`): `processDeletion` anonimiza PII em cascata (pedidos/conversas/usuario) preservando registro fiscal, + audit log + endpoints `DELETE`/`GET /lgpd/meus-dados`. 9 testes.
