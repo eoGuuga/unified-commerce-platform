@@ -172,4 +172,52 @@ describe('StockEngineService (integration)', () => {
     expect(res.saldo_resultante).toBe(12);
     expect((await saldo(pid)).current).toBe(12);
   });
+
+  it('invariante do ledger: current_stock == SUM(delta) de todas as movimentações do produto', async () => {
+    // Garante que toda mutação de estoque passou pelo motor e foi registrada no ledger.
+    // Sequência: compra +10, reserva 4, commit venda -4, perda -2 → current_stock final = 4.
+    // Invariante: current_stock deve igual SUM(delta) do ledger.
+    if (!dataSource) return;
+
+    // Seed com saldo zerando (sem linha de ledger pré-existente) para garantir a invariante desde o início
+    const pid = await seedProduto(0, 0);
+
+    // Passo 1: compra inicial → current 10
+    await dataSource.transaction(async (m: EntityManager) => {
+      await m.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      await engine.recordManualMovement(m, tenantId, pid, 'COMPRA' as any, 10, 'compra inicial', null);
+    });
+
+    // Passo 2: reserva 4 unidades (para o pedido futuro)
+    await dataSource.transaction(async (m: EntityManager) => {
+      await m.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      await engine.reserve(m, tenantId, pid, 4);
+    });
+
+    // Passo 3: commit da venda → current 6, ledger VENDA -4
+    const orderId = (await dataSource!.query(`SELECT uuid_generate_v4() AS id`))[0].id;
+    await dataSource.transaction(async (m: EntityManager) => {
+      await m.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      await engine.commitSale(m, tenantId, orderId, [{ produto_id: pid, quantity: 4 }]);
+    });
+
+    // Passo 4: perda -2 (quebra/avaria) → current 4
+    await dataSource.transaction(async (m: EntityManager) => {
+      await m.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      await engine.recordManualMovement(m, tenantId, pid, 'PERDA' as any, -2, 'quebra', null);
+    });
+
+    // Valida saldo intermediário esperado
+    expect((await saldo(pid)).current).toBe(4);
+
+    // Valida a invariante: current_stock == SUM(delta) do ledger (regra de ouro)
+    const invarianteResult = await dataSource.query(
+      `SELECT (
+         (SELECT current_stock FROM movimentacoes_estoque WHERE produto_id = $1)
+         = (SELECT COALESCE(SUM(delta), 0) FROM movimentacoes_estoque_historico WHERE produto_id = $1)
+       ) AS ok`,
+      [pid],
+    );
+    expect(invarianteResult[0].ok).toBe(true);
+  });
 });
