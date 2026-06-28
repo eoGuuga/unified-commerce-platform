@@ -8,6 +8,7 @@ import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque
 import { Produto } from '../../database/entities/Produto.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CanalVenda } from '../../database/entities/Pedido.entity';
+import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
 import { IdempotencyService } from '../common/services/idempotency.service';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -189,6 +190,8 @@ describe('OrdersService', () => {
       ],
       discount_amount: 0,
       shipping_amount: 0,
+      // Pagamento sincrono de balcao — obrigatorio para canal PDV
+      payment: { method: MetodoPagamento.DINHEIRO },
     };
 
     const mockEstoques: Partial<MovimentacaoEstoque>[] = [
@@ -602,14 +605,57 @@ describe('OrdersService', () => {
       const resultPDV = await service.create(createOrderDto, tenantId);
       expect(resultPDV.status).toBe(PedidoStatus.PENDENTE_PAGAMENTO);
 
-      // Test E-commerce
-      const orderEcommerce = { ...createOrderDto, channel: CanalVenda.ECOMMERCE };
+      // Test E-commerce — sem payment (nao permitido fora do PDV)
+      const orderEcommerce = { ...createOrderDto, channel: CanalVenda.ECOMMERCE, payment: undefined };
       const pedidoEcommerce = { ...mockPedido, status: PedidoStatus.PENDENTE_PAGAMENTO };
       mockManager.create = jest.fn().mockReturnValue(pedidoEcommerce);
       mockManager.save = jest.fn().mockResolvedValue(pedidoEcommerce);
 
       const resultEcommerce = await service.create(orderEcommerce, tenantId);
       expect(resultEcommerce.status).toBe(PedidoStatus.PENDENTE_PAGAMENTO);
+    });
+
+    // ── Guardas de validacao PDV ────────────────────────────────────────────
+    // Estas guardas devem rejeitar ANTES de abrir transacao com o banco,
+    // protegendo contra flood de checkouts maliciosos.
+    describe('validacao PDV', () => {
+      const baseDto: CreateOrderDto = {
+        channel: CanalVenda.PDV,
+        items: [{ produto_id: produtoId1, quantity: 1, unit_price: 10.5 }],
+      };
+
+      it('rejeita pedido PDV sem payment.method', async () => {
+        await expect(
+          service.create({ ...baseDto, channel: CanalVenda.PDV, payment: undefined } as any, tenantId),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        // Guarda deve falhar antes de abrir transacao com o banco
+        expect(mockDbContextService.runInTransaction).not.toHaveBeenCalled();
+      });
+
+      it('rejeita payment em canal nao-PDV', async () => {
+        await expect(
+          service.create(
+            { ...baseDto, channel: CanalVenda.ECOMMERCE, payment: { method: MetodoPagamento.DINHEIRO } } as any,
+            tenantId,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        // Guarda deve falhar antes de abrir transacao com o banco
+        expect(mockDbContextService.runInTransaction).not.toHaveBeenCalled();
+      });
+
+      it('rejeita method boleto no PDV', async () => {
+        await expect(
+          service.create(
+            { ...baseDto, channel: CanalVenda.PDV, payment: { method: MetodoPagamento.BOLETO } } as any,
+            tenantId,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        // Guarda deve falhar antes de abrir transacao com o banco
+        expect(mockDbContextService.runInTransaction).not.toHaveBeenCalled();
+      });
     });
   });
 });

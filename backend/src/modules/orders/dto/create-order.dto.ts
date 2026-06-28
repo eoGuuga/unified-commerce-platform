@@ -13,6 +13,13 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { CanalVenda } from '../../../database/entities/Pedido.entity';
+import { MetodoPagamento } from '../../../database/entities/Pagamento.entity';
+
+export class PdvPaymentDto {
+  @ApiProperty({ description: 'Metodo de pagamento fisico no balcao', enum: MetodoPagamento })
+  @IsEnum(MetodoPagamento)
+  method: MetodoPagamento;
+}
 
 export class DeliveryAddressDto {
   @IsString()
@@ -123,4 +130,14 @@ export class CreateOrderDto {
   @IsNumber()
   @Min(0)
   shipping_amount?: number;
+
+  @ApiProperty({
+    description: 'Pagamento sincrono (apenas canal PDV/balcao)',
+    required: false,
+    type: PdvPaymentDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PdvPaymentDto)
+  payment?: PdvPaymentDto;
 }

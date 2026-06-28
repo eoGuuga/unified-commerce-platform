@@ -135,6 +135,28 @@ export class OrdersService {
       throw new BadRequestException('discount_amount so é permitido quando coupon_code é informado');
     }
 
+    // Validacao do pagamento sincrono de balcao (PDV).
+    // Estas guardas ficam ANTES da transacao para rejeitar requests invalidas
+    // sem abrir conexao com o banco — fail-fast contra flood de checkouts.
+    const PDV_METODOS_VALIDOS = [
+      MetodoPagamento.DINHEIRO,
+      MetodoPagamento.PIX,
+      MetodoPagamento.DEBITO,
+      MetodoPagamento.CREDITO,
+    ];
+    if (createOrderDto.channel === CanalVenda.PDV) {
+      if (!createOrderDto.payment?.method) {
+        throw new BadRequestException('Venda PDV exige payment.method.');
+      }
+      if (!PDV_METODOS_VALIDOS.includes(createOrderDto.payment.method)) {
+        throw new BadRequestException(
+          `Metodo de pagamento invalido para PDV: ${createOrderDto.payment.method}.`,
+        );
+      }
+    } else if (createOrderDto.payment) {
+      throw new BadRequestException('payment so e permitido no canal PDV.');
+    }
+
     // Inicia transação CRÍTICA
     const pedido = await this.db.runInTransaction(async (manager) => {
       // 1. FOR UPDATE lock - Bloqueia linhas de estoque
@@ -233,7 +255,8 @@ export class OrdersService {
         }
       }
 
-      // 5. RESERVAR estoque (não baixar — a baixa ocorre no PRONTO via StockEngine.commitSale).
+      // 5. RESERVAR estoque (não baixar). A baixa ocorre no PRONTO via StockEngine.commitSale
+      // para canais order-driven; no PDV, a baixa é comitada nesta mesma transação (ramo isPdv abaixo).
       // O lock pessimista do passo 1 + a guarda atômica do reserve garantem
       // que não há overselling concorrente.
       for (const item of createOrderDto.items) {
@@ -247,8 +270,11 @@ export class OrdersService {
 
       // 6. Criar pedido
       const orderNo = await this.generateOrderNumber(tenantId);
-      // Todos os canais comecam em PENDENTE_PAGAMENTO para fluxo de pagamento consistente.
-      const initialStatus: PedidoStatus = PedidoStatus.PENDENTE_PAGAMENTO;
+      const isPdv = createOrderDto.channel === CanalVenda.PDV;
+      // PDV nasce ENTREGUE (pago e levado no balcao); demais canais, pendente de pagamento.
+      const initialStatus: PedidoStatus = isPdv
+        ? PedidoStatus.ENTREGUE
+        : PedidoStatus.PENDENTE_PAGAMENTO;
 
       const pedido = manager.getRepository(Pedido).create();
       pedido.tenant_id = tenantId;
@@ -281,6 +307,27 @@ export class OrdersService {
       );
 
       await manager.save(itens);
+
+      // Fast-pass PDV: baixa imediata + pagamento sincrono, tudo atomico.
+      if (isPdv) {
+        const stockItems = createOrderDto.items.map((i) => ({
+          produto_id: i.produto_id,
+          quantity: i.quantity,
+        }));
+        // Baixa real (current -= qty, reserved -= qty) + VENDA no ledger.
+        await this.stockEngine.commitSale(manager, tenantId, savedPedido.id, stockItems);
+
+        // Pagamento interno, ja PAGO (liquidacao fisica ocorreu no balcao).
+        const pagamento = manager.create(Pagamento, {
+          tenant_id: tenantId,
+          pedido_id: savedPedido.id,
+          method: createOrderDto.payment!.method,
+          status: PagamentoStatus.PAID,
+          amount: total,
+          metadata: { pdv: true, confirmed_at_counter: true },
+        });
+        await manager.save(pagamento);
+      }
 
       // Consumir cupom (incrementa used_count com proteção contra corrida)
       if (couponCode) {
@@ -359,7 +406,7 @@ export class OrdersService {
       });
     }
 
-    // ✅ NOVO: Notificar cliente sobre criação do pedido (especialmente para WhatsApp)
+    // Notificacao especifica de WhatsApp; PDV (entregue, pago) e demais canais nao disparam aqui.
     if (createOrderDto.channel === CanalVenda.WHATSAPP) {
       try {
         // Notificar mudança de status (de null para PENDENTE_PAGAMENTO)
