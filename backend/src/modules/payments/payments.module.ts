@@ -12,8 +12,9 @@ import { OrdersModule } from '../orders/orders.module';
   imports: [
     TypeOrmModule.forFeature([Pagamento, Pedido]),
     forwardRef(() => NotificationsModule),
-    // Task 8: importa OrdersModule para reusar releaseExpiredPendingOrder no webhook
-    forwardRef(() => OrdersModule),
+    // Task 8: importa OrdersModule para reusar releaseExpiredPendingOrder no webhook.
+    // OrdersModule nao importa PaymentsModule, portanto nao ha ciclo real aqui.
+    OrdersModule,
   ],
   providers: [PaymentsService, MercadoPagoProvider],
   controllers: [PaymentsController],

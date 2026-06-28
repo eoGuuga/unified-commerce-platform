@@ -578,7 +578,7 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
       jest.restoreAllMocks();
     });
 
-    it('colisao webhook × sweeper: reserved_stock nunca negativo, pedido cancelado uma vez', async () => {
+    it('colisao webhook × sweeper: liberacao unica — reserved_stock exatamente 0, pedido cancelado, stock_released_at preenchido', async () => {
       if (!app) {
         console.log('⏭️ Pulando teste Task 8 colisao - app nao inicializado');
         return;
@@ -609,19 +609,78 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
       await qr.connect();
       await qr.query(`SET session_replication_role = replica`);
 
-      // reserved_stock nunca pode ser negativo (GREATEST(0,...) no engine)
+      // reserved_stock deve ser EXATAMENTE 0 — nao basta >= 0.
+      // GREATEST(0,...) clamparia dupla liberacao para 0 tambem, mascarando o bug;
+      // a combinacao das tres assertivas abaixo prova liberacao unica correta.
       const estoques = await qr.query(
         `SELECT reserved_stock FROM movimentacoes_estoque WHERE produto_id = $1 AND tenant_id = $2`,
         [produtoIdExp, tenantId],
       );
-      expect(Number(estoques[0].reserved_stock)).toBeGreaterThanOrEqual(0);
+      expect(Number(estoques[0].reserved_stock)).toBe(0);
 
-      // Pedido deve estar cancelado
+      // Pedido deve estar cancelado com stock_released_at preenchido (liberacao registrada)
       const pedidos = await qr.query(
-        `SELECT status FROM pedidos WHERE id = $1`,
+        `SELECT status, stock_released_at FROM pedidos WHERE id = $1`,
         [pedidoIdExp],
       );
       expect(pedidos[0].status).toBe('cancelado');
+      expect(pedidos[0].stock_released_at).not.toBeNull();
+
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+
+      jest.restoreAllMocks();
+    });
+
+    it('rejected NAO cancela pedido nem libera reserva (recusa de cartao retentavel)', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste Task 8 rejected - app nao inicializado');
+        return;
+      }
+
+      const paymentsService = moduleFixture.get<PaymentsService>(PaymentsService);
+      const mpProvider      = moduleFixture.get<MercadoPagoProvider>(MercadoPagoProvider);
+
+      // Mock: MercadoPago retorna status 'rejected' (recusa de cartao — retentavel)
+      jest.spyOn(mpProvider, 'isConfigured').mockReturnValue(true);
+      jest.spyOn(mpProvider, 'getPaymentDetails').mockResolvedValue({
+        status: 'rejected',
+        status_detail: 'cc_rejected_insufficient_amount',
+        metadata: { tenant_id: tenantId },
+        external_reference: pedidoIdExp,
+        payment_method_id: 'credit_card',
+      });
+
+      const payload = buildWebhookPayload(mpPaymentIdExp);
+      const result = await paymentsService.handleMercadoPagoWebhook(payload, { token: '' });
+
+      expect(result.status).toBe('ok');
+
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+
+      // Pedido deve permanecer pendente_pagamento — nao foi cancelado
+      const pedidos = await qr.query(
+        `SELECT status, stock_released_at FROM pedidos WHERE id = $1`,
+        [pedidoIdExp],
+      );
+      expect(pedidos[0].status).toBe('pendente_pagamento');
+      expect(pedidos[0].stock_released_at).toBeNull();
+
+      // Reserva deve permanecer intacta (2 unidades ainda reservadas)
+      const estoques = await qr.query(
+        `SELECT reserved_stock FROM movimentacoes_estoque WHERE produto_id = $1 AND tenant_id = $2`,
+        [produtoIdExp, tenantId],
+      );
+      expect(Number(estoques[0].reserved_stock)).toBe(2);
+
+      // Pagamento deve estar como FAILED (status salvo corretamente)
+      const pagamentos = await qr.query(
+        `SELECT status FROM pagamentos WHERE id = $1`,
+        [pagamentoIdExp],
+      );
+      expect(pagamentos[0].status).toBe('failed');
 
       await qr.query(`SET session_replication_role = DEFAULT`);
       await qr.release();
