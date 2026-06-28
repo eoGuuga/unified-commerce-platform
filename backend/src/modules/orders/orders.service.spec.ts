@@ -257,19 +257,12 @@ describe('OrdersService', () => {
         getMany: jest.fn().mockResolvedValue(mockProdutos),
       };
 
-      const updateQueryBuilder = {
-        update: jest.fn().mockReturnThis(),
-        set: jest.fn().mockReturnThis(),
-        setParameters: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({ affected: 1 }),
-      };
-
+      // Nota: updateQueryBuilder removido — após Task 4 o StockEngineService.reserve()
+      // é responsável pelo UPDATE de estoque; não há mais QueryBuilder de UPDATE em create().
       mockManager.createQueryBuilder = jest.fn((entity) => {
         if (entity === MovimentacaoEstoque) return estoqueQueryBuilder as any;
         if (entity === Produto) return produtosQueryBuilder as any;
-        return updateQueryBuilder as any;
+        return {} as any;
       });
       mockManager.create = jest.fn().mockReturnValue(mockPedido);
       mockManager.save = jest.fn().mockResolvedValue(mockPedido);
@@ -292,6 +285,23 @@ describe('OrdersService', () => {
       expect(estoqueQueryBuilder.setLock).toHaveBeenCalledWith('pessimistic_write');
       expect(estoqueQueryBuilder.getMany).toHaveBeenCalled();
       expect(mockManager.save).toHaveBeenCalled();
+
+      // Task 4: verifica que a reserva atômica de estoque foi chamada uma vez por item
+      // (se o loop de reserve() fosse removido do create(), este assertion falharia)
+      // Assinatura real: reserve(manager, tenantId, produto_id, quantity)
+      expect(mockStockEngineService.reserve).toHaveBeenCalledTimes(createOrderDto.items.length);
+      expect(mockStockEngineService.reserve).toHaveBeenCalledWith(
+        expect.anything(), // manager (EntityManager)
+        tenantId,
+        produtoId1,
+        5,
+      );
+      expect(mockStockEngineService.reserve).toHaveBeenCalledWith(
+        expect.anything(), // manager (EntityManager)
+        tenantId,
+        produtoId2,
+        3,
+      );
     });
 
     it('deve lançar NotFoundException quando produto não tem estoque cadastrado', async () => {
