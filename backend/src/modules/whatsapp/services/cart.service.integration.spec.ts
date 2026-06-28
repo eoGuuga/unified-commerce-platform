@@ -205,4 +205,29 @@ describe('CartService (integration — reserva de estoque)', () => {
     await expect(cartService.addItem(input)).rejects.toThrow();
     expect((await saldo(produtoId)).reserved).toBe(0);
   });
+
+  it('updateItem ajusta reserved_stock conforme o delta (current=10, add=2→5→1)', async () => {
+    if (!dataSource) return;
+    await limparCarrinhos();
+    const produtoId = await seedProduto(10);
+
+    // addItem qty=2: reserva 2
+    const cart = await cartService.addItem({
+      tenantId,
+      customerPhone,
+      produtoId,
+      produtoName: 'Produto Teste Cart',
+      quantity: 2,
+      unitPrice: 29.90,
+    });
+    expect((await saldo(produtoId)).reserved).toBe(2);
+
+    // updateItem para qty=5: delta=+3, reserva mais 3 → total 5
+    await cartService.updateItem(cart.id, produtoId, 5);
+    expect((await saldo(produtoId)).reserved).toBe(5);
+
+    // updateItem para qty=1: delta=-4, libera 4 → total 1
+    await cartService.updateItem(cart.id, produtoId, 1);
+    expect((await saldo(produtoId)).reserved).toBe(1);
+  });
 });

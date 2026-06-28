@@ -163,8 +163,9 @@ export class CartService {
   }
 
   /**
-   * Atualiza quantidade de um item.
-   * TODO: adaptar para reservar/liberar a diferença quando integrado ao estoque.
+   * Atualiza quantidade de um item, reservando ou liberando o delta de estoque
+   * atomicamente. Se delta > 0 e reserve lançar (estoque insuficiente), propaga
+   * sem alterar o carrinho. Se delta < 0, libera o excedente de reserva.
    */
   async updateItem(cartId: string, produtoId: string, quantity: number): Promise<WhatsAppCart> {
     const cart = await this.getCartById(cartId);
@@ -179,10 +180,32 @@ export class CartService {
       throw new Error('Item não encontrado no carrinho');
     }
 
+    const oldQty = item.quantity;
+
     if (quantity <= 0) {
-      // Remover item
+      // Remoção: liberar toda a reserva do item antes de remover do carrinho
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [cart.tenant_id]);
+        await this.stockEngine.release(manager, cart.tenant_id, produtoId, oldQty);
+      });
       cart.items = cart.items.filter((i: CartItem) => i.produto_id !== produtoId);
     } else {
+      const delta = quantity - oldQty;
+      if (delta > 0) {
+        // Nova quantidade maior: reservar o delta adicional.
+        // Se lançar (estoque insuficiente), propaga sem alterar o carrinho.
+        await this.dataSource.transaction(async (manager) => {
+          await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [cart.tenant_id]);
+          await this.stockEngine.reserve(manager, cart.tenant_id, produtoId, delta);
+        });
+      } else if (delta < 0) {
+        // Nova quantidade menor: liberar o delta reduzido.
+        await this.dataSource.transaction(async (manager) => {
+          await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [cart.tenant_id]);
+          await this.stockEngine.release(manager, cart.tenant_id, produtoId, -delta);
+        });
+      }
+      // delta === 0: sem operação de estoque
       item.quantity = quantity;
     }
 
@@ -282,7 +305,7 @@ export class CartService {
       // RLS: necessário para acessar whatsapp_carts (e também movimentacoes_estoque)
       await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [tenantId]);
 
-      // pg driver retorna array plano de linhas para manager.query(); unwrap defensivo como guarda de compatibilidade.
+      // manager.query() com RETURNING retorna tupla [[linhas], rowCount] neste TypeORM+pg; unwrap obrigatorio antes de ler campos.
       const rawUpdate = await manager.query(
         `UPDATE whatsapp_carts
            SET status = 'expired', stock_released_at = now()

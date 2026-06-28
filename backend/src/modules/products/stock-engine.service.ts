@@ -81,7 +81,7 @@ export class StockEngineService {
 
       // Gate de idempotência: tenta inserir o registro de VENDA primeiro.
       // ON CONFLICT no índice parcial (order_id, produto_id) WHERE tipo='VENDA'.
-      // pg driver retorna array plano de linhas para manager.query(); unwrap defensivo como guarda de compatibilidade.
+      // manager.query() com RETURNING retorna tupla [[linhas], rowCount] neste TypeORM+pg; unwrap obrigatorio antes de ler campos.
       const rawInsert = await manager.query(
         `INSERT INTO movimentacoes_estoque_historico
            (id, tenant_id, produto_id, tipo, delta, saldo_resultante, order_id, created_at)
@@ -90,7 +90,7 @@ export class StockEngineService {
          RETURNING id`,
         [tenantId, item.produto_id, -item.quantity, orderId],
       );
-      // pg driver retorna array plano de linhas para manager.query(); unwrap defensivo como guarda de compatibilidade.
+      // manager.query() com RETURNING retorna tupla [[linhas], rowCount] neste TypeORM+pg; unwrap obrigatorio antes de ler campos.
       const insertedRows: Array<{ id: string }> = Array.isArray(rawInsert[0])
         ? rawInsert[0]
         : rawInsert;
@@ -100,7 +100,7 @@ export class StockEngineService {
       const ledgerId = insertedRows[0].id;
 
       // Baixa guardada; RETURNING dá o saldo pós-update (sem ler memória).
-      // pg driver retorna array plano de linhas para manager.query(); unwrap defensivo como guarda de compatibilidade.
+      // manager.query() com RETURNING retorna tupla [[linhas], rowCount] neste TypeORM+pg; unwrap obrigatorio antes de ler campos.
       const rawUpdate = await manager.query(
         `UPDATE movimentacoes_estoque
          SET current_stock = current_stock - $3,
@@ -110,7 +110,7 @@ export class StockEngineService {
          RETURNING current_stock`,
         [tenantId, item.produto_id, item.quantity],
       );
-      // pg driver retorna array plano de linhas para manager.query(); unwrap defensivo como guarda de compatibilidade.
+      // manager.query() com RETURNING retorna tupla [[linhas], rowCount] neste TypeORM+pg; unwrap obrigatorio antes de ler campos.
       const updatedRows: Array<{ current_stock: number }> = Array.isArray(rawUpdate[0])
         ? rawUpdate[0]
         : rawUpdate;
@@ -144,7 +144,7 @@ export class StockEngineService {
     if (!Number.isInteger(delta) || delta === 0) {
       throw new BadRequestException('Delta inválido para movimento manual.');
     }
-    // pg driver retorna array plano de linhas para manager.query(); unwrap defensivo como guarda de compatibilidade.
+    // manager.query() com RETURNING retorna tupla [[linhas], rowCount] neste TypeORM+pg; unwrap obrigatorio antes de ler campos.
     const rawUpdate = await manager.query(
       `UPDATE movimentacoes_estoque
        SET current_stock = current_stock + $3, last_updated = now()
@@ -152,7 +152,7 @@ export class StockEngineService {
        RETURNING current_stock`,
       [tenantId, produtoId, delta],
     );
-    // pg driver retorna array plano de linhas para manager.query(); unwrap defensivo como guarda de compatibilidade.
+    // manager.query() com RETURNING retorna tupla [[linhas], rowCount] neste TypeORM+pg; unwrap obrigatorio antes de ler campos.
     const updatedRows: Array<{ current_stock: number }> = Array.isArray(rawUpdate[0])
       ? rawUpdate[0]
       : rawUpdate;
