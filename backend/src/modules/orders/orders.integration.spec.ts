@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, ValidationPipe, BadRequestException } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import request from 'supertest';
 import { OrdersModule } from './orders.module';
+import { OrdersService } from './orders.service';
 import { ProductsModule } from '../products/products.module';
 import { AuthModule } from '../auth/auth.module';
 import { CommonModule } from '../common/common.module';
@@ -19,6 +20,7 @@ import { TenantDbContextInterceptor } from '../../common/interceptors/tenant-db-
 describe('Orders Integration Tests (e2e)', () => {
   let app: INestApplication | null = null;
   let dataSource: DataSource;
+  let ordersService: OrdersService;
   let jwtToken: string;
   const tenantId = '00000000-0000-0000-0000-000000000000';
   const productName = 'Produto Teste E2E Orders';
@@ -45,6 +47,7 @@ describe('Orders Integration Tests (e2e)', () => {
       }).compile();
 
       dataSource = moduleFixture.get<DataSource>(DataSource);
+      ordersService = moduleFixture.get<OrdersService>(OrdersService);
 
       app = moduleFixture.createNestApplication();
       app.useGlobalPipes(
@@ -724,6 +727,134 @@ describe('Orders Integration Tests (e2e)', () => {
       await qr.release();
       expect(ledger).toHaveLength(0);
       expect(pags).toHaveLength(0);
+    });
+
+    // -----------------------------------------------------------------------
+    // Task 3 — Garantias: ENTREGUE terminal, release no-op, invariante ledger
+    // -----------------------------------------------------------------------
+
+    /**
+     * Helper: cria produto com current_stock=stock E linha INVENTARIO_INICIAL
+     * no ledger (delta=+stock, saldo_resultante=stock), de modo que a soma do
+     * historico reflita o saldo inicial antes de qualquer venda.
+     */
+    async function seedProdutoComLedgerInicial(stock: number): Promise<string> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const inserted = await qr.query(
+        `INSERT INTO produtos (tenant_id, name, price, is_active, unit)
+         VALUES ($1, $2, 10.00, true, 'unidade')
+         RETURNING id`,
+        [tenantId, `Produto PDV Task3 LedgerInv ${Date.now()}`],
+      ) as Array<{ id: string }>;
+      const produtoId = inserted[0].id;
+
+      // Registro de saldo atual
+      await qr.query(
+        `INSERT INTO movimentacoes_estoque (tenant_id, produto_id, current_stock, reserved_stock, min_stock, last_updated)
+         VALUES ($1, $2, $3, 0, 0, NOW())
+         ON CONFLICT (tenant_id, produto_id) DO UPDATE
+           SET current_stock = $3, reserved_stock = 0, last_updated = NOW()`,
+        [tenantId, produtoId, stock],
+      );
+
+      // Linha de ledger INVENTARIO_INICIAL para que SUM(delta) == current_stock inicial
+      await qr.query(
+        `INSERT INTO movimentacoes_estoque_historico
+           (tenant_id, produto_id, tipo, delta, saldo_resultante, created_at)
+         VALUES ($1, $2, 'INVENTARIO_INICIAL', $3, $3, NOW())`,
+        [tenantId, produtoId, stock],
+      );
+
+      await qr.release();
+      return produtoId;
+    }
+
+    it('PDV: ENTREGUE e terminal — updateStatus rejeita qualquer transicao', async () => {
+      if (!app) return;
+      // Seed: produto com estoque suficiente
+      const produtoId = await seedProdutoComEstoque(10, 0);
+
+      // Criar pedido PDV (nasce ENTREGUE)
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({
+          channel: 'pdv',
+          payment: { method: 'pix' },
+          items: [{ produto_id: produtoId, quantity: 1, unit_price: 10.0 }],
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.status).toBe('entregue');
+
+      // Qualquer transicao a partir de ENTREGUE deve rejeitar (maquina de estados — terminal)
+      await expect(
+        ordersService.updateStatus(res.body.id, 'confirmado' as any, tenantId),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('PDV: releaseExpiredPendingOrder e no-op num pedido ENTREGUE', async () => {
+      if (!app) return;
+      // Seed: produto com estoque suficiente
+      const produtoId = await seedProdutoComEstoque(10, 0);
+
+      // Criar pedido PDV qty=4 (nasce ENTREGUE, baixa current para 6)
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({
+          channel: 'pdv',
+          payment: { method: 'dinheiro' },
+          items: [{ produto_id: produtoId, quantity: 4, unit_price: 10.0 }],
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.status).toBe('entregue');
+
+      // Captura saldo apos a venda PDV (current=6, reserved=0)
+      const antes = await queryEstoque(produtoId);
+
+      // release nao deve alterar nada — pedido esta ENTREGUE, nao pendente_pagamento
+      await ordersService.releaseExpiredPendingOrder(res.body.id);
+
+      // Saldo deve permanecer inalterado
+      const depois = await queryEstoque(produtoId);
+      expect(depois.current_stock).toBe(antes.current_stock);
+      expect(depois.reserved_stock).toBe(antes.reserved_stock);
+    });
+
+    it('PDV: invariante current_stock == soma(deltas) apos a venda', async () => {
+      if (!app) return;
+      // Seed: produto com current=10 + ledger INVENTARIO_INICIAL de +10
+      const pid = await seedProdutoComLedgerInicial(10);
+
+      // Venda PDV qty=4 → current deve cair para 6; ledger VENDA de -4 e inserido
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({
+          channel: 'pdv',
+          payment: { method: 'credito' },
+          items: [{ produto_id: pid, quantity: 4, unit_price: 10.0 }],
+        });
+      expect(res.status).toBe(201);
+
+      // Invariante: current_stock == SUM(delta) do historico
+      // Esperado: 10 (INVENTARIO_INICIAL) - 4 (VENDA) = 6 == current_stock=6
+      const qrInv = dataSource.createQueryRunner();
+      await qrInv.connect();
+      await qrInv.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const rows = await qrInv.query(
+        `SELECT
+           (SELECT current_stock FROM movimentacoes_estoque WHERE produto_id = $1) AS current,
+           COALESCE(SUM(delta), 0)::int AS soma
+         FROM movimentacoes_estoque_historico
+         WHERE produto_id = $1`,
+        [pid],
+      ) as Array<{ current: number; soma: number }>;
+      await qrInv.release();
+
+      expect(Number(rows[0].current)).toBe(Number(rows[0].soma));
     });
   });
 
