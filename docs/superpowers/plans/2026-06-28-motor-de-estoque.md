@@ -27,7 +27,7 @@
 
 **Criar:**
 - `backend/src/database/entities/MovimentacaoEstoqueHistorico.entity.ts` — entidade do ledger.
-- `backend/src/database/migrations/1719600000000-AddStockLedgerAndReleaseTracking.ts` — tabela ledger + colunas `stock_released_at` + índice único + backfill.
+- `backend/src/database/migrations/1751300000000-AddStockLedgerAndReleaseTracking.ts` — tabela ledger + colunas `stock_released_at` + índice único + backfill.
 - `backend/src/modules/products/stock-engine.service.ts` — primitivas atômicas.
 - `backend/src/modules/products/stock-engine.service.integration.spec.ts` — testes com banco real.
 - `backend/src/modules/products/stock-sweeper.service.ts` — varredor de TTL.
@@ -49,7 +49,7 @@
 
 **Files:**
 - Create: `backend/src/database/entities/MovimentacaoEstoqueHistorico.entity.ts`
-- Create: `backend/src/database/migrations/1719600000000-AddStockLedgerAndReleaseTracking.ts`
+- Create: `backend/src/database/migrations/1751300000000-AddStockLedgerAndReleaseTracking.ts`
 - Modify: `backend/src/database/entities/Pedido.entity.ts` (adicionar coluna)
 - Modify: `backend/src/database/entities/WhatsappCart.entity.ts` (adicionar coluna)
 - Test: `backend/src/modules/products/stock-engine.service.integration.spec.ts` (esqueleto + 1 teste de schema)
@@ -149,15 +149,15 @@ Em `backend/src/database/entities/WhatsappCart.entity.ts`, adicionar a mesma col
 
 - [ ] **Step 3: Criar a migration**
 
-Criar `backend/src/database/migrations/1719600000000-AddStockLedgerAndReleaseTracking.ts`:
+Criar `backend/src/database/migrations/1751300000000-AddStockLedgerAndReleaseTracking.ts`:
 
 ```typescript
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddStockLedgerAndReleaseTracking1719600000000
+export class AddStockLedgerAndReleaseTracking1751300000000
   implements MigrationInterface
 {
-  name = 'AddStockLedgerAndReleaseTracking1719600000000';
+  name = 'AddStockLedgerAndReleaseTracking1751300000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Enum de tipos de movimentação
@@ -249,7 +249,7 @@ Run: `grep -n "entities" backend/src/config/database.config.ts backend/src/datab
 - [ ] **Step 5: Rodar a migration e verificar**
 
 Run (a partir de `backend/`): `npm run migration:run`
-Expected: aplica `AddStockLedgerAndReleaseTracking1719600000000` sem erro; cria tabela, índice único parcial e colunas.
+Expected: aplica `AddStockLedgerAndReleaseTracking1751300000000` sem erro; cria tabela, índice único parcial e colunas.
 
 Verificar o índice e backfill:
 Run: `docker exec ucm-postgres psql -U postgres -d ucm -c "\d movimentacoes_estoque_historico"`
@@ -261,7 +261,7 @@ Expected: tabela existe com o índice `uq_ledger_venda_por_item`.
 git add backend/src/database/entities/MovimentacaoEstoqueHistorico.entity.ts \
         backend/src/database/entities/Pedido.entity.ts \
         backend/src/database/entities/WhatsappCart.entity.ts \
-        backend/src/database/migrations/1719600000000-AddStockLedgerAndReleaseTracking.ts
+        backend/src/database/migrations/1751300000000-AddStockLedgerAndReleaseTracking.ts
 git commit -m "feat(stock): add stock ledger table, release-tracking columns, initial backfill"
 ```
 
