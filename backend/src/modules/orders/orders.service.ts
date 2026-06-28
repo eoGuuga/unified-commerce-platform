@@ -255,7 +255,8 @@ export class OrdersService {
         }
       }
 
-      // 5. RESERVAR estoque (não baixar — a baixa ocorre no PRONTO via StockEngine.commitSale).
+      // 5. RESERVAR estoque (não baixar). A baixa ocorre no PRONTO via StockEngine.commitSale
+      // para canais order-driven; no PDV, a baixa é comitada nesta mesma transação (ramo isPdv abaixo).
       // O lock pessimista do passo 1 + a guarda atômica do reserve garantem
       // que não há overselling concorrente.
       for (const item of createOrderDto.items) {
