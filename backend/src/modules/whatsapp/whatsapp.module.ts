@@ -35,6 +35,7 @@ import { SalesOrchestratorService } from './services/sales-orchestrator.service'
 import { InteractiveMessageService } from './services/interactive-message.service';
 import { EvolutionApiProvider } from './providers/evolution-api.provider';
 import { MockWhatsappProvider } from './providers/mock-whatsapp.provider';
+import { WhatsappSendingModule } from './config/whatsapp-sending.module';
 
 // Entities
 import { WhatsappConversation } from '../../database/entities/WhatsappConversation.entity';
@@ -64,6 +65,7 @@ import { CommonModule } from '../common/common.module';
     CommonModule,
     ProductsModule,
     TenantsModule,
+    WhatsappSendingModule,
     forwardRef(() => OrdersModule),
     forwardRef(() => PaymentsModule),
     NotificationsModule,
@@ -101,7 +103,7 @@ import { CommonModule } from '../common/common.module';
     SalesOrchestratorService,
     InteractiveMessageService,
 
-    // WhatsApp Providers (botões interativos)
+    // WhatsApp Providers legados (fallback global; per-tenant vem do WhatsappSendingModule)
     EvolutionApiProvider,
     MockWhatsappProvider,
 
@@ -111,6 +113,9 @@ import { CommonModule } from '../common/common.module';
   exports: [
     // Services existentes
     ConversationService,
+
+    // R2: reexporta o envio tenant-aware (vem do WhatsappSendingModule)
+    WhatsappSendingModule,
 
     // NOVOS SERVICES
     CartService,

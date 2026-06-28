@@ -21,11 +21,17 @@ describe('NotificationsService', () => {
       text: async () => '',
     } as Response);
 
+    const whatsappSenderMock = {
+      sendText: jest.fn().mockResolvedValue(undefined),
+      sendButtons: jest.fn().mockResolvedValue(undefined),
+    };
+
     const service = new NotificationsService(
       {} as DbContextService,
       {
         get: jest.fn().mockReturnValue(undefined),
       } as unknown as ConfigService,
+      whatsappSenderMock as never,
     );
 
     await service.sendWhatsAppMessage({

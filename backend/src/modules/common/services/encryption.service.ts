@@ -36,7 +36,7 @@ export class EncryptionService {
    */
   async encryptAndSaveApiKey(
     tenantId: string,
-    keyType: 'openai' | 'twilio_sid' | 'twilio_token' | 'stripe',
+    keyType: 'openai' | 'twilio_sid' | 'twilio_token' | 'stripe' | 'whatsapp_cloud_token',
     apiKey: string,
   ): Promise<void> {
     // Usa função SQL do PostgreSQL para encriptar
@@ -45,6 +45,7 @@ export class EncryptionService {
       twilio_sid: 'twilio_account_sid_encrypted',
       twilio_token: 'twilio_auth_token_encrypted',
       stripe: 'stripe_api_key_encrypted',
+      whatsapp_cloud_token: 'whatsapp_cloud_token_encrypted',
     };
 
     const column = columnMap[keyType];
@@ -62,13 +63,14 @@ export class EncryptionService {
    */
   async decryptApiKey(
     tenantId: string,
-    keyType: 'openai' | 'twilio_sid' | 'twilio_token' | 'stripe',
+    keyType: 'openai' | 'twilio_sid' | 'twilio_token' | 'stripe' | 'whatsapp_cloud_token',
   ): Promise<string | null> {
     const columnMap = {
       openai: 'openai_api_key_encrypted',
       twilio_sid: 'twilio_account_sid_encrypted',
       twilio_token: 'twilio_auth_token_encrypted',
       stripe: 'stripe_api_key_encrypted',
+      whatsapp_cloud_token: 'whatsapp_cloud_token_encrypted',
     };
 
     const column = columnMap[keyType];
