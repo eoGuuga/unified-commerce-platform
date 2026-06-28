@@ -28,11 +28,11 @@
 
 ## 2. Princípios de arquitetura (inegociáveis)
 
-1. **Ledger é a fonte da verdade.** Toda mudança física de estoque é uma linha imutável em `movimentacao_estoque_historico`. O `current_stock` é uma **projeção/cache** mantida na mesma transação que insere a linha (event sourcing leve). Invariante: `current_stock == soma(deltas do ledger)` para cada produto, desde o dia zero.
+1. **Ledger é a fonte da verdade.** Toda mudança física de estoque é uma linha imutável em `movimentacoes_estoque_historico`. O `current_stock` é uma **projeção/cache** mantida na mesma transação que insere a linha (event sourcing leve). Invariante: `current_stock == soma(deltas do ledger)` para cada produto, desde o dia zero.
 2. **`available = current_stock - reserved_stock`.** É o único número que pode ser vendido.
 3. **Regra de ouro da atomicidade.** Nunca ler estoque, calcular na memória e gravar o valor final. A matemática é sempre delegada ao banco, na mesma transação, com guarda na cláusula `WHERE` e checagem de linhas afetadas:
    ```sql
-   UPDATE movimentacao_estoque
+   UPDATE movimentacoes_estoque
    SET current_stock = current_stock + :delta,
        reserved_stock = GREATEST(0, reserved_stock - :reservaConsumida)
    WHERE tenant_id = :t AND produto_id = :p
@@ -48,9 +48,9 @@
 
 ### 3.1 Tabela existente (mantida, papel esclarecido)
 
-`MovimentacaoEstoque` (tabela `movimentacao_estoque`) **é mal nomeada**: apesar do nome, ela guarda o **saldo atual** (uma linha por produto): `current_stock`, `reserved_stock`, `min_stock`. **Não vamos renomear** (risco desnecessário em migration de prod); apenas documentamos: esta é a tabela de **saldo/projeção**, não o histórico.
+`MovimentacaoEstoque` (tabela `movimentacoes_estoque`) **é mal nomeada**: apesar do nome, ela guarda o **saldo atual** (uma linha por produto): `current_stock`, `reserved_stock`, `min_stock`. **Não vamos renomear** (risco desnecessário em migration de prod); apenas documentamos: esta é a tabela de **saldo/projeção**, não o histórico.
 
-### 3.2 Nova tabela: `movimentacao_estoque_historico` (o ledger)
+### 3.2 Nova tabela: `movimentacoes_estoque_historico` (o ledger)
 
 | Coluna | Tipo | Nota |
 |---|---|---|
@@ -67,11 +67,11 @@
 
 **Idempotência da baixa de venda:** índice único parcial
 ```sql
-CREATE UNIQUE INDEX uq_ledger_venda_por_pedido
-ON movimentacao_estoque_historico (order_id)
+CREATE UNIQUE INDEX uq_ledger_venda_por_item
+ON movimentacoes_estoque_historico (order_id, produto_id)
 WHERE tipo = 'VENDA';
 ```
-Garante **uma e só uma** baixa `VENDA` por pedido — blindagem definitiva contra retry fantasma de webhook de pagamento.
+Garante **uma e só uma** baixa `VENDA` por (pedido, produto) — permite múltiplos itens no pedido, mas bloqueia baixa dupla do mesmo item. Blindagem definitiva contra retry fantasma de webhook de pagamento.
 
 **O ledger registra apenas mudanças físicas de `current_stock`.** Reservas **não** entram no ledger (reserva mexe só em `reserved_stock`, e cancelamento de reserva "não tira da prateleira", logo não gera movimento — consistente com a decisão de negócio). O rastreio de reservas vive no contador `reserved_stock` + nos registros de carrinho/pedido.
 
@@ -84,18 +84,18 @@ Marcam que a reserva daquele registro já foi devolvida — base do *compare-and
 
 ### 3.4 Migração de dados (backfill do invariante)
 
-Para honrar "ledger soma a `current_stock` desde o dia zero": migration que, para cada linha de `movimentacao_estoque` com `current_stock > 0`, insere **uma** linha `INVENTARIO_INICIAL` no ledger com `delta = current_stock`, `saldo_resultante = current_stock`. Idempotente (não insere se já houver `INVENTARIO_INICIAL` para o produto).
+Para honrar "ledger soma a `current_stock` desde o dia zero": migration que, para cada linha de `movimentacoes_estoque` com `current_stock > 0`, insere **uma** linha `INVENTARIO_INICIAL` no ledger com `delta = current_stock`, `saldo_resultante = current_stock`. Idempotente (não insere se já houver `INVENTARIO_INICIAL` para o produto).
 
 **Concorrência no backfill (salvaguarda).** Se a migration rodar com o sistema ativo, um produto pode ter o `current_stock` alterado entre a leitura e a inserção. **Não** ler em JS e inserir depois. Usar **uma única `INSERT INTO ... SELECT ...`** atômica, para que o `current_stock` lido seja exatamente o `delta`/`saldo_resultante` gravado no mesmo comando:
 ```sql
-INSERT INTO movimentacao_estoque_historico
+INSERT INTO movimentacoes_estoque_historico
   (id, tenant_id, produto_id, tipo, delta, saldo_resultante, created_at)
 SELECT gen_random_uuid(), me.tenant_id, me.produto_id,
        'INVENTARIO_INICIAL', me.current_stock, me.current_stock, now()
-FROM movimentacao_estoque me
+FROM movimentacoes_estoque me
 WHERE me.current_stock > 0
   AND NOT EXISTS (
-    SELECT 1 FROM movimentacao_estoque_historico h
+    SELECT 1 FROM movimentacoes_estoque_historico h
     WHERE h.produto_id = me.produto_id AND h.tipo = 'INVENTARIO_INICIAL'
   );
 ```
@@ -140,7 +140,7 @@ Todas recebem o `QueryRunner` do chamador para compor transações maiores (ex.:
 **Mantém o lock pessimista já adotado no checkout** (`setLock('pessimistic_write')` = `FOR UPDATE`) **somado** às guardas atômicas no `WHERE` — cinto e suspensório. O projeto já escolheu esse padrão; não o removemos.
 
 - **Dois canais, último item:** o lock serializa o acesso à linha de estoque durante a validação; a guarda atômica garante que o `UPDATE` de reserva só sucede se `current - reserved >= qty`. O segundo recebe negativa limpa. Sem overselling.
-- **Commit:** o `UPDATE` guardado impede `current_stock` negativo; o índice único `(order_id) WHERE tipo='VENDA'` impede baixa dupla.
+- **Commit:** o `UPDATE` guardado impede `current_stock` negativo; o índice único `(order_id, produto_id) WHERE tipo='VENDA'` impede baixa dupla.
 - **Isolamento:** cada `UPDATE ... WHERE` é atômico no nível de linha do Postgres.
 
 > **Diretriz crítica de implementação:** o lock pessimista só é eficiente se a transação for **ultrarrápida**. **Nenhuma chamada externa** (API de pagamento/MercadoPago, cálculo de frete via HTTP, envio de WhatsApp, etc.) pode rodar **dentro** da transação que segura o lock de estoque. Validação de preço/cupom contra o banco é permitida (é local). Qualquer I/O externo acontece **antes** (entrada da transação) ou **depois** (commitada a transação). Isso vale tanto para o `create` refatorado quanto para o commit no `PRONTO`.
@@ -201,7 +201,7 @@ Quem flipar primeiro (webhook **ou** sweeper, mesmo no mesmo milissegundo) ganha
 
 ## 8. Migrations
 
-1. Criar enum + tabela `movimentacao_estoque_historico` + índice único parcial `uq_ledger_venda_por_pedido`.
+1. Criar enum + tabela `movimentacoes_estoque_historico` + índice único parcial `uq_ledger_venda_por_pedido`.
 2. Adicionar `stock_released_at` a `whatsapp_carts` e `pedidos`.
 3. Backfill `INVENTARIO_INICIAL` (§3.4), idempotente.
 
@@ -241,7 +241,7 @@ Lotes, validade, múltiplos depósitos/locais, custo médio móvel, tabela dedic
 - Commit da baixa no **`PRONTO`** (ponto de não-retorno físico).
 - Pós-`PRONTO`: devolução/perda = movimento **manual** no ledger.
 - PDV = reserve+commit atômico, sem fase pendente.
-- Idempotência da venda por índice único `(order_id) WHERE tipo='VENDA'`.
+- Idempotência da venda por índice único `(order_id, produto_id) WHERE tipo='VENDA'`.
 - TTL por sweeper `@nestjs/schedule` a **60s** + fast-path preguiçoso + webhook.
 - Colisão webhook×sweeper resolvida por **compare-and-set** na linha do pedido (sem corrida).
 - `MovimentacaoEstoque` (saldo) **não** será renomeada; papéis documentados.
