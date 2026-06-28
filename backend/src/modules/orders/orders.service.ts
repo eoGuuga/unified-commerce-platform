@@ -135,6 +135,28 @@ export class OrdersService {
       throw new BadRequestException('discount_amount so é permitido quando coupon_code é informado');
     }
 
+    // Validacao do pagamento sincrono de balcao (PDV).
+    // Estas guardas ficam ANTES da transacao para rejeitar requests invalidas
+    // sem abrir conexao com o banco — fail-fast contra flood de checkouts.
+    const PDV_METODOS_VALIDOS = [
+      MetodoPagamento.DINHEIRO,
+      MetodoPagamento.PIX,
+      MetodoPagamento.DEBITO,
+      MetodoPagamento.CREDITO,
+    ];
+    if (createOrderDto.channel === CanalVenda.PDV) {
+      if (!createOrderDto.payment?.method) {
+        throw new BadRequestException('Venda PDV exige payment.method.');
+      }
+      if (!PDV_METODOS_VALIDOS.includes(createOrderDto.payment.method)) {
+        throw new BadRequestException(
+          `Metodo de pagamento invalido para PDV: ${createOrderDto.payment.method}.`,
+        );
+      }
+    } else if (createOrderDto.payment) {
+      throw new BadRequestException('payment so e permitido no canal PDV.');
+    }
+
     // Inicia transação CRÍTICA
     const pedido = await this.db.runInTransaction(async (manager) => {
       // 1. FOR UPDATE lock - Bloqueia linhas de estoque
