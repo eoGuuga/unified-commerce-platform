@@ -29,24 +29,35 @@ body: { tipo: 'COMPRA'|'PERDA'|'DEVOLUCAO'|'AJUSTE', delta: number (sinalizado),
 ```
 - Roda em `db.runInTransaction`; chama `recordManualMovement(manager, tenantId, produtoId, tipo, delta, motivo, usuarioId)`.
 - `recordManualMovement` já guarda `current_stock + delta >= 0` e grava a linha no ledger (`saldo_resultante` incluso).
+- **Validação sinal×tipo (server-side, OBRIGATÓRIA):** sem isso, `{tipo:'COMPRA', delta:-10}` passaria e o ledger mentiria (auditoria corrompida, mesmo com o invariante intacto). Regras:
+  - `COMPRA`, `DEVOLUCAO`, `INVENTARIO_INICIAL` → `delta > 0`.
+  - `PERDA` → `delta < 0`.
+  - `AJUSTE` → `delta ≠ 0` (qualquer sinal).
+  - Sinal incoerente com o tipo → `400 BadRequest`.
+- **Direção de `DEVOLUCAO` (decidido):** devolução de **cliente** = entra no estoque (`delta > 0`). Devolução a fornecedor (saída) **não** é coberta na v1 (seria `PERDA` ou tipo futuro).
+- **Erro de estoque insuficiente tipado:** quando o guard `current_stock + delta < 0` rejeita (PERDA/AJUSTE negativo maior que o saldo), responder **`422` com código `INSUFFICIENT_STOCK`** (não erro genérico), para o hook frontend exibir "Estoque insuficiente para esta saída".
 - O endpoint **deixa de chamar** o `adjustStock` antigo (AuditLog); o método antigo é **removido** se não houver outros consumidores (verificar na implementação — o grep atual mostra que só o controller o chamava). Invalida o cache de produtos como hoje.
-- **Resultado:** todo ajuste manual vira movimentação auditável; o invariante sobrevive.
+- **Resultado:** todo ajuste manual vira movimentação auditável e coerente; o invariante sobrevive.
 
 ### A2. Endpoint de extrato (leitura do ledger)
 ```
 GET /products/:id/stock-history?limit=50&offset=0
 → { items: [{ tipo, delta, saldo_resultante, motivo, created_at }], total }
 ```
-- `movimentacoes_estoque_historico` do produto, escopado por tenant, **mais recentes primeiro**, paginado (`LIMIT/OFFSET`).
+- `movimentacoes_estoque_historico` do produto, escopado por tenant, paginado (`LIMIT/OFFSET`).
+- **Ordenação determinística:** `ORDER BY created_at DESC, id DESC`. O desempate por `id` evita que linhas com o mesmo timestamp embaralhem entre páginas. `OFFSET` sobre um ledger append-only é aceitável na v1 (registro o caveat: sob escrita concorrente intensa, paginação por OFFSET pode repetir/pular; migrar para keyset/cursor se virar problema — improvável para o volume de uma loja).
+- `usuario_id` **fora** do payload do extrato na v1 (loja de dono único — decisão consciente; reincluir quando houver multi-operador).
 - Fonte do "extrato bancário" na tela de Estoque.
 
 ### A3. Categorias simplificadas
 - **Migration:** coluna nullable `category` (varchar) no `Produto`. O `categoria_id` FK fica **dormente**.
 - `GET /products/categories` → `DISTINCT category` (não-nulo, ordenado), escopado por tenant.
-- DTOs de criar/editar produto aceitam `category?: string`.
+- DTOs de criar/editar produto aceitam `category?: string`. **Normalização no write:** `trim()` (e colapsar espaços internos); string vazia após trim → `null`. Evita fragmentação do DISTINCT por espaços ("Trufas" vs "Trufas "). Mantém o case digitado para exibição (sem forçar lowercase na v1).
 
 ### A4. Estoque inicial ledger-correto na criação de produto
-Ao criar um produto **com estoque inicial > 0**, gravar um movimento `INVENTARIO_INICIAL` no ledger (via `recordManualMovement`) na mesma transação da criação — mantendo o invariante desde o nascimento do produto. (Já previsto no spec do motor; aqui é confirmado/implementado no fluxo de criação.)
+Ao criar um produto **com estoque inicial > 0**, gravar um movimento `INVENTARIO_INICIAL` no ledger (via `recordManualMovement`) na mesma transação da criação — mantendo o invariante desde o nascimento do produto.
+- **Anti-contagem-dobrada (CRÍTICO):** criar a linha de saldo com `current_stock = 0` e deixar o `recordManualMovement(INVENTARIO_INICIAL, +inicial)` **trazer** o saldo ao valor inicial. **Nunca** setar `current_stock = inicial` E gravar o movimento `+inicial` (resultaria em `2×inicial`). O movimento é a única fonte que move o saldo.
+- **Enum mais largo no método:** o parâmetro `tipo` de `recordManualMovement` aceita **todos** os `LedgerTipo` (incl. `INVENTARIO_INICIAL`), embora o DTO do endpoint A1 exponha só os 4 manuais (COMPRA/PERDA/DEVOLUCAO/AJUSTE). `INVENTARIO_INICIAL` é uso interno (criação de produto), não exposto no endpoint. Confirmar essa separação na implementação.
 
 **Testes (integração, banco real):** ajuste manual mantém o invariante; extrato retorna na ordem e paginação corretas; `categories` faz DISTINCT por tenant; criação com estoque inicial grava `INVENTARIO_INICIAL`.
 
@@ -59,8 +70,9 @@ Ao criar um produto **com estoque inicial > 0**, gravar um movimento `INVENTARIO
 - **Navegação responsiva:**
   - **Desktop (≥1024px):** menu lateral fixo (~240px): logo, itens, rodapé com loja + usuário + Sair.
   - **Celular:** barra de abas inferior (padrão Instagram/WhatsApp), **4 abas:** Início · Pedidos · Produtos · Estoque. Avatar no topo com usuário + Sair (Negócio entra aqui na v2). Item ativo no acento `#b8654a`.
-  - **Selo de contagem** em "Pedidos" (pedidos novos/pendentes) e em "Estoque" (produtos em reposição — ver C).
-- **Início (hub simples v1):** cards de navegação + 2-3 números reais (ex.: pedidos do dia, produtos em reposição). Não é dashboard rico.
+  - **Selo de contagem** em "Pedidos" (pedidos novos/pendentes) e em "Estoque" (produtos em reposição — ver C1).
+  - **Fonte dos selos:** o de **Estoque** vem da fonte única de status (C1). O de **Pedidos** na v1 **deriva do `getOrders` já carregado** (filtrar status novos/pendentes no cliente) — sem endpoint novo. *Verificar na implementação se `getOrders` retorna o conjunto suficiente (se for paginado, a contagem pode subestimar); um endpoint de contagem dedicado (`GET /orders/stats` ou similar) fica como otimização v2. Confirmar se já existe um stats de pedidos antes de assumir.*
+- **Início (hub simples v1):** cards de navegação + 2-3 números reais (pedidos novos/pendentes via a mesma fonte do selo de Pedidos; "X produtos precisam de reposição" via a fonte única do Estoque). Não é dashboard rico nem traz métrica que exija endpoint novo.
 - **Tokens visuais atuais:** `#f6f3ee` (fundo), `#1a1814` (escuro), `#b8654a` (acento), serif display. Coerência com login/pedidos no ar.
 
 **Arquivos:** `app/admin/layout.tsx`, `components/admin/shell/AdminNav.tsx` (lateral+barra), `components/admin/shell/AdminShell.tsx`. As páginas de seção viram só "conteúdo" (sem header próprio).
@@ -68,7 +80,8 @@ Ao criar um produto **com estoque inicial > 0**, gravar um movimento `INVENTARIO
 ### B2. Produtos (`app/admin/produtos/page.tsx`)
 - **Lista:** cada produto com nome, preço, categoria, selo Ativo/Inativo, estoque atual. Busca (nome) + filtro Ativos/Inativos/Todos. Estados: carregando, vazio, erro com retry. Botão "+ Adicionar produto".
 - **Formulário ÚNICO `ProductForm` (mode-aware)** — painel lateral (desktop) / tela cheia (celular):
-  - Campos: **nome\***, **preço\***, descrição, **categoria** (combobox creatable, alimentado por `GET /products/categories`), unidade, preço de custo, **estoque inicial** (só no modo create), **foto por URL** (com `onError` → placeholder "Imagem indisponível"), **SKU/EAN** (editável no create / **read-only no edit**; se vazio no create, gera a partir do nome).
+  - Campos: **nome\***, **preço\***, descrição, **categoria** (combobox creatable, alimentado por `GET /products/categories`), unidade, preço de custo, **estoque inicial** (só no modo create), **foto por URL** (com `onError` → placeholder "Imagem indisponível"), **SKU** (editável no create / **read-only no edit**).
+  - **SKU é INTERNO (não EAN):** se vazio no create, **gerar** a partir do nome (slug) **com uniquificação** — se colidir com o `sku` único do tenant (dois "Coca-Cola"), anexar sufixo (`-2`, `-3`…). **Não** gerar EAN/código de barras a partir do nome (produziria barcode inválido). Se o lojista quiser um **EAN real escaneável**, ele digita manualmente (armazenado como o `sku` ou, futuramente, num campo `barcode` próprio — fora do escopo v1). A geração automática vale só para SKU interno.
   - Diferenças create↔edit por props: valores iniciais, ação de submit (`createProduct`/`updateProduct`), estoque inicial e editabilidade do SKU. Validação **num lugar só**.
 - **Desativar** (soft-delete, `is_active=false`) com confirmação; reativável. Nunca hard-delete (preserva histórico).
 - **Hook `useProducts`** (listar/criar/editar/desativar) com **optimistic update** no toggle Ativo/Inativo (UI muda na hora; reverte + toast no erro).
@@ -84,11 +97,11 @@ Ao criar um produto **com estoque inicial > 0**, gravar um movimento `INVENTARIO
   - **Baixo** (âmbar) — `available <= min_stock` (e > 0).
   - **Esgotado** (vermelho) — `available <= 0`.
 - **Por que `available` (não `current`):** evita a operadora vender no balcão um item já reservado por um carrinho do WhatsApp ("vender o que já tem dono").
-- **Filtro "Precisam de atenção"** (Baixo + Esgotado). A contagem desses alimenta o **selo da aba Estoque** + o número no Início ("X produtos precisam de reposição") — estoque passa de dado passivo a tarefa ativa de reposição.
+- **Filtro "Precisam de atenção"** (Baixo + Esgotado). **Fonte única:** o cálculo de status (OK/Baixo/Esgotado) vive numa função pura derivada do `getStockSummary` (ex.: `lib/stock-status.ts`), e os **três consumidores** — o filtro C1, o **selo da aba Estoque** e o número no Início ("X produtos precisam de reposição") — leem dessa mesma fonte. Nunca recalcular em três lugares (divergiriam). Estoque passa de dado passivo a tarefa ativa de reposição.
 
 ### C2. Ajuste de estoque (modal)
-- Escolhe **tipo** (Compra / Perda / Devolução / Correção), `delta` (sinalizado conforme o tipo), motivo → `POST /products/:id/adjust-stock` (A1, ledger-correto).
-- **Optimistic update** da linha (atual/badge mudam na hora; reverte + toast no erro).
+- Escolhe **tipo** (rótulo na UI → enum): **Compra**→`COMPRA`, **Perda**→`PERDA`, **Devolução**→`DEVOLUCAO`, **Correção**→`AJUSTE` (mapeamento explícito; "Correção" **não** é valor literal do enum). A UI aplica o sinal conforme o tipo (Compra/Devolução = +, Perda = −, Correção = +/−) e o backend revalida (A1). `motivo` opcional → `POST /products/:id/adjust-stock`.
+- **Optimistic update** da linha (atual/badge mudam na hora). No erro: **reverte** o estado e mostra toast; se for `422 INSUFFICIENT_STOCK` (A1), a mensagem é específica — "Estoque insuficiente para esta saída" — não genérica.
 
 ### C3. Extrato por produto (o "extrato bancário")
 - Tocar num produto abre um painel/drawer com o histórico do ledger (`GET /products/:id/stock-history`, A2), paginado, mais recentes primeiro — estilo "+50 Compra · 12/06 → saldo 50". Dá ao lojista autossuficiência de auditoria (vê a movimentação em vez de chamar suporte).
@@ -112,7 +125,7 @@ Ao criar um produto **com estoque inicial > 0**, gravar um movimento `INVENTARIO
 
 ## 6. Testes
 
-- **Backend (integração, banco real):** A1 (ajuste mantém invariante + grava ledger por tipo), A2 (extrato ordenado/paginado/tenant-scoped), A3 (categories DISTINCT), A4 (criação com estoque inicial grava INVENTARIO_INICIAL).
+- **Backend (integração, banco real):** A1 — ajuste mantém invariante + grava ledger; **rejeita sinal incoerente** (`{COMPRA, delta<0}` → 400; `{PERDA, delta>0}` → 400); **PERDA/AJUSTE que zeraria abaixo de 0 → 422 `INSUFFICIENT_STOCK`**. A2 — extrato ordenado `created_at DESC, id DESC`, paginado, tenant-scoped. A3 — `categories` DISTINCT por tenant; categoria com espaços é normalizada (trim). A4 — criação com estoque inicial grava **uma** linha `INVENTARIO_INICIAL` e `current_stock == inicial` (não `2×`).
 - **Frontend (vitest):** `useProducts`/`useStock` — optimistic update aplica e **reverte no erro**; `ProductForm` valida nome/preço obrigatórios e foto-URL fallback; mapeamento de badge (OK/Baixo/Esgotado) por `available`. Componentes de lista: estados carregando/vazio/erro.
 
 ---
@@ -132,3 +145,12 @@ Negócio/configurações (endpoints de settings), Início rico/analytics, fronte
 - Badges por `available = current - reserved` (não por `current`).
 - Optimistic updates como contrato de UX; ledger como fonte da verdade em segundo plano.
 - Fatias verticais (hook + tela juntos), começando pela casca.
+- **Validação sinal×tipo server-side** (COMPRA/DEVOLUCAO/INVENTARIO_INICIAL>0, PERDA<0, AJUSTE≠0); `DEVOLUCAO` = devolução de cliente (entra, +).
+- **`INSUFFICIENT_STOCK` (422)** tipado para saída maior que o saldo → mensagem específica no hook.
+- **A4 sem contagem-dobrada:** produto nasce `current_stock=0`; o movimento `INVENTARIO_INICIAL` traz ao valor inicial.
+- `recordManualMovement.tipo` aceita todos os `LedgerTipo`; o endpoint A1 expõe só os 4 manuais.
+- Extrato: `ORDER BY created_at DESC, id DESC`; OFFSET aceitável v1 (caveat); `usuario_id` fora do payload v1.
+- SKU **interno** (gera+uniquifica do nome se vazio); **não** gerar EAN; EAN real é digitado.
+- Categoria normalizada no write (trim; vazio→null).
+- "Correção" (UI) → `AJUSTE` (enum).
+- Selo de Pedidos: deriva de `getOrders` na v1 (endpoint de contagem = v2; confirmar stats existente).
