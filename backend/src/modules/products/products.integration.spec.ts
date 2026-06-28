@@ -391,6 +391,12 @@ describe('Products Integration Tests (e2e)', () => {
       expect(res.body.items).toHaveLength(2);
       // ordenado created_at DESC (mais recente primeiro)
       expect(res.body.total).toBeGreaterThanOrEqual(3);
+      // Verifica ordenação real: primeiro item deve ser ao menos tão recente quanto o segundo.
+      // O seed insere COMPRA, AJUSTE, PERDA em sequência — PERDA é a mais recente,
+      // portanto items[0].tipo deve ser 'PERDA' (tiebreaker id DESC garante ordem determinística).
+      expect(new Date(res.body.items[0].created_at).getTime())
+        .toBeGreaterThanOrEqual(new Date(res.body.items[1].created_at).getTime());
+      expect(res.body.items[0].tipo).toBe('PERDA');
     });
 
     it('AJUSTE com delta negativo mantém invariante (bidirectionality)', async () => {
@@ -444,6 +450,8 @@ describe('Products Integration Tests (e2e)', () => {
       const sorted = res.body.sort();
       expect(sorted).toContain('Bombons');
       expect(sorted).toContain('Trufas');
+      // Valida que DISTINCT está funcionando: sem categorias duplicadas na resposta
+      expect(new Set(res.body).size).toBe(res.body.length);
     });
   });
 });
