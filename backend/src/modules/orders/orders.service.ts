@@ -269,8 +269,11 @@ export class OrdersService {
 
       // 6. Criar pedido
       const orderNo = await this.generateOrderNumber(tenantId);
-      // Todos os canais comecam em PENDENTE_PAGAMENTO para fluxo de pagamento consistente.
-      const initialStatus: PedidoStatus = PedidoStatus.PENDENTE_PAGAMENTO;
+      const isPdv = createOrderDto.channel === CanalVenda.PDV;
+      // PDV nasce ENTREGUE (pago e levado no balcao); demais canais, pendente de pagamento.
+      const initialStatus: PedidoStatus = isPdv
+        ? PedidoStatus.ENTREGUE
+        : PedidoStatus.PENDENTE_PAGAMENTO;
 
       const pedido = manager.getRepository(Pedido).create();
       pedido.tenant_id = tenantId;
@@ -303,6 +306,27 @@ export class OrdersService {
       );
 
       await manager.save(itens);
+
+      // Fast-pass PDV: baixa imediata + pagamento sincrono, tudo atomico.
+      if (isPdv) {
+        const stockItems = createOrderDto.items.map((i) => ({
+          produto_id: i.produto_id,
+          quantity: i.quantity,
+        }));
+        // Baixa real (current -= qty, reserved -= qty) + VENDA no ledger.
+        await this.stockEngine.commitSale(manager, tenantId, savedPedido.id, stockItems);
+
+        // Pagamento interno, ja PAGO (liquidacao fisica ocorreu no balcao).
+        const pagamento = manager.create(Pagamento, {
+          tenant_id: tenantId,
+          pedido_id: savedPedido.id,
+          method: createOrderDto.payment!.method,
+          status: PagamentoStatus.PAID,
+          amount: total,
+          metadata: { pdv: true, confirmed_at_counter: true },
+        });
+        await manager.save(pagamento);
+      }
 
       // Consumir cupom (incrementa used_count com proteção contra corrida)
       if (couponCode) {
@@ -382,7 +406,8 @@ export class OrdersService {
     }
 
     // ✅ NOVO: Notificar cliente sobre criação do pedido (especialmente para WhatsApp)
-    if (createOrderDto.channel === CanalVenda.WHATSAPP) {
+    // PDV nao notifica — venda atomica de balcao nao requer confirmacao externa.
+    if (createOrderDto.channel !== CanalVenda.PDV && createOrderDto.channel === CanalVenda.WHATSAPP) {
       try {
         // Notificar mudança de status (de null para PENDENTE_PAGAMENTO)
         await this.notificationsService.notifyOrderStatusChange(

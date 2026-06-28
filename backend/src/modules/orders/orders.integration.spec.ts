@@ -140,13 +140,14 @@ describe('Orders Integration Tests (e2e)', () => {
         .send({ quantity: 10, reason: 'Teste de integracao' })
         .expect(201);
 
-      // Criar pedido
+      // Criar pedido (canal whatsapp = pendente_pagamento; PDV agora nasce ENTREGUE)
       const orderResponse = await request(app.getHttpServer())
         .post(`/api/v1/orders?tenantId=${tenantId}`)
         .set('Authorization', `Bearer ${jwtToken}`)
         .send({
-          channel: 'pdv',
+          channel: 'whatsapp',
           customer_name: 'Cliente Teste',
+          customer_phone: '11999990001',
           items: [
             {
               produto_id: productId,
@@ -161,7 +162,7 @@ describe('Orders Integration Tests (e2e)', () => {
 
       expect(orderResponse.body).toHaveProperty('id');
       expect(orderResponse.body).toHaveProperty('order_no');
-      expect(orderResponse.body.status).toBe('pendente_pagamento'); // PDV = pendente_pagamento
+      expect(orderResponse.body.status).toBe('pendente_pagamento');
       expect(orderResponse.body.total_amount).toBe(52.5); // 5 * 10.5
     });
 
@@ -324,14 +325,15 @@ describe('Orders Integration Tests (e2e)', () => {
       expect(Number(estoqueAntesList[0].current_stock)).toBe(10);
       expect(Number(estoqueAntesList[0].reserved_stock)).toBe(0);
 
-      // Criar pedido de qty=3 via HTTP (artéria principal)
+      // Criar pedido de qty=3 via HTTP (artéria principal — canal whatsapp reserva sem baixar)
       const qty = 3;
       const orderResponse = await request(app.getHttpServer())
         .post(`/api/v1/orders?tenantId=${tenantId}`)
         .set('Authorization', `Bearer ${jwtToken}`)
         .send({
-          channel: 'pdv',
+          channel: 'whatsapp',
           customer_name: 'Cliente Reserva Task4',
+          customer_phone: '11999990002',
           items: [
             {
               produto_id: productId,
@@ -402,13 +404,14 @@ describe('Orders Integration Tests (e2e)', () => {
       );
       await qrSetup.release();
 
-      // Criar pedido qty=3 → reserva: current=10, reserved=3
+      // Criar pedido qty=3 via whatsapp → reserva: current=10, reserved=3
       const orderResp = await request(app.getHttpServer())
         .post(`/api/v1/orders?tenantId=${tenantId}`)
         .set('Authorization', `Bearer ${jwtToken}`)
         .send({
-          channel: 'pdv',
+          channel: 'whatsapp',
           customer_name: 'Cliente PRONTO Task5',
+          customer_phone: '11999990003',
           items: [{ produto_id: productId, quantity: 3, unit_price: 15.0 }],
           discount_amount: 0,
           shipping_amount: 0,
@@ -525,13 +528,14 @@ describe('Orders Integration Tests (e2e)', () => {
       );
       await qrSetup.release();
 
-      // Criar pedido qty=3 → reserva: current=10, reserved=3
+      // Criar pedido qty=3 via whatsapp → reserva: current=10, reserved=3
       const orderResp = await request(app.getHttpServer())
         .post(`/api/v1/orders?tenantId=${tenantId}`)
         .set('Authorization', `Bearer ${jwtToken}`)
         .send({
-          channel: 'pdv',
+          channel: 'whatsapp',
           customer_name: 'Cliente CANCELADO Task5',
+          customer_phone: '11999990004',
           items: [{ produto_id: productId, quantity: 3, unit_price: 15.0 }],
           discount_amount: 0,
           shipping_amount: 0,
@@ -582,6 +586,138 @@ describe('Orders Integration Tests (e2e)', () => {
       expect(ledgerList).toHaveLength(0);
 
       await qrCheck.release();
+    });
+  });
+
+  describe('PDV Fast-Pass (Task 2): venda atomica de balcao', () => {
+    // Helper: insere produto ativo + linha de estoque via SQL, retorna produto_id.
+    async function seedProdutoComEstoque(
+      currentStock: number,
+      reservedStock: number,
+    ): Promise<string> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const inserted = await qr.query(
+        `INSERT INTO produtos (tenant_id, name, price, is_active, unit)
+         VALUES ($1, $2, 10.00, true, 'unidade')
+         RETURNING id`,
+        [tenantId, `Produto PDV Task2 ${Date.now()}`],
+      ) as Array<{ id: string }>;
+      const produtoId = inserted[0].id;
+      await qr.query(
+        `INSERT INTO movimentacoes_estoque (tenant_id, produto_id, current_stock, reserved_stock, min_stock, last_updated)
+         VALUES ($1, $2, $3, $4, 0, NOW())
+         ON CONFLICT (tenant_id, produto_id) DO UPDATE
+           SET current_stock = $3, reserved_stock = $4, last_updated = NOW()`,
+        [tenantId, produtoId, currentStock, reservedStock],
+      );
+      await qr.release();
+      return produtoId;
+    }
+
+    // Helper: le saldo atual do estoque.
+    async function queryEstoque(
+      produtoId: string,
+    ): Promise<{ current_stock: number; reserved_stock: number }> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const rows = await qr.query(
+        'SELECT current_stock, reserved_stock FROM movimentacoes_estoque WHERE tenant_id = $1 AND produto_id = $2',
+        [tenantId, produtoId],
+      ) as Array<{ current_stock: number; reserved_stock: number }>;
+      await qr.release();
+      return { current_stock: Number(rows[0].current_stock), reserved_stock: Number(rows[0].reserved_stock) };
+    }
+
+    it('PDV: cria venda ENTREGUE, baixa estoque, grava Pagamento PAGO (atomico)', async () => {
+      if (!app) return;
+      // Seed: produto current_stock=10, reserved_stock=0
+      const produtoId = await seedProdutoComEstoque(10, 0);
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({
+          channel: 'pdv',
+          payment: { method: 'dinheiro' },
+          items: [{ produto_id: produtoId, quantity: 3, unit_price: 10.0 }],
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.status).toBe('entregue');
+
+      // Saldo: current baixou para 7, reserved volta a 0
+      const saldo = await queryEstoque(produtoId);
+      expect(saldo.current_stock).toBe(7);
+      expect(saldo.reserved_stock).toBe(0);
+
+      // Ledger: exatamente 1 VENDA para (order, produto)
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const ledger = await qr.query(
+        `SELECT tipo, delta FROM movimentacoes_estoque_historico WHERE order_id = $1 AND produto_id = $2`,
+        [res.body.id, produtoId],
+      ) as Array<{ tipo: string; delta: number }>;
+      expect(ledger).toHaveLength(1);
+      expect(ledger[0].tipo).toBe('VENDA');
+
+      // Pagamento PAGO
+      const pag = await qr.query(
+        `SELECT method, status, amount FROM pagamentos WHERE pedido_id = $1`,
+        [res.body.id],
+      ) as Array<{ method: string; status: string; amount: string }>;
+      await qr.release();
+      expect(pag).toHaveLength(1);
+      expect(pag[0].status).toBe('paid');
+      expect(pag[0].method).toBe('dinheiro');
+      expect(Number(pag[0].amount)).toBe(30);
+    });
+
+    it('PDV: respeita reserva alheia (available = current - reserved)', async () => {
+      if (!app) return;
+      // Seed: 3 reservados por carrinho online, available = 2
+      const produtoId = await seedProdutoComEstoque(5, 3);
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({
+          channel: 'pdv',
+          payment: { method: 'debito' },
+          items: [{ produto_id: produtoId, quantity: 2, unit_price: 10.0 }],
+        });
+      expect(res.status).toBe(201);
+      const saldo = await queryEstoque(produtoId);
+      expect(saldo.current_stock).toBe(3);   // baixou 2
+      expect(saldo.reserved_stock).toBe(3);  // reservas online intactas
+    });
+
+    it('PDV: estoque insuficiente faz rollback TOTAL (nada persiste)', async () => {
+      if (!app) return;
+      // Seed: available = 1 (nao suficiente para qty=2)
+      const produtoId = await seedProdutoComEstoque(5, 4);
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({
+          channel: 'pdv',
+          payment: { method: 'credito' },
+          items: [{ produto_id: produtoId, quantity: 2, unit_price: 10.0 }],
+        });
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      // Nada persistido: sem pedido, sem ledger VENDA, sem pagamento
+      const saldo = await queryEstoque(produtoId);
+      expect(saldo.current_stock).toBe(5);
+      expect(saldo.reserved_stock).toBe(4);
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const ledger = await qr.query(
+        `SELECT 1 FROM movimentacoes_estoque_historico WHERE produto_id = $1 AND tipo = 'VENDA'`,
+        [produtoId],
+      ) as Array<unknown>;
+      await qr.release();
+      expect(ledger).toHaveLength(0);
     });
   });
 
