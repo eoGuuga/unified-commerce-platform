@@ -3,11 +3,13 @@ import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Produto } from '../../database/entities/Produto.entity';
 import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque.entity';
+import { LedgerTipo } from '../../database/entities/MovimentacaoEstoqueHistorico.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CacheService } from '../common/services/cache.service';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { DbContextService } from '../common/services/db-context.service';
+import { StockEngineService } from './stock-engine.service';
 import { PaginatedResult, createPaginatedResult } from '../common/types/pagination.types';
 import { PaginationDto } from './dto/pagination.dto';
 import { ProductWithStock } from './types/product.types';
@@ -26,6 +28,7 @@ export class ProductsService {
     private cacheService: CacheService,
     private auditLogService: AuditLogService,
     private readonly db: DbContextService,
+    private readonly stockEngine: StockEngineService,
   ) {}
 
   async findAll(tenantId: string, pagination?: PaginationDto): Promise<ProductWithStock[] | PaginatedResult<ProductWithStock>> {
@@ -35,11 +38,17 @@ export class ProductsService {
     const produtosRepository = this.db.getRepository(Produto);
     const estoqueRepository = this.db.getRepository(MovimentacaoEstoque);
 
-    // ✅ CACHE: Tentar buscar do cache primeiro (apenas sem paginação)
+    // ✅ CACHE: Tentar buscar do cache primeiro (apenas sem paginação) — não-fatal
     if (!pagination) {
-      const cached = await this.cacheService.getCachedProducts(tenantId);
-      if (cached) {
-        return cached;
+      try {
+        const cached = await this.cacheService.getCachedProducts(tenantId);
+        if (cached) {
+          return cached;
+        }
+      } catch (error) {
+        this.logger.warn('Cache read falhou em findAll (não-fatal)', {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -127,8 +136,14 @@ export class ProductsService {
       };
     });
 
-    // ✅ CACHE: Salvar no cache (TTL: 5 minutos)
-    await this.cacheService.cacheProducts(tenantId, produtosComEstoque, 300);
+    // ✅ CACHE: Salvar no cache (TTL: 5 minutos) — não-fatal
+    try {
+      await this.cacheService.cacheProducts(tenantId, produtosComEstoque, 300);
+    } catch (error) {
+      this.logger.warn('Cache write falhou em findAll (não-fatal)', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     return produtosComEstoque;
   }
@@ -153,29 +168,46 @@ export class ProductsService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<Produto> {
-    const produtoRepo = this.db.getRepository(Produto);
-    const produto = produtoRepo.create({
-      ...createProductDto,
-      tenant_id: tenantId,
-    });
+    // Normalizar category: trim, colapsar espaços, vazio → null
+    const category = createProductDto.category?.trim().replace(/\s+/g, ' ') || null;
 
-    const savedProduto = await produtoRepo.save(produto);
-    const estoqueRepo = this.db.getRepository(MovimentacaoEstoque);
-    const existingStock = await estoqueRepo.findOne({
-      where: { tenant_id: tenantId, produto_id: savedProduto.id },
-    });
+    // Executar criação do produto + estoque inicial em uma transação atômica
+    const savedProduto = await this.db.runInTransaction(async (manager) => {
+      const produtoData: Record<string, any> = {
+        ...createProductDto,
+        category,
+        tenant_id: tenantId,
+      };
+      // initial_stock não é coluna do produto — remover antes de persistir
+      delete produtoData.initial_stock;
 
-    if (!existingStock) {
-      await estoqueRepo.save(
-        estoqueRepo.create({
-          tenant_id: tenantId,
-          produto_id: savedProduto.id,
-          current_stock: 0,
-          reserved_stock: 0,
-          min_stock: 0,
-        }),
-      );
-    }
+      const produto = manager.getRepository(Produto).create(produtoData as Partial<Produto>);
+      const p = await manager.getRepository(Produto).save(produto);
+
+      // Sempre criar a linha de estoque com current_stock=0
+      await manager.getRepository(MovimentacaoEstoque).insert({
+        tenant_id: tenantId,
+        produto_id: p.id,
+        current_stock: 0,
+        reserved_stock: 0,
+        min_stock: 0,
+      });
+
+      // Se initial_stock > 0, registrar INVENTARIO_INICIAL via motor (nunca setar direct)
+      if (createProductDto.initial_stock && createProductDto.initial_stock > 0) {
+        await this.stockEngine.recordManualMovement(
+          manager,
+          tenantId,
+          p.id,
+          LedgerTipo.INVENTARIO_INICIAL,
+          createProductDto.initial_stock,
+          'Inventário inicial',
+          userId ?? null,
+        );
+      }
+
+      return p;
+    });
 
     // ✅ AUDIT LOG: Registrar criação de produto
     try {
@@ -197,12 +229,18 @@ export class ProductsService {
       this.logger.error('Erro ao registrar audit log', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
-        context: { tenantId, userId, produtoId: savedProduto.id, action: 'UPDATE' },
+        context: { tenantId, userId, produtoId: savedProduto.id, action: 'CREATE' },
       });
     }
 
-    // ✅ CACHE: Invalidar cache de produtos
-    await this.cacheService.invalidateProductsCache(tenantId);
+    // ✅ CACHE: Invalidar cache — não-fatal (Redis pode estar indisponível em testes)
+    try {
+      await this.cacheService.invalidateProductsCache(tenantId);
+    } catch (error) {
+      this.logger.warn('Cache invalidation falhou em create (não-fatal)', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     return savedProduto;
   }
@@ -251,8 +289,14 @@ export class ProductsService {
       });
     }
 
-    // ✅ CACHE: Invalidar cache de produtos
-    await this.cacheService.invalidateProductsCache(tenantId);
+    // ✅ CACHE: Invalidar cache — não-fatal
+    try {
+      await this.cacheService.invalidateProductsCache(tenantId);
+    } catch (error) {
+      this.logger.warn('Cache invalidation falhou em update (não-fatal)', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     return savedProduto;
   }
@@ -292,8 +336,14 @@ export class ProductsService {
       });
     }
 
-    // ✅ CACHE: Invalidar cache de produtos
-    await this.cacheService.invalidateProductsCache(tenantId);
+    // ✅ CACHE: Invalidar cache — não-fatal
+    try {
+      await this.cacheService.invalidateProductsCache(tenantId);
+    } catch (error) {
+      this.logger.warn('Cache invalidation falhou em remove (não-fatal)', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   async search(tenantId: string, query: string): Promise<Produto[]> {
@@ -647,11 +697,45 @@ export class ProductsService {
       });
     }
 
-    // ✅ CACHE: Invalidar cache de produtos
-    await this.cacheService.invalidateProductsCache(tenantId);
-    await this.cacheService.invalidateStockCache(tenantId, produtoId);
+    // ✅ CACHE: Invalidar cache — não-fatal
+    try {
+      await this.cacheService.invalidateProductsCache(tenantId);
+      await this.cacheService.invalidateStockCache(tenantId, produtoId);
+    } catch (error) {
+      this.logger.warn('Cache invalidation falhou em adjustStock (não-fatal)', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     return savedEstoque;
+  }
+
+  /**
+   * Ajusta estoque via ledger (COMPRA/PERDA/DEVOLUCAO/AJUSTE). Ledger-correto.
+   */
+  async adjustStockLedger(
+    produtoId: string,
+    tipo: LedgerTipo,
+    delta: number,
+    motivo: string | null,
+    tenantId: string,
+    usuarioId: string | null,
+  ): Promise<{ saldo_resultante: number }> {
+    // 404 se produto não existe ou não pertence ao tenant
+    await this.findOne(produtoId, tenantId);
+    const res = await this.db.runInTransaction((manager) =>
+      this.stockEngine.recordManualMovement(manager, tenantId, produtoId, tipo, delta, motivo, usuarioId),
+    );
+    // ✅ CACHE: Invalidar cache — não-fatal
+    try {
+      await this.cacheService.invalidateProductsCache(tenantId);
+      await this.cacheService.invalidateStockCache(tenantId, produtoId);
+    } catch (error) {
+      this.logger.warn('Cache invalidation falhou em adjustStockLedger (não-fatal)', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return res;
   }
 
   /**

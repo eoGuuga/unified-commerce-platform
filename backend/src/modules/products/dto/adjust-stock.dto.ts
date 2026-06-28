@@ -1,13 +1,25 @@
-import { IsNumber, IsString, IsOptional } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, NotEquals } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class AdjustStockDto {
-  @ApiProperty({ description: 'Quantidade a ajustar (positivo para adicionar, negativo para remover)', example: 10 })
-  @IsNumber()
-  quantity: number;
+export enum AdjustStockTipo {
+  COMPRA = 'COMPRA',
+  PERDA = 'PERDA',
+  DEVOLUCAO = 'DEVOLUCAO',
+  AJUSTE = 'AJUSTE',
+}
 
-  @ApiProperty({ description: 'Motivo do ajuste', required: false, example: 'Reposição de estoque' })
+export class AdjustStockDto {
+  @ApiProperty({ enum: AdjustStockTipo, description: 'Tipo de movimento manual (INVENTARIO_INICIAL nao e aceito no wire)' })
+  @IsEnum(AdjustStockTipo)
+  tipo: AdjustStockTipo;
+
+  @ApiProperty({ description: 'Delta sinalizado (+ entrada / - saida)' })
+  @IsInt()
+  @NotEquals(0)
+  delta: number;
+
+  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  reason?: string;
+  motivo?: string;
 }

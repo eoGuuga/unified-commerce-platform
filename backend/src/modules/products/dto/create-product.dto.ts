@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsBoolean, Min } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsBoolean, IsInt, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateProductDto {
@@ -45,4 +45,15 @@ export class CreateProductDto {
   @ApiProperty({ description: 'Metadata adicional (imagens, tags, etc)', required: false })
   @IsOptional()
   metadata?: Record<string, any>;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @ApiProperty({ required: false, description: 'Estoque inicial (gera INVENTARIO_INICIAL)' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  initial_stock?: number;
 }

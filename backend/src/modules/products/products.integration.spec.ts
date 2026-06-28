@@ -233,4 +233,113 @@ describe('Products Integration Tests (e2e)', () => {
         .expect(401);
     });
   });
+
+  describe('Admin estoque — adjust-stock ledger-correto', () => {
+    let produtoId: string;
+
+    beforeEach(async () => {
+      if (!app) return;
+      // Criar produto + seed de estoque via SQL direto
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const prod = await queryRunner.query(
+        `INSERT INTO produtos (id, tenant_id, name, price, is_active, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, 'Produto Adjust Test', 10.0, true, now(), now())
+         RETURNING id`,
+        [tenantId],
+      );
+      produtoId = prod[0].id;
+      // Estoque inicial = 10
+      await queryRunner.query(
+        `INSERT INTO movimentacoes_estoque (id, tenant_id, produto_id, current_stock, reserved_stock, min_stock, last_updated)
+         VALUES (uuid_generate_v4(), $1, $2, 10, 0, 0, now())`,
+        [tenantId, produtoId],
+      );
+      await queryRunner.release();
+    });
+
+    it('COMPRA grava ledger e mantem invariante', async () => {
+      if (!app) return;
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'COMPRA', delta: 5, motivo: 'reposicao' });
+      expect(res.status).toBe(201);
+      expect(res.body.saldo_resultante).toBe(15);
+
+      // Verificar ledger
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const ledger = await queryRunner.query(
+        `SELECT tipo, delta, saldo_resultante FROM movimentacoes_estoque_historico
+         WHERE produto_id = $1 AND tipo = 'COMPRA'`,
+        [produtoId],
+      );
+      await queryRunner.release();
+      expect(ledger.length).toBeGreaterThanOrEqual(1);
+      expect(Number(ledger[0].delta)).toBe(5);
+      expect(Number(ledger[0].saldo_resultante)).toBe(15);
+    });
+
+    it('rejeita sinal incoerente (COMPRA com delta negativo) -> 400', async () => {
+      if (!app) return;
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'COMPRA', delta: -5 });
+      expect(res.status).toBe(400);
+    });
+
+    it('saida maior que saldo -> 422 INSUFFICIENT_STOCK', async () => {
+      if (!app) return;
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'PERDA', delta: -50 });
+      expect(res.status).toBe(422);
+      expect(res.body.code).toBe('INSUFFICIENT_STOCK');
+    });
+
+    it('rejeita tipo INVENTARIO_INICIAL no wire -> 400', async () => {
+      if (!app) return;
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'INVENTARIO_INICIAL', delta: 5 });
+      expect(res.status).toBe(400);
+    });
+
+    it('criar produto com initial_stock grava UMA linha INVENTARIO_INICIAL (sem 2x)', async () => {
+      if (!app) return;
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/products`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ name: 'Trufa', price: 5.0, initial_stock: 10 });
+      expect(res.status).toBe(201);
+
+      const novoProdutoId = res.body.id;
+
+      // Verificar que estoque = 10
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const estoque = await queryRunner.query(
+        `SELECT current_stock FROM movimentacoes_estoque WHERE produto_id = $1`,
+        [novoProdutoId],
+      );
+      const ledger = await queryRunner.query(
+        `SELECT tipo, delta FROM movimentacoes_estoque_historico WHERE produto_id = $1`,
+        [novoProdutoId],
+      );
+      await queryRunner.release();
+
+      expect(Number(estoque[0].current_stock)).toBe(10);
+      // Exatamente UMA linha INVENTARIO_INICIAL — sem double-count
+      expect(ledger.length).toBe(1);
+      expect(ledger[0].tipo).toBe('INVENTARIO_INICIAL');
+      expect(Number(ledger[0].delta)).toBe(10);
+    });
+  });
 });

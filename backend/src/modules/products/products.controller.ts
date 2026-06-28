@@ -15,6 +15,7 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { PaginationDto } from './dto/pagination.dto';
+import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../common/decorators/tenant.decorator';
@@ -155,26 +156,25 @@ export class ProductsController {
 
   @Post(':id/adjust-stock')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Ajustar estoque (adicionar ou remover quantidade)' })
-  @ApiResponse({ status: 200, description: 'Estoque ajustado com sucesso' })
-  @ApiResponse({ status: 400, description: 'Quantidade inválida ou estoque insuficiente' })
+  @ApiOperation({ summary: 'Ajustar estoque via ledger (COMPRA/PERDA/DEVOLUCAO/AJUSTE)' })
+  @ApiResponse({ status: 201, description: 'Estoque ajustado com sucesso via ledger' })
+  @ApiResponse({ status: 400, description: 'Tipo ou sinal inválido' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 404, description: 'Produto não encontrado' })
+  @ApiResponse({ status: 422, description: 'Estoque insuficiente (INSUFFICIENT_STOCK)' })
   adjustStock(
     @Param('id') id: string,
-    @Body() adjustStockDto: { quantity: number; reason?: string },
+    @Body() dto: AdjustStockDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: Usuario,
-    @Request() req: TypedRequest,
   ) {
-    return this.productsService.adjustStock(
+    return this.productsService.adjustStockLedger(
       id,
-      adjustStockDto.quantity,
+      dto.tipo as unknown as any,
+      dto.delta,
+      dto.motivo ?? null,
       tenantId,
-      adjustStockDto.reason,
-      user?.id,
-      getClientIp(req),
-      getUserAgent(req),
+      user?.id ?? null,
     );
   }
 
