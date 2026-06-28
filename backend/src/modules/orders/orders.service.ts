@@ -559,34 +559,67 @@ export class OrdersService {
   ): Promise<Pedido> {
     const pedido = await this.findOne(id, tenantId);
     const oldStatus = pedido.status;
-    if (oldStatus !== status) {
-      this.assertStatusTransition(oldStatus, status);
-    }
-    pedido.status = status;
-    const updatedPedido = await this.db.getRepository(Pedido).save(pedido);
 
-    // Notificar cliente sobre mudança de status
-    if (oldStatus !== status) {
-      try {
-        await this.notificationsService.notifyOrderStatusChange(
-          tenantId,
-          updatedPedido,
-          oldStatus,
-          status,
-        );
-      } catch (error) {
-        // Não falhar a atualização se a notificação falhar
-        this.logger.error('Error sending order status notification', {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          context: {
-            tenantId,
-            pedidoId: id,
-            oldStatus,
-            newStatus: status,
-          },
-        });
+    // No-op idempotente: mesma transição não reprocessa estoque
+    if (oldStatus === status) {
+      return pedido;
+    }
+
+    this.assertStatusTransition(oldStatus, status);
+
+    const updatedPedido = await this.db.runInTransaction(async (manager) => {
+      // Lock pessimista para serializar transições concorrentes
+      await manager
+        .createQueryBuilder(Pedido, 'p')
+        .setLock('pessimistic_write')
+        .where('p.id = :id', { id })
+        .andWhere('p.tenant_id = :tenantId', { tenantId })
+        .getOne();
+
+      // Carregar itens do pedido para o commit/release
+      const itens = await manager.find(ItemPedido, { where: { pedido_id: id } });
+      const stockItems = itens.map((i) => ({
+        produto_id: i.produto_id,
+        quantity: i.quantity,
+      }));
+
+      // COMMIT da baixa ao entrar em PRONTO (idempotente via ledger único)
+      if (status === PedidoStatus.PRONTO) {
+        await this.stockEngine.commitSale(manager, tenantId, id, stockItems);
       }
+
+      // RELEASE da reserva ao cancelar pré-PRONTO (apenas uma vez, guarda via stock_released_at)
+      if (status === PedidoStatus.CANCELADO && pedido.stock_released_at == null) {
+        for (const it of stockItems) {
+          await this.stockEngine.release(manager, tenantId, it.produto_id, it.quantity);
+        }
+        pedido.stock_released_at = new Date();
+      }
+
+      pedido.status = status;
+      return manager.getRepository(Pedido).save(pedido);
+    });
+
+    // Notificação FORA da transação (sem I/O externo sob lock)
+    try {
+      await this.notificationsService.notifyOrderStatusChange(
+        tenantId,
+        updatedPedido,
+        oldStatus,
+        status,
+      );
+    } catch (error) {
+      // Não falhar a atualização se a notificação falhar
+      this.logger.error('Error sending order status notification', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: {
+          tenantId,
+          pedidoId: id,
+          oldStatus,
+          newStatus: status,
+        },
+      });
     }
 
     return updatedPedido;
