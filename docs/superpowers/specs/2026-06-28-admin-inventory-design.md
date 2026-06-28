@@ -29,11 +29,11 @@ body: { tipo: 'COMPRA'|'PERDA'|'DEVOLUCAO'|'AJUSTE', delta: number (sinalizado),
 ```
 - Roda em `db.runInTransaction`; chama `recordManualMovement(manager, tenantId, produtoId, tipo, delta, motivo, usuarioId)`.
 - `recordManualMovement` já guarda `current_stock + delta >= 0` e grava a linha no ledger (`saldo_resultante` incluso).
-- **Validação sinal×tipo (server-side, OBRIGATÓRIA):** sem isso, `{tipo:'COMPRA', delta:-10}` passaria e o ledger mentiria (auditoria corrompida, mesmo com o invariante intacto). Regras:
+- **Validação sinal×tipo (server-side, OBRIGATÓRIA) — DENTRO do `recordManualMovement`, não (só) no DTO/controller.** Sem isso, `{tipo:'COMPRA', delta:-10}` passaria e o ledger mentiria (auditoria corrompida, mesmo com o invariante intacto). **Por que no `recordManualMovement` (chokepoint único):** a regra de `INVENTARIO_INICIAL` é inalcançável por uma validação só-de-DTO — esse tipo **nunca chega pelo endpoint** (o A4 o injeta internamente). Validando no método, a regra cobre de uma vez o endpoint A1, o A4 e qualquer caller interno futuro. Regras:
   - `COMPRA`, `DEVOLUCAO`, `INVENTARIO_INICIAL` → `delta > 0`.
   - `PERDA` → `delta < 0`.
   - `AJUSTE` → `delta ≠ 0` (qualquer sinal).
-  - Sinal incoerente com o tipo → `400 BadRequest`.
+  - Sinal incoerente com o tipo → `400 BadRequest`. (O DTO do endpoint ainda faz a validação de forma/enum dos 4 tipos manuais; a regra semântica sinal×tipo é do método.)
 - **Direção de `DEVOLUCAO` (decidido):** devolução de **cliente** = entra no estoque (`delta > 0`). Devolução a fornecedor (saída) **não** é coberta na v1 (seria `PERDA` ou tipo futuro).
 - **Erro de estoque insuficiente tipado:** quando o guard `current_stock + delta < 0` rejeita (PERDA/AJUSTE negativo maior que o saldo), responder **`422` com código `INSUFFICIENT_STOCK`** (não erro genérico), para o hook frontend exibir "Estoque insuficiente para esta saída".
 - O endpoint **deixa de chamar** o `adjustStock` antigo (AuditLog); o método antigo é **removido** se não houver outros consumidores (verificar na implementação — o grep atual mostra que só o controller o chamava). Invalida o cache de produtos como hoje.
@@ -80,8 +80,8 @@ Ao criar um produto **com estoque inicial > 0**, gravar um movimento `INVENTARIO
 ### B2. Produtos (`app/admin/produtos/page.tsx`)
 - **Lista:** cada produto com nome, preço, categoria, selo Ativo/Inativo, estoque atual. Busca (nome) + filtro Ativos/Inativos/Todos. Estados: carregando, vazio, erro com retry. Botão "+ Adicionar produto".
 - **Formulário ÚNICO `ProductForm` (mode-aware)** — painel lateral (desktop) / tela cheia (celular):
-  - Campos: **nome\***, **preço\***, descrição, **categoria** (combobox creatable, alimentado por `GET /products/categories`), unidade, preço de custo, **estoque inicial** (só no modo create), **foto por URL** (com `onError` → placeholder "Imagem indisponível"), **SKU** (editável no create / **read-only no edit**).
-  - **SKU é INTERNO (não EAN):** se vazio no create, **gerar** a partir do nome (slug) **com uniquificação** — se colidir com o `sku` único do tenant (dois "Coca-Cola"), anexar sufixo (`-2`, `-3`…). **Não** gerar EAN/código de barras a partir do nome (produziria barcode inválido). Se o lojista quiser um **EAN real escaneável**, ele digita manualmente (armazenado como o `sku` ou, futuramente, num campo `barcode` próprio — fora do escopo v1). A geração automática vale só para SKU interno.
+  - Campos: **nome\***, **preço\***, descrição, **categoria** (combobox creatable, alimentado por `GET /products/categories`; **match case-insensitive:** digitar "tru" surfa "Trufas" para a operadora **escolher** em vez de criar "trufas" — mitiga a fragmentação por case sem forçar lowercase no storage; o case digitado é preservado, só o match ignora caixa), unidade, preço de custo, **estoque inicial** (só no modo create), **foto por URL** (com `onError` → placeholder "Imagem indisponível"), **SKU** (editável no create / **read-only no edit**).
+  - **SKU é INTERNO (não EAN):** se vazio no create, **gerar** a partir do nome (slug) **com uniquificação** — se colidir com o `sku` único do tenant (dois "Coca-Cola"), anexar sufixo (`-2`, `-3`…). **Backstop:** a unicidade real é garantida pela **constraint única do banco** (`[tenant_id, sku]`), não só por um `SELECT` prévio — tratar violação de unicidade no insert (retry com próximo sufixo) para ser à prova de corrida. **Não** gerar EAN/código de barras a partir do nome (produziria barcode inválido). Se o lojista quiser um **EAN real escaneável**, ele digita manualmente (armazenado como o `sku` ou, futuramente, num campo `barcode` próprio — fora do escopo v1). A geração automática vale só para SKU interno.
   - Diferenças create↔edit por props: valores iniciais, ação de submit (`createProduct`/`updateProduct`), estoque inicial e editabilidade do SKU. Validação **num lugar só**.
 - **Desativar** (soft-delete, `is_active=false`) com confirmação; reativável. Nunca hard-delete (preserva histórico).
 - **Hook `useProducts`** (listar/criar/editar/desativar) com **optimistic update** no toggle Ativo/Inativo (UI muda na hora; reverte + toast no erro).
@@ -92,7 +92,7 @@ Ao criar um produto **com estoque inicial > 0**, gravar um movimento `INVENTARIO
 ## 4. Seção C — Estoque (alimentado pelo ledger)
 
 ### C1. Lista (`app/admin/estoque/page.tsx`)
-- Consome `getStockSummary`: cada produto com **atual / reservado / mínimo** + **badge de status colorido** baseado em `available = current - reserved`:
+- Consome `getStockSummary` — **confirmado (verify):** o método já retorna por produto `current_stock, reserved_stock, available_stock, min_stock` **e** um `status ('ok'|'low'|'out')` pré-computado, além de `low_stock_count`/`out_of_stock_count` agregados. **Sem gap de backend** para os badges/C4. A função pura `lib/stock-status.ts` pode reusar o `status` do servidor ou recomputar de `available`/`min` — desde que seja a **fonte única** (C1). Cada produto com **atual / reservado / mínimo** + **badge de status colorido** baseado em `available = current - reserved`:
   - **OK** (verde) — `available > min_stock`.
   - **Baixo** (âmbar) — `available <= min_stock` (e > 0).
   - **Esgotado** (vermelho) — `available <= 0`.
@@ -100,8 +100,10 @@ Ao criar um produto **com estoque inicial > 0**, gravar um movimento `INVENTARIO
 - **Filtro "Precisam de atenção"** (Baixo + Esgotado). **Fonte única:** o cálculo de status (OK/Baixo/Esgotado) vive numa função pura derivada do `getStockSummary` (ex.: `lib/stock-status.ts`), e os **três consumidores** — o filtro C1, o **selo da aba Estoque** e o número no Início ("X produtos precisam de reposição") — leem dessa mesma fonte. Nunca recalcular em três lugares (divergiriam). Estoque passa de dado passivo a tarefa ativa de reposição.
 
 ### C2. Ajuste de estoque (modal)
-- Escolhe **tipo** (rótulo na UI → enum): **Compra**→`COMPRA`, **Perda**→`PERDA`, **Devolução**→`DEVOLUCAO`, **Correção**→`AJUSTE` (mapeamento explícito; "Correção" **não** é valor literal do enum). A UI aplica o sinal conforme o tipo (Compra/Devolução = +, Perda = −, Correção = +/−) e o backend revalida (A1). `motivo` opcional → `POST /products/:id/adjust-stock`.
+- Escolhe **tipo** (rótulo na UI → enum): **Compra**→`COMPRA`, **Perda**→`PERDA`, **Devolução**→`DEVOLUCAO`, **Correção**→`AJUSTE` (mapeamento explícito; "Correção" **não** é valor literal do enum). A UI aplica o sinal conforme o tipo e o backend revalida (A1). `motivo` opcional → `POST /products/:id/adjust-stock`.
+- **Foot-gun da Correção — modo contagem (decisão de UI):** contagem física é **absoluta**; um form de `delta` é **relativo**. Cenário: a operadora conta a prateleira (47), o sistema diz 50, ela quer "deixar em 47" — se digitar `47` num campo de delta, o sistema somaria 47 → 97. Por isso, **a UI de Correção pede o valor CONTADO (alvo)** e **calcula o delta = alvo − atual** (aqui: −3) antes de enviar. O wire continua `delta` sinalizado (backend inalterado); só muda **onde** o delta é computado. Compra/Perda/Devolução seguem em modo quantidade (a UI aplica o sinal do tipo).
 - **Optimistic update** da linha (atual/badge mudam na hora). No erro: **reverte** o estado e mostra toast; se for `422 INSUFFICIENT_STOCK` (A1), a mensagem é específica — "Estoque insuficiente para esta saída" — não genérica.
+  - **Badge otimista fiel:** o ajuste manual mexe em `current`, **não** em `reserved`. O update otimista recalcula o badge pela **mesma** função pura (`lib/stock-status.ts`) passando o `current` novo + o `reserved` **inalterado** — senão o badge otimista diverge da verdade.
 
 ### C3. Extrato por produto (o "extrato bancário")
 - Tocar num produto abre um painel/drawer com o histórico do ledger (`GET /products/:id/stock-history`, A2), paginado, mais recentes primeiro — estilo "+50 Compra · 12/06 → saldo 50". Dá ao lojista autossuficiência de auditoria (vê a movimentação em vez de chamar suporte).
@@ -125,7 +127,7 @@ Ao criar um produto **com estoque inicial > 0**, gravar um movimento `INVENTARIO
 
 ## 6. Testes
 
-- **Backend (integração, banco real):** A1 — ajuste mantém invariante + grava ledger; **rejeita sinal incoerente** (`{COMPRA, delta<0}` → 400; `{PERDA, delta>0}` → 400); **PERDA/AJUSTE que zeraria abaixo de 0 → 422 `INSUFFICIENT_STOCK`**. A2 — extrato ordenado `created_at DESC, id DESC`, paginado, tenant-scoped. A3 — `categories` DISTINCT por tenant; categoria com espaços é normalizada (trim). A4 — criação com estoque inicial grava **uma** linha `INVENTARIO_INICIAL` e `current_stock == inicial` (não `2×`).
+- **Backend (integração, banco real):** A1 — ajuste mantém invariante + grava ledger; **rejeita sinal incoerente** (`{COMPRA, delta<0}` → 400; `{PERDA, delta>0}` → 400); **PERDA/AJUSTE que zeraria abaixo de 0 → 422 `INSUFFICIENT_STOCK`**. A2 — extrato ordenado `created_at DESC, id DESC`, paginado, tenant-scoped. A3 — `categories` DISTINCT por tenant; categoria com espaços é normalizada (trim). A4 — criação com estoque inicial grava **uma** linha `INVENTARIO_INICIAL` e `current_stock == inicial` (não `2×`). **Fronteira do DTO (teste negativo):** `POST /adjust-stock` com `tipo:'INVENTARIO_INICIAL'` no wire é **rejeitado** (400) — só os 4 tipos manuais passam pelo endpoint; `INVENTARIO_INICIAL` é uso interno (trava contra alguém alargar o DTO depois).
 - **Frontend (vitest):** `useProducts`/`useStock` — optimistic update aplica e **reverte no erro**; `ProductForm` valida nome/preço obrigatórios e foto-URL fallback; mapeamento de badge (OK/Baixo/Esgotado) por `available`. Componentes de lista: estados carregando/vazio/erro.
 
 ---
