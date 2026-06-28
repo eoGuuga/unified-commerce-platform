@@ -1,10 +1,8 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import Link from 'next/link';
 import { RefreshCw, Package, Search, Bell } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { useOrders } from '@/hooks/useOrders';
+import { useAdminData } from '@/components/admin/shell/AdminDataProvider';
 import { StatusBadge } from './StatusBadge';
 import { getNextStatuses, getStatusMeta } from '@/lib/order-status';
 import type { Order, OrderStatus } from '@/lib/types/order';
@@ -27,8 +25,15 @@ function formatDate(iso?: string): string {
 }
 
 export function OrdersManager() {
-  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
-  const { orders, loading, error, refetch, updateStatus, updatingId } = useOrders();
+  // Consome dados do provider compartilhado (auth-gate fica no AdminShell)
+  const {
+    orders,
+    ordersLoading: loading,
+    ordersError: error,
+    refetchOrders: refetch,
+    updateOrderStatus: updateStatus,
+    updatingOrderId: updatingId,
+  } = useAdminData();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'todos'>('todos');
   const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
@@ -67,24 +72,6 @@ export function OrdersManager() {
     }
   }
 
-  // ---- Estados de acesso ----
-  if (authLoading) {
-    return <CenteredMessage>Verificando seu acesso…</CenteredMessage>;
-  }
-  if (!isAuthenticated) {
-    return (
-      <CenteredMessage>
-        <p className="mb-4">Você precisa entrar para gerenciar pedidos.</p>
-        <Link
-          href="/login?redirect=/admin/pedidos"
-          className="inline-flex h-11 items-center rounded-full bg-[#1a1814] px-6 text-[14px] font-medium text-[#f6f3ee] transition hover:bg-[#1a1814]/90"
-        >
-          Entrar
-        </Link>
-      </CenteredMessage>
-    );
-  }
-
   return (
     <div className="mx-auto max-w-[1320px] px-6 py-10">
       {/* Cabecalho */}
@@ -97,9 +84,6 @@ export function OrdersManager() {
           >
             Pedidos
           </h1>
-          {user?.full_name && (
-            <p className="mt-1 text-[13px] text-[#1a1814]/55">Olá, {user.full_name}</p>
-          )}
         </div>
         <button
           onClick={() => refetch()}
