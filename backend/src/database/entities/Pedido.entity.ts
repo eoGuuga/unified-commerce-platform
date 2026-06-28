@@ -112,6 +112,10 @@ export class Pedido {
   @Column({ length: 50, nullable: true })
   delivery_type?: string;
 
+  // Rastreio de liberação de reserva de estoque
+  @Column({ type: 'timestamptz', nullable: true })
+  stock_released_at: Date | null;
+
   @CreateDateColumn()
   created_at: Date;
 
