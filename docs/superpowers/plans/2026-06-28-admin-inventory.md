@@ -38,10 +38,12 @@
 - Test: `backend/src/modules/products/products.integration.spec.ts` (ou stock-engine.service.integration.spec.ts conforme o caso)
 
 **Frontend (T3-T5b):**
-- Create: `frontend/app/admin/layout.tsx`, `frontend/components/admin/shell/AdminShell.tsx`, `frontend/components/admin/shell/AdminNav.tsx`
+- Create: `frontend/app/admin/layout.tsx`, `frontend/components/admin/shell/AdminShell.tsx`, `frontend/components/admin/shell/AdminNav.tsx`, **`frontend/components/admin/shell/AdminDataProvider.tsx`** (provider único — segura UMA `useOrders` (T3) e UMA `useStock` (T5a); fonte única **de dado**, não só de função)
 - Create: `frontend/hooks/useProducts.ts`, `frontend/hooks/useStock.ts`, `frontend/lib/stock-status.ts`
 - Create: `frontend/components/admin/ProductsManager.tsx`, `frontend/components/admin/ProductForm.tsx`, `frontend/components/admin/StockManager.tsx`
-- Modify: `frontend/lib/api-client.ts` (adjustStock novo body; +getStockHistory; +getCategories), `frontend/lib/types.ts` (tipos novos), `frontend/app/admin/produtos/page.tsx`, `frontend/app/admin/estoque/page.tsx`, `frontend/app/admin/page.tsx` (Início hub)
+- Modify: `frontend/lib/api-client.ts` (adjustStock novo body; +getStockHistory; +getCategories), `frontend/lib/types.ts` (tipos novos), `frontend/app/admin/produtos/page.tsx`, `frontend/app/admin/estoque/page.tsx`, `frontend/app/admin/page.tsx` (Início hub), `frontend/components/admin/OrdersManager.tsx` (consome orders do provider; remove auth-gate interno e o `useOrders` próprio)
+
+> **Princípio do provider (a correção estrutural):** hooks hand-rolled (modelo `useOrders`) **não deduplicam** — N chamadas = N estados. Para o selo da aba, o número do Início e a tela operarem sobre o **mesmo** estado (e o optimistic de um ajuste propagar pros três + reverter junto), um único `AdminDataProvider` no `AdminShell` segura uma instância de cada hook e os consumidores leem via contexto. Colapsa as cópias, mata o double-fetch (Pedidos era buscado no shell **e** no OrdersManager) e torna o `lib/stock-status.ts` realmente fonte única — no dado.
 
 ---
 
@@ -393,22 +395,26 @@ git commit -m "feat(products): add stock-history (ledger extrato) and categories
 - Modify: `frontend/app/admin/produtos/page.tsx`, `frontend/app/admin/estoque/page.tsx`, `frontend/app/admin/pedidos/page.tsx`, `frontend/app/admin/page.tsx` (remover headers próprios; virar conteúdo)
 
 **Interfaces:**
-- Produces: `<AdminShell>` que embrulha as telas com auth-gate único + nav (sidebar desktop / bottom tabs mobile / avatar). Aceita `badges?: { pedidos?: number; estoque?: number }` (stubbed: undefined → oculto). A fiação real dos selos é feita na T5a (estoque) e deriva de getOrders (pedidos) — a casca só precisa renderizar sem quebrar com fonte vazia.
+- Produces: `AdminDataProvider` (contexto) segurando **uma** `useOrders()` (T5a estende com `useStock()`); expõe `{ pedidosCount, ... }`. `<AdminShell>` embrulha as telas em `<AdminDataProvider>` + auth-gate **único** + nav. `AdminNav` lê os selos do **contexto** (não via prop). Selo de Estoque stubbed (provider só ganha stock na T5a). `OrdersManager` passa a consumir orders do provider (sem `useOrders` próprio, sem auth-gate interno).
 
-- [ ] **Step 1: `AdminNav` — sidebar desktop + bottom tabs mobile + avatar**
+- [ ] **Step 1: `AdminDataProvider` — estado compartilhado (orders agora; stock na T5a)**
 
-Criar `frontend/components/admin/shell/AdminNav.tsx` (`'use client'`): 4 abas (Início `/admin`, Pedidos `/admin/pedidos`, Produtos `/admin/produtos`, Estoque `/admin/estoque`) com ícones `lucide-react` (Home, Receipt, Package, Boxes). Item ativo (via `usePathname`) destacado com `#b8654a`. Selo opcional por aba: se `badge && badge > 0`, mostra a contagem; senão nada (stub-safe). Avatar no canto (desktop: rodapé da sidebar; mobile: topo) com nome do usuário (de `useAuth`) + "Sair" (`logout`). Desktop: `<nav>` lateral fixa `w-[240px]`; mobile: `<nav>` fixa `bottom-0` com as 4 abas. Tokens `#f6f3ee`/`#1a1814`/`#b8654a`, `var(--font-display)` no logo.
+Criar `frontend/components/admin/shell/AdminDataProvider.tsx` (`'use client'`): um React context que chama **uma** `useOrders()` e expõe `{ orders, ordersLoading, ordersError, refetchOrders, updateOrderStatus, updatingOrderId, pedidosCount }`. `pedidosCount` = nº de pedidos em status novo/pendente (filtrar `orders` pelos status que contam pro selo — ex.: `pendente_pagamento`/`confirmado`; alinhar com o que o OrdersManager considera "novo"). Hook de consumo: `export function useAdminData()` (lança se fora do provider). (Na T5a, este provider ganha também `useStock()` e expõe `summary`/`attentionCount` — ver T5a step 4.)
 
-- [ ] **Step 2: `AdminShell` — moldura + auth-gate único**
+- [ ] **Step 2: `AdminNav` — sidebar desktop + bottom tabs mobile + avatar, selos do contexto**
 
-Criar `frontend/components/admin/shell/AdminShell.tsx` (`'use client'`): usa `useAuth()` (`isAuthenticated`, `isLoading`, `user`). Reusa o padrão de auth-gate do `OrdersManager` (verbatim):
+Criar `frontend/components/admin/shell/AdminNav.tsx` (`'use client'`): 4 abas (Início `/admin`, Pedidos `/admin/pedidos`, Produtos `/admin/produtos`, Estoque `/admin/estoque`) com ícones `lucide-react` (Home, Receipt, Package, Boxes). Item ativo via `usePathname`, destaque `#b8654a`. **Selos lidos de `useAdminData()`:** Pedidos = `pedidosCount`; Estoque = `attentionCount` (undefined até T5a → oculto). Mostra a contagem só se `> 0` (stub-safe). Avatar (desktop: rodapé da sidebar; mobile: topo) com `useAuth().user` + "Sair" (`logout`). Desktop: `<nav>` lateral `w-[240px]` fixa; mobile: `<nav>` fixa `bottom-0`. Tokens `#f6f3ee`/`#1a1814`/`#b8654a`, `var(--font-display)`.
+
+- [ ] **Step 3: `AdminShell` — provider + auth-gate único + moldura**
+
+Criar `frontend/components/admin/shell/AdminShell.tsx` (`'use client'`): usa `useAuth()`. Auth-gate **único** (verbatim do padrão de `OrdersManager`):
 ```typescript
   if (isLoading) return <CenteredMessage>Verificando seu acesso…</CenteredMessage>;
   if (!isAuthenticated) return (/* mensagem + <Link href="/login?redirect=/admin"> Entrar </Link> */);
 ```
-Embrulha `<AdminNav badges={badges} />` + `<main>{children}</main>` num grid responsivo (desktop: sidebar + conteúdo; mobile: conteúdo + bottom bar com `pb-[72px]` pra não cobrir). Recebe `children` e `badges`.
+Só DEPOIS do gate, embrulha em `<AdminDataProvider>` (assim o provider só busca dados quando autenticado): `<AdminDataProvider><AdminNav /><main>{children}</main></AdminDataProvider>` num grid responsivo (desktop: sidebar+conteúdo; mobile: conteúdo + `pb-[72px]`). Sem prop `badges` (o nav lê do contexto).
 
-- [ ] **Step 3: `layout.tsx` aplica a casca a `/admin/*`**
+- [ ] **Step 4: `layout.tsx` + refatorar OrdersManager + remover headers**
 
 Criar `frontend/app/admin/layout.tsx`:
 ```typescript
@@ -417,18 +423,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return <AdminShell>{children}</AdminShell>;
 }
 ```
-Remover os headers próprios das páginas `/admin/page.tsx`, `/admin/pedidos/page.tsx`, `/admin/estoque/page.tsx` — elas viram só o conteúdo (o `OrdersManager` em pedidos; hub em `/admin`; placeholder em estoque até T5). Manter `'use client'` onde já é.
+Remover os headers próprios de `/admin/page.tsx`, `/admin/pedidos/page.tsx`, `/admin/estoque/page.tsx` (a casca cuida). **Refatorar `OrdersManager.tsx`:** trocar `const {...} = useOrders()` por `const {...} = useAdminData()` (orders/updateOrderStatus do provider) e **remover o auth-gate interno** (`if (authLoading)`/`if (!isAuthenticated)`) — a casca já gateia; deixar os dois evita o flash duplo de "verificando acesso" que o spec pediu pra eliminar (gate único). Mantém o resto (busca/filtro/feedback).
 
-- [ ] **Step 4: Teste (vitest) da nav + auth-gate**
+- [ ] **Step 5: Teste (vitest) + commit**
 
-`frontend/components/admin/shell/AdminNav.test.tsx`: renderiza com `useAuth` mockado autenticado → mostra as 4 abas; selo oculto quando badge undefined/0, visível quando >0; item ativo destacado por pathname. `AdminShell.test.tsx`: não-autenticado → mostra "Entrar"; autenticado → renderiza children.
+`AdminNav.test.tsx`: autenticado → 4 abas; selo oculto quando count 0/undefined, visível >0; ativo por pathname. `AdminShell.test.tsx`: não-autenticado → "Entrar"; autenticado → renderiza children dentro do provider. `useAdminData` fora do provider → lança.
 Run: `npm test` (frontend) → PASS.
-
-- [ ] **Step 5: Commit**
-
 ```bash
-git add frontend/app/admin/layout.tsx frontend/components/admin/shell/ frontend/app/admin/
-git commit -m "feat(admin): responsive admin shell (sidebar/bottom-tabs/avatar) with single auth-gate, stubbed badges"
+git add frontend/app/admin/layout.tsx frontend/components/admin/shell/ frontend/app/admin/ frontend/components/admin/OrdersManager.tsx
+git commit -m "feat(admin): responsive shell with single auth-gate + shared AdminDataProvider (orders), OrdersManager consumes provider"
 ```
 
 ---
@@ -494,10 +497,14 @@ git commit -m "feat(admin): products screen (useProducts optimistic toggle, sing
 Criar `frontend/lib/stock-status.ts`:
 ```typescript
 export type StockStatus = 'ok' | 'low' | 'out';
-/** Fonte ÚNICA do status. available = current - reserved (nunca current puro). */
-export function stockStatus(available: number, minStock: number): StockStatus {
+/** Fonte ÚNICA do status. available = current - reserved (nunca current puro).
+ *  Blindagem: campo ausente/null NÃO pode cair silenciosamente em 'ok' (mascararia
+ *  um bug de chave errada do summary) — trata-se como 'out'. */
+export function stockStatus(available: number | null | undefined, minStock: number | null | undefined): StockStatus {
+  if (available == null || !Number.isFinite(available)) return 'out';
+  const min = (minStock == null || !Number.isFinite(minStock)) ? 0 : minStock;
   if (available <= 0) return 'out';
-  if (available <= minStock) return 'low';
+  if (available <= min) return 'low';
   return 'ok';
 }
 export function isAttention(s: StockStatus): boolean {
@@ -518,19 +525,25 @@ Em `api-client.ts`:
     return this.request(`/products/${productId}/stock-history`, { params: { limit: String(limit), offset: String(offset) } });
   }
 ```
-Criar `frontend/hooks/useStock.ts` (`'use client'`, modelado em `useOrders`): `getStockSummary` → `summary`; deriva `attentionCount` somando `isAttention(stockStatus(p.available_stock, p.min_stock))` sobre `summary.products` (fonte única); `history(id)` chama `api.getStockHistory`. Retorna `{ summary, loading, error, refetch, history, attentionCount }`.
+**Chaves exatas (confirmadas no retorno de `getStockSummary`):** cada `summary.products[i]` tem `{ id, name, current_stock, reserved_stock, available_stock, min_stock, status }`. Usar **exatamente** `available_stock` e `min_stock` (não `minimo`/`min`). Conferir que `frontend/lib/types.ts` (`StockSummary`) declara essas chaves; se divergir do backend, corrigir o tipo.
+Criar `frontend/hooks/useStock.ts` (`'use client'`, modelado em `useOrders`): `getStockSummary` → `summary`; deriva `attentionCount` somando `isAttention(stockStatus(p.available_stock, p.min_stock))` sobre `summary.products` (via a função única); `history(id)` chama `api.getStockHistory`. Retorna `{ summary, loading, error, refetch, history, attentionCount }`.
 
-- [ ] **Step 3: `StockManager` (lista + badges + filtro + extrato drawer)**
+- [ ] **Step 3: Estender o `AdminDataProvider` com `useStock` (UMA instância — a fonte única de DADO)**
 
-Criar `frontend/components/admin/StockManager.tsx` (`'use client'`): usa `useStock()`. Lista cada produto com atual/reservado/mínimo + **badge** via `STATUS_META[stockStatus(available, min)]`. Filtro "Precisam de atenção" (só `isAttention`). Tocar num produto abre drawer com o extrato (`history(id)`): linhas "tipo · delta · data → saldo". Estados loading/erro/vazio (padrão OrdersManager). (Mutações — ajuste/min — entram na T5b; aqui é read-only.)
+Em `AdminDataProvider.tsx` (criado na T3 com orders), **adicionar** uma chamada a `useStock()` e expor no contexto: `summary`, `stockLoading`, `stockError`, `refetchStock`, `attentionCount`, `history`, e (T5b) `adjustStock`/`setMin`. Agora o provider segura **uma** instância de cada hook; todos os consumidores (selo, Início, StockManager) leem o **mesmo** estado — o optimistic de um ajuste (T5b) re-renderiza os três e reverte junto. (Este é o coração da correção: fonte única no dado, não só na função.)
 
-- [ ] **Step 4: FIAR os selos na fonte única (a parte que orfana se esquecer)**
+- [ ] **Step 4: Consumidores leem do provider (selo, Início, tela) — sem nova instância**
 
-`frontend/app/admin/estoque/page.tsx`: `'use client'` → `<StockManager />`. **Fiação explícita:** a casca precisa do `attentionCount` para o selo da aba Estoque e o Início para o número de reposição. Como `AdminShell` é layout (server-ish wrapper), criar um pequeno provider/cliente: `useStock().attentionCount` exposto via um contexto leve `StockBadgeContext` (ou: o `AdminShell` consome `useStock` diretamente para o selo de Estoque — aceitável, custa um `getStockSummary` no mount). **Decisão:** `AdminShell` chama `useStock()` e passa `badges={{ estoque: attentionCount, pedidos: <de getOrders> }}` ao `AdminNav`. No `app/admin/page.tsx` (Início hub), mostrar "X produtos precisam de reposição" lendo o mesmo `useStock().attentionCount`. **Não recalcular** status em nenhum desses lugares — sempre via `stock-status.ts`.
+- `AdminNav` (T3): o selo de Estoque agora resolve (`attentionCount` do `useAdminData()`).
+- `frontend/app/admin/page.tsx` (Início hub): `'use client'` → mostra "X produtos precisam de reposição" lendo `useAdminData().attentionCount` (mesmo estado) + "Y pedidos novos" de `pedidosCount`. **Não** chamar `useStock()`/`useOrders()` aqui.
+- `frontend/components/admin/StockManager.tsx` (`'use client'`): consome `useAdminData()` (`summary`, `stockLoading`, `stockError`, `refetchStock`, `history`) — **não** chama `useStock()` direto. Lista cada produto com atual/reservado/mínimo + **badge** via `STATUS_META[stockStatus(p.available_stock, p.min_stock)]`. Filtro "Precisam de atenção" (só `isAttention`). Tocar abre drawer com o extrato (`history(id)`): "tipo · delta · data → saldo". Estados loading/erro/vazio (padrão OrdersManager). (Mutações entram na T5b.)
+- `frontend/app/admin/estoque/page.tsx`: `'use client'` → `<StockManager />`.
+
+> **Por que não três `useStock()`:** hooks hand-rolled não deduplicam — seriam três fetches e três cópias; o ajuste otimista (T5b) mexeria só na cópia do StockManager e o selo/Início ficariam stale até remount. O provider colapsa as três numa.
 
 - [ ] **Step 5: Testes**
 
-Vitest: `stockStatus` mapeia OK/Baixo/Esgotado corretamente nas bordas (`available=min` → low; `available=0` → out; `available=min+1` → ok); `useStock.attentionCount` conta low+out; `StockManager` filtro "atenção" esconde os OK; extrato renderiza as linhas do history.
+Vitest: `stockStatus` mapeia OK/Baixo/Esgotado nas bordas (`available=min` → low; `available=0` → out; `available=min+1` → ok); **`stockStatus(undefined, undefined)` → `'out'`** (blindagem — não cair em `ok` se a chave do summary vier errada); `attentionCount` (no provider) conta low+out; `StockManager` filtro "atenção" esconde os OK; extrato renderiza as linhas do history.
 Run: `npm test` (frontend) → PASS.
 
 - [ ] **Step 6: Commit**
@@ -572,14 +585,14 @@ Em `api-client.ts`, trocar o corpo do `adjustStock`:
 ```
 > **Preferir reusar o `request<T>` privado**, mas estendê-lo para preservar `body.code` no erro (hoje o `request` joga `new Error(errorBody.message)` e descarta o `code`). Ajustar `request` para anexar `(err as any).code = errorBody.code` antes do throw — assim TODO erro tipado (incl. 422 INSUFFICIENT_STOCK) chega aos hooks. Fazer essa pequena mudança no `request` e manter `adjustStock` usando-o.
 
-- [ ] **Step 2: `useStock` — adjust + setMinStock com optimistic fiel**
+- [ ] **Step 2: `useStock` — adjust + setMinStock com optimistic fiel (no estado compartilhado do provider)**
 
-Em `useStock.ts`, adicionar `adjust(productId, tipo, delta, motivo)` e `setMin(productId, min)`:
-- **Optimistic:** atualiza localmente o produto no `summary` — `current_stock += delta` (no adjust) ou `min_stock = min` (no setMin) — e **recomputa o badge pela mesma `stockStatus(newCurrent - reserved, min)`** (reserved inalterado). Dispara a request; no erro **reverte** o `summary` e retorna `{ok:false, error, code}`. Se `code==='INSUFFICIENT_STOCK'`, o componente mostra "Estoque insuficiente para esta saída".
+Em `useStock.ts` (a instância única vive no `AdminDataProvider`), adicionar `adjust(productId, tipo, delta, motivo)` e `setMin(productId, min)`, e expô-las pelo contexto (`useAdminData()`):
+- **Optimistic:** atualiza o produto no `summary` (estado do provider) — `current_stock += delta` (adjust) ou `min_stock = min` (setMin) — e **recomputa `available_stock = current_stock - reserved_stock`** (reserved **inalterado**) + o badge pela mesma `stockStatus(available, min)`. Como o estado é do provider, o re-render propaga **de graça** pro selo da aba e pro número do Início (a correção estrutural em ação). Dispara a request; no erro **reverte** o `summary` e retorna `{ok:false, error, code}`. Se `code==='INSUFFICIENT_STOCK'`, o componente mostra "Estoque insuficiente para esta saída".
 
 - [ ] **Step 3: Modal de ajuste (modo-contagem para Correção) + edição de mínimo**
 
-Em `StockManager.tsx`, adicionar um modal de ajuste por produto:
+Em `StockManager.tsx` (consumindo `adjust`/`setMin` de `useAdminData()`), adicionar um modal de ajuste por produto:
 - Tipo (rótulo→enum): Compra→COMPRA, Perda→PERDA, Devolução→DEVOLUCAO, **Correção→AJUSTE**.
 - **Compra/Perda/Devolução:** campo "quantidade" (positiva); a UI aplica o sinal (Perda = `-qtd`).
 - **Correção:** campo "**valor contado**" (o estoque real na prateleira); a UI calcula `delta = contado - current_stock` antes de enviar. Mostrar o delta calculado ("ajuste: −3") pra confirmação.
@@ -608,6 +621,17 @@ git commit -m "feat(admin): stock mutations (count-mode correction, optimistic w
 - A4 (estoque inicial INVENTARIO_INICIAL, sem 2×) → T1 step 6. ✔
 - Casca responsiva + auth-gate + selos stubbed → T3. ✔
 - Produtos (form único, combobox case-insensitive, SKU interno, optimistic) → T4. ✔
-- Estoque badges (available, fonte única) + extrato + filtro → T5a. ✔ Fiação dos selos/Início → T5a step 4 (explícita, não orfana). ✔
-- Estoque mutações (modo-contagem, optimistic fiel, 422 tipado) → T5b. ✔
-- **Verify pendente na execução:** confirmar que `request<T>` do api-client preserva `body.code` (T5b step 1); confirmar a ordem `@Get('categories')` antes de `@Get(':id')` (T2 step 3); confirmar se `StockEngineService` já está injetado em `ProductsService` (T1 step 5) — se não, injetar.
+- Estoque badges (available, **fonte única no DADO** via `AdminDataProvider`) + extrato + filtro → T5a. ✔ Selo/Início/tela leem o mesmo estado do provider — o optimistic do ajuste (T5b) propaga e reverte junto; sem stale-até-remount. ✔
+- Estoque mutações (modo-contagem, optimistic fiel no estado compartilhado, 422 tipado) → T5b. ✔
+
+**Verifies resolvidos (registro):**
+- Migration no banco de teste: NÃO há DB de dev separado — `backend/.env` aponta pro `ucm_test_motor` e o `migration:run` (via `data-source.ts`) e os testes leem o **mesmo** `.env`. O `migration:run` da T1 aplica no próprio `ucm_test_motor` antes dos specs. ✔
+- Chaves do summary pinadas: `available_stock`/`min_stock` (confirmado no retorno verbatim); `stockStatus` blindado contra null/undefined (cai em `out`). ✔
+- Selo-stale + double-fetch de Pedidos: resolvidos pelo provider único (uma `useOrders` + uma `useStock`); o prop `badges` vestigial foi **removido** (nav lê do contexto). ✔
+- Auth-gate único: o interno do `OrdersManager` é removido na T3 step 4 (a casca gateia) — sem flash duplo. ✔
+
+**Verifies pendentes na execução (baratos, anotados nos steps):**
+- `request<T>` do api-client deve **preservar `body.code`** no erro (T5b step 1) — mudança cross-cutting: confirmar que nenhum teste existente assere o **shape exato** do `Error` lançado.
+- Ordem de rota: `@Get('categories')` **antes** de `@Get(':id')` (T2 step 3).
+- `StockEngineService` injetado em `ProductsService` (T1 steps 5-6) — se não, injetar (ProductsModule já provê).
+- **Decisão v1 registrada:** a lista de Produtos (T4) **omite** o estoque atual se `getProducts` não o traz (o estoque é a tela de Estoque); não é regressão, é corte de v1.
