@@ -123,9 +123,10 @@ describe('StockEngineService (integration)', () => {
     if (!dataSource) return;
     const pid = await seedProduto(10, 4);
     const orderId = (await dataSource.query(`SELECT uuid_generate_v4() AS id`))[0].id;
-    await dataSource.transaction((m) =>
-      engine.commitSale(m, tenantId, orderId, [{ produto_id: pid, quantity: 4 }]),
-    );
+    await dataSource.transaction(async (m: EntityManager) => {
+      await m.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      return engine.commitSale(m, tenantId, orderId, [{ produto_id: pid, quantity: 4 }]);
+    });
     expect(await saldo(pid)).toEqual({ current: 6, reserved: 0 });
 
     const ledger = await dataSource.query(
@@ -144,8 +145,14 @@ describe('StockEngineService (integration)', () => {
     const pid = await seedProduto(10, 4);
     const orderId = (await dataSource.query(`SELECT uuid_generate_v4() AS id`))[0].id;
     const items = [{ produto_id: pid, quantity: 4 }];
-    await dataSource.transaction((m) => engine.commitSale(m, tenantId, orderId, items));
-    await dataSource.transaction((m) => engine.commitSale(m, tenantId, orderId, items));
+    await dataSource.transaction(async (m: EntityManager) => {
+      await m.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      return engine.commitSale(m, tenantId, orderId, items);
+    });
+    await dataSource.transaction(async (m: EntityManager) => {
+      await m.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      return engine.commitSale(m, tenantId, orderId, items);
+    });
     expect(await saldo(pid)).toEqual({ current: 6, reserved: 0 });
     const count = await dataSource.query(
       `SELECT COUNT(*)::int AS n FROM movimentacoes_estoque_historico
@@ -158,9 +165,10 @@ describe('StockEngineService (integration)', () => {
   it('recordManualMovement grava ledger e ajusta saldo', async () => {
     if (!dataSource) return;
     const pid = await seedProduto(5);
-    const res = await dataSource.transaction((m) =>
-      engine.recordManualMovement(m, tenantId, pid, 'COMPRA' as any, 7, 'reposição', null),
-    );
+    const res = await dataSource.transaction(async (m: EntityManager) => {
+      await m.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      return engine.recordManualMovement(m, tenantId, pid, 'COMPRA' as any, 7, 'reposição', null);
+    });
     expect(res.saldo_resultante).toBe(12);
     expect((await saldo(pid)).current).toBe(12);
   });

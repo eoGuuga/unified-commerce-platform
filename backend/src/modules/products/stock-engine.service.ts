@@ -76,15 +76,12 @@ export class StockEngineService {
     orderId: string,
     items: Array<{ produto_id: string; quantity: number }>,
   ): Promise<void> {
-    // Garante que o contexto de tenant esteja definido para esta transação (RLS).
-    await manager.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
-
     for (const item of items) {
       this.assertQty(item.quantity);
 
       // Gate de idempotência: tenta inserir o registro de VENDA primeiro.
       // ON CONFLICT no índice parcial (order_id, produto_id) WHERE tipo='VENDA'.
-      // Nota: EntityManager.query() para INSERT RETURNING retorna [rows[], affectedCount].
+      // pg driver retorna array plano de linhas para manager.query(); unwrap defensivo como guarda de compatibilidade.
       const rawInsert = await manager.query(
         `INSERT INTO movimentacoes_estoque_historico
            (id, tenant_id, produto_id, tipo, delta, saldo_resultante, order_id, created_at)
@@ -93,7 +90,7 @@ export class StockEngineService {
          RETURNING id`,
         [tenantId, item.produto_id, -item.quantity, orderId],
       );
-      // rawInsert pode ser [[rows...], count] ou [rows...] dependendo do driver.
+      // pg driver retorna array plano de linhas para manager.query(); unwrap defensivo como guarda de compatibilidade.
       const insertedRows: Array<{ id: string }> = Array.isArray(rawInsert[0])
         ? rawInsert[0]
         : rawInsert;
@@ -103,7 +100,7 @@ export class StockEngineService {
       const ledgerId = insertedRows[0].id;
 
       // Baixa guardada; RETURNING dá o saldo pós-update (sem ler memória).
-      // Nota: EntityManager.query() para UPDATE RETURNING retorna [rows[], affectedCount].
+      // pg driver retorna array plano de linhas para manager.query(); unwrap defensivo como guarda de compatibilidade.
       const rawUpdate = await manager.query(
         `UPDATE movimentacoes_estoque
          SET current_stock = current_stock - $3,
@@ -113,7 +110,7 @@ export class StockEngineService {
          RETURNING current_stock`,
         [tenantId, item.produto_id, item.quantity],
       );
-      // rawUpdate pode ser [[rows...], count] ou [rows...] dependendo do driver.
+      // pg driver retorna array plano de linhas para manager.query(); unwrap defensivo como guarda de compatibilidade.
       const updatedRows: Array<{ current_stock: number }> = Array.isArray(rawUpdate[0])
         ? rawUpdate[0]
         : rawUpdate;
@@ -147,9 +144,7 @@ export class StockEngineService {
     if (!Number.isInteger(delta) || delta === 0) {
       throw new BadRequestException('Delta inválido para movimento manual.');
     }
-    // Garante que o contexto de tenant esteja definido para esta transação (RLS).
-    await manager.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
-    // Nota: EntityManager.query() para UPDATE RETURNING retorna [rows[], affectedCount].
+    // pg driver retorna array plano de linhas para manager.query(); unwrap defensivo como guarda de compatibilidade.
     const rawUpdate = await manager.query(
       `UPDATE movimentacoes_estoque
        SET current_stock = current_stock + $3, last_updated = now()
@@ -157,7 +152,7 @@ export class StockEngineService {
        RETURNING current_stock`,
       [tenantId, produtoId, delta],
     );
-    // rawUpdate pode ser [[rows...], count] ou [rows...] dependendo do driver.
+    // pg driver retorna array plano de linhas para manager.query(); unwrap defensivo como guarda de compatibilidade.
     const updatedRows: Array<{ current_stock: number }> = Array.isArray(rawUpdate[0])
       ? rawUpdate[0]
       : rawUpdate;
