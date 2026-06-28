@@ -24,6 +24,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import * as QRCode from 'qrcode';
 import { DbContextService } from '../common/services/db-context.service';
 import { MercadoPagoProvider, MercadoPagoPaymentDetails } from './providers/mercadopago.provider';
+import { OrdersService } from '../orders/orders.service';
 
 export interface CreatePaymentDto {
   pedido_id: string;
@@ -63,6 +64,9 @@ export class PaymentsService {
     private readonly mercadoPagoProvider: MercadoPagoProvider,
     @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
+    // Task 8: reutiliza o cancel+release idempotente do Motor de Estoque
+    @Inject(forwardRef(() => OrdersService))
+    private readonly ordersService: OrdersService,
   ) {}
 
   /**
@@ -727,7 +731,13 @@ export class PaymentsService {
     if (normalized === 'authorized' || normalized === 'in_process') return PagamentoStatus.PROCESSING;
     if (normalized === 'pending' || normalized === 'in_mediation') return PagamentoStatus.PENDING;
     if (normalized === 'refunded') return PagamentoStatus.REFUNDED;
-    if (normalized === 'rejected' || normalized === 'cancelled' || normalized === 'charged_back') {
+    // Task 8: 'expired' adicionado ao grupo de falha — PIX vencido = FAILED
+    if (
+      normalized === 'rejected' ||
+      normalized === 'cancelled' ||
+      normalized === 'expired' ||
+      normalized === 'charged_back'
+    ) {
       return PagamentoStatus.FAILED;
     }
     return PagamentoStatus.PENDING;
@@ -869,6 +879,36 @@ export class PaymentsService {
 
         if (mappedStatus === PagamentoStatus.PAID) {
           await this.confirmPayment(pagamento.id, tenantId);
+          return { status: 'ok' };
+        }
+
+        // Task 8: PIX expirado/cancelado → cancela o pedido e libera a reserva
+        // de estoque de forma idempotente (mesmo metodo do sweeper TTL).
+        // A chamada ocorre FORA de qualquer transacao de estoque — o proprio
+        // releaseExpiredPendingOrder gerencia sua propria transacao com
+        // compare-and-set (stock_released_at IS NULL), garantindo que
+        // webhook e sweeper nunca liberem em dobro.
+        if (mappedStatus === PagamentoStatus.FAILED) {
+          pagamento.status = mappedStatus;
+          pagamento.metadata = {
+            ...pagamento.metadata,
+            ...providerMeta,
+          };
+          await this.db.getRepository(Pagamento).save(pagamento);
+
+          try {
+            await this.ordersService.releaseExpiredPendingOrder(pagamento.pedido_id);
+            this.logger.log(
+              `Webhook MP: reserva liberada para pedido ${pagamento.pedido_id} (status: ${details.status})`,
+            );
+          } catch (releaseErr) {
+            // Log mas nao propaga: o pedido pode ja ter sido cancelado por outro caminho
+            this.logger.warn('Webhook MP: erro ao liberar reserva do pedido (pode ja ter sido liberada)', {
+              pedidoId: pagamento.pedido_id,
+              error: releaseErr instanceof Error ? releaseErr.message : String(releaseErr),
+            });
+          }
+
           return { status: 'ok' };
         }
 

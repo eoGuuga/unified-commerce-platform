@@ -6,11 +6,14 @@ import { PaymentsController } from './payments.controller';
 import { Pagamento } from '../../database/entities/Pagamento.entity';
 import { Pedido } from '../../database/entities/Pedido.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { OrdersModule } from '../orders/orders.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Pagamento, Pedido]),
     forwardRef(() => NotificationsModule),
+    // Task 8: importa OrdersModule para reusar releaseExpiredPendingOrder no webhook
+    forwardRef(() => OrdersModule),
   ],
   providers: [PaymentsService, MercadoPagoProvider],
   controllers: [PaymentsController],
