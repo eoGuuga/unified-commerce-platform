@@ -83,6 +83,12 @@ services:
       WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-evolution}
       WHATSAPP_CONVERSATION_TTL_HOURS: ${WHATSAPP_CONVERSATION_TTL_HOURS:-12}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
+      # Pagamento (sem isto o backend cai em modo 'mock' e nao cobra de verdade).
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN:-}
+      MERCADOPAGO_WEBHOOK_TOKEN: ${MERCADOPAGO_WEBHOOK_TOKEN:-}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-}
+      PIX_KEY: ${PIX_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
