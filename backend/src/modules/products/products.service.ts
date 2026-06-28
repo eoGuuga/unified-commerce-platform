@@ -334,6 +334,9 @@ export class ProductsService {
     const produto = await this.findOne(id, tenantId);
     const oldData = { ...produto };
 
+    // SKU é imutável pós-criação: ignorar qualquer tentativa de alteração via API.
+    delete (updateProductDto as any).sku;
+
     Object.assign(produto, updateProductDto);
 
     const savedProduto = await this.db.getRepository(Produto).save(produto);
@@ -363,7 +366,7 @@ export class ProductsService {
       this.logger.error('Erro ao registrar audit log', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
-        context: { tenantId, userId, produtoId: savedProduto.id, action: 'CREATE' },
+        context: { tenantId, userId, produtoId: savedProduto.id, action: 'UPDATE' },
       });
     }
 
