@@ -762,6 +762,55 @@ export class OrdersService {
     }
   }
 
+  /**
+   * Cancela e libera reserva de um pedido pendente vencido, de forma idempotente.
+   * Usado pelo StockSweeperService (Task 7) como rede de segurança do TTL.
+   *
+   * Compare-and-set atômico: apenas o ator que faz o flip
+   * status→'cancelado' + stock_released_at=now() de fato libera o estoque.
+   * Chamadas subsequentes encontram stock_released_at preenchido e retornam sem-op.
+   */
+  async releaseExpiredPendingOrder(orderId: string): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      // Flip atômico: só afeta linha com status='pendente_pagamento' e sem liberação anterior
+      const rawUpdate = await manager.query(
+        `UPDATE pedidos
+            SET status = 'cancelado', stock_released_at = now()
+          WHERE id = $1
+            AND status = 'pendente_pagamento'
+            AND stock_released_at IS NULL
+          RETURNING id, tenant_id`,
+        [orderId],
+      );
+
+      // TypeORM+pg retorna [[rows], rowCount] em manager.query() com RETURNING
+      const rows: Array<{ id: string; tenant_id: string }> = Array.isArray(rawUpdate[0])
+        ? rawUpdate[0]
+        : rawUpdate;
+
+      if (!rows || rows.length === 0) {
+        // Outro ator já tratou — no-op
+        return;
+      }
+
+      const tenantId = rows[0].tenant_id;
+
+      // Configura RLS tenant-local para acessar movimentacoes_estoque
+      await manager.query(
+        `SELECT set_config('app.current_tenant_id', $1, true)`,
+        [tenantId],
+      );
+
+      // Carregar itens do pedido e liberar cada reserva
+      const itens = await manager.find(ItemPedido, { where: { pedido_id: orderId } });
+      for (const it of itens) {
+        await this.stockEngine.release(manager, tenantId, it.produto_id, it.quantity);
+      }
+
+      this.logger.log(`Pedido ${orderId} cancelado por TTL — ${itens.length} reserva(s) liberada(s)`);
+    });
+  }
+
   async getSalesReport(tenantId: string): Promise<any> {
     const orders = await this.db.getRepository(Pedido).find({
       where: { tenant_id: tenantId },

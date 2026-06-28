@@ -5,6 +5,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { databaseConfig } from './config/database.config';
 import { ProductsModule } from './modules/products/products.module';
 import { OrdersModule } from './modules/orders/orders.module';
@@ -16,6 +17,7 @@ import { HealthModule } from './modules/health/health.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { LgpdModule } from './modules/lgpd/lgpd.module';
+import { StockSchedulerModule } from './modules/products/stock-scheduler.module';
 import { TenantDbContextInterceptor } from './common/interceptors/tenant-db-context.interceptor';
 import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
 
@@ -45,6 +47,8 @@ import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
       },
     ]),
     TypeOrmModule.forRootAsync(databaseConfig),
+    ScheduleModule.forRoot(),
+    StockSchedulerModule,
     ProductsModule,
     OrdersModule,
     AuthModule,
