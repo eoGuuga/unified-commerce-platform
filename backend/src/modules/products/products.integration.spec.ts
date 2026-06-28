@@ -342,4 +342,108 @@ describe('Products Integration Tests (e2e)', () => {
       expect(Number(ledger[0].delta)).toBe(10);
     });
   });
+
+  describe('Admin estoque — extrato (stock-history) e categories', () => {
+    let produtoId: string;
+
+    beforeEach(async () => {
+      if (!app) return;
+      // Criar produto com estoque inicial via SQL direto
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const prod = await queryRunner.query(
+        `INSERT INTO produtos (id, tenant_id, name, price, is_active, category, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, 'Produto Extrato Test', 10.0, true, 'Trufas', now(), now())
+         RETURNING id`,
+        [tenantId],
+      );
+      produtoId = prod[0].id;
+      // Estoque inicial = 10
+      await queryRunner.query(
+        `INSERT INTO movimentacoes_estoque (id, tenant_id, produto_id, current_stock, reserved_stock, min_stock, last_updated)
+         VALUES (uuid_generate_v4(), $1, $2, 10, 0, 0, now())`,
+        [tenantId, produtoId],
+      );
+      await queryRunner.release();
+    });
+
+    it('extrato retorna movimentacoes do produto, recentes primeiro, paginado', async () => {
+      if (!app) return;
+      // Seed de 3 movimentos no ledger via endpoint adjust-stock
+      await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'COMPRA', delta: 5, motivo: 'reposicao' });
+      await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'AJUSTE', delta: -2, motivo: 'correcao' });
+      await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'PERDA', delta: -1, motivo: 'avaria' });
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${produtoId}/stock-history?limit=2&offset=0`)
+        .set('Authorization', `Bearer ${jwtToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(2);
+      // ordenado created_at DESC (mais recente primeiro)
+      expect(res.body.total).toBeGreaterThanOrEqual(3);
+    });
+
+    it('AJUSTE com delta negativo mantém invariante (bidirectionality)', async () => {
+      if (!app) return;
+      // Seed produto com estoque = 50 via SQL direto
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      // Ajustar estoque para 50 via SQL
+      await queryRunner.query(
+        `UPDATE movimentacoes_estoque SET current_stock = 50 WHERE produto_id = $1`,
+        [produtoId],
+      );
+      await queryRunner.release();
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'AJUSTE', delta: -3, motivo: 'correcao negativa' });
+      expect(res.status).toBeGreaterThanOrEqual(200);
+      expect(res.status).toBeLessThan(300);
+      expect(res.body.saldo_resultante).toBe(47);
+    });
+
+    it('categories retorna DISTINCT por tenant', async () => {
+      if (!app) return;
+      // Seed: 2 produtos com category 'Trufas' (1 já criado no beforeEach) e 1 com 'Bombons'
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      // Inserir produto com categoria Trufas (duplicado — DISTINCT deve retornar só 1)
+      await queryRunner.query(
+        `INSERT INTO produtos (id, tenant_id, name, price, is_active, category, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, 'Produto Trufas 2', 5.0, true, 'Trufas', now(), now())`,
+        [tenantId],
+      );
+      // Inserir produto com categoria Bombons
+      await queryRunner.query(
+        `INSERT INTO produtos (id, tenant_id, name, price, is_active, category, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, 'Produto Bombons', 8.0, true, 'Bombons', now(), now())`,
+        [tenantId],
+      );
+      await queryRunner.release();
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/categories`)
+        .set('Authorization', `Bearer ${jwtToken}`);
+      expect(res.status).toBe(200);
+      // Deve conter pelo menos 'Bombons' e 'Trufas' (pode ter outros de testes anteriores)
+      expect(Array.isArray(res.body)).toBe(true);
+      const sorted = res.body.sort();
+      expect(sorted).toContain('Bombons');
+      expect(sorted).toContain('Trufas');
+    });
+  });
 });

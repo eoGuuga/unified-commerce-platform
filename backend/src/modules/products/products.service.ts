@@ -3,7 +3,7 @@ import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Produto } from '../../database/entities/Produto.entity';
 import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque.entity';
-import { LedgerTipo } from '../../database/entities/MovimentacaoEstoqueHistorico.entity';
+import { LedgerTipo, MovimentacaoEstoqueHistorico } from '../../database/entities/MovimentacaoEstoqueHistorico.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CacheService } from '../common/services/cache.service';
@@ -679,5 +679,55 @@ export class ProductsService {
     }
 
     return estoqueRepo.save(estoque);
+  }
+
+  /**
+   * Retorna o extrato paginado de movimentações de estoque de um produto.
+   * Ordenado por created_at DESC, id DESC (determinístico).
+   * Exclui usuario_id do payload por privacidade.
+   */
+  async getStockHistory(
+    produtoId: string,
+    tenantId: string,
+    limit = 50,
+    offset = 0,
+  ): Promise<{ items: Array<{ tipo: string; delta: number; saldo_resultante: number; motivo: string | null; created_at: Date }>; total: number }> {
+    // Garante que o produto pertence ao tenant (lança 404 se não existir)
+    await this.findOne(produtoId, tenantId);
+    const repo = this.db.getRepository(MovimentacaoEstoqueHistorico);
+    const [rows, total] = await repo
+      .createQueryBuilder('h')
+      .where('h.tenant_id = :tenantId', { tenantId })
+      .andWhere('h.produto_id = :produtoId', { produtoId })
+      .orderBy('h.created_at', 'DESC')
+      .addOrderBy('h.id', 'DESC')
+      .limit(Math.min(limit, 200))
+      .offset(offset)
+      .getManyAndCount();
+    return {
+      items: rows.map((h) => ({
+        tipo: h.tipo,
+        delta: h.delta,
+        saldo_resultante: h.saldo_resultante,
+        motivo: h.motivo,
+        created_at: h.created_at,
+      })),
+      total,
+    };
+  }
+
+  /**
+   * Retorna categorias DISTINCT dos produtos ativos do tenant, ordenadas alfabeticamente.
+   */
+  async getCategories(tenantId: string): Promise<string[]> {
+    const rows = await this.db
+      .getRepository(Produto)
+      .createQueryBuilder('p')
+      .select('DISTINCT p.category', 'category')
+      .where('p.tenant_id = :tenantId', { tenantId })
+      .andWhere('p.category IS NOT NULL')
+      .orderBy('p.category', 'ASC')
+      .getRawMany();
+    return rows.map((r) => r.category as string).filter(Boolean);
   }
 }

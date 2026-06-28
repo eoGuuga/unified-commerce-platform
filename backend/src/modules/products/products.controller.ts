@@ -69,11 +69,39 @@ export class ProductsController {
     return this.productsService.getStockSummary(tenantId);
   }
 
+  @Get('categories')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Retorna categorias DISTINCT dos produtos do tenant' })
+  @ApiResponse({ status: 200, description: 'Lista de categorias' })
+  getCategories(@CurrentTenant() tenantId: string) {
+    return this.productsService.getCategories(tenantId);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Buscar produto por ID' })
   findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     return this.productsService.findOne(id, tenantId);
+  }
+
+  @Get(':id/stock-history')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Extrato paginado de movimentações de estoque do produto' })
+  @ApiResponse({ status: 200, description: 'Extrato retornado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Produto não encontrado' })
+  getStockHistory(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.productsService.getStockHistory(
+      id,
+      tenantId,
+      Number(limit) || 50,
+      Number(offset) || 0,
+    );
   }
 
   @Post()
