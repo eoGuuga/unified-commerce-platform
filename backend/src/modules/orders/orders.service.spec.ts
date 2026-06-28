@@ -14,6 +14,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { DbContextService } from '../common/services/db-context.service';
 import { CouponsService } from '../coupons/coupons.service';
 import { CacheService } from '../common/services/cache.service';
+import { StockEngineService } from '../products/stock-engine.service';
 
 describe('OrdersService', () => {
   let service: OrdersService;
@@ -100,6 +101,14 @@ describe('OrdersService', () => {
     computeDiscount: jest.fn().mockReturnValue(0),
   };
 
+  // Mock do StockEngineService (Task 4 — Motor de Estoque).
+  // Por padrão resolve sem erro (reserva bem-sucedida).
+  const mockStockEngineService = {
+    reserve: jest.fn().mockResolvedValue(undefined),
+    release: jest.fn().mockResolvedValue(undefined),
+    commitSale: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -143,6 +152,10 @@ describe('OrdersService', () => {
         {
           provide: CacheService,
           useValue: mockCacheService,
+        },
+        {
+          provide: StockEngineService,
+          useValue: mockStockEngineService,
         },
       ],
     }).compile();
@@ -381,13 +394,14 @@ describe('OrdersService', () => {
       await expect(createPromise).rejects.toThrow('Estoque insuficiente');
     });
 
-    it('deve permitir fechar pedido consumindo a reserva do proprio PDV', async () => {
-      // Arrange
-      const estoquesComReserva: Partial<MovimentacaoEstoque>[] = [
+    it('deve rejeitar pedido quando estoque disponivel (current - reserved) for insuficiente', async () => {
+      // Task 4: a validação do passo 4 agora usa current_stock - reserved_stock.
+      // Se current=5 e reserved=6, disponivel=-1 < qty=5 → BadRequestException.
+      const estoquesComReservaExcedente: Partial<MovimentacaoEstoque>[] = [
         {
           ...mockEstoques[0],
           current_stock: 5,
-          reserved_stock: 6, // Estoque disponível = 10 - 6 = 4, mas precisa de 5
+          reserved_stock: 6, // Disponível = 5 - 6 = -1 < qty=5
         },
         mockEstoques[1],
       ] as MovimentacaoEstoque[];
@@ -396,7 +410,7 @@ describe('OrdersService', () => {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         setLock: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue(estoquesComReserva),
+        getMany: jest.fn().mockResolvedValue(estoquesComReservaExcedente),
       };
 
       const produtosQueryBuilder = {
@@ -405,39 +419,24 @@ describe('OrdersService', () => {
         getMany: jest.fn().mockResolvedValue(mockProdutos),
       };
 
-      const updateQueryBuilder = {
-        update: jest.fn().mockReturnThis(),
-        set: jest.fn().mockReturnThis(),
-        setParameters: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({ affected: 1 }),
-      };
-
       mockManager.createQueryBuilder = jest.fn((entity) => {
         if (entity === MovimentacaoEstoque) return estoqueQueryBuilder as any;
         if (entity === Produto) return produtosQueryBuilder as any;
-        return updateQueryBuilder as any;
+        return { update: jest.fn().mockReturnThis(), set: jest.fn().mockReturnThis() } as any;
       });
 
-      // ✅ OrdersService agora usa db.runInTransaction
       mockDbContextService.runInTransaction = jest.fn(async (callback) => {
         return callback(mockManager);
       });
 
-      jest.spyOn(service as any, 'generateOrderNumber').mockResolvedValue('PED-20260107-001');
-
-      // Act
-      const result = await service.create(createOrderDto, tenantId);
-
-      // Assert
-      expect(result).toBeDefined();
-      expect(result.status).toBe(PedidoStatus.PENDENTE_PAGAMENTO);
-      expect(updateQueryBuilder.setParameters).toHaveBeenCalled();
+      // Act & Assert
+      await expect(service.create(createOrderDto, tenantId)).rejects.toThrow(BadRequestException);
+      await expect(service.create(createOrderDto, tenantId)).rejects.toThrow('Estoque insuficiente');
     });
 
-    it('deve falhar se o abate atomico de estoque nao conseguir atualizar a linha', async () => {
-      // Arrange
+    it('deve falhar se a reserva atomica de estoque lancar BadRequestException', async () => {
+      // Task 4: o reserve() do StockEngineService é a guarda atômica.
+      // Se ele lançar BadRequestException, o create deve propagar o erro.
       const estoqueQueryBuilder = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -451,27 +450,22 @@ describe('OrdersService', () => {
         getMany: jest.fn().mockResolvedValue(mockProdutos),
       };
 
-      const updateQueryBuilder = {
-        update: jest.fn().mockReturnThis(),
-        set: jest.fn().mockReturnThis(),
-        setParameters: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        execute: jest
-          .fn()
-          .mockResolvedValueOnce({ affected: 1 })
-          .mockResolvedValueOnce({ affected: 0 }),
-      };
-
       mockManager.createQueryBuilder = jest.fn((entity) => {
         if (entity === MovimentacaoEstoque) return estoqueQueryBuilder as any;
         if (entity === Produto) return produtosQueryBuilder as any;
-        return updateQueryBuilder as any;
+        return {} as any;
       });
 
       mockDbContextService.runInTransaction = jest.fn(async (callback) => {
         return callback(mockManager);
       });
+
+      // Simular falha atômica do reserve (segundo produto sem estoque suficiente)
+      mockStockEngineService.reserve
+        .mockResolvedValueOnce(undefined) // primeiro produto ok
+        .mockRejectedValueOnce(
+          new BadRequestException(`Estoque insuficiente para reservar produto ${produtoId2}`),
+        );
 
       // Act & Assert
       const createPromise = service.create(createOrderDto, tenantId);

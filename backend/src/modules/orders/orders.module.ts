@@ -9,6 +9,7 @@ import { Produto } from '../../database/entities/Produto.entity';
 import { CommonModule } from '../common/common.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CouponsModule } from '../coupons/coupons.module';
+import { ProductsModule } from '../products/products.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { CouponsModule } from '../coupons/coupons.module';
     CommonModule, // Importar CommonModule para usar IdempotencyService e AuditLogService
     forwardRef(() => NotificationsModule),
     CouponsModule,
+    ProductsModule, // Importar para usar StockEngineService (Motor de Estoque — Task 4)
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

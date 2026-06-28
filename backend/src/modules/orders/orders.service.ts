@@ -19,6 +19,7 @@ import { CouponsService } from '../coupons/coupons.service';
 import { CacheService } from '../common/services/cache.service';
 import { CupomDesconto } from '../../database/entities/CupomDesconto.entity';
 import { DbContextService } from '../common/services/db-context.service';
+import { StockEngineService } from '../products/stock-engine.service';
 
 interface PublicTrackedOrderItem {
   id: string;
@@ -78,6 +79,7 @@ export class OrdersService {
     private auditLogService: AuditLogService,
     private couponsService: CouponsService,
     private cacheService: CacheService,
+    private readonly stockEngine: StockEngineService,
     @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
   ) {}
@@ -219,39 +221,28 @@ export class OrdersService {
         }
       }
 
-      // 4. Validar estoque físico disponível.
-      // reserved_stock representa reservas soltas de carrinhos abertos e não carrega ownership.
-      // No checkout, o pedido atual pode estar consumindo parte ou toda essa reserva.
+      // 4. Validar estoque disponível (current - reserved) — verificação amigável de mensagem.
+      // A guarda atômica do reserve() aplica a mesma regra na camada SQL.
       for (const item of createOrderDto.items) {
         const estoque = produtosMap.get(item.produto_id)!;
-        if (estoque.current_stock < item.quantity) {
+        const disponivel = estoque.current_stock - estoque.reserved_stock;
+        if (disponivel < item.quantity) {
           throw new BadRequestException(
-            `Estoque insuficiente para produto ${item.produto_id}: necessário ${item.quantity}, disponível ${estoque.current_stock}`,
+            `Estoque insuficiente para produto ${item.produto_id}: necessário ${item.quantity}, disponível ${disponivel}`,
           );
         }
       }
 
-      // 5. Abater estoque e liberar reserva (dentro da transação)
+      // 5. RESERVAR estoque (não baixar — a baixa ocorre no PRONTO via StockEngine.commitSale).
+      // O lock pessimista do passo 1 + a guarda atômica do reserve garantem
+      // que não há overselling concorrente.
       for (const item of createOrderDto.items) {
-        const updateResult = await manager
-          .createQueryBuilder()
-          .update(MovimentacaoEstoque)
-          .set({
-            current_stock: () => 'current_stock - :quantity',
-            reserved_stock: () => 'GREATEST(0, reserved_stock - :quantity)', // Libera a reserva
-            last_updated: () => 'NOW()',
-          })
-          .setParameters({ quantity: item.quantity })
-          .where('tenant_id = :tenantId', { tenantId })
-          .andWhere('produto_id = :produtoId', { produtoId: item.produto_id })
-          .andWhere('current_stock >= :quantity', { quantity: item.quantity })
-          .execute();
-
-        if (!updateResult.affected || updateResult.affected < 1) {
-          throw new BadRequestException(
-            `Estoque insuficiente para produto ${item.produto_id}: necessário ${item.quantity}`,
-          );
-        }
+        await this.stockEngine.reserve(
+          manager,
+          tenantId,
+          item.produto_id,
+          item.quantity,
+        );
       }
 
       // 6. Criar pedido
