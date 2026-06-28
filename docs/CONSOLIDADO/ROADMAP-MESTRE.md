@@ -10,6 +10,41 @@ Cada item: `[ ]` pendente / `[x]` feito (com data + commit). Status atualizado a
 
 ---
 
+## 📍 HANDOFF — ESTADO ATUAL (atualizado 2026-06-28)
+
+**O que JA FOI FEITO e esta NA MAIN + DEPLOYADO em producao (gtsofthub.com.br):**
+- CLAUDE.md reescrito nivel elite (guia operacional).
+- R1: bot despacha mensagens de verdade (era mudo). 6 testes.
+- Sprint "Cofre" (seguranca): webhooks fail-closed, /whatsapp/test bloqueado em prod, /whatsapp/metrics exige API key, PIX nao usa mock, lock anti-dupla-confirmacao. 8 testes. (S6/F1 eram falsos-positivos.)
+- Sprint LGPD: exclusao real por anonimizacao (Art.18, preserva pedido p/ fisco) + consentimento no registro + endpoints /lgpd/meus-dados. 18 testes. L3 cripto-PII = risco aceito documentado.
+- Loja /loja REMOVIDA (nao faz parte do produto — ver [[product-vision]]). Limpeza em SEO/termos/login/precos.
+- Fluxo de pedido (PED-1/2/3): /admin/pedidos (lojista avanca status) + /pedido (cliente acompanha timeline). Backend ja tinha state machine + notificacao WhatsApp. 11 testes order-status.
+- R2: WhatsApp por-tenant (base). CloudApiProvider (Meta oficial), resolver, WhatsappSender, modulo isolado. Cripto AES-256-GCM REAL em TS (o EncryptionService SQL legado era infra fantasma). 7+6 testes.
+- Catalogo real da mae (61 produtos) cadastrado em prod.
+- **DEPLOY do backend feito (2026-06-28):** R1/LGPD/pedidos/R2 no ar. NODE_ENV=production ATIVO (protecoes fail-closed ligadas). Colunas LGPD/R2 aplicadas no banco (via ALTER TABLE IF NOT EXISTS).
+- **PAGAMENTO REAL LIGADO (2026-06-28):** estava em MOCK (compose nao passava secrets ao container). Corrigido. Log: 'Mercado Pago client initialized'. Token APP_USR = PRODUCAO.
+
+**PROVADO funcionando ao vivo:** bot+IA (gpt-4o-mini, ~R$0,30/mes, NAO inventa preco — so classifica intencao, dado vem do banco, entende girias). Catalogo real com estoque. Site (home/login/admin/pedidos = 200).
+
+**DIVIDA CRITICA DE INFRA descoberta (ver `DIAGNOSTICO-INFRA-SERVIDOR.md` + [[server-infra-debt]]):**
+- DOIS repos no servidor: `/opt/ucm` (o que o deploy usa; 86 commits atras + 43 edicoes locais) vs `/opt/ucm/unified-commerce-platform` (clone limpo). Confunde o build.
+- O container rodando tem o codigo NOVO (foi buildado do clone); o repo "oficial" e que esta velho.
+- Sem `.dockerignore` versionado em /opt/ucm (causou bug de build "Public is not defined").
+- Codigo so-do-servidor PRESERVADO em branch `chore/preserve-server-snapshot` (sem secrets). Secrets backupeados em `~/secrets-backup` no servidor.
+
+**PROXIMOS PASSOS (ordem recomendada):**
+1. **Validar pagamento ponta-a-ponta de VERDADE** — pedido descartavel: gerar PIX real -> pagar valor minimo -> ver webhook MercadoPago confirmar. (So provei que LIGOU, nao que completa.)
+2. **Faxina de infra (sessao dedicada):** consolidar para UM repo; reconciliar /opt/ucm com a main preservando nginx/.env locais; documentar deploy no CLAUDE.md; limpar lixo (scripts soltos, backups nginx, CREDENCIAIS-SERVIDOR.txt).
+3. **Cadastro Cloud API oficial (Meta) — COM Gustavo guiado:** usar NUMERO DE TESTE gratis da Meta (NAO queimar o numero pessoal; registrar na Cloud API REMOVE o numero do app normal). Depois UI no /admin p/ o cliente cadastrar credencial (saveWhatsappCloudToken + phoneNumberId em settings.whatsapp + invalidar cache resolver).
+4. **R4 onboarding self-service** + **Q4 observabilidade (Sentry)** antes de escalar.
+
+**COMO DEPLOYAR (aprendido a duras penas — ver [[deploy-frontend-gotchas]]):**
+- Buildar do dir CERTO. `docker build` direto OU `docker compose build --no-cache` apos limpar dist velho.
+- Recriar backend SEMPRE com env-file: `docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml up -d --no-deps backend` (senao `${}` nao interpola).
+- VALIDAR boot (`docker logs | grep 'successfully started'` + `curl API health`) ANTES de considerar pronto. NUNCA remover container antigo antes de validar a imagem nova.
+
+---
+
 ## Veredito honesto do estado atual
 
 O projeto **funciona em partes, mas NAO esta vendavel hoje** — e a causa nao e "bagunca" no sentido que assusta; e **trabalho incompleto em pontos criticos** + arquitetura cansada de tanto iterar. A boa noticia: a fundacao e solida (RLS multi-tenant correto, DI, validacao, idempotencia em pedidos, paginas legais existem, CI roda). Os bloqueadores sao finitos e conhecidos.
