@@ -1,0 +1,19 @@
+# Nunca copiar artefatos de build locais para o contexto Docker.
+# Sem isto, um dist/ ou .tsbuildinfo antigo do host era copiado e o build
+# incremental do TypeScript reusava codigo desatualizado (ex.: import do
+# @Public sumindo no auth.controller compilado).
+node_modules
+dist
+*.tsbuildinfo
+.tsbuildinfo
+
+# Lixo de dev / nao necessario no build
+.git
+.env
+.env.*
+*.log
+coverage
+.vscode
+.idea
+test
+**/*.spec.ts
