@@ -187,40 +187,71 @@ export class ProductsService {
     // Normalizar category: trim, colapsar espaços, vazio → null
     const category = createProductDto.category?.trim().replace(/\s+/g, ' ') || null;
 
-    // Executar criação do produto + estoque inicial em uma transação atômica
+    // Determinar o SKU base: fornecido pelo usuário ou gerado a partir do nome.
+    const skuBase = createProductDto.sku?.trim()
+      ? createProductDto.sku.trim()
+      : gerarSlugSku(createProductDto.name);
+
+    // Executar criação do produto + estoque inicial em uma transação atômica.
+    // Backstop de colisão de SKU (23505): usa SAVEPOINT para retentar dentro da
+    // mesma transação (o interceptor pode já ter aberto uma tx externa; não podemos
+    // abrir outra — usamos savepoints do Postgres para isolar cada tentativa).
     const savedProduto = await this.db.runInTransaction(async (manager) => {
-      const produtoData: Record<string, any> = {
-        ...createProductDto,
-        category,
-        tenant_id: tenantId,
-      };
-      // initial_stock não é coluna do produto — remover antes de persistir
-      delete produtoData.initial_stock;
-
-      // Determinar o SKU base: fornecido pelo usuário ou gerado a partir do nome
-      const skuBase = createProductDto.sku?.trim()
-        ? createProductDto.sku.trim()
-        : gerarSlugSku(createProductDto.name);
-
-      produtoData.sku = skuBase;
-
-      let p: Produto | null = null;
       const MAX_TENTATIVAS = 5;
 
       for (let tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
+        const skuTentativa = tentativa === 1 ? skuBase : `${skuBase}-${tentativa}`;
+        const savepointNome = `sku_insert_${tentativa}`;
+
+        // SAVEPOINT antes da tentativa: em caso de 23505, fazemos ROLLBACK TO SAVEPOINT
+        // para desfazer apenas o INSERT sem abortar a transação inteira.
+        await manager.query(`SAVEPOINT ${savepointNome}`);
+
         try {
+          const produtoData: Record<string, any> = {
+            ...createProductDto,
+            category,
+            tenant_id: tenantId,
+            sku: skuTentativa,
+          };
+          // initial_stock não é coluna do produto — remover antes de persistir
+          delete produtoData.initial_stock;
+
           const produto = manager.getRepository(Produto).create(produtoData as Partial<Produto>);
-          p = await manager.getRepository(Produto).save(produto);
-          break; // sucesso — sair do loop
+          const p = await manager.getRepository(Produto).save(produto);
+
+          // Confirmar savepoint (limpa o stack de savepoints no Postgres)
+          await manager.query(`RELEASE SAVEPOINT ${savepointNome}`);
+
+          // Sempre criar a linha de estoque com current_stock=0
+          await manager.getRepository(MovimentacaoEstoque).insert({
+            tenant_id: tenantId,
+            produto_id: p.id,
+            current_stock: 0,
+            reserved_stock: 0,
+            min_stock: 0,
+          });
+
+          // Se initial_stock > 0, registrar INVENTARIO_INICIAL via motor (nunca setar direct)
+          if (createProductDto.initial_stock && createProductDto.initial_stock > 0) {
+            await this.stockEngine.recordManualMovement(
+              manager,
+              tenantId,
+              p.id,
+              LedgerTipo.INVENTARIO_INICIAL,
+              createProductDto.initial_stock,
+              'Inventário inicial',
+              userId ?? null,
+            );
+          }
+
+          return p; // sucesso — retornar produto criado
         } catch (err: any) {
-          // Código Postgres 23505 = unique_violation
+          // Verificar se é violação de unique (23505) no índice [tenant_id, sku]
           const isUniqueViolation =
             err?.code === '23505' ||
-            (err?.message as string | undefined)?.includes('23505') ||
             (err?.driverError?.code === '23505');
 
-          // O detail do Postgres inclui os nomes das colunas: "Key (tenant_id, sku)=(...)"
-          // O constraint é um hash gerado pelo TypeORM (não contém "sku" no nome)
           const detailStr: string =
             (err?.detail as string | undefined) ||
             (err?.driverError?.detail as string | undefined) ||
@@ -230,48 +261,30 @@ export class ProductsService {
             (err?.driverError?.constraint as string | undefined) ||
             '';
 
+          // Só retentar se a colisão for especificamente no campo SKU
           const ehColisaoSku =
             isUniqueViolation &&
-            (detailStr.includes('sku') || constraintStr.includes('sku'));
+            (detailStr.toLowerCase().includes('sku') ||
+              constraintStr.toLowerCase().includes('sku') ||
+              constraintStr.toLowerCase().includes('tenant_sku'));
 
-          // Só retentar se for colisão no SKU (não em outra constraint)
           if (!ehColisaoSku || tentativa >= MAX_TENTATIVAS) {
+            // Erro não relacionado a SKU — desfazer savepoint e propagar
+            try { await manager.query(`ROLLBACK TO SAVEPOINT ${savepointNome}`); } catch { /* ignore */ }
             throw err;
           }
 
-          // Sufixo numérico: base-2, base-3, ...
-          produtoData.sku = `${skuBase}-${tentativa + 1}`;
-          this.logger.warn(`Colisão de SKU (tentativa ${tentativa}): tentando ${produtoData.sku}`);
+          // Colisão de SKU: desfazer apenas o INSERT problemático e tentar próximo sufixo
+          await manager.query(`ROLLBACK TO SAVEPOINT ${savepointNome}`);
+          this.logger.warn(
+            `Colisão de SKU "${skuTentativa}" (tentativa ${tentativa}/${MAX_TENTATIVAS}): tentando sufixo -${tentativa + 1}`,
+          );
         }
       }
 
-      if (!p) {
-        throw new BadRequestException(`Não foi possível gerar um SKU único para "${createProductDto.name}" após ${MAX_TENTATIVAS} tentativas.`);
-      }
-
-      // Sempre criar a linha de estoque com current_stock=0
-      await manager.getRepository(MovimentacaoEstoque).insert({
-        tenant_id: tenantId,
-        produto_id: p.id,
-        current_stock: 0,
-        reserved_stock: 0,
-        min_stock: 0,
-      });
-
-      // Se initial_stock > 0, registrar INVENTARIO_INICIAL via motor (nunca setar direct)
-      if (createProductDto.initial_stock && createProductDto.initial_stock > 0) {
-        await this.stockEngine.recordManualMovement(
-          manager,
-          tenantId,
-          p.id,
-          LedgerTipo.INVENTARIO_INICIAL,
-          createProductDto.initial_stock,
-          'Inventário inicial',
-          userId ?? null,
-        );
-      }
-
-      return p;
+      throw new BadRequestException(
+        `Não foi possível gerar um SKU único para "${createProductDto.name}" após ${MAX_TENTATIVAS} tentativas.`,
+      );
     });
 
     // ✅ AUDIT LOG: Registrar criação de produto
