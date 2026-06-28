@@ -47,6 +47,37 @@ export class WhatsappSender {
     await this.send(tenantId, to, body, buttons);
   }
 
+  /**
+   * Envia imagem por URL (ex.: QR Code do PIX) com legenda. Se o provider/config
+   * nao suportar imagem, degrada enviando a legenda + URL como texto (o cliente
+   * ainda recebe a informacao do pagamento).
+   */
+  async sendImage(tenantId: string, to: string, imageUrl: string, caption: string): Promise<void> {
+    if (!imageUrl) {
+      await this.sendText(tenantId, to, caption);
+      return;
+    }
+    const config = await this.resolver.resolve(tenantId);
+    if (!isWhatsappConfigUsable(config)) {
+      this.logger.warn('WhatsApp do tenant nao configurado; imagem nao enviada.', { tenantId });
+      return;
+    }
+    try {
+      if (config.provider === 'cloud_api') {
+        await this.cloudApi.sendImage(config.cloudApi!, to, imageUrl, caption);
+        return;
+      }
+      // Outros providers: degrada para texto com a legenda (mantem a info).
+      await this.send(tenantId, to, caption || imageUrl, []);
+    } catch (error) {
+      this.logger.error('Falha ao enviar imagem; degradando para texto.', {
+        tenantId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      await this.send(tenantId, to, caption || imageUrl, []);
+    }
+  }
+
   private async send(
     tenantId: string,
     to: string,

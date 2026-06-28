@@ -372,11 +372,21 @@ export class NotificationsService {
 
       // R2: envia pelo canal DO TENANT (provider/credencial proprios do cliente).
       // conversation.tenant_id garante o isolamento. O sender ja degrada/loga em falha.
-      await this.whatsappSender.sendText(
-        conversation.tenant_id,
-        conversation.customer_phone,
-        notification.message,
-      );
+      // Preserva o QR Code do PIX (imageUrl) — senao o cliente nao consegue pagar.
+      if (notification.imageUrl) {
+        await this.whatsappSender.sendImage(
+          conversation.tenant_id,
+          conversation.customer_phone,
+          notification.imageUrl,
+          notification.message,
+        );
+      } else {
+        await this.whatsappSender.sendText(
+          conversation.tenant_id,
+          conversation.customer_phone,
+          notification.message,
+        );
+      }
 
       this.logger.log(`WhatsApp notification sent to ${conversation.customer_phone}`);
       return true;

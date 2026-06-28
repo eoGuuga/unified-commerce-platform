@@ -35,6 +35,21 @@ export class CloudApiProvider {
     });
   }
 
+  /** Envia imagem por URL com legenda opcional (ex.: QR Code do PIX). */
+  async sendImage(
+    creds: CloudApiCredentials,
+    to: string,
+    imageUrl: string,
+    caption?: string,
+  ): Promise<string> {
+    return this.post(creds, {
+      messaging_product: 'whatsapp',
+      to: this.formatPhone(to),
+      type: 'image',
+      image: { link: imageUrl, ...(caption ? { caption } : {}) },
+    });
+  }
+
   /**
    * Envia mensagem com botoes de resposta rapida (interactive reply buttons).
    * A Cloud API limita a 3 botoes; titulos a 20 chars.
@@ -83,7 +98,12 @@ export class CloudApiProvider {
 
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
-      throw new Error(`Cloud API erro ${response.status}: ${errText.slice(0, 300)}`);
+      // Sanitiza: nunca propagar token/credencial que por acaso volte no corpo do erro.
+      const sanitized = errText
+        .replace(/Bearer\s+[\w.\-]+/gi, 'Bearer [REDACTED]')
+        .replace(/"access_token"\s*:\s*"[^"]*"/gi, '"access_token":"[REDACTED]"')
+        .slice(0, 200);
+      throw new Error(`Cloud API erro ${response.status}: ${sanitized}`);
     }
 
     const data = (await response.json().catch(() => ({}))) as {

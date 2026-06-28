@@ -26,6 +26,14 @@ import { WhatsappSender } from './whatsapp-sender.service';
     WhatsappConfigResolver,
     WhatsappSender,
   ],
-  exports: [WhatsappSender, WhatsappConfigResolver, CloudApiProvider],
+  exports: [
+    WhatsappSender,
+    WhatsappConfigResolver,
+    CloudApiProvider,
+    // Reexporta os providers legados para o WhatsappService (fallback global)
+    // injeta-los a partir de UMA unica instancia (evita dupla-registracao).
+    EvolutionApiProvider,
+    MockWhatsappProvider,
+  ],
 })
 export class WhatsappSendingModule {}

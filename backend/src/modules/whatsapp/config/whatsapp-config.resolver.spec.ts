@@ -18,7 +18,7 @@ function buildResolver(opts: {
     }),
   };
   const encryptionService = {
-    decryptApiKey: jest.fn().mockResolvedValue(opts.decryptedToken ?? null),
+    getWhatsappCloudToken: jest.fn().mockResolvedValue(opts.decryptedToken ?? null),
   };
   const config = {
     get: (key: string, def?: string) => opts.globalEnv?.[key] ?? def ?? '',

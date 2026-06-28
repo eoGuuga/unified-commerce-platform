@@ -68,8 +68,7 @@ export class WhatsappConfigResolver {
       const apiVersion = String(whatsappSettings.apiVersion || DEFAULT_CLOUD_API_VERSION);
       let accessToken = '';
       try {
-        accessToken =
-          (await this.encryptionService.decryptApiKey(tenantId, 'whatsapp_cloud_token')) || '';
+        accessToken = (await this.encryptionService.getWhatsappCloudToken(tenantId)) || '';
       } catch (error) {
         this.logger.error('Falha ao descriptografar token Cloud API do tenant', {
           tenantId,
