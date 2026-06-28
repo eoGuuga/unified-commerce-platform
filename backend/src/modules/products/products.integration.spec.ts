@@ -203,6 +203,33 @@ describe('Products Integration Tests (e2e)', () => {
 
       expect(response.body).toHaveProperty('message');
     });
+
+    it('dois produtos com mesmo nome (sku vazio) devem receber SKUs distintos', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste - app não inicializado');
+        return;
+      }
+      const nomeDuplicado = `Trufa SKU Teste ${Date.now()}`;
+
+      const res1 = await request(app.getHttpServer())
+        .post(`/api/v1/products`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ name: nomeDuplicado, price: 5.0 })
+        .expect(201);
+
+      const res2 = await request(app.getHttpServer())
+        .post(`/api/v1/products`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ name: nomeDuplicado, price: 5.0 })
+        .expect(201);
+
+      // Ambos devem ter SKU definido e SKUs distintos
+      expect(res1.body.sku).toBeTruthy();
+      expect(res2.body.sku).toBeTruthy();
+      expect(res1.body.sku).not.toBe(res2.body.sku);
+      // O segundo deve ter sufixo numérico (backstop de 23505)
+      expect(res2.body.sku).toMatch(/-\d+$/);
+    });
   });
 
   describe('GET /products/stock-summary - Resumo de Estoque', () => {

@@ -14,6 +14,22 @@ import { PaginatedResult, createPaginatedResult } from '../common/types/paginati
 import { PaginationDto } from './dto/pagination.dto';
 import { ProductWithStock } from './types/product.types';
 
+/**
+ * Gera um slug de SKU a partir do nome do produto:
+ * lowercase, acentos removidos, caracteres não-alfanuméricos substituídos por hífen,
+ * hífens consecutivos colapsados, hífens nas bordas removidos.
+ * Exemplo: "Brigadeiro Gourmet!" → "brigadeiro-gourmet"
+ */
+function gerarSlugSku(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // remove diacríticos
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')    // não-alfanum → hífen
+    .replace(/^-+|-+$/g, '')        // bordas
+    .replace(/-{2,}/g, '-');        // hífens duplos
+}
+
 @Injectable()
 export class ProductsService {
   private readonly logger = new Logger(ProductsService.name);
@@ -181,8 +197,57 @@ export class ProductsService {
       // initial_stock não é coluna do produto — remover antes de persistir
       delete produtoData.initial_stock;
 
-      const produto = manager.getRepository(Produto).create(produtoData as Partial<Produto>);
-      const p = await manager.getRepository(Produto).save(produto);
+      // Determinar o SKU base: fornecido pelo usuário ou gerado a partir do nome
+      const skuBase = createProductDto.sku?.trim()
+        ? createProductDto.sku.trim()
+        : gerarSlugSku(createProductDto.name);
+
+      produtoData.sku = skuBase;
+
+      let p: Produto | null = null;
+      const MAX_TENTATIVAS = 5;
+
+      for (let tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
+        try {
+          const produto = manager.getRepository(Produto).create(produtoData as Partial<Produto>);
+          p = await manager.getRepository(Produto).save(produto);
+          break; // sucesso — sair do loop
+        } catch (err: any) {
+          // Código Postgres 23505 = unique_violation
+          const isUniqueViolation =
+            err?.code === '23505' ||
+            (err?.message as string | undefined)?.includes('23505') ||
+            (err?.driverError?.code === '23505');
+
+          // O detail do Postgres inclui os nomes das colunas: "Key (tenant_id, sku)=(...)"
+          // O constraint é um hash gerado pelo TypeORM (não contém "sku" no nome)
+          const detailStr: string =
+            (err?.detail as string | undefined) ||
+            (err?.driverError?.detail as string | undefined) ||
+            '';
+          const constraintStr: string =
+            (err?.constraint as string | undefined) ||
+            (err?.driverError?.constraint as string | undefined) ||
+            '';
+
+          const ehColisaoSku =
+            isUniqueViolation &&
+            (detailStr.includes('sku') || constraintStr.includes('sku'));
+
+          // Só retentar se for colisão no SKU (não em outra constraint)
+          if (!ehColisaoSku || tentativa >= MAX_TENTATIVAS) {
+            throw err;
+          }
+
+          // Sufixo numérico: base-2, base-3, ...
+          produtoData.sku = `${skuBase}-${tentativa + 1}`;
+          this.logger.warn(`Colisão de SKU (tentativa ${tentativa}): tentando ${produtoData.sku}`);
+        }
+      }
+
+      if (!p) {
+        throw new BadRequestException(`Não foi possível gerar um SKU único para "${createProductDto.name}" após ${MAX_TENTATIVAS} tentativas.`);
+      }
 
       // Sempre criar a linha de estoque com current_stock=0
       await manager.getRepository(MovimentacaoEstoque).insert({
