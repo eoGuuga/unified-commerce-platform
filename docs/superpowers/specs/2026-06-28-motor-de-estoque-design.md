@@ -1,7 +1,7 @@
 # Spec A — Motor de Estoque & Ciclo de Vida
 
 **Data:** 2026-06-28
-**Status:** Em revisão arquitetural
+**Status:** Aprovado (diagnóstico corrigido 2026-06-28) — pronto para plano de implementação
 **Escopo:** Backend (NestJS + TypeORM + Postgres). Nenhuma mudança de UI.
 **Depende de:** nada. **Habilita:** Spec B (Admin de Operação) sobre um inventário confiável.
 
@@ -9,20 +9,20 @@
 
 ## 1. Problema
 
-Os blocos de manipulação de estoque (`reserveStock`, `releaseStock`, `adjustStock`) existem, são **atômicos e corretos**, mas estão **desengatados de todo o fluxo de venda**. Hoje só são invocados pelos próprios endpoints HTTP (`products.controller`); nenhuma regra de negócio os chama.
+> **Correção de diagnóstico (2026-06-28).** Uma primeira leitura por *grep de call-site* (`.reserveStock(`/`.adjustStock(`) concluiu que o estoque estava "totalmente desengatado / risco de overselling". **Estava errado.** A lógica de estoque do checkout está **inline** dentro da transação de `orders.service.create`, não em chamadas a métodos — por isso o grep não a viu. A leitura direta do código (linhas 137-313) revelou o quadro real abaixo. Lição: grep de call-site não enxerga SQL inline.
 
-Consequências verificadas no código (2026-06-28):
+**O que `orders.service.create` realmente faz (verificado):** abre transação (`db.runInTransaction`), pega **lock pessimista** (`setLock('pessimistic_write')` = `FOR UPDATE`) nas linhas de estoque, revalida preço/cupom contra o banco, e **abate `current_stock -= qty`** com guarda atômica `WHERE current_stock >= qty` + checagem de `affected`. Ou seja: **a baixa acontece na CRIAÇÃO do pedido (status `PENDENTE_PAGAMENTO`), e é à prova de overselling.** Esse caminho é robusto.
 
-- O carrinho do WhatsApp **não reserva** estoque ao adicionar item (`cart.service.ts` — nenhuma chamada a `reserveStock`).
-- A criação de pedido **não reserva** (`orders.service.ts` — nenhuma chamada).
-- As transições de status (`assertStatusTransition`) **não dão baixa** no estoque.
-- O cancelamento de pedido **não libera** reserva.
-- A expiração do carrinho (`expireOldCarts`) apenas vira o status para `expired`; **não libera** nada.
-- **Não existe agendador** no projeto (`@nestjs/schedule` ausente; só há um `setInterval` de métricas).
+**O bug existencial real não é overselling — é vazamento silencioso de estoque:**
 
-**Risco existencial:** não há "reserva fantasma travando estoque" — porque não há reserva nenhuma. O risco real é o oposto e pior: **overselling**. Em operação multicanal (PDV no balcão concorrendo em milissegundos com pedido do WhatsApp), dois canais vendem o último item porque ninguém reserva. Se o número na tela perde credibilidade, o software é abandonado na primeira semana.
+- A baixa ocorre na criação, mas **nada restaura o estoque**: `updateStatus → CANCELADO` não toca estoque, e não há `current_stock + qty` em lugar nenhum do módulo de pedidos (verificado). Como **todos** os canais começam em `PENDENTE_PAGAMENTO` e não há restauração na expiração/cancelamento, **todo PIX abandonado evapora estoque permanentemente.** O número na tela derrete sozinho.
+- **Vetor de ataque:** um bot gerando carrinhos com PIX numa sexta à noite esvazia o estoque virtual da loja inteira sem gastar um centavo, e os itens nunca voltam à prateleira. É um DoS de inventário grátis — pior que overselling porque é silencioso.
+- **Baixa no momento errado:** abater em `PENDENTE_PAGAMENTO` viola o princípio "`current_stock` = prateleira física" — o item segue na prateleira durante a produção, mas já foi descontado.
+- **Sem ledger:** nenhuma movimentação tem rastro/extrato auditável.
+- **Carrinho não reserva** (`cart.service` não chama `reserveStock`); a expiração de carrinho (`expireOldCarts`) só vira o status para `expired`.
+- **Não existe agendador** (`@nestjs/schedule` está no `package.json` mas não é importado no `AppModule`; só há um `setInterval` de métricas).
 
-**Objetivo deste spec:** plugar o ciclo de vida completo de estoque nos fluxos reais de venda, com um **ledger** como fonte da verdade, **garantias de atomicidade** contra concorrência, **idempotência** contra retries de webhook, e **TTL** que libera reservas abandonadas.
+**Objetivo deste spec:** corrigir o ciclo de vida do estoque migrando do modelo "baixa na criação que nunca volta" para **reserva→commit no `PRONTO`** (espelho da prateleira física), com **ledger** como fonte da verdade, **idempotência** contra retries de webhook, e **TTL** que libera reservas abandonadas — tudo mantendo o **lock pessimista** já adotado no checkout.
 
 ---
 
@@ -105,18 +105,20 @@ Idealmente rodar na janela de deploy (tráfego chaveado), mas o `INSERT ... SELE
 
 ## 4. O ciclo de vida do estoque (a costura)
 
-Mapa de cada momento do fluxo de venda → ação no estoque. **Toda operação multi-passo roda dentro de uma transação** (`QueryRunner`).
+Mapa de cada momento do fluxo de venda → ação no estoque. **Toda operação multi-passo roda dentro de uma transação** (`db.runInTransaction`).
 
-| Momento | Origem | Ação |
-|---|---|---|
-| Adicionar item ao carrinho | `cart.service.addItem` | `reserveStock` atômico. Rejeita o add se `available < qty`. |
-| Remover item / limpar carrinho | `cart.service.removeItem/clearCart` | `releaseStock` dos itens afetados. |
-| Carrinho expira | sweeper + fast-path preguiçoso (§6) | libera a reserva de todos os itens. |
-| Pedido criado (WhatsApp/online) | `orders.service.create` | garante a reserva (carrega a do carrinho; se não houver, reserva na criação atomicamente; rejeita se faltar saldo). |
-| Pedido → **`PRONTO`** | `orders.service.updateStatus` | **COMMIT**: `current_stock -= qty` **e** `reserved_stock -= qty` (1 transação) + insere `VENDA` no ledger (idempotente). |
-| Pedido cancelado (**pré-`PRONTO`**) | `orders.service.updateStatus` → `CANCELADO` | `releaseStock` (sem ledger). |
-| Problema **pós-`PRONTO`** (motoboy volta, cliente some) | ajuste manual (Spec B) | nova linha no ledger: `DEVOLUCAO` (volta à prateleira) ou `PERDA` (prejuízo auditado). Nunca release automático. |
-| Venda no **PDV** (balcão) | fluxo PDV | `reserve` + `commit` na **mesma transação**, sem fase pendente. |
+> **Esta é uma REFATORAÇÃO, não um greenfield.** Hoje `orders.service.create` **abate `current_stock` na criação** (§1). O alvo migra essa baixa da criação para a transição `PRONTO`, transformando a operação de criação em **reserva**. É a mudança mais sensível do spec — mexe na artéria principal (checkout) — e por isso exige regressão forte (§9).
+
+| Momento | Origem | Ação | Mudança |
+|---|---|---|---|
+| Adicionar item ao carrinho | `cart.service.addItem` | `reserve` atômico; rejeita se `available < qty`. | **novo** |
+| Remover item / limpar carrinho | `cart.service.removeItem/clearCart` | `release` dos itens afetados. | **novo** |
+| Carrinho expira | sweeper + fast-path preguiçoso (§6) | libera a reserva de todos os itens. | **novo** |
+| Pedido criado (WhatsApp/online) | `orders.service.create` | **REFATOR:** trocar `current_stock -= qty` por `reserved_stock += qty` (guarda `current - reserved >= qty`). `current_stock` fica intacto. Mantém o lock pessimista. | **refator** |
+| Pedido → **`PRONTO`** | `orders.service.updateStatus` | **COMMIT:** `current_stock -= qty` **e** `reserved_stock -= qty` (1 transação) + insere `VENDA` no ledger (idempotente). | **novo** |
+| Pedido cancelado (**pré-`PRONTO`**) | `orders.service.updateStatus` → `CANCELADO` | `release` (`reserved_stock -= qty`, sem ledger). **Tapa o vazamento.** | **novo** |
+| Problema **pós-`PRONTO`** | ajuste manual (Spec B) | nova linha no ledger: `DEVOLUCAO` (volta à prateleira) ou `PERDA`. Nunca release automático. | **novo** |
+| Venda no **PDV** (balcão) | fluxo PDV (provavelmente `create` com `channel='pdv'`) | `reserve` + `commit` na **mesma transação**, sem fase pendente. Verificar na implementação se o PDV usa `create`. | **novo** |
 
 ### 4.1 Por que o commit é no `PRONTO`
 
@@ -135,11 +137,13 @@ Todas recebem o `QueryRunner` do chamador para compor transações maiores (ex.:
 
 ## 5. Concorrência
 
-Sem locks pessimistas. As garantias vêm das guardas atômicas no `WHERE`:
+**Mantém o lock pessimista já adotado no checkout** (`setLock('pessimistic_write')` = `FOR UPDATE`) **somado** às guardas atômicas no `WHERE` — cinto e suspensório. O projeto já escolheu esse padrão; não o removemos.
 
-- **Dois canais, último item:** ambos disparam `reserve`. O primeiro `UPDATE` consome o saldo; o segundo tem `affected = 0` → exceção "estoque insuficiente". Um vende, o outro recebe negativa limpa. Sem overselling.
-- **Commit:** o `UPDATE` guardado impede `current_stock` negativo; o índice único impede baixa dupla.
-- **Isolamento:** transações curtas; cada `UPDATE ... WHERE` é atômico no nível de linha do Postgres.
+- **Dois canais, último item:** o lock serializa o acesso à linha de estoque durante a validação; a guarda atômica garante que o `UPDATE` de reserva só sucede se `current - reserved >= qty`. O segundo recebe negativa limpa. Sem overselling.
+- **Commit:** o `UPDATE` guardado impede `current_stock` negativo; o índice único `(order_id) WHERE tipo='VENDA'` impede baixa dupla.
+- **Isolamento:** cada `UPDATE ... WHERE` é atômico no nível de linha do Postgres.
+
+> **Diretriz crítica de implementação:** o lock pessimista só é eficiente se a transação for **ultrarrápida**. **Nenhuma chamada externa** (API de pagamento/MercadoPago, cálculo de frete via HTTP, envio de WhatsApp, etc.) pode rodar **dentro** da transação que segura o lock de estoque. Validação de preço/cupom contra o banco é permitida (é local). Qualquer I/O externo acontece **antes** (entrada da transação) ou **depois** (commitada a transação). Isso vale tanto para o `create` refatorado quanto para o commit no `PRONTO`.
 
 ---
 
@@ -213,8 +217,11 @@ Todas reversíveis. Rodar com backup prévio (procedimento de deploy já documen
 - **Colisão webhook×sweeper:** disparar os dois caminhos sobre o mesmo pedido → um único release.
 - **TTL:** carrinho/pedido vencidos → sweeper libera; rodar 2× → não libera de novo (`stock_released_at`).
 - **Invariante:** após uma bateria de operações, `current_stock == soma(deltas do ledger)` por produto.
+- **Vazamento (regressão do bug original):** criar pedido → cancelar/expirar → `current_stock` volta ao valor inicial (não vaza). Era o bug existencial; tem que ter teste dedicado.
+- **Regressão forte no `create` (artéria principal):** o `create` é o caminho mais crítico do sistema. Bateria que cobre o comportamento atual preservado **exceto** a baixa→reserva: preço recalculado do banco, rejeição de preço divergente (>0.01), validação de cupom/limite, lock pessimista ativo, rejeição por estoque insuficiente, criação de itens, geração de `order_no`, audit log. Rodar a suíte de integração existente de pedidos (`orders.integration.spec.ts`) e garantir que passa com a nova semântica (estado pós-`create`: `reserved_stock += qty`, `current_stock` intacto).
+- **Sem I/O externo sob lock:** teste/asserção de que a transação de `create` e a de commit não fazem chamada de rede (revisar que notificação WhatsApp e chamada de pagamento ficam fora da transação).
 
-Meta: cobertura alta nos caminhos de concorrência e idempotência.
+Meta: cobertura alta nos caminhos de concorrência, idempotência e na regressão do `create`.
 
 ---
 
@@ -226,6 +233,10 @@ Lotes, validade, múltiplos depósitos/locais, custo médio móvel, tabela dedic
 
 ## 11. Decisões travadas nesta sessão
 
+- **Diagnóstico corrigido:** a baixa já ocorre na criação (oversell-safe); o bug existencial é **vazamento de estoque** em pedido não-pago/cancelado (nunca restaura). Vetor de ataque: DoS de inventário via PIX abandonado.
+- **Refatorar** `create`: baixa na criação → **reserva** na criação; baixa real migra para o `PRONTO`.
+- **Manter o lock pessimista** existente (`pessimistic_write`) + guardas atômicas.
+- **Nenhuma chamada externa dentro da transação travada** (transação ultrarrápida).
 - Ledger = fonte da verdade; `current_stock` = projeção transacional.
 - Commit da baixa no **`PRONTO`** (ponto de não-retorno físico).
 - Pós-`PRONTO`: devolução/perda = movimento **manual** no ledger.
@@ -234,6 +245,7 @@ Lotes, validade, múltiplos depósitos/locais, custo médio móvel, tabela dedic
 - TTL por sweeper `@nestjs/schedule` a **60s** + fast-path preguiçoso + webhook.
 - Colisão webhook×sweeper resolvida por **compare-and-set** na linha do pedido (sem corrida).
 - `MovimentacaoEstoque` (saldo) **não** será renomeada; papéis documentados.
+- Regressão forte obrigatória no `create` (artéria principal) — §9.
 
 ---
 
