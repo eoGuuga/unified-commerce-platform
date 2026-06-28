@@ -51,6 +51,10 @@ export class WhatsAppCart {
   @Column('timestamp')
   expires_at: Date;
 
+  // Rastreio de liberação de reserva de estoque
+  @Column({ type: 'timestamptz', nullable: true })
+  stock_released_at: Date | null;
+
   @CreateDateColumn()
   created_at: Date;
 

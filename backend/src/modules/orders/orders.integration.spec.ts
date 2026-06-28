@@ -269,6 +269,320 @@ describe('Orders Integration Tests (e2e)', () => {
 
       expect(response.body).toHaveProperty('message');
     });
+
+    it('create reserva estoque (nao baixa current) e preserva validacoes', async () => {
+      // Artéria principal: pedido criado deve RESERVAR, não baixar current_stock.
+      // Task 4 — Motor de Estoque.
+      if (!app) {
+        console.log('⏭️ Pulando teste - app não inicializado');
+        return;
+      }
+
+      // Inserir produto e estoque diretamente no banco (evita dependência de Redis
+      // que não está disponível no ambiente de testes — Redis é swallowed no service
+      // mas não no products.service.create fora de transação).
+      const qrSetup = dataSource.createQueryRunner();
+      await qrSetup.connect();
+      await qrSetup.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+
+      // Desativar produto homônimo de execuções anteriores (idempotência)
+      await qrSetup.query(
+        'UPDATE produtos SET is_active = false WHERE tenant_id = $1 AND name = $2',
+        [tenantId, `${productName} Reserva Task4`],
+      );
+
+      // Criar produto ativo com preço 20.00
+      const produtosInseridos = await qrSetup.query(
+        `INSERT INTO produtos (tenant_id, name, price, is_active, unit)
+         VALUES ($1, $2, 20.00, true, 'unidade')
+         RETURNING id`,
+        [tenantId, `${productName} Reserva Task4`],
+      ) as Array<{ id: string }>;
+      const productId = produtosInseridos[0].id;
+
+      // Criar registro de estoque: current_stock=10, reserved_stock=0
+      await qrSetup.query(
+        `INSERT INTO movimentacoes_estoque (tenant_id, produto_id, current_stock, reserved_stock, min_stock, last_updated)
+         VALUES ($1, $2, 10, 0, 0, NOW())
+         ON CONFLICT (tenant_id, produto_id) DO UPDATE
+           SET current_stock = 10, reserved_stock = 0, last_updated = NOW()`,
+        [tenantId, productId],
+      );
+      await qrSetup.release();
+
+      // Verificar saldo inicial
+      const qrAnte = dataSource.createQueryRunner();
+      await qrAnte.connect();
+      await qrAnte.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const estoqueAntesList = await qrAnte.query(
+        'SELECT current_stock, reserved_stock FROM movimentacoes_estoque WHERE tenant_id = $1 AND produto_id = $2',
+        [tenantId, productId],
+      ) as Array<{ current_stock: number; reserved_stock: number }>;
+      await qrAnte.release();
+
+      expect(estoqueAntesList).toHaveLength(1);
+      expect(Number(estoqueAntesList[0].current_stock)).toBe(10);
+      expect(Number(estoqueAntesList[0].reserved_stock)).toBe(0);
+
+      // Criar pedido de qty=3 via HTTP (artéria principal)
+      const qty = 3;
+      const orderResponse = await request(app.getHttpServer())
+        .post(`/api/v1/orders?tenantId=${tenantId}`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({
+          channel: 'pdv',
+          customer_name: 'Cliente Reserva Task4',
+          items: [
+            {
+              produto_id: productId,
+              quantity: qty,
+              unit_price: 20.0,
+            },
+          ],
+          discount_amount: 0,
+          shipping_amount: 0,
+        })
+        .expect(201);
+
+      // Assert: pedido criado em pendente_pagamento
+      expect(orderResponse.body).toHaveProperty('id');
+      expect(orderResponse.body).toHaveProperty('order_no');
+      expect(orderResponse.body.status).toBe('pendente_pagamento');
+      // Preço recalculado do banco: 3 * 20.00
+      expect(Number(orderResponse.body.total_amount)).toBe(60.0);
+
+      // Assert estoque: current_stock INTACTO, reserved_stock INCREMENTADO por qty
+      const qrDepois = dataSource.createQueryRunner();
+      await qrDepois.connect();
+      await qrDepois.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const estoqueDepoisList = await qrDepois.query(
+        'SELECT current_stock, reserved_stock FROM movimentacoes_estoque WHERE tenant_id = $1 AND produto_id = $2',
+        [tenantId, productId],
+      ) as Array<{ current_stock: number; reserved_stock: number }>;
+      await qrDepois.release();
+
+      // current_stock deve permanecer 10 (sem baixa — a baixa ocorre no PRONTO)
+      expect(Number(estoqueDepoisList[0].current_stock)).toBe(10);
+      // reserved_stock deve ser 3 (qty reservada pelo create)
+      expect(Number(estoqueDepoisList[0].reserved_stock)).toBe(qty);
+    });
+  });
+
+  describe('PATCH /orders/:id/status - Motor de Estoque (Task 5)', () => {
+    it('transição para PRONTO baixa current_stock e grava VENDA (uma vez)', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste - app não inicializado');
+        return;
+      }
+
+      // Seed produto e estoque via SQL (evita dependência de Redis no ProductsService)
+      const qrSetup = dataSource.createQueryRunner();
+      await qrSetup.connect();
+      await qrSetup.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+
+      await qrSetup.query(
+        'UPDATE produtos SET is_active = false WHERE tenant_id = $1 AND name = $2',
+        [tenantId, `${productName} PRONTO Task5`],
+      );
+
+      const prodInserido = await qrSetup.query(
+        `INSERT INTO produtos (tenant_id, name, price, is_active, unit)
+         VALUES ($1, $2, 15.00, true, 'unidade')
+         RETURNING id`,
+        [tenantId, `${productName} PRONTO Task5`],
+      ) as Array<{ id: string }>;
+      const productId = prodInserido[0].id;
+
+      await qrSetup.query(
+        `INSERT INTO movimentacoes_estoque (tenant_id, produto_id, current_stock, reserved_stock, min_stock, last_updated)
+         VALUES ($1, $2, 10, 0, 0, NOW())
+         ON CONFLICT (tenant_id, produto_id) DO UPDATE
+           SET current_stock = 10, reserved_stock = 0, last_updated = NOW()`,
+        [tenantId, productId],
+      );
+      await qrSetup.release();
+
+      // Criar pedido qty=3 → reserva: current=10, reserved=3
+      const orderResp = await request(app.getHttpServer())
+        .post(`/api/v1/orders?tenantId=${tenantId}`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({
+          channel: 'pdv',
+          customer_name: 'Cliente PRONTO Task5',
+          items: [{ produto_id: productId, quantity: 3, unit_price: 15.0 }],
+          discount_amount: 0,
+          shipping_amount: 0,
+        })
+        .expect(201);
+
+      const orderId = orderResp.body.id;
+      expect(orderResp.body.status).toBe('pendente_pagamento');
+
+      // Avançar: pendente_pagamento → confirmado → em_producao → pronto
+      await request(app.getHttpServer())
+        .patch(`/api/v1/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .set('x-tenant-id', tenantId)
+        .send({ status: 'confirmado' })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .set('x-tenant-id', tenantId)
+        .send({ status: 'em_producao' })
+        .expect(200);
+
+      const prontoResp = await request(app.getHttpServer())
+        .patch(`/api/v1/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .set('x-tenant-id', tenantId)
+        .send({ status: 'pronto' })
+        .expect(200);
+
+      expect(prontoResp.body.status).toBe('pronto');
+
+      // Assert saldo: current=7, reserved=0
+      const qrCheck = dataSource.createQueryRunner();
+      await qrCheck.connect();
+      await qrCheck.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+
+      const saldoList = await qrCheck.query(
+        'SELECT current_stock, reserved_stock FROM movimentacoes_estoque WHERE tenant_id = $1 AND produto_id = $2',
+        [tenantId, productId],
+      ) as Array<{ current_stock: number; reserved_stock: number }>;
+
+      expect(Number(saldoList[0].current_stock)).toBe(7);
+      expect(Number(saldoList[0].reserved_stock)).toBe(0);
+
+      // Assert ledger: exatamente 1 linha VENDA para (order, produto) com delta=-3
+      const ledgerList = await qrCheck.query(
+        `SELECT delta FROM movimentacoes_estoque_historico
+         WHERE tenant_id = $1 AND order_id = $2 AND produto_id = $3 AND tipo = 'VENDA'`,
+        [tenantId, orderId, productId],
+      ) as Array<{ delta: number }>;
+
+      expect(ledgerList).toHaveLength(1);
+      expect(Number(ledgerList[0].delta)).toBe(-3);
+
+      // Reaplicar PRONTO (idempotência via oldStatus===status) → saldo não muda
+      await request(app.getHttpServer())
+        .patch(`/api/v1/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .set('x-tenant-id', tenantId)
+        .send({ status: 'pronto' })
+        .expect(200);
+
+      const saldoAposIdempotencia = await qrCheck.query(
+        'SELECT current_stock, reserved_stock FROM movimentacoes_estoque WHERE tenant_id = $1 AND produto_id = $2',
+        [tenantId, productId],
+      ) as Array<{ current_stock: number; reserved_stock: number }>;
+
+      expect(Number(saldoAposIdempotencia[0].current_stock)).toBe(7);
+      expect(Number(saldoAposIdempotencia[0].reserved_stock)).toBe(0);
+
+      const ledgerAposIdempotencia = await qrCheck.query(
+        `SELECT delta FROM movimentacoes_estoque_historico
+         WHERE tenant_id = $1 AND order_id = $2 AND produto_id = $3 AND tipo = 'VENDA'`,
+        [tenantId, orderId, productId],
+      ) as Array<{ delta: number }>;
+
+      expect(ledgerAposIdempotencia).toHaveLength(1); // ainda 1, não duplicou
+
+      await qrCheck.release();
+    });
+
+    it('cancelar antes do PRONTO libera reserva e NÃO vaza estoque', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste - app não inicializado');
+        return;
+      }
+
+      // Seed produto e estoque via SQL
+      const qrSetup = dataSource.createQueryRunner();
+      await qrSetup.connect();
+      await qrSetup.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+
+      await qrSetup.query(
+        'UPDATE produtos SET is_active = false WHERE tenant_id = $1 AND name = $2',
+        [tenantId, `${productName} CANCELADO Task5`],
+      );
+
+      const prodInserido = await qrSetup.query(
+        `INSERT INTO produtos (tenant_id, name, price, is_active, unit)
+         VALUES ($1, $2, 15.00, true, 'unidade')
+         RETURNING id`,
+        [tenantId, `${productName} CANCELADO Task5`],
+      ) as Array<{ id: string }>;
+      const productId = prodInserido[0].id;
+
+      await qrSetup.query(
+        `INSERT INTO movimentacoes_estoque (tenant_id, produto_id, current_stock, reserved_stock, min_stock, last_updated)
+         VALUES ($1, $2, 10, 0, 0, NOW())
+         ON CONFLICT (tenant_id, produto_id) DO UPDATE
+           SET current_stock = 10, reserved_stock = 0, last_updated = NOW()`,
+        [tenantId, productId],
+      );
+      await qrSetup.release();
+
+      // Criar pedido qty=3 → reserva: current=10, reserved=3
+      const orderResp = await request(app.getHttpServer())
+        .post(`/api/v1/orders?tenantId=${tenantId}`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({
+          channel: 'pdv',
+          customer_name: 'Cliente CANCELADO Task5',
+          items: [{ produto_id: productId, quantity: 3, unit_price: 15.0 }],
+          discount_amount: 0,
+          shipping_amount: 0,
+        })
+        .expect(201);
+
+      const orderId = orderResp.body.id;
+      expect(orderResp.body.status).toBe('pendente_pagamento');
+
+      // Cancelar diretamente de pendente_pagamento
+      const cancelResp = await request(app.getHttpServer())
+        .patch(`/api/v1/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .set('x-tenant-id', tenantId)
+        .send({ status: 'cancelado' })
+        .expect(200);
+
+      expect(cancelResp.body.status).toBe('cancelado');
+
+      // Assert saldo: current=10 (intacto — o bug do vazamento corrigido), reserved=0
+      const qrCheck = dataSource.createQueryRunner();
+      await qrCheck.connect();
+      await qrCheck.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+
+      const saldoList = await qrCheck.query(
+        'SELECT current_stock, reserved_stock FROM movimentacoes_estoque WHERE tenant_id = $1 AND produto_id = $2',
+        [tenantId, productId],
+      ) as Array<{ current_stock: number; reserved_stock: number }>;
+
+      expect(Number(saldoList[0].current_stock)).toBe(10);
+      expect(Number(saldoList[0].reserved_stock)).toBe(0);
+
+      // Assert: pedido.stock_released_at != null
+      const pedidoList = await qrCheck.query(
+        'SELECT stock_released_at FROM pedidos WHERE id = $1 AND tenant_id = $2',
+        [orderId, tenantId],
+      ) as Array<{ stock_released_at: string | null }>;
+
+      expect(pedidoList[0].stock_released_at).not.toBeNull();
+
+      // Assert: nenhum ledger VENDA para este pedido (não baixou o estoque)
+      const ledgerList = await qrCheck.query(
+        `SELECT delta FROM movimentacoes_estoque_historico
+         WHERE tenant_id = $1 AND order_id = $2 AND tipo = 'VENDA'`,
+        [tenantId, orderId],
+      ) as Array<{ delta: number }>;
+
+      expect(ledgerList).toHaveLength(0);
+
+      await qrCheck.release();
+    });
   });
 
   describe('GET /orders - Listar Pedidos', () => {

@@ -19,6 +19,7 @@ import { CouponsService } from '../coupons/coupons.service';
 import { CacheService } from '../common/services/cache.service';
 import { CupomDesconto } from '../../database/entities/CupomDesconto.entity';
 import { DbContextService } from '../common/services/db-context.service';
+import { StockEngineService } from '../products/stock-engine.service';
 
 interface PublicTrackedOrderItem {
   id: string;
@@ -78,6 +79,7 @@ export class OrdersService {
     private auditLogService: AuditLogService,
     private couponsService: CouponsService,
     private cacheService: CacheService,
+    private readonly stockEngine: StockEngineService,
     @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
   ) {}
@@ -219,39 +221,28 @@ export class OrdersService {
         }
       }
 
-      // 4. Validar estoque físico disponível.
-      // reserved_stock representa reservas soltas de carrinhos abertos e não carrega ownership.
-      // No checkout, o pedido atual pode estar consumindo parte ou toda essa reserva.
+      // 4. Validar estoque disponível (current - reserved) — verificação amigável de mensagem.
+      // A guarda atômica do reserve() aplica a mesma regra na camada SQL.
       for (const item of createOrderDto.items) {
         const estoque = produtosMap.get(item.produto_id)!;
-        if (estoque.current_stock < item.quantity) {
+        const disponivel = estoque.current_stock - estoque.reserved_stock;
+        if (disponivel < item.quantity) {
           throw new BadRequestException(
-            `Estoque insuficiente para produto ${item.produto_id}: necessário ${item.quantity}, disponível ${estoque.current_stock}`,
+            `Estoque insuficiente para produto ${item.produto_id}: necessário ${item.quantity}, disponível ${disponivel}`,
           );
         }
       }
 
-      // 5. Abater estoque e liberar reserva (dentro da transação)
+      // 5. RESERVAR estoque (não baixar — a baixa ocorre no PRONTO via StockEngine.commitSale).
+      // O lock pessimista do passo 1 + a guarda atômica do reserve garantem
+      // que não há overselling concorrente.
       for (const item of createOrderDto.items) {
-        const updateResult = await manager
-          .createQueryBuilder()
-          .update(MovimentacaoEstoque)
-          .set({
-            current_stock: () => 'current_stock - :quantity',
-            reserved_stock: () => 'GREATEST(0, reserved_stock - :quantity)', // Libera a reserva
-            last_updated: () => 'NOW()',
-          })
-          .setParameters({ quantity: item.quantity })
-          .where('tenant_id = :tenantId', { tenantId })
-          .andWhere('produto_id = :produtoId', { produtoId: item.produto_id })
-          .andWhere('current_stock >= :quantity', { quantity: item.quantity })
-          .execute();
-
-        if (!updateResult.affected || updateResult.affected < 1) {
-          throw new BadRequestException(
-            `Estoque insuficiente para produto ${item.produto_id}: necessário ${item.quantity}`,
-          );
-        }
+        await this.stockEngine.reserve(
+          manager,
+          tenantId,
+          item.produto_id,
+          item.quantity,
+        );
       }
 
       // 6. Criar pedido
@@ -568,34 +559,84 @@ export class OrdersService {
   ): Promise<Pedido> {
     const pedido = await this.findOne(id, tenantId);
     const oldStatus = pedido.status;
-    if (oldStatus !== status) {
-      this.assertStatusTransition(oldStatus, status);
-    }
-    pedido.status = status;
-    const updatedPedido = await this.db.getRepository(Pedido).save(pedido);
 
-    // Notificar cliente sobre mudança de status
-    if (oldStatus !== status) {
-      try {
-        await this.notificationsService.notifyOrderStatusChange(
-          tenantId,
-          updatedPedido,
-          oldStatus,
-          status,
-        );
-      } catch (error) {
-        // Não falhar a atualização se a notificação falhar
-        this.logger.error('Error sending order status notification', {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          context: {
-            tenantId,
-            pedidoId: id,
-            oldStatus,
-            newStatus: status,
-          },
-        });
+    // No-op idempotente: mesma transição não reprocessa estoque
+    if (oldStatus === status) {
+      return pedido;
+    }
+
+    this.assertStatusTransition(oldStatus, status);
+
+    const updatedPedido = await this.db.runInTransaction(async (manager) => {
+      // Lock pessimista para serializar transições concorrentes.
+      // Capturamos a linha bloqueada para usar dentro da transação — nunca o snapshot
+      // pré-lock (pedido), que pode estar desatualizado em caso de corrida.
+      const lockedPedido = await manager
+        .createQueryBuilder(Pedido, 'p')
+        .setLock('pessimistic_write')
+        .where('p.id = :id', { id })
+        .andWhere('p.tenant_id = :tenantId', { tenantId })
+        .getOne();
+
+      if (!lockedPedido) {
+        throw new NotFoundException(`Pedido ${id} nao encontrado`);
       }
+
+      // Defesa contra transição já aplicada por request concorrente:
+      // se outro processo aplicou exatamente esta transição enquanto
+      // esperávamos o lock, retornamos sem reprocessar estoque.
+      if (lockedPedido.status === status) {
+        return lockedPedido;
+      }
+
+      // Carregar itens do pedido para o commit/release
+      const itens = await manager.find(ItemPedido, { where: { pedido_id: id } });
+      const stockItems = itens.map((i) => ({
+        produto_id: i.produto_id,
+        quantity: i.quantity,
+      }));
+
+      // COMMIT da baixa ao entrar em PRONTO (idempotente via ledger único)
+      if (status === PedidoStatus.PRONTO) {
+        await this.stockEngine.commitSale(manager, tenantId, id, stockItems);
+      }
+
+      // RELEASE da reserva ao cancelar pré-PRONTO (apenas uma vez).
+      // Lemos stock_released_at do lockedPedido (linha bloqueada) para evitar
+      // o TOCTOU: dois cancels concorrentes veriam o snapshot pré-lock como null
+      // e ambos liberariam a reserva (double-release). Com o lock adquirido, apenas
+      // o vencedor vê null; o perdedor aguarda e encontra a data já preenchida.
+      if (status === PedidoStatus.CANCELADO && lockedPedido.stock_released_at == null) {
+        for (const it of stockItems) {
+          await this.stockEngine.release(manager, tenantId, it.produto_id, it.quantity);
+        }
+        lockedPedido.stock_released_at = new Date();
+      }
+
+      lockedPedido.status = status;
+      return manager.getRepository(Pedido).save(lockedPedido);
+    });
+
+    // Notificação FORA da transação (sem I/O externo sob lock)
+    try {
+      await this.notificationsService.notifyOrderStatusChange(
+        tenantId,
+        updatedPedido,
+        oldStatus,
+        status,
+      );
+    } catch (error) {
+      // Não falhar a atualização se a notificação falhar
+      this.logger.error('Error sending order status notification', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: {
+          tenantId,
+          pedidoId: id,
+          oldStatus,
+          newStatus: status,
+        },
+      });
     }
 
     return updatedPedido;
@@ -719,6 +760,55 @@ export class OrdersService {
         `Transicao de status invalida: ${from} -> ${to}`,
       );
     }
+  }
+
+  /**
+   * Cancela e libera reserva de um pedido pendente vencido, de forma idempotente.
+   * Usado pelo StockSweeperService (Task 7) como rede de segurança do TTL.
+   *
+   * Compare-and-set atômico: apenas o ator que faz o flip
+   * status→'cancelado' + stock_released_at=now() de fato libera o estoque.
+   * Chamadas subsequentes encontram stock_released_at preenchido e retornam sem-op.
+   */
+  async releaseExpiredPendingOrder(orderId: string): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      // Flip atômico: só afeta linha com status='pendente_pagamento' e sem liberação anterior
+      const rawUpdate = await manager.query(
+        `UPDATE pedidos
+            SET status = 'cancelado', stock_released_at = now()
+          WHERE id = $1
+            AND status = 'pendente_pagamento'
+            AND stock_released_at IS NULL
+          RETURNING id, tenant_id`,
+        [orderId],
+      );
+
+      // TypeORM+pg retorna [[rows], rowCount] em manager.query() com RETURNING
+      const rows: Array<{ id: string; tenant_id: string }> = Array.isArray(rawUpdate[0])
+        ? rawUpdate[0]
+        : rawUpdate;
+
+      if (!rows || rows.length === 0) {
+        // Outro ator já tratou — no-op
+        return;
+      }
+
+      const tenantId = rows[0].tenant_id;
+
+      // Configura RLS tenant-local para acessar movimentacoes_estoque
+      await manager.query(
+        `SELECT set_config('app.current_tenant_id', $1, true)`,
+        [tenantId],
+      );
+
+      // Carregar itens do pedido e liberar cada reserva
+      const itens = await manager.find(ItemPedido, { where: { pedido_id: orderId } });
+      for (const it of itens) {
+        await this.stockEngine.release(manager, tenantId, it.produto_id, it.quantity);
+      }
+
+      this.logger.log(`Pedido ${orderId} cancelado por TTL — ${itens.length} reserva(s) liberada(s)`);
+    });
   }
 
   async getSalesReport(tenantId: string): Promise<any> {

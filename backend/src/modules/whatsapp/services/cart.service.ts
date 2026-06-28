@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, In, LessThan, MoreThan } from 'typeorm';
 import { WhatsAppCart, CartItem } from '../../../database/entities/WhatsappCart.entity';
+import { StockEngineService } from '../../products/stock-engine.service';
 
 export interface AddToCartInput {
   tenantId: string;
@@ -36,6 +37,7 @@ export class CartService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly config: ConfigService,
+    private readonly stockEngine: StockEngineService,
   ) {}
 
   private getCartTtlMinutes(): number {
@@ -107,14 +109,15 @@ export class CartService {
       newCart.status = 'active';
 
       cart = await repo.save(newCart);
-      this.logger.log(`Created new cart ${cart.id} for ${customerPhone}`);
+      this.logger.log(`Carrinho ${cart.id} criado para ${customerPhone}`);
     }
 
     return cart;
   }
 
   /**
-   * Adiciona item ao carrinho
+   * Adiciona item ao carrinho e reserva estoque atomicamente.
+   * Se não houver estoque suficiente, lança exceção e o item NÃO é adicionado.
    */
   async addItem(input: AddToCartInput): Promise<WhatsAppCart> {
     const cart = await this.getOrCreateCart(input.tenantId, input.customerPhone);
@@ -124,14 +127,21 @@ export class CartService {
       throw new Error(`Carrinho cheio! Máximo de ${MAX_CART_ITEMS} itens por carrinho.`);
     }
 
-    // Verificar se item já existe
+    // Calcular delta (quantidade adicionada)
     const existingItem = cart.items.find((i: CartItem) => i.produto_id === input.produtoId);
+    const deltaQty = input.quantity; // sempre reserva apenas o delta adicionado
 
+    // Reservar o delta no estoque — se lançar (insuficiente), propaga sem alterar o carrinho
+    await this.dataSource.transaction(async (manager) => {
+      // Contexto RLS tenant para a tabela movimentacoes_estoque
+      await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [input.tenantId]);
+      await this.stockEngine.reserve(manager, input.tenantId, input.produtoId, deltaQty);
+    });
+
+    // Só chega aqui se a reserva foi bem-sucedida — atualiza o carrinho em memória
     if (existingItem) {
-      // Atualizar quantidade
       existingItem.quantity += input.quantity;
     } else {
-      // Adicionar novo item
       cart.items.push({
         produto_id: input.produtoId,
         produto_name: input.produtoName,
@@ -140,13 +150,11 @@ export class CartService {
       });
     }
 
-    // Recalcular totais
+    // Recalcular totais e salvar
     this.recalculateTotals(cart);
-
-    // Salvar
     await this.getRepository().save(cart);
 
-    this.logger.log(`Added item ${input.produtoName} to cart ${cart.id}`, {
+    this.logger.log(`Item ${input.produtoName} adicionado ao carrinho ${cart.id}`, {
       quantity: input.quantity,
       total: Number(cart.total_amount),
     });
@@ -155,7 +163,9 @@ export class CartService {
   }
 
   /**
-   * Atualiza quantidade de um item
+   * Atualiza quantidade de um item, reservando ou liberando o delta de estoque
+   * atomicamente. Se delta > 0 e reserve lançar (estoque insuficiente), propaga
+   * sem alterar o carrinho. Se delta < 0, libera o excedente de reserva.
    */
   async updateItem(cartId: string, produtoId: string, quantity: number): Promise<WhatsAppCart> {
     const cart = await this.getCartById(cartId);
@@ -170,10 +180,32 @@ export class CartService {
       throw new Error('Item não encontrado no carrinho');
     }
 
+    const oldQty = item.quantity;
+
     if (quantity <= 0) {
-      // Remover item
+      // Remoção: liberar toda a reserva do item antes de remover do carrinho
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [cart.tenant_id]);
+        await this.stockEngine.release(manager, cart.tenant_id, produtoId, oldQty);
+      });
       cart.items = cart.items.filter((i: CartItem) => i.produto_id !== produtoId);
     } else {
+      const delta = quantity - oldQty;
+      if (delta > 0) {
+        // Nova quantidade maior: reservar o delta adicional.
+        // Se lançar (estoque insuficiente), propaga sem alterar o carrinho.
+        await this.dataSource.transaction(async (manager) => {
+          await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [cart.tenant_id]);
+          await this.stockEngine.reserve(manager, cart.tenant_id, produtoId, delta);
+        });
+      } else if (delta < 0) {
+        // Nova quantidade menor: liberar o delta reduzido.
+        await this.dataSource.transaction(async (manager) => {
+          await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [cart.tenant_id]);
+          await this.stockEngine.release(manager, cart.tenant_id, produtoId, -delta);
+        });
+      }
+      // delta === 0: sem operação de estoque
       item.quantity = quantity;
     }
 
@@ -184,7 +216,7 @@ export class CartService {
   }
 
   /**
-   * Remove item do carrinho
+   * Remove item do carrinho e libera a reserva de estoque correspondente.
    */
   async removeItem(cartId: string, produtoId: string): Promise<WhatsAppCart> {
     const cart = await this.getCartById(cartId);
@@ -193,10 +225,22 @@ export class CartService {
       throw new Error('Carrinho não encontrado');
     }
 
+    // Encontrar o item a remover para calcular quanto liberar
+    const itemRemovido = cart.items.find((i: CartItem) => i.produto_id === produtoId);
+
+    // Liberar reserva do item removido (se o carrinho estiver ativo e tiver reserva)
+    if (itemRemovido && cart.status === 'active') {
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [cart.tenant_id]);
+        await this.stockEngine.release(manager, cart.tenant_id, produtoId, itemRemovido.quantity);
+      });
+    }
+
     cart.items = cart.items.filter((i: CartItem) => i.produto_id !== produtoId);
 
     if (cart.items.length === 0) {
       cart.status = 'abandoned';
+      cart.stock_released_at = new Date();
       await this.getRepository().save(cart);
       return cart;
     }
@@ -208,7 +252,7 @@ export class CartService {
   }
 
   /**
-   * Limpa carrinho (remove todos os itens)
+   * Limpa carrinho (remove todos os itens) e libera todas as reservas de estoque.
    */
   async clearCart(cartId: string): Promise<WhatsAppCart> {
     const cart = await this.getCartById(cartId);
@@ -217,15 +261,78 @@ export class CartService {
       throw new Error('Carrinho não encontrado');
     }
 
+    // Liberar reservas de todos os itens (somente se ainda ativo e não liberado)
+    if (cart.status === 'active' && cart.items.length > 0 && !cart.stock_released_at) {
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [cart.tenant_id]);
+        for (const item of cart.items) {
+          await this.stockEngine.release(manager, cart.tenant_id, item.produto_id, item.quantity);
+        }
+      });
+    }
+
     cart.items = [];
     cart.subtotal = 0;
     cart.discount_amount = 0;
     cart.total_amount = 0;
     cart.status = 'abandoned';
+    cart.stock_released_at = cart.stock_released_at ?? new Date();
 
     await this.getRepository().save(cart);
 
     return cart;
+  }
+
+  /**
+   * Libera as reservas de um carrinho expirado de forma idempotente.
+   * Usa compare-and-set atômico: só o actor que vira o status='expired'
+   * com stock_released_at=now() de fato libera as reservas.
+   * Usado tanto pelo fast-path de expireOldCarts quanto pelo sweeper (Task 7).
+   */
+  async releaseExpiredCart(cartId: string): Promise<void> {
+    // Buscar tenant_id antes para poder configurar RLS no UPDATE atômico
+    const cartRow = await this.dataSource.query(
+      `SELECT tenant_id FROM whatsapp_carts WHERE id = $1`,
+      [cartId],
+    );
+    if (!cartRow || cartRow.length === 0) return;
+    const tenantId: string = cartRow[0].tenant_id;
+
+    // Atomic compare-and-set dentro de transação com RLS configurado:
+    // só afeta carrinhos active sem stock_released_at
+    let items: CartItem[] | null = null;
+    await this.dataSource.transaction(async (manager) => {
+      // RLS: necessário para acessar whatsapp_carts (e também movimentacoes_estoque)
+      await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [tenantId]);
+
+      // manager.query() com RETURNING retorna tupla [[linhas], rowCount] neste TypeORM+pg; unwrap obrigatorio antes de ler campos.
+      const rawUpdate = await manager.query(
+        `UPDATE whatsapp_carts
+           SET status = 'expired', stock_released_at = now()
+         WHERE id = $1
+           AND status = 'active'
+           AND stock_released_at IS NULL
+         RETURNING items, tenant_id`,
+        [cartId],
+      );
+      const rows: Array<{ items: CartItem[]; tenant_id: string }> = Array.isArray(rawUpdate[0])
+        ? rawUpdate[0]
+        : rawUpdate;
+
+      // Se nenhuma linha foi afetada, já foi tratado por outro actor — no-op
+      if (!rows || rows.length === 0) return;
+
+      items = rows[0].items;
+
+      // Liberar reservas de cada item do carrinho expirado
+      if (items && items.length > 0) {
+        for (const item of items) {
+          await this.stockEngine.release(manager, tenantId, item.produto_id, item.quantity);
+        }
+      }
+    });
+
+    this.logger.log(`Carrinho ${cartId} expirado: ${items ? (items as CartItem[]).length : 0} item(ns) liberado(s)`);
   }
 
   /**
@@ -275,7 +382,7 @@ export class CartService {
     if (cart) {
       cart.status = 'converted';
       await this.getRepository().save(cart);
-      this.logger.log(`Cart ${cartId} converted to order`);
+      this.logger.log(`Carrinho ${cartId} convertido em pedido`);
     }
   }
 
@@ -352,18 +459,27 @@ export class CartService {
     });
   }
 
+  /**
+   * Expira carrinhos antigos do cliente, liberando reservas de cada um via releaseExpiredCart.
+   */
   private async expireOldCarts(tenantId: string, customerPhone: string): Promise<void> {
     const now = new Date();
 
-    await this.getRepository().update(
-      {
+    // Buscar carrinhos expirados ainda marcados como 'active'
+    const carrinhos = await this.getRepository().find({
+      where: {
         tenant_id: tenantId,
         customer_phone: customerPhone,
         status: 'active' as any,
         expires_at: LessThan(now) as any,
       },
-      { status: 'expired' as any },
-    );
+      select: ['id'],
+    });
+
+    // Liberar estoque de cada carrinho expirado via compare-and-set idempotente
+    for (const c of carrinhos) {
+      await this.releaseExpiredCart(c.id);
+    }
   }
 
   private recalculateTotals(cart: WhatsAppCart): void {

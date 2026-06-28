@@ -24,6 +24,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import * as QRCode from 'qrcode';
 import { DbContextService } from '../common/services/db-context.service';
 import { MercadoPagoProvider, MercadoPagoPaymentDetails } from './providers/mercadopago.provider';
+import { OrdersService } from '../orders/orders.service';
 
 export interface CreatePaymentDto {
   pedido_id: string;
@@ -63,6 +64,8 @@ export class PaymentsService {
     private readonly mercadoPagoProvider: MercadoPagoProvider,
     @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
+    // Task 8: reutiliza o cancel+release idempotente do Motor de Estoque
+    private readonly ordersService: OrdersService,
   ) {}
 
   /**
@@ -727,7 +730,13 @@ export class PaymentsService {
     if (normalized === 'authorized' || normalized === 'in_process') return PagamentoStatus.PROCESSING;
     if (normalized === 'pending' || normalized === 'in_mediation') return PagamentoStatus.PENDING;
     if (normalized === 'refunded') return PagamentoStatus.REFUNDED;
-    if (normalized === 'rejected' || normalized === 'cancelled' || normalized === 'charged_back') {
+    // Task 8: 'expired' adicionado ao grupo de falha — PIX vencido = FAILED
+    if (
+      normalized === 'rejected' ||
+      normalized === 'cancelled' ||
+      normalized === 'expired' ||
+      normalized === 'charged_back'
+    ) {
       return PagamentoStatus.FAILED;
     }
     return PagamentoStatus.PENDING;
@@ -869,6 +878,44 @@ export class PaymentsService {
 
         if (mappedStatus === PagamentoStatus.PAID) {
           await this.confirmPayment(pagamento.id, tenantId);
+          return { status: 'ok' };
+        }
+
+        // Task 8: salva o novo status FAILED independentemente do motivo (rejected,
+        // cancelled, expired, charged_back). A liberacao de reserva, porem, ocorre
+        // SOMENTE para abandono definitivo do PIX ('expired' ou 'cancelled'):
+        //   - 'rejected'     → recusa de cartao retentavel; pedido permanece pendente.
+        //   - 'charged_back' → estorno pos-aprovacao; nao toca o fluxo de reserva.
+        //   - 'expired'/'cancelled' → PIX vencido/cancelado; libera reserva imediatamente
+        //     via releaseExpiredPendingOrder (mesmo mecanismo do sweeper TTL),
+        //     que usa compare-and-set (stock_released_at IS NULL) para garantir
+        //     idempotencia caso webhook e sweeper colidam.
+        if (mappedStatus === PagamentoStatus.FAILED) {
+          pagamento.status = mappedStatus;
+          pagamento.metadata = {
+            ...pagamento.metadata,
+            ...providerMeta,
+          };
+          await this.db.getRepository(Pagamento).save(pagamento);
+
+          // Libera reserva somente para abandono definitivo do PIX.
+          const rawStatus = (details.status ?? '').toLowerCase();
+          if (['expired', 'cancelled'].includes(rawStatus)) {
+            try {
+              await this.ordersService.releaseExpiredPendingOrder(pagamento.pedido_id);
+              this.logger.log(
+                `Webhook MP: reserva liberada para pedido ${pagamento.pedido_id} (status MP: ${details.status})`,
+              );
+            } catch (releaseErr) {
+              // Falha inesperada aqui e sobrevivivel: o sweeper TTL e o fallback
+              // e vai liberar a reserva no seu proximo tick sem intervencao manual.
+              this.logger.warn('Webhook MP: erro ao liberar reserva do pedido (sweeper TTL atuara como fallback)', {
+                pedidoId: pagamento.pedido_id,
+                error: releaseErr instanceof Error ? releaseErr.message : String(releaseErr),
+              });
+            }
+          }
+
           return { status: 'ok' };
         }
 
