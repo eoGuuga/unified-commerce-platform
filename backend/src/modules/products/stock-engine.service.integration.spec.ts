@@ -118,4 +118,50 @@ describe('StockEngineService (integration)', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(await saldo(pid)).toEqual({ current: 1, reserved: 1 }); // reservado só uma vez
   });
+
+  it('commitSale baixa current e reserved e grava VENDA no ledger', async () => {
+    if (!dataSource) return;
+    const pid = await seedProduto(10, 4);
+    const orderId = (await dataSource.query(`SELECT uuid_generate_v4() AS id`))[0].id;
+    await dataSource.transaction((m) =>
+      engine.commitSale(m, tenantId, orderId, [{ produto_id: pid, quantity: 4 }]),
+    );
+    expect(await saldo(pid)).toEqual({ current: 6, reserved: 0 });
+
+    const ledger = await dataSource.query(
+      `SELECT tipo, delta, saldo_resultante FROM movimentacoes_estoque_historico
+       WHERE order_id = $1 AND produto_id = $2`,
+      [orderId, pid],
+    );
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0].tipo).toBe('VENDA');
+    expect(Number(ledger[0].delta)).toBe(-4);
+    expect(Number(ledger[0].saldo_resultante)).toBe(6);
+  });
+
+  it('commitSale é idempotente — 2ª chamada não baixa de novo', async () => {
+    if (!dataSource) return;
+    const pid = await seedProduto(10, 4);
+    const orderId = (await dataSource.query(`SELECT uuid_generate_v4() AS id`))[0].id;
+    const items = [{ produto_id: pid, quantity: 4 }];
+    await dataSource.transaction((m) => engine.commitSale(m, tenantId, orderId, items));
+    await dataSource.transaction((m) => engine.commitSale(m, tenantId, orderId, items));
+    expect(await saldo(pid)).toEqual({ current: 6, reserved: 0 });
+    const count = await dataSource.query(
+      `SELECT COUNT(*)::int AS n FROM movimentacoes_estoque_historico
+       WHERE order_id = $1 AND produto_id = $2 AND tipo = 'VENDA'`,
+      [orderId, pid],
+    );
+    expect(count[0].n).toBe(1);
+  });
+
+  it('recordManualMovement grava ledger e ajusta saldo', async () => {
+    if (!dataSource) return;
+    const pid = await seedProduto(5);
+    const res = await dataSource.transaction((m) =>
+      engine.recordManualMovement(m, tenantId, pid, 'COMPRA' as any, 7, 'reposição', null),
+    );
+    expect(res.saldo_resultante).toBe(12);
+    expect((await saldo(pid)).current).toBe(12);
+  });
 });

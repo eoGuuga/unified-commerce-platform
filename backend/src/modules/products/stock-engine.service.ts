@@ -1,6 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque.entity';
+import {
+  MovimentacaoEstoqueHistorico,
+  LedgerTipo,
+} from '../../database/entities/MovimentacaoEstoqueHistorico.entity';
 
 /**
  * Primitivas atômicas de estoque. Toda mutação é UPDATE guardado no banco,
@@ -60,6 +64,122 @@ export class StockEngineService {
       .andWhere('produto_id = :produtoId', { produtoId })
       .setParameters({ qty })
       .execute();
+  }
+
+  /**
+   * Baixa real de venda: current -= qty e reserved -= qty, + ledger VENDA.
+   * Idempotente: se já existe VENDA para (order_id, produto_id), pula o item.
+   */
+  async commitSale(
+    manager: EntityManager,
+    tenantId: string,
+    orderId: string,
+    items: Array<{ produto_id: string; quantity: number }>,
+  ): Promise<void> {
+    // Garante que o contexto de tenant esteja definido para esta transação (RLS).
+    await manager.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+
+    for (const item of items) {
+      this.assertQty(item.quantity);
+
+      // Gate de idempotência: tenta inserir o registro de VENDA primeiro.
+      // ON CONFLICT no índice parcial (order_id, produto_id) WHERE tipo='VENDA'.
+      // Nota: EntityManager.query() para INSERT RETURNING retorna [rows[], affectedCount].
+      const rawInsert = await manager.query(
+        `INSERT INTO movimentacoes_estoque_historico
+           (id, tenant_id, produto_id, tipo, delta, saldo_resultante, order_id, created_at)
+         VALUES (uuid_generate_v4(), $1, $2, 'VENDA', $3, 0, $4, now())
+         ON CONFLICT (order_id, produto_id) WHERE tipo = 'VENDA' DO NOTHING
+         RETURNING id`,
+        [tenantId, item.produto_id, -item.quantity, orderId],
+      );
+      // rawInsert pode ser [[rows...], count] ou [rows...] dependendo do driver.
+      const insertedRows: Array<{ id: string }> = Array.isArray(rawInsert[0])
+        ? rawInsert[0]
+        : rawInsert;
+
+      // Já existia (retry) → no-op para este item.
+      if (!insertedRows || insertedRows.length === 0) continue;
+      const ledgerId = insertedRows[0].id;
+
+      // Baixa guardada; RETURNING dá o saldo pós-update (sem ler memória).
+      // Nota: EntityManager.query() para UPDATE RETURNING retorna [rows[], affectedCount].
+      const rawUpdate = await manager.query(
+        `UPDATE movimentacoes_estoque
+         SET current_stock = current_stock - $3,
+             reserved_stock = GREATEST(0, reserved_stock - $3),
+             last_updated = now()
+         WHERE tenant_id = $1 AND produto_id = $2 AND current_stock - $3 >= 0
+         RETURNING current_stock`,
+        [tenantId, item.produto_id, item.quantity],
+      );
+      // rawUpdate pode ser [[rows...], count] ou [rows...] dependendo do driver.
+      const updatedRows: Array<{ current_stock: number }> = Array.isArray(rawUpdate[0])
+        ? rawUpdate[0]
+        : rawUpdate;
+
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new BadRequestException(
+          `Estoque insuficiente para baixar produto ${item.produto_id} (qtd ${item.quantity}).`,
+        );
+      }
+
+      // Preenche o saldo_resultante real no ledger.
+      await manager.query(
+        `UPDATE movimentacoes_estoque_historico SET saldo_resultante = $2 WHERE id = $1`,
+        [ledgerId, Number(updatedRows[0].current_stock)],
+      );
+    }
+  }
+
+  /**
+   * Movimento manual (COMPRA/AJUSTE/PERDA/DEVOLUCAO). Ajusta current_stock e grava ledger.
+   */
+  async recordManualMovement(
+    manager: EntityManager,
+    tenantId: string,
+    produtoId: string,
+    tipo: LedgerTipo,
+    delta: number,
+    motivo: string | null,
+    usuarioId: string | null,
+  ): Promise<{ saldo_resultante: number }> {
+    if (!Number.isInteger(delta) || delta === 0) {
+      throw new BadRequestException('Delta inválido para movimento manual.');
+    }
+    // Garante que o contexto de tenant esteja definido para esta transação (RLS).
+    await manager.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+    // Nota: EntityManager.query() para UPDATE RETURNING retorna [rows[], affectedCount].
+    const rawUpdate = await manager.query(
+      `UPDATE movimentacoes_estoque
+       SET current_stock = current_stock + $3, last_updated = now()
+       WHERE tenant_id = $1 AND produto_id = $2 AND current_stock + $3 >= 0
+       RETURNING current_stock`,
+      [tenantId, produtoId, delta],
+    );
+    // rawUpdate pode ser [[rows...], count] ou [rows...] dependendo do driver.
+    const updatedRows: Array<{ current_stock: number }> = Array.isArray(rawUpdate[0])
+      ? rawUpdate[0]
+      : rawUpdate;
+    if (!updatedRows || updatedRows.length === 0) {
+      throw new BadRequestException(
+        `Movimento inválido: estoque ficaria negativo (produto ${produtoId}).`,
+      );
+    }
+    const saldo = Number(updatedRows[0].current_stock);
+    await manager
+      .getRepository(MovimentacaoEstoqueHistorico)
+      .insert({
+        tenant_id: tenantId,
+        produto_id: produtoId,
+        tipo,
+        delta,
+        saldo_resultante: saldo,
+        motivo,
+        order_id: null,
+        usuario_id: usuarioId,
+      });
+    return { saldo_resultante: saldo };
   }
 
   private assertQty(qty: number): void {
