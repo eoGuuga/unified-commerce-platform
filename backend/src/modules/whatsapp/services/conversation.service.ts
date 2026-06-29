@@ -14,6 +14,16 @@ export class ConversationService {
     private readonly config: ConfigService,
   ) {}
 
+  /**
+   * TTL de conversa — POR QUE existe: conversas antigas em `waiting_payment`
+   * interferiam em novos pedidos. O cliente voltava depois e a conversa velha
+   * pulava etapas de coleta ou confundia a seleção de pagamento. A limpeza por
+   * TTL encerra conversas antigas para que um novo pedido comece limpo.
+   * Pareado com getActiveGraceMinutes(): uma conversa `active` em coleta só vence
+   * se NÃO estiver recente (dentro da janela de graça), pra não matar uma coleta
+   * em andamento; `waiting_payment` é mantida enquanto houver pedido pendente
+   * válido. (Decisão de 2026-02-13.)
+   */
   private getConversationTtlHours(): number {
     const raw = (this.config.get<string>('WHATSAPP_CONVERSATION_TTL_HOURS') || '').trim();
     const parsed = Number(raw);
