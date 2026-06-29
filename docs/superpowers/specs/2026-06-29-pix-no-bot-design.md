@@ -44,11 +44,16 @@ O bot já cria Pedido real e tem webhook fail-closed que confirma/cancela. Mas o
 
 **Estado atual:** `MercadoPagoProvider` ([providers/mercadopago.provider.ts:84-99](../../backend/src/modules/payments/providers/mercadopago.provider.ts)) lê `MERCADOPAGO_ACCESS_TOKEN` e inicializa o client sem olhar o ambiente. Nada impede `APP_USR` em dev.
 
-**Decisão travada:** em `NODE_ENV !== 'production'`, se o token começar com `APP_USR`, o sistema **falha alto**. Dois pontos (defesa em profundidade — **ambos**):
-- **No boot (construtor do provider):** se `!isProd && token.startsWith('APP_USR')` → **lançar** erro claro que impede o backend de subir. Mensagem: `[SEGURANCA] Token de PRODUÇÃO (APP_USR) detectado fora de produção. Use um token TEST- localmente. Backend bloqueado.` Falhar no boot é o mais cedo possível e impossível de ignorar.
-- **No momento de criar pagamento (`createPixPayment`):** reverificar antes do `payment.create()` — backstop caso o provider seja instanciado de outra forma (testes, DI futura). Mesmo critério, mesmo erro.
+**Decisão travada — guarda BIDIRECIONAL (Ajuste 1 do review):** o token tem que casar com o ambiente, nos **dois** sentidos do erro (ambos custam dinheiro):
+- `NODE_ENV !== 'production'` + `APP_USR` → **lança** (`[SEGURANCA] Token de PRODUÇÃO (APP_USR) detectado fora de produção. Use um token TEST- localmente. Backend bloqueado.`). Risco: cobrar de verdade em dev.
+- `NODE_ENV === 'production'` + `TEST-` → **lança** (`[SEGURANCA] Token de TESTE (TEST-) detectado em PRODUÇÃO. Cobranças não serão reais. Backend bloqueado.`). Risco-espelho, igualmente caro: o backend sobe, processa checkouts, e **nenhuma cobrança real entra** — o dinheiro do lojista não cai e ninguém percebe até o fim do dia.
+- `APP_USR` em prod / `TEST-` em dev → ok. Token **vazio** → não-configurado, nunca lança (qualquer ambiente).
 
-> Por que ambos: o boot pega 99% dos casos (o caminho normal de subida); o check no create é o cinto-e-suspensório que garante que **nenhum** `payment.create()` real saia com token de prod em dev, mesmo que alguém mude a inicialização.
+Em **dois pontos** (defesa em profundidade — **ambos**):
+- **No boot (construtor do provider):** falha mais cedo possível, impossível de ignorar.
+- **No momento de criar pagamento (`createPixPayment`):** backstop caso o provider seja instanciado de outra forma (testes, DI futura).
+
+> Por que bidirecional + ambos os pontos: num sistema que vive de cobrar, "subiu em prod e não cobra" é tão grave quanto "cobrou em dev". O check no create é o cinto-e-suspensório que garante que nenhum `payment.create()` real saia com o token errado pro ambiente.
 
 **Esta task é isolada e mergeada antes de S2a/S3/S4.** Nenhuma outra seção começa antes do guarda estar verde e na base.
 
