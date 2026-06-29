@@ -149,4 +149,85 @@ describe('Checkout: coleta de entrega (S2a)', () => {
     expect(createSpy).not.toHaveBeenCalled();
     expect(String(r).toLowerCase()).toMatch(/entrega/);
   });
+
+  // ---- CAMINHO DO ROTEADOR REAL (regressao do bug Critical) ----
+  // O bug original: detectIntent testava palavra-chave ANTES de checar a FSM ativa,
+  // entao "entrega" caia em order_status e "confirmar" em cart (que reseta a FSM).
+  // Estes testes entram pelo detectIntent/processByIntent (nao chamam a FSM por baixo).
+  describe('roteador (detectIntent/processByIntent) com checkout ativo', () => {
+    it('detectIntent: com checkout ativo, "entrega" e "confirmar" -> intent de coleta (collection)', async () => {
+      // Inicia a FSM via router para deixar context.checkout ativo.
+      await start();
+      expect(conversation.context.checkout?.stage).toBe('ask_fulfillment');
+
+      // "entrega" NAO pode virar order_status (apesar de 'entrega' casar isOrderStatusIntent).
+      expect(service.detectIntent('entrega', conversation)).toBe('collection');
+
+      // Avanca a FSM ate confirming_address para provar o "confirmar".
+      await step('entrega');
+      await step('Maria Souza');
+      await step('11988887777');
+      await step('Rua das Flores, 123, Centro, Sao Paulo, SP, 01001-000');
+      expect(conversation.context.checkout?.stage).toBe('confirming_address');
+
+      // "confirmar" NAO pode virar cart (apesar de 'confirmar' casar isCartCommand).
+      expect(service.detectIntent('confirmar', conversation)).toBe('collection');
+    });
+
+    it('processByIntent ponta-a-ponta: "finalizar"->"entrega"->endereco->"confirmar" cria o pedido UMA vez', async () => {
+      const tenant = { id: tenantId };
+      // Helper que reproduz o loop real: detectIntent -> processByIntent.
+      const route = async (body: string): Promise<string> => {
+        const intent = service.detectIntent(body, conversation);
+        const response = await service.processByIntent(intent, {
+          message: { tenantId, from: phone, messageType: 'text' },
+          processed: { sanitizedBody: body, normalizedBody: body.toLowerCase() },
+          conversation,
+          tenant,
+        });
+        return typeof response === 'string' ? response : (response?.previewText ?? '');
+      };
+
+      // "finalizar" -> isCartCommand -> cart -> handleCart -> handleCheckout (sem checkout ativo ainda).
+      const r1 = await route('finalizar');
+      expect(String(r1).toLowerCase()).toMatch(/entrega|retirada/);
+      expect(conversation.context.checkout?.stage).toBe('ask_fulfillment');
+
+      // "entrega": com a FSM ativa, vai pra coleta — nao pra order_status.
+      const r2 = await route('entrega');
+      expect(String(r2).toLowerCase()).toMatch(/nome/);
+
+      await route('Maria Souza');
+      await route('11988887777');
+      const rAddr = await route('Rua das Flores, 123, Centro, Sao Paulo, SP, 01001-000');
+      expect(String(rAddr).toLowerCase()).toMatch(/confirm/);
+      expect(createSpy).not.toHaveBeenCalled();
+
+      // "confirmar": com a FSM ativa, vai pra coleta — nao pra cart (que resetaria).
+      await route('confirmar');
+      expect(createSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('detectIntent: SEM checkout ativo, "entrega"->order_status e "confirmar"->cart (roteamento legado intacto)', () => {
+      // "entrega" (sem checkout) cai no check de catalogo antes do order_status; stub minimo.
+      service.catalogManager = { isCatalogCommand: () => false };
+      // Sem context.checkout, o roteamento de palavra-chave continua como antes.
+      expect(service.detectIntent('entrega', conversation)).toBe('order_status');
+      expect(service.detectIntent('confirmar', conversation)).toBe('cart');
+    });
+
+    it('escape: "cancelar" durante o checkout encerra a FSM sem criar pedido', async () => {
+      await start();
+      expect(conversation.context.checkout?.stage).toBe('ask_fulfillment');
+
+      // "cancelar" roteia pra coleta e a FSM trata o escape internamente.
+      expect(service.detectIntent('cancelar', conversation)).toBe('collection');
+      const r = await step('cancelar');
+
+      expect(createSpy).not.toHaveBeenCalled();
+      expect(conversation.context.checkout).toBeFalsy();
+      expect(conversation.context.state).toBe('idle');
+      expect(String(r).toLowerCase()).toMatch(/cancel/);
+    });
+  });
 });

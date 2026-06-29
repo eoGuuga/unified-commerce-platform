@@ -450,6 +450,18 @@ export class WhatsAppService {
     const lower = message.toLowerCase().trim();
     const currentState = conversation.context?.state as ConversationState | undefined;
 
+    // PRECEDENCIA DA FSM DE CHECKOUT (S2a): se ha um checkout ativo (context.checkout.stage
+    // setado), a mensagem do cliente pertence a coleta e DEVE ir para handleCollectionStage
+    // (-> handleCheckoutStage), nao para os handlers de palavra-chave. Sem isso, respostas
+    // que o proprio bot pede — "entrega" (casaria isOrderStatusIntent) ou "confirmar"
+    // (casaria isCartCommand) — sequestrariam o fluxo e prenderiam/resetariam a FSM.
+    // O escape explicito ("cancelar"/"sair") e tratado DENTRO da FSM (handleCheckoutStage),
+    // que limpa o context.checkout de forma limpa antes de qualquer outra coisa.
+    const activeCheckout = conversation.context?.checkout as CheckoutContext | undefined;
+    if (activeCheckout?.stage) {
+      return 'collection';
+    }
+
     // Verificar comandos de carrinho
     if (this.isCartCommand(lower)) {
       return 'cart';
@@ -887,6 +899,17 @@ export class WhatsAppService {
     const text = (message || '').trim();
     const lower = text.toLowerCase();
 
+    // Escape limpo: o cliente pode abandonar a coleta a qualquer estagio com
+    // "cancelar"/"sair". Encerra a FSM (state idle, checkout null) sem criar pedido.
+    if (lower === 'cancelar' || lower === 'sair' || lower === 'cancela') {
+      await this.conversationService.updateContext(conversation.id, {
+        state: 'idle',
+        checkout: null,
+      });
+      conversation.context = { ...conversation.context, state: 'idle', checkout: undefined };
+      return 'Tudo bem, cancelei a finalização. 🙂 Seus itens continuam no carrinho. É só dizer *finalizar* quando quiser.';
+    }
+
     const persist = async (updates: Partial<CheckoutContext>, extra?: Record<string, any>) => {
       const next: CheckoutContext = { ...checkout, ...updates };
       await this.conversationService.updateContext(conversation.id, { checkout: next, ...(extra || {}) });
@@ -1063,7 +1086,7 @@ export class WhatsAppService {
         });
 
         if (paymentResult.qr_code) {
-          pixMessage = `\n\n📱 *Pagamento PIX*\n\nEscaneie o QR Code ou copie a chave:\n\n\`${paymentResult.copy_paste || 'Chave PIX'}\``;
+          pixMessage = `\n\n📱 *Pagamento PIX*\n\nEscaneie o QR Code abaixo ou copie a chave:\n\n\`${paymentResult.copy_paste || 'Chave PIX'}\``;
         }
       } catch (paymentError) {
         this.logger.warn('Erro ao criar pagamento PIX, continuando sem PIX', { error: paymentError });
