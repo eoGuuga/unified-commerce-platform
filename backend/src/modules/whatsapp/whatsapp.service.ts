@@ -7,7 +7,7 @@ import { PaymentsService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CouponsService } from '../coupons/coupons.service';
 import { DbContextService } from '../common/services/db-context.service';
-import { CanalVenda } from '../../database/entities/Pedido.entity';
+import { CanalVenda, Pedido } from '../../database/entities/Pedido.entity';
 
 // Services de inteligência (mantidos para recursos avançados)
 import { OpenAIService } from './services/openai.service';
@@ -1074,9 +1074,12 @@ export class WhatsAppService {
         tenantId,
       );
 
-      // Criar pagamento PIX (geração detalhada é a Task 3 — aqui mantemos o
-      // comportamento atual e só garantimos o fluxo).
+      // Criar pagamento PIX (S3): envia a IMAGEM do QR + copia-e-cola em texto,
+      // exibe o VALOR COBRADO (95%, o pagamento.amount), e em falha segue o
+      // caminho honesto (payment_issue=true + aviso ao lojista).
       let pixMessage = '';
+      // Formatador BRL do sistema (mesmo de generatePixMessage): R$ 95,00.
+      const brl = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
       try {
         const paymentResult = await this.paymentsService.createPayment(tenantId, {
           pedido_id: order.id,
@@ -1085,12 +1088,76 @@ export class WhatsAppService {
           metadata: { customerPhone, orderId: order.id },
         });
 
+        // VALOR EXIBIDO = VALOR COBRADO (Ajuste 2): o pagamento.amount ja vem com o
+        // desconto PIX (95%) aplicado pelo createPayment. NUNCA order.total_amount.
+        const valorCobrado = Number(paymentResult.pagamento?.amount);
+        const copyPaste = paymentResult.copy_paste || 'Chave PIX';
+
+        const totalCheio = Number(order.total_amount);
+        const linhasPix = ['', '', '📱 *Pagamento PIX*'];
+        if (Number.isFinite(valorCobrado) && valorCobrado > 0) {
+          if (Number.isFinite(totalCheio) && totalCheio > valorCobrado) {
+            // Desconto PIX EXPLICITO como argumento de venda: o cliente VE que
+            // economiza pagando no PIX (incentivo concreto num ticket baixo).
+            const economia = Number((totalCheio - valorCobrado).toFixed(2));
+            linhasPix.push(
+              '',
+              `De ${brl(totalCheio)} por *${brl(valorCobrado)}* no PIX`,
+              `💚 Você economiza ${brl(economia)} pagando com PIX!`,
+            );
+          } else {
+            linhasPix.push('', `Valor a pagar no PIX: *${brl(valorCobrado)}*`);
+          }
+        }
+        linhasPix.push('', 'Escaneie o QR Code enviado ou copie a chave:', '', `\`${copyPaste}\``);
+        pixMessage = linhasPix.join('\n');
+
+        // Envia a IMAGEM do QR (data-URL base64) ALEM da copia-e-cola no texto.
+        // Best-effort: o sendImage ja degrada pra texto, e a copia-e-cola e o
+        // caminho garantido — nunca bloquear o checkout nisso.
         if (paymentResult.qr_code) {
-          pixMessage = `\n\n📱 *Pagamento PIX*\n\nEscaneie o QR Code abaixo ou copie a chave:\n\n\`${paymentResult.copy_paste || 'Chave PIX'}\``;
+          try {
+            await this.whatsappSender.sendImage(
+              tenantId,
+              customerPhone,
+              paymentResult.qr_code,
+              'QR Code do seu pagamento PIX',
+            );
+          } catch (imageError) {
+            this.logger.warn('Falha ao enviar imagem do QR PIX (segue com copia-e-cola)', {
+              error: imageError instanceof Error ? imageError.message : String(imageError),
+              tenantId,
+              orderId: order.id,
+            });
+          }
         }
       } catch (paymentError) {
-        this.logger.warn('Erro ao criar pagamento PIX, continuando sem PIX', { error: paymentError });
-        pixMessage = '\n\n💳 *Forma de pagamento:* PIX (à vista)\nAguarde o link de pagamento.';
+        // Caminho de falha HONESTO: nada de "aguarde o link". Marca o estado
+        // tipado payment_issue=true (consultavel) e avisa o lojista diretamente.
+        this.logger.error('Erro ao gerar pagamento PIX', {
+          error: paymentError instanceof Error ? paymentError.message : String(paymentError),
+          tenantId,
+          orderId: order.id,
+        });
+
+        try {
+          const pedidoRepo = this.db.getRepository(Pedido);
+          order.payment_issue = true;
+          await pedidoRepo.save(order);
+        } catch (saveError) {
+          this.logger.error('Falha ao marcar payment_issue no pedido', {
+            error: saveError instanceof Error ? saveError.message : String(saveError),
+            tenantId,
+            orderId: order.id,
+          });
+        }
+
+        // Aviso ao lojista — best-effort/nao-fatal (a propria funcao nao lanca).
+        await this.notificationsService.notifyMerchantPaymentIssue(tenantId, order);
+
+        pixMessage =
+          '\n\n⚠️ Tivemos um problema ao gerar o pagamento PIX agora. ' +
+          'Seu pedido está reservado e nossa equipe já foi avisada para entrar em contato e concluir com você.';
       }
 
       await this.cartService.markAsConverted(cart.id);
