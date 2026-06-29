@@ -30,8 +30,6 @@ import { ConversationManagerService } from './services/conversation-manager.serv
 import { MessageProcessorService } from './services/message-processor.service';
 import { CatalogManagerService } from './services/catalog-manager.service';
 import { ResponseBuilderService } from './services/response-builder.service';
-import { NLPService } from './services/nlp.service';
-import { SalesOrchestratorService } from './services/sales-orchestrator.service';
 import { InteractiveMessageService } from './services/interactive-message.service';
 import { WhatsappSendingModule } from './config/whatsapp-sending.module';
 
@@ -97,8 +95,6 @@ import { CommonModule } from '../common/common.module';
     MessageProcessorService,
     CatalogManagerService,
     ResponseBuilderService,
-    NLPService,
-    SalesOrchestratorService,
     InteractiveMessageService,
 
     // Providers de WhatsApp (Evolution/Mock/CloudApi) vêm do WhatsappSendingModule
@@ -124,8 +120,6 @@ import { CommonModule } from '../common/common.module';
     MessageProcessorService,
     CatalogManagerService,
     ResponseBuilderService,
-    NLPService,
-    SalesOrchestratorService,
   ],
 })
 export class WhatsappModule {}
