@@ -1,11 +1,18 @@
 /**
- * Testes do StockManager — leitura (T5a).
+ * Testes do StockManager — leitura (T5a) + mutações (T5b).
  *
- * Verifica:
+ * T5a verifica:
  *  - filtro "Precisam de atenção" esconde produtos OK
  *  - badge por status usa classes corretas (stock-status.ts)
  *  - extrato renderiza linhas do history
  *  - estados de loading/erro/vazio
+ *
+ * T5b verifica:
+ *  - modo-contagem: delta = contado - atual (contado=47, atual=50 → delta=-3)
+ *  - modo-contagem: delta positivo (contado=55, atual=50 → delta=+5)
+ *  - 422 INSUFFICIENT_STOCK → mensagem específica "Estoque insuficiente para esta saída"
+ *  - ajuste OK fecha o modal
+ *  - Correção usa delta bidirecional
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -82,11 +89,13 @@ function makeAdminData(overrides = {}) {
     stockError: null,
     refetchStock: vi.fn(),
     history: vi.fn().mockResolvedValue({ items: historyItems, total: 2 }),
+    adjustStock: vi.fn().mockResolvedValue({ ok: true }),
+    setMin: vi.fn().mockResolvedValue({ ok: true }),
     ...overrides,
   };
 }
 
-describe('StockManager', () => {
+describe('StockManager — leitura (T5a)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseAdminData.mockReturnValue(makeAdminData());
@@ -201,6 +210,178 @@ describe('StockManager', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/nenhuma movimentação/i)).toBeInTheDocument();
+    });
+  });
+});
+
+// ---- Testes T5b: mutações ----
+
+describe('StockManager — mutações (T5b)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /**
+   * T5b — Modo-contagem: contado=47, current=50 → delta no wire = -3.
+   * Tipo Correção (AJUSTE) com valor contado na prateleira.
+   */
+  it('modo-contagem Correção: contado=47, atual=50 → adjustStock recebe delta=-3', async () => {
+    const adjustStockFn = vi.fn().mockResolvedValue({ ok: true });
+    mockUseAdminData.mockReturnValue(makeAdminData({ adjustStock: adjustStockFn }));
+
+    render(<StockManager />);
+
+    // Abre modal de ajuste para Produto OK (current_stock=50)
+    const botoesAjustar = screen.getAllByText('Ajustar');
+    fireEvent.click(botoesAjustar[0]);
+
+    // Seleciona Correção
+    const selectTipo = screen.getByRole('combobox');
+    fireEvent.change(selectTipo, { target: { value: 'AJUSTE' } });
+
+    // Insere valor contado = 47
+    const inputQtd = screen.getByPlaceholderText(/quantas unidades há na prateleira/i);
+    fireEvent.change(inputQtd, { target: { value: '47' } });
+
+    // Confirma o delta preview: ajuste: -3
+    expect(screen.getByTestId('delta-preview')).toHaveTextContent('ajuste: -3');
+
+    // Submete
+    fireEvent.click(screen.getByText('Confirmar'));
+
+    await waitFor(() => {
+      expect(adjustStockFn).toHaveBeenCalledWith('p1', 'AJUSTE', -3, undefined);
+    });
+  });
+
+  /**
+   * T5b — Modo-contagem bidirecional: contado=55, current=50 → delta=+5.
+   */
+  it('modo-contagem Correção: contado=55, atual=50 → adjustStock recebe delta=+5', async () => {
+    const adjustStockFn = vi.fn().mockResolvedValue({ ok: true });
+    mockUseAdminData.mockReturnValue(makeAdminData({ adjustStock: adjustStockFn }));
+
+    render(<StockManager />);
+
+    const botoesAjustar = screen.getAllByText('Ajustar');
+    fireEvent.click(botoesAjustar[0]); // Produto OK (current=50)
+
+    const selectTipo = screen.getByRole('combobox');
+    fireEvent.change(selectTipo, { target: { value: 'AJUSTE' } });
+
+    const inputQtd = screen.getByPlaceholderText(/quantas unidades há na prateleira/i);
+    fireEvent.change(inputQtd, { target: { value: '55' } });
+
+    // Confirma o delta preview: ajuste: +5
+    expect(screen.getByTestId('delta-preview')).toHaveTextContent('ajuste: +5');
+
+    fireEvent.click(screen.getByText('Confirmar'));
+
+    await waitFor(() => {
+      expect(adjustStockFn).toHaveBeenCalledWith('p1', 'AJUSTE', 5, undefined);
+    });
+  });
+
+  /**
+   * T5b — 422 INSUFFICIENT_STOCK → mensagem específica no UI.
+   */
+  it('422 INSUFFICIENT_STOCK → UI mostra "Estoque insuficiente para esta saída"', async () => {
+    const adjustStockFn = vi
+      .fn()
+      .mockResolvedValue({ ok: false, code: 'INSUFFICIENT_STOCK', error: 'Estoque insuficiente' });
+
+    mockUseAdminData.mockReturnValue(makeAdminData({ adjustStock: adjustStockFn }));
+
+    render(<StockManager />);
+
+    const botoesAjustar = screen.getAllByText('Ajustar');
+    fireEvent.click(botoesAjustar[0]);
+
+    // Seleciona Perda e insere quantidade
+    const selectTipo = screen.getByRole('combobox');
+    fireEvent.change(selectTipo, { target: { value: 'PERDA' } });
+
+    const inputQtd = screen.getByPlaceholderText('0');
+    fireEvent.change(inputQtd, { target: { value: '100' } });
+
+    fireEvent.click(screen.getByText('Confirmar'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Estoque insuficiente para esta saída.',
+      );
+    });
+  });
+
+  /**
+   * T5b — Ajuste bem-sucedido fecha o modal.
+   */
+  it('ajuste OK fecha o modal', async () => {
+    const adjustStockFn = vi.fn().mockResolvedValue({ ok: true });
+    mockUseAdminData.mockReturnValue(makeAdminData({ adjustStock: adjustStockFn }));
+
+    render(<StockManager />);
+
+    const botoesAjustar = screen.getAllByText('Ajustar');
+    fireEvent.click(botoesAjustar[0]);
+
+    expect(screen.getByText('Ajustar Estoque')).toBeInTheDocument();
+
+    const inputQtd = screen.getByPlaceholderText('0');
+    fireEvent.change(inputQtd, { target: { value: '10' } });
+
+    fireEvent.click(screen.getByText('Confirmar'));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Ajustar Estoque')).not.toBeInTheDocument();
+    });
+  });
+
+  /**
+   * T5b — Perda: UI aplica delta negativo.
+   */
+  it('tipo Perda: quantidade=5 → adjustStock recebe delta=-5', async () => {
+    const adjustStockFn = vi.fn().mockResolvedValue({ ok: true });
+    mockUseAdminData.mockReturnValue(makeAdminData({ adjustStock: adjustStockFn }));
+
+    render(<StockManager />);
+
+    const botoesAjustar = screen.getAllByText('Ajustar');
+    fireEvent.click(botoesAjustar[0]);
+
+    const selectTipo = screen.getByRole('combobox');
+    fireEvent.change(selectTipo, { target: { value: 'PERDA' } });
+
+    const inputQtd = screen.getByPlaceholderText('0');
+    fireEvent.change(inputQtd, { target: { value: '5' } });
+
+    fireEvent.click(screen.getByText('Confirmar'));
+
+    await waitFor(() => {
+      expect(adjustStockFn).toHaveBeenCalledWith('p1', 'PERDA', -5, undefined);
+    });
+  });
+
+  /**
+   * T5b — Compra: quantidade positiva vai direto para o wire.
+   */
+  it('tipo Compra: quantidade=20 → adjustStock recebe delta=+20', async () => {
+    const adjustStockFn = vi.fn().mockResolvedValue({ ok: true });
+    mockUseAdminData.mockReturnValue(makeAdminData({ adjustStock: adjustStockFn }));
+
+    render(<StockManager />);
+
+    const botoesAjustar = screen.getAllByText('Ajustar');
+    fireEvent.click(botoesAjustar[0]);
+
+    // Compra é o tipo padrão — deixamos assim
+    const inputQtd = screen.getByPlaceholderText('0');
+    fireEvent.change(inputQtd, { target: { value: '20' } });
+
+    fireEvent.click(screen.getByText('Confirmar'));
+
+    await waitFor(() => {
+      expect(adjustStockFn).toHaveBeenCalledWith('p1', 'COMPRA', 20, undefined);
     });
   });
 });

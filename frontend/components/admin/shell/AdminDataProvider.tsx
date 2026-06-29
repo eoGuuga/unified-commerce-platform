@@ -19,7 +19,7 @@ import { useOrders } from '@/hooks/useOrders';
 import { useStock } from '@/hooks/useStock';
 import type { Order, OrderStatus } from '@/lib/types/order';
 import type { StockSummary } from '@/lib/types/product';
-import type { StockHistoryItem } from '@/hooks/useStock';
+import type { StockHistoryItem, AdjustResult } from '@/hooks/useStock';
 
 export type { StockHistoryItem };
 
@@ -49,9 +49,14 @@ export interface AdminDataContextValue {
   /** Nº de SKUs em atenção; undefined quando fetch falhou (badge some). */
   attentionCount: number | undefined;
   history: (productId: string, limit?: number, offset?: number) => Promise<StockHistoryResult>;
-  /** Stubs para T5b — preenchidos com mutações reais na T5b. */
-  adjustStock: (productId: string, delta: number, reason?: string) => Promise<void>;
-  setMin: (productId: string, min: number) => Promise<void>;
+  /** Mutações de estoque com optimistic update (T5b). */
+  adjustStock: (
+    productId: string,
+    tipo: 'COMPRA' | 'PERDA' | 'DEVOLUCAO' | 'AJUSTE',
+    delta: number,
+    motivo?: string,
+  ) => Promise<AdjustResult>;
+  setMin: (productId: string, min: number) => Promise<AdjustResult>;
 }
 
 // ---- Status que contam pro selo de "novos pedidos" ----
