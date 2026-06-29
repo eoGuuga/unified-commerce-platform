@@ -32,7 +32,9 @@ if (-not $ipToUnban) {
 Write-Host "🔧 Desbloqueando IP: $ipToUnban" -ForegroundColor Yellow
 
 # Executar desbloqueio
-$unbanResult = ssh ubuntu@37.59.118.210 "echo 'Ramongu2005.' | sudo -S fail2ban-client set sshd unbanip $ipToUnban"
+# Seguranca: nunca embutir senha no script. O 'ssh -t' aloca TTY e o 'sudo'
+# pede a senha interativamente no momento do uso.
+$unbanResult = ssh -t ubuntu@37.59.118.210 "sudo fail2ban-client set sshd unbanip $ipToUnban"
 
 if ($unbanResult -match "1") {
     Write-Host "✅ IP $ipToUnban desbloqueado com sucesso!" -ForegroundColor Green
@@ -45,7 +47,7 @@ Write-Host ""
 
 # Verificar status
 Write-Host "📊 Verificando status do Fail2Ban..." -ForegroundColor Yellow
-$statusResult = ssh ubuntu@37.59.118.210 "echo 'Ramongu2005.' | sudo -S fail2ban-client status sshd"
+$statusResult = ssh -t ubuntu@37.59.118.210 "sudo fail2ban-client status sshd"
 Write-Host $statusResult
 
 Write-Host ""
