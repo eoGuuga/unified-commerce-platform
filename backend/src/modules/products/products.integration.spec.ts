@@ -19,7 +19,10 @@ describe('Products Integration Tests (e2e)', () => {
   let dataSource: DataSource;
   let jwtToken: string;
   const tenantId = '00000000-0000-0000-0000-000000000000';
-  const productName = 'Produto Teste E2E Produtos';
+  // Sufixo único por execução: evita colisão de SKU no banco compartilhado (ucm_test_motor)
+  // quando produtos de runs anteriores acumulam e esgotam os sufixos do retry (MAX_TENTATIVAS=5).
+  const runToken = Date.now().toString(36);
+  const productName = `Produto Teste E2E Produtos ${runToken}`;
 
   beforeAll(async () => {
     try {
@@ -95,6 +98,22 @@ describe('Products Integration Tests (e2e)', () => {
   });
 
   afterAll(async () => {
+    // Limpar produtos criados por este run (nome contém o runToken único)
+    // para que o banco compartilhado não acumule dados entre execuções.
+    if (dataSource && dataSource.isInitialized) {
+      try {
+        const qr = dataSource.createQueryRunner();
+        await qr.connect();
+        await qr.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+        await qr.query(
+          `DELETE FROM produtos WHERE tenant_id = $1 AND name LIKE $2`,
+          [tenantId, `%${runToken}%`],
+        );
+        await qr.release();
+      } catch {
+        // cleanup não-fatal — falha silenciosa para não mascarar erros reais dos testes
+      }
+    }
     if (app) {
       await app.close();
     }
@@ -340,10 +359,11 @@ describe('Products Integration Tests (e2e)', () => {
 
     it('criar produto com initial_stock grava UMA linha INVENTARIO_INICIAL (sem 2x)', async () => {
       if (!app) return;
+      // Nome único por run: evita colisão de SKU "trufa" no banco compartilhado acumulado
       const res = await request(app.getHttpServer())
         .post(`/api/v1/products`)
         .set('Authorization', `Bearer ${jwtToken}`)
-        .send({ name: 'Trufa', price: 5.0, initial_stock: 10 });
+        .send({ name: `Trufa ${runToken}`, price: 5.0, initial_stock: 10 });
       expect(res.status).toBe(201);
 
       const novoProdutoId = res.body.id;
