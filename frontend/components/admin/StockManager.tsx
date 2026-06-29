@@ -8,7 +8,7 @@
  * Mutações (ajuste, setMin) entram na T5b.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { RefreshCw, Package, AlertTriangle, X, Clock } from 'lucide-react';
 import { useAdminData } from '@/components/admin/shell/AdminDataProvider';
 import { stockStatus, isAttention, STATUS_META } from '@/lib/stock-status';
@@ -45,8 +45,8 @@ function ExtratoDrawer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Carrega histórico ao montar
-  useState(() => {
+  // Carrega histórico ao montar; cancela requisição pendente se desmontar antes de resolver
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -64,7 +64,7 @@ function ExtratoDrawer({
     return () => {
       cancelled = true;
     };
-  });
+  }, [product.id, history]);
 
   const status = stockStatus(
     product.available_stock as number | null | undefined,
