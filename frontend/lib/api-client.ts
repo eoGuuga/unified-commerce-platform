@@ -14,7 +14,6 @@ import type {
   PublicOrderTrackingResponse,
   RegisterInput,
   SalesReport,
-  StockAdjustmentResponse,
   StockReservationResponse,
   StockSummary,
   UpdateProductInput,

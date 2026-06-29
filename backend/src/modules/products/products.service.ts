@@ -808,7 +808,7 @@ export class ProductsService {
   }
 
   /**
-   * Retorna categorias DISTINCT dos produtos ativos do tenant, ordenadas alfabeticamente.
+   * Retorna categorias DISTINCT de todos os produtos do tenant, ordenadas alfabeticamente.
    */
   async getCategories(tenantId: string): Promise<string[]> {
     const rows = await this.db

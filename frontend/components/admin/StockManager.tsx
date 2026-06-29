@@ -88,6 +88,12 @@ function ModalAjuste({
       delta = qtd;
     }
 
+    // Nenhuma alteração real — evita chamar a API com delta=0 (rejeitado pelo backend)
+    if (delta === 0) {
+      setErro('Nenhuma mudança a registrar.');
+      return;
+    }
+
     setSalvando(true);
     const result = await adjustStock(product.id, tipo, delta, motivo || undefined);
     setSalvando(false);
