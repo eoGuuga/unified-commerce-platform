@@ -74,6 +74,32 @@ export interface MercadoPagoPaymentResponse {
   };
 }
 
+export const PROD_TOKEN_PREFIX = 'APP_USR';
+export const TEST_TOKEN_PREFIX = 'TEST-';
+export const PROD_TOKEN_IN_DEV_MSG =
+  '[SEGURANCA] Token de PRODUCAO (APP_USR) detectado fora de producao. ' +
+  'Use um token TEST- localmente. Backend bloqueado.';
+export const TEST_TOKEN_IN_PROD_MSG =
+  '[SEGURANCA] Token de TESTE (TEST-) detectado em PRODUCAO. ' +
+  'Cobrancas nao serao reais. Backend bloqueado.';
+
+/**
+ * Guarda bidirecional: o token tem que casar com o ambiente.
+ * - APP_USR só em produção (senão cobra de verdade em dev).
+ * - TEST- só fora de produção (senão sobe em prod sem conseguir cobrar).
+ * Token vazio é "não-configurado" e nunca lança.
+ */
+function assertTokenMatchesEnv(token: string): void {
+  if (!token) return;
+  const isProd = process.env.NODE_ENV === 'production';
+  if (!isProd && token.startsWith(PROD_TOKEN_PREFIX)) {
+    throw new Error(PROD_TOKEN_IN_DEV_MSG);
+  }
+  if (isProd && token.startsWith(TEST_TOKEN_PREFIX)) {
+    throw new Error(TEST_TOKEN_IN_PROD_MSG);
+  }
+}
+
 @Injectable()
 export class MercadoPagoProvider {
   private readonly logger = new Logger(MercadoPagoProvider.name);
@@ -83,6 +109,7 @@ export class MercadoPagoProvider {
 
   constructor(private configService: ConfigService) {
     this.accessToken = this.configService.get<string>('MERCADOPAGO_ACCESS_TOKEN') || '';
+    assertTokenMatchesEnv(this.accessToken); // guarda bidirecional no boot
 
     if (this.accessToken) {
       this.client = new MercadoPagoConfig({
@@ -109,6 +136,8 @@ export class MercadoPagoProvider {
     payerEmail?: string,
     metadata?: Record<string, any>,
   ): Promise<MercadoPagoPixResult> {
+    assertTokenMatchesEnv(this.accessToken); // backstop no momento de criar pagamento
+
     if (!this.isConfigured()) {
       throw new Error('Mercado Pago nao esta configurado');
     }
