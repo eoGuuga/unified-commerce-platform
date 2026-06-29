@@ -121,6 +121,35 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 curl -I https://gtsofthub.com.br/api/v1/health/ready
 ```
 
+## Recuperação de deploy falhado (rollback)
+Uso quando o health falha após um deploy ou surgem erros críticos (ex.: o
+`apply-and-health.sh` ou o health check manual retornou erro). Antes de
+investigar a fundo, restaure o serviço voltando ao estado anterior.
+
+### 1) Voltar para o commit anterior (rollback imediato)
+```bash
+cd /opt/ucm
+git log --oneline -n 5
+git checkout <commit_anterior>
+docker compose --env-file ./deploy/.env -f ./deploy/docker-compose.prod.yml up -d --build
+curl -s https://gtsofthub.com.br/api/v1/health
+```
+Para retornar ao `main` depois de estabilizar:
+```bash
+git checkout main
+git pull --ff-only
+```
+
+### 2) Alternativa: restaurar do backup
+```bash
+ls -la /opt/ucm/backups
+```
+Use o script oficial de restore: `deploy/scripts/restore-drill-offsite.sh`.
+
+> Regras: nunca fazer deploy/rollback com **git sujo**; sempre gerar backup antes
+> de um deploy grande; um 502 temporário durante o recreate pode ocorrer — o que
+> importa é o **health final** estar OK.
+
 ## DEV/TESTE no servidor (stack separado)
 ### Subir banco e redis dev
 ```bash
