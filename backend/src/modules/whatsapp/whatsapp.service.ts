@@ -80,13 +80,35 @@ interface DeliveryAddressParts {
   zipcode: string;
 }
 
-/** Estagios da FSM de checkout (S2a). */
+/** Estagios da FSM de checkout (S2a entrega + S2b retirada). */
 type CheckoutStage =
   | 'ask_fulfillment'
   | 'collecting_name'
   | 'collecting_phone'
   | 'collecting_address'
-  | 'confirming_address';
+  | 'confirming_address'
+  | 'selecting_pickup_slot';
+
+/**
+ * Slot de retirada oferecido ao cliente. label e amigavel em PT (fuso da loja),
+ * scheduled_at e o instante (ISO) correspondente. Guardado no checkout para mapear
+ * a escolha numerica do cliente de volta ao instante.
+ */
+interface PickupSlot {
+  label: string;
+  scheduled_at: string; // ISO
+}
+
+/**
+ * Horario de funcionamento da loja, lido de tenant.settings.business_hours.
+ * days: 0=domingo .. 6=sabado. open/close em "HH:MM". tz: IANA (ex.: America/Sao_Paulo).
+ */
+interface BusinessHours {
+  days: number[];
+  open: string;
+  close: string;
+  tz: string;
+}
 
 /**
  * Estado da coleta de checkout, guardado em conversation.context.checkout.
@@ -99,6 +121,8 @@ interface CheckoutContext {
   customer_phone?: string; // telefone do contato (numero do WhatsApp)
   contact_phone?: string; // telefone informado pelo cliente na coleta
   delivery_address?: DeliveryAddressParts;
+  scheduled_at?: string; // horario de retirada agendado (ISO), so para pickup
+  pickup_slots?: PickupSlot[]; // opcoes de retirada oferecidas ao cliente (pickup)
 }
 
 @Injectable()
@@ -920,14 +944,21 @@ export class WhatsAppService {
     switch (checkout.stage) {
       case 'ask_fulfillment': {
         if (lower.includes('retir')) {
-          // Branch RETIRADA: placeholder honesto (a retirada completa e a Task 5).
-          // Encerra a coleta para nao prender o cliente num estado morto.
-          await this.conversationService.updateContext(conversation.id, {
-            state: 'idle',
-            checkout: null,
-          });
-          conversation.context = { ...conversation.context, state: 'idle', checkout: undefined };
-          return 'No momento estamos fechando só entregas por aqui — em breve retirada. 🙏';
+          // Branch RETIRADA (S2b). DEFAULT RESTRITIVO: a retirada SO e oferecida se
+          // o tenant tem settings.business_hours configurado. Sem isso, NAO adivinhamos
+          // um horario padrao — caimos no fallback honesto "so entrega" e encerramos a
+          // FSM para nao prender o cliente num estado morto.
+          const businessHours = await this.getBusinessHours(tenantId);
+          if (!businessHours) {
+            await this.conversationService.updateContext(conversation.id, {
+              state: 'idle',
+              checkout: null,
+            });
+            conversation.context = { ...conversation.context, state: 'idle', checkout: undefined };
+            return 'No momento estamos fazendo só entregas por aqui. 🙏';
+          }
+          await persist({ stage: 'collecting_name', delivery_type: 'pickup' });
+          return 'Perfeito, retirada! 🛍️\n\nQual é o seu *nome*?';
         }
         if (lower.includes('entreg')) {
           await persist({ stage: 'collecting_name', delivery_type: 'delivery' });
@@ -942,6 +973,40 @@ export class WhatsAppService {
       }
 
       case 'collecting_phone': {
+        // O proximo estagio depende do tipo de cumprimento: entrega coleta endereco,
+        // retirada coleta o horario de retirada.
+        if (checkout.delivery_type === 'pickup') {
+          const businessHours = await this.getBusinessHours(tenantId);
+          if (!businessHours) {
+            // Defesa: business_hours sumiu no meio do fluxo. Encerra honesto.
+            await this.conversationService.updateContext(conversation.id, {
+              state: 'idle',
+              checkout: null,
+            });
+            conversation.context = { ...conversation.context, state: 'idle', checkout: undefined };
+            return 'No momento estamos fazendo só entregas por aqui. 🙏';
+          }
+          const slots = this.generatePickupSlots(businessHours, new Date());
+          if (slots.length === 0) {
+            // Sem nenhum horario disponivel em breve: encerra honesto, sem criar pedido.
+            await this.conversationService.updateContext(conversation.id, {
+              state: 'idle',
+              checkout: null,
+            });
+            conversation.context = { ...conversation.context, state: 'idle', checkout: undefined };
+            return 'Não há horários disponíveis para retirada em breve. 🙏 Tente novamente mais tarde.';
+          }
+          const pickupSlots: PickupSlot[] = slots.map((s) => ({
+            label: s.label,
+            scheduled_at: s.scheduledAt.toISOString(),
+          }));
+          await persist({
+            stage: 'selecting_pickup_slot',
+            contact_phone: text,
+            pickup_slots: pickupSlots,
+          });
+          return this.formatPickupSlotsMessage(pickupSlots);
+        }
         await persist({ stage: 'collecting_address', contact_phone: text });
         return [
           '📍 Agora me passe o *endereço de entrega* numa mensagem só, neste formato:',
@@ -950,6 +1015,51 @@ export class WhatsAppService {
           '',
           'Ex.: Rua das Flores, 123, Centro, São Paulo, SP, 01001-000',
         ].join('\n');
+      }
+
+      case 'selecting_pickup_slot': {
+        const businessHours = await this.getBusinessHours(tenantId);
+        if (!businessHours) {
+          // Defesa: business_hours sumiu no meio do fluxo. Encerra honesto.
+          await this.conversationService.updateContext(conversation.id, {
+            state: 'idle',
+            checkout: null,
+          });
+          conversation.context = { ...conversation.context, state: 'idle', checkout: undefined };
+          return 'No momento estamos fazendo só entregas por aqui. 🙏';
+        }
+
+        const slots = checkout.pickup_slots || [];
+        // O cliente responde o NUMERO da opcao. Sem parsing de linguagem natural.
+        const choice = Number.parseInt(text, 10);
+        const isValidChoice =
+          /^\d+$/.test(text) && choice >= 1 && choice <= slots.length;
+        if (!isValidChoice) {
+          // Escolha invalida (fora da lista ou texto): re-mostra a lista. NAO cria pedido.
+          return [
+            '😕 Não entendi. Responda com o *número* da opção desejada.',
+            '',
+            this.formatPickupSlotsMessage(slots),
+          ].join('\n');
+        }
+
+        const slot = slots[choice - 1];
+        const scheduledAt = new Date(slot.scheduled_at);
+        // BACKSTOP (defesa-em-profundidade): por construcao o slot ja esta dentro do
+        // funcionamento, mas revalidamos antes de criar o pedido (cinto-e-suspensorio).
+        if (!this.isWithinBusinessHours(scheduledAt, businessHours)) {
+          return [
+            `😕 Esse horário está fora do nosso funcionamento (${this.describeBusinessHours(businessHours)}).`,
+            '',
+            this.formatPickupSlotsMessage(slots),
+          ].join('\n');
+        }
+        // Slot valido: cria o pedido pickup.
+        await persist({ scheduled_at: scheduledAt.toISOString() });
+        return this.finalizePickupCheckout(tenantId, conversation, {
+          ...checkout,
+          scheduled_at: scheduledAt.toISOString(),
+        });
       }
 
       case 'collecting_address': {
@@ -1194,6 +1304,386 @@ export class WhatsAppService {
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.logger.error('Error finalizing delivery checkout', {
+        error: err.message,
+        tenantId,
+        customerPhone,
+      });
+      return '😕 Houve um erro ao finalizar seu pedido. Tente novamente.';
+    }
+  }
+
+  /**
+   * Le o horario de funcionamento do tenant de settings.business_hours.
+   * DEFAULT RESTRITIVO: retorna null se ausente ou malformado — NUNCA adivinha um
+   * horario padrao. Sem business_hours explicito, a retirada nao e oferecida.
+   */
+  private async getBusinessHours(tenantId: string): Promise<BusinessHours | null> {
+    try {
+      const tenant = await this.tenantsService.findOneById(tenantId);
+      const bh = tenant?.settings?.business_hours;
+      if (
+        bh &&
+        Array.isArray(bh.days) &&
+        bh.days.length > 0 &&
+        typeof bh.open === 'string' &&
+        typeof bh.close === 'string' &&
+        typeof bh.tz === 'string' &&
+        bh.tz.length > 0
+      ) {
+        return bh as BusinessHours;
+      }
+      return null;
+    } catch (error) {
+      this.logger.warn('Falha ao ler business_hours do tenant', {
+        error: error instanceof Error ? error.message : String(error),
+        tenantId,
+      });
+      return null;
+    }
+  }
+
+  /** Descreve o horario de funcionamento em texto para o cliente. */
+  private describeBusinessHours(bh: BusinessHours): string {
+    const nomes = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+    const dias = [...bh.days].sort((a, b) => a - b).map((d) => nomes[d] || String(d));
+    return `${dias.join(', ')}, das ${bh.open} às ${bh.close}`;
+  }
+
+  /**
+   * Gera as OPCOES de horario de retirada a partir do business_hours, em vez de
+   * pedir ao cliente que digite uma data (que um cliente de WhatsApp nao faz).
+   * Funcao PURA e deterministica: recebe `now` por parametro (nunca chama new Date()
+   * internamente), para ser testavel.
+   *
+   * Regras:
+   *  - Trabalha SEMPRE no fuso da loja (businessHours.tz) via Intl. O scheduled_at
+   *    resultante e um Date (instante UTC) correto.
+   *  - Passos de 1 HORA, de `open` (inclusive) ate `close` (inclusive).
+   *  - NUNCA oferece slot no passado: descarta qualquer instante <= now.
+   *  - Cap de `maxSlots` (default 8), do mais proximo ao mais distante.
+   *  - Varre ate `lookaheadDays` (default 7) dias a frente, pulando dias fora de `days`.
+   */
+  private generatePickupSlots(
+    businessHours: BusinessHours,
+    now: Date,
+    opts?: { maxSlots?: number; lookaheadDays?: number },
+  ): Array<{ label: string; scheduledAt: Date }> {
+    const maxSlots = opts?.maxSlots ?? 8;
+    const lookaheadDays = opts?.lookaheadDays ?? 7;
+    const tz = businessHours.tz;
+
+    const parseHHMM = (hhmm: string): { hour: number; minute: number } => {
+      const [h, m] = hhmm.split(':').map(Number);
+      return { hour: h, minute: m };
+    };
+    const open = parseHHMM(businessHours.open);
+    const close = parseHHMM(businessHours.close);
+    const openMin = open.hour * 60 + open.minute;
+    const closeMin = close.hour * 60 + close.minute;
+
+    // Componentes da data "hoje" NO FUSO da loja, a partir do instante `now`.
+    const todayParts = this.localDateParts(now, tz);
+
+    const nomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const slots: Array<{ label: string; scheduledAt: Date }> = [];
+
+    for (let dayOffset = 0; dayOffset <= lookaheadDays && slots.length < maxSlots; dayOffset++) {
+      // Data civil (ano/mes/dia local) deste dia, deslocando a partir de hoje.
+      // Usamos Date.UTC sobre os componentes locais so para aritmetica de calendario
+      // (somar dias); a hora UTC aqui e irrelevante.
+      const civil = new Date(Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day));
+      civil.setUTCDate(civil.getUTCDate() + dayOffset);
+      const y = civil.getUTCFullYear();
+      const mo = civil.getUTCMonth() + 1;
+      const d = civil.getUTCDate();
+      // Dia da semana (0=dom..6=sab) desta data civil.
+      const dow = civil.getUTCDay();
+      if (!businessHours.days.includes(dow)) {
+        continue; // dia fora do funcionamento — pula.
+      }
+
+      for (let min = openMin; min <= closeMin && slots.length < maxSlots; min += 60) {
+        const hour = Math.floor(min / 60);
+        const minute = min % 60;
+        // Converte o "wall clock" local (y-mo-d hour:minute no fuso da loja) no instante UTC.
+        const scheduledAt = this.localWallClockToInstant(y, mo, d, hour, minute, tz);
+        if (scheduledAt.getTime() <= now.getTime()) {
+          continue; // slot no passado (ou agora) — nunca oferece.
+        }
+        const label = this.pickupSlotLabel(dayOffset, nomes[dow], hour, minute);
+        slots.push({ label, scheduledAt });
+      }
+    }
+
+    return slots;
+  }
+
+  /** Componentes civis (ano/mes/dia) de um instante visto NO fuso da loja. */
+  private localDateParts(date: Date, tz: string): { year: number; month: number; day: number } {
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    });
+    const parts = dtf.formatToParts(date);
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+    return { year: get('year'), month: get('month'), day: get('day') };
+  }
+
+  /**
+   * Converte um "wall clock" local (componentes no fuso `tz`) no instante UTC correto.
+   * Usa o offset do fuso para aquela data (respeita horario de verao).
+   */
+  private localWallClockToInstant(
+    year: number, month: number, day: number, hour: number, minute: number, tz: string,
+  ): Date {
+    const asUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
+    const offsetMin = this.tzOffsetMinutes(new Date(asUtc), tz);
+    // wall-clock local = UTC + offset  =>  UTC = wall-clock - offset.
+    return new Date(asUtc - offsetMin * 60 * 1000);
+  }
+
+  /** Label amigavel em PT para um slot (ex.: "Hoje 16h", "Amanhã 10h", "Sex 14h"). */
+  private pickupSlotLabel(dayOffset: number, weekdayName: string, hour: number, minute: number): string {
+    const hh = minute === 0 ? `${hour}h` : `${hour}h${String(minute).padStart(2, '0')}`;
+    let prefix: string;
+    if (dayOffset === 0) prefix = 'Hoje';
+    else if (dayOffset === 1) prefix = 'Amanhã';
+    else prefix = weekdayName;
+    return `${prefix} ${hh}`;
+  }
+
+  /** Monta a mensagem numerada de opcoes de retirada. */
+  private formatPickupSlotsMessage(slots: PickupSlot[]): string {
+    const linhas = slots.map((s, i) => `${i + 1}) ${s.label}`);
+    return [
+      '🕐 *Quando quer retirar?*',
+      '',
+      'Responda com o *número* da opção:',
+      '',
+      ...linhas,
+    ].join('\n');
+  }
+
+  /**
+   * Offset (em minutos) do fuso `tz` para o instante `date`. Positivo a leste de UTC,
+   * negativo a oeste (America/Sao_Paulo = -180). Calculado via Intl.DateTimeFormat,
+   * que respeita historico/horario de verao do fuso — nunca um -03:00 hardcoded.
+   */
+  private tzOffsetMinutes(date: Date, tz: string): number {
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    });
+    const parts = dtf.formatToParts(date);
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+    let hour = get('hour');
+    if (hour === 24) hour = 0; // Intl pode emitir 24 a meia-noite
+    // O instante `date` (UTC) visto NO fuso tz tem estes componentes locais.
+    const asUtcOfLocal = Date.UTC(
+      get('year'), get('month') - 1, get('day'), hour, get('minute'), get('second'),
+    );
+    // offset = (horario local) - (horario UTC do mesmo instante).
+    return Math.round((asUtcOfLocal - date.getTime()) / 60000);
+  }
+
+  /**
+   * Valida se `scheduledAt` cai DENTRO do horario de funcionamento da loja.
+   *
+   * PONTO DE LUPA (FUSO): a comparacao e feita NO FUSO DA LOJA (businessHours.tz),
+   * NUNCA em UTC. Convertemos o instante `scheduledAt` para o horario local da loja
+   * (dia da semana + hora:minuto locais) ANTES de comparar contra open/close e days.
+   * Ex.: 16:00 em America/Sao_Paulo (= 19:00 UTC) deve ser ACEITO contra 09-18 local —
+   * comparar a hora UTC (19h) contra "fecha 18h" rejeitaria errado.
+   */
+  private isWithinBusinessHours(scheduledAt: Date, businessHours: BusinessHours): boolean {
+    if (!scheduledAt || Number.isNaN(scheduledAt.getTime())) {
+      return false;
+    }
+    // Extrai os componentes LOCAIS (no fuso da loja) do instante agendado.
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: businessHours.tz,
+      weekday: 'short',
+      hour: '2-digit', minute: '2-digit',
+      hour12: false,
+    });
+    const parts = dtf.formatToParts(scheduledAt);
+    const weekdayStr = parts.find((p) => p.type === 'weekday')?.value || '';
+    let hour = Number(parts.find((p) => p.type === 'hour')?.value);
+    const minute = Number(parts.find((p) => p.type === 'minute')?.value);
+    if (hour === 24) hour = 0;
+
+    const weekdayMap: Record<string, number> = {
+      Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+    };
+    const dow = weekdayMap[weekdayStr];
+    if (dow === undefined || !businessHours.days.includes(dow)) {
+      return false;
+    }
+
+    const toMinutes = (hhmm: string): number => {
+      const [hh, mm] = hhmm.split(':').map(Number);
+      return hh * 60 + mm;
+    };
+    const localMin = hour * 60 + minute;
+    const openMin = toMinutes(businessHours.open);
+    const closeMin = toMinutes(businessHours.close);
+    // [open, close]: inclui o horario de abertura e o de fechamento.
+    return localMin >= openMin && localMin <= closeMin;
+  }
+
+  /**
+   * Cria o pedido de RETIRADA (pickup) com scheduled_at e segue para o PIX.
+   * Espelha finalizeDeliveryCheckout, mas com delivery_type='pickup' e sem endereco.
+   */
+  private async finalizePickupCheckout(
+    tenantId: string,
+    conversation: TypedConversation,
+    checkout: CheckoutContext,
+  ): Promise<WhatsAppOutboundResponse> {
+    const customerPhone = checkout.customer_phone || conversation.customer_phone || '';
+    try {
+      const cart = await this.cartService.getOrCreateCart(tenantId, customerPhone);
+      if (cart.items.length === 0) {
+        await this.conversationService.updateContext(conversation.id, { state: 'idle', checkout: null });
+        conversation.context = { ...conversation.context, state: 'idle', checkout: undefined };
+        return '🛒 Seu carrinho está vazio! Adicione itens primeiro.';
+      }
+
+      const scheduledAt = checkout.scheduled_at ? new Date(checkout.scheduled_at) : undefined;
+
+      const order = await this.ordersService.create(
+        {
+          channel: CanalVenda.WHATSAPP,
+          customer_phone: customerPhone,
+          customer_name: checkout.customer_name,
+          delivery_type: 'pickup',
+          scheduled_at: scheduledAt,
+          items: cart.items.map((item: any) => ({
+            produto_id: item.produto_id,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+          })),
+          shipping_amount: 0,
+          discount_amount: Number(cart.discount_amount) || 0,
+          coupon_code: cart.coupon_code,
+        },
+        tenantId,
+      );
+
+      // Criar pagamento PIX (mesmo caminho da entrega): imagem do QR + copia-e-cola,
+      // valor cobrado (95%), e falha honesta com payment_issue + aviso ao lojista.
+      let pixMessage = '';
+      const brl = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
+      try {
+        const paymentResult = await this.paymentsService.createPayment(tenantId, {
+          pedido_id: order.id,
+          method: MetodoPagamento.PIX,
+          amount: Number(order.total_amount),
+          metadata: { customerPhone, orderId: order.id },
+        });
+
+        const valorCobrado = Number(paymentResult.pagamento?.amount);
+        const copyPaste = paymentResult.copy_paste || 'Chave PIX';
+        const totalCheio = Number(order.total_amount);
+        const linhasPix = ['', '', '📱 *Pagamento PIX*'];
+        if (Number.isFinite(valorCobrado) && valorCobrado > 0) {
+          if (Number.isFinite(totalCheio) && totalCheio > valorCobrado) {
+            const economia = Number((totalCheio - valorCobrado).toFixed(2));
+            linhasPix.push(
+              '',
+              `De ${brl(totalCheio)} por *${brl(valorCobrado)}* no PIX`,
+              `💚 Você economiza ${brl(economia)} pagando com PIX!`,
+            );
+          } else {
+            linhasPix.push('', `Valor a pagar no PIX: *${brl(valorCobrado)}*`);
+          }
+        }
+        linhasPix.push('', 'Escaneie o QR Code enviado ou copie a chave:', '', `\`${copyPaste}\``);
+        pixMessage = linhasPix.join('\n');
+
+        if (paymentResult.qr_code) {
+          try {
+            await this.whatsappSender.sendImage(
+              tenantId,
+              customerPhone,
+              paymentResult.qr_code,
+              'QR Code do seu pagamento PIX',
+            );
+          } catch (imageError) {
+            this.logger.warn('Falha ao enviar imagem do QR PIX (segue com copia-e-cola)', {
+              error: imageError instanceof Error ? imageError.message : String(imageError),
+              tenantId,
+              orderId: order.id,
+            });
+          }
+        }
+      } catch (paymentError) {
+        this.logger.error('Erro ao gerar pagamento PIX (pickup)', {
+          error: paymentError instanceof Error ? paymentError.message : String(paymentError),
+          tenantId,
+          orderId: order.id,
+        });
+        try {
+          const pedidoRepo = this.db.getRepository(Pedido);
+          order.payment_issue = true;
+          await pedidoRepo.save(order);
+        } catch (saveError) {
+          this.logger.error('Falha ao marcar payment_issue no pedido (pickup)', {
+            error: saveError instanceof Error ? saveError.message : String(saveError),
+            tenantId,
+            orderId: order.id,
+          });
+        }
+        await this.notificationsService.notifyMerchantPaymentIssue(tenantId, order);
+        pixMessage =
+          '\n\n⚠️ Tivemos um problema ao gerar o pagamento PIX agora. ' +
+          'Seu pedido está reservado e nossa equipe já foi avisada para entrar em contato e concluir com você.';
+      }
+
+      await this.cartService.markAsConverted(cart.id);
+
+      await this.conversationService.updateContext(conversation.id, {
+        state: 'waiting_payment',
+        checkout: null,
+        pedido_id: order.id,
+      });
+      conversation.context = {
+        ...conversation.context,
+        state: 'waiting_payment',
+        checkout: undefined,
+        pedido_id: order.id,
+      };
+
+      const itemsList = cart.items.map((item: any, i: number) =>
+        `${i + 1}. ${item.produto_name} x${item.quantity}`
+      ).join('\n');
+
+      const businessHours = await this.getBusinessHours(tenantId);
+      const horarioStr = scheduledAt
+        ? scheduledAt.toLocaleString('pt-BR', {
+            timeZone: businessHours?.tz || 'America/Sao_Paulo',
+            dateStyle: 'short',
+            timeStyle: 'short',
+          })
+        : '';
+
+      return [
+        `✅ *Pedido #${order.id.substring(0, 8).toUpperCase()} confirmado!*`,
+        '',
+        `📦 *Resumo:*`,
+        itemsList,
+        '',
+        `🛍️ *Retirada agendada para:*`,
+        horarioStr,
+        '',
+        `💰 *Total: R$ ${Number(order.total_amount).toFixed(2)}*`,
+        pixMessage,
+      ].join('\n');
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.error('Error finalizing pickup checkout', {
         error: err.message,
         tenantId,
         customerPhone,

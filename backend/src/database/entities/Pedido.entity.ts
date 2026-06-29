@@ -113,6 +113,14 @@ export class Pedido {
   delivery_type?: string;
 
   /**
+   * Horario AGENDADO de retirada (pickup). NULL para entrega/PDV.
+   * Guardado como timestamptz: um instante bem-definido, comparado contra o
+   * horario de funcionamento da loja (business_hours) NO FUSO da loja.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  scheduled_at?: Date | null;
+
+  /**
    * Flag ORTOGONAL ao ciclo de vida (status): sinaliza que a geracao do PIX
    * falhou. O pedido continua PENDENTE_PAGAMENTO; isto so marca "precisa de
    * atencao" de forma CONSULTAVEL (WHERE payment_issue = true, indice parcial),

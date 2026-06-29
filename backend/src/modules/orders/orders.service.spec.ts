@@ -598,6 +598,22 @@ describe('OrdersService', () => {
       );
     });
 
+    it('deve rejeitar retirada (pickup) sem scheduled_at (fail-fast, sem abrir transacao)', async () => {
+      const pickupSemHorario: CreateOrderDto = {
+        channel: CanalVenda.WHATSAPP,
+        customer_name: 'Maria',
+        delivery_type: 'pickup',
+        // Sem scheduled_at -> deve barrar.
+        items: [{ produto_id: produtoId1, quantity: 1, unit_price: 10.5 }],
+      };
+
+      await expect(service.create(pickupSemHorario, tenantId)).rejects.toThrow(
+        BadRequestException,
+      );
+      // Fail-fast: nao abriu transacao.
+      expect(mockDbContextService.runInTransaction).not.toHaveBeenCalled();
+    });
+
     it('deve definir status correto baseado no canal (sempre PENDENTE_PAGAMENTO)', async () => {
       // Arrange
       const estoqueQueryBuilder = {

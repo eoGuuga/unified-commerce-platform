@@ -145,6 +145,21 @@ export class OrdersService {
       }
     }
 
+    // Guarda de RETIRADA (espelha a de entrega, fail-fast pre-transacao): pickup
+    // exige scheduled_at presente e valido. A validacao do horario contra o
+    // funcionamento da loja e feita no bot (no fuso da loja); aqui garantimos que
+    // nenhum pedido pickup nasce sem um instante agendado bem-definido.
+    if (deliveryType === 'pickup') {
+      const s = createOrderDto.scheduled_at
+        ? new Date(createOrderDto.scheduled_at)
+        : null;
+      if (!s || Number.isNaN(s.getTime())) {
+        throw new BadRequestException(
+          'Pedido de retirada exige um horário de retirada (scheduled_at) válido.',
+        );
+      }
+    }
+
     const shipping = createOrderDto.shipping_amount || 0;
 
     if (createOrderDto.discount_amount && !createOrderDto.coupon_code) {
@@ -308,6 +323,11 @@ export class OrdersService {
       pedido.total_amount = total;
       pedido.delivery_type = deliveryType;
       pedido.delivery_address = deliveryType === 'delivery' ? (deliveryAddress as NonNullable<typeof pedido.delivery_address>) : undefined;
+      // scheduled_at so faz sentido para retirada (pickup).
+      pedido.scheduled_at =
+        deliveryType === 'pickup' && createOrderDto.scheduled_at
+          ? new Date(createOrderDto.scheduled_at)
+          : null;
 
       const savedPedido = await manager.save(pedido);
 

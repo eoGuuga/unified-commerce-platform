@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsUUID,
   IsIn,
+  IsDate,
   IsNotEmpty,
   Min,
   Length,
@@ -109,6 +110,12 @@ export class CreateOrderDto {
   @ValidateNested()
   @Type(() => DeliveryAddressDto)
   delivery_address?: DeliveryAddressDto;
+
+  @ApiProperty({ description: 'Horario agendado de retirada (pickup)', required: false })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  scheduled_at?: Date;
 
   @ApiProperty({ 
     description: 'Itens do pedido',
