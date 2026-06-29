@@ -105,7 +105,32 @@ curl -s -X POST http://localhost:3000/api/v1/payments/public \
 
 ---
 
-## 3. Aprovar o pagamento no sandbox do MP
+## 3. CHECKPOINT CRÍTICO (negativo): webhook ANTES de aprovar → NÃO pode confirmar
+
+> **Este é o passo que prova que o sistema é REAL — contra-intuitivo, NÃO pule.**
+> A tentação é: gerar PIX, aprovar, mandar webhook, ver "confirmado", comemorar. Mas isso
+> sozinho não prova nada — um sistema que aceita qualquer POST também daria "confirmado".
+> O que prova solidez é disparar o webhook ENQUANTO o pagamento ainda está `pending` no MP
+> e ver o pedido **recusar** a confirmação. É o teste negativo que dá sentido ao positivo.
+
+Com o pagamento ainda **NÃO aprovado** no sandbox, dispare o webhook (o mesmo POST do passo 5):
+
+```bash
+curl -s -X POST "http://localhost:3000/api/v1/payments/webhook/mercadopago?token=um-token-qualquer-de-dev" \
+  -H "Content-Type: application/json" \
+  -d '{"data":{"id":"<MP_PAYMENT_ID>"}}'
+```
+
+Verifique o pedido:
+```bash
+curl -s http://localhost:3000/api/v1/orders/<PEDIDO_ID> -H "x-tenant-id: <TENANT_ID>" | grep -o '"status":"[^"]*"'
+# -> DEVE seguir "pendente_pagamento". NUNCA "confirmado" aqui.
+```
+
+- **Pedido NÃO confirmou** → ✅ prova que quem manda é o status real consultado no MP (`getPaymentDetails`), não o corpo do POST (que qualquer um forja). Só agora o "confirmado" do passo 5 tem sentido.
+- **Pedido CONFIRMOU aqui** → 🛑 **PARE TUDO.** O handler está confiando no POST, não no MP — furo de segurança. Não mergeie; investigue antes.
+
+## 4. Aprovar o pagamento no sandbox do MP
 
 No painel de **teste** do Mercado Pago, va em **Atividade / Pagamentos** e
 localize o pagamento PIX recem-criado (pelo `MP_PAYMENT_ID`). Use a opcao de
@@ -117,7 +142,7 @@ no MP antes do proximo passo.
 
 ---
 
-## 4. Disparar o webhook por POST manual
+## 5. Disparar o webhook por POST manual (positivo — agora aprovado)
 
 Como em dev o webhook aceita nao-assinado, basta o `data.id`. O backend vai
 chamar `getPaymentDetails(<MP_PAYMENT_ID>)` no MP (agora `approved`) e confirmar:
@@ -133,7 +158,7 @@ curl -s -X POST "http://localhost:3000/api/v1/payments/webhook/mercadopago?token
 
 ---
 
-## 5. Verificar o resultado (criterio de aceitacao)
+## 6. Verificar o resultado (criterio de aceitacao)
 
 ```bash
 # Status do pedido -> deve ser "confirmado"
@@ -156,7 +181,7 @@ nova.
 
 ---
 
-## 6. (Opcional) Tunel para o MP chamar seu webhook automaticamente
+## 7. (Opcional) Tunel para o MP chamar seu webhook automaticamente
 
 Se quiser que o proprio Mercado Pago dispare o webhook (em vez do POST manual),
 exponha o backend com um tunel e aponte `MERCADOPAGO_WEBHOOK_URL` pra ele.
