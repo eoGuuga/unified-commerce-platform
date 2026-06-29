@@ -6,6 +6,8 @@ import {
   ValidateNested,
   IsOptional,
   IsUUID,
+  IsIn,
+  IsNotEmpty,
   Min,
   Length,
   ArrayMinSize,
@@ -23,9 +25,11 @@ export class PdvPaymentDto {
 
 export class DeliveryAddressDto {
   @IsString()
+  @IsNotEmpty()
   street: string;
 
   @IsString()
+  @IsNotEmpty()
   number: string;
 
   @IsOptional()
@@ -33,9 +37,11 @@ export class DeliveryAddressDto {
   complement?: string;
 
   @IsString()
+  @IsNotEmpty()
   neighborhood: string;
 
   @IsString()
+  @IsNotEmpty()
   city: string;
 
   @IsString()
@@ -43,6 +49,7 @@ export class DeliveryAddressDto {
   state: string;
 
   @IsString()
+  @IsNotEmpty()
   zipcode: string;
 }
 
@@ -92,10 +99,10 @@ export class CreateOrderDto {
   @Length(0, 500)
   customer_notes?: string;
 
-  @ApiProperty({ description: 'Tipo de entrega (delivery/pickup)', required: false })
+  @ApiProperty({ description: 'Tipo de entrega (delivery/pickup)', required: false, enum: ['delivery', 'pickup'] })
   @IsOptional()
-  @IsString()
-  delivery_type?: string;
+  @IsIn(['delivery', 'pickup'])
+  delivery_type?: 'delivery' | 'pickup';
 
   @ApiProperty({ description: 'Endereco de entrega', required: false, type: DeliveryAddressDto })
   @IsOptional()

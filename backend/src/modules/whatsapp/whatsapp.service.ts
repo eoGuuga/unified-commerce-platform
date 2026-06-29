@@ -69,6 +69,38 @@ interface StageRecoveryKind {
   delivery?: string;
 }
 
+/** Endereco de entrega montado a partir da coleta (campos do delivery_address). */
+interface DeliveryAddressParts {
+  street: string;
+  number: string;
+  complement?: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  zipcode: string;
+}
+
+/** Estagios da FSM de checkout (S2a). */
+type CheckoutStage =
+  | 'ask_fulfillment'
+  | 'collecting_name'
+  | 'collecting_phone'
+  | 'collecting_address'
+  | 'confirming_address';
+
+/**
+ * Estado da coleta de checkout, guardado em conversation.context.checkout.
+ * INVARIANTE (D2): so com stage 'confirming_address' + confirmacao o pedido nasce.
+ */
+interface CheckoutContext {
+  stage: CheckoutStage;
+  delivery_type?: 'delivery' | 'pickup';
+  customer_name?: string;
+  customer_phone?: string; // telefone do contato (numero do WhatsApp)
+  contact_phone?: string; // telefone informado pelo cliente na coleta
+  delivery_address?: DeliveryAddressParts;
+}
+
 @Injectable()
 export class WhatsAppService {
   private readonly logger = new Logger(WhatsAppService.name);
@@ -579,7 +611,7 @@ export class WhatsAppService {
 
     // Verificar intenção de finalizar/confirmar pedido
     if (lower.includes('finalizar') || lower.includes('confirmar') || lower.includes('fechar pedido')) {
-      return this.handleCheckout(tenantId, customerPhone);
+      return this.handleCheckout(tenantId, customerPhone, conversation);
     }
 
     // Verificar intenção de remover item
@@ -780,9 +812,18 @@ export class WhatsAppService {
     return 'Não encontrei pedidos recentes. Quer ver o cardápio?';
   }
 
+  /**
+   * Inicio do checkout (S2a). NAO cria mais o pedido direto: valida o carrinho
+   * e INICIA a coleta de cumprimento, perguntando "Entrega ou retirada?".
+   *
+   * O estagio fica gravado em conversation.context.checkout.stage. Tambem
+   * marcamos context.state como estado de coleta para que o detectIntent roteie
+   * as proximas mensagens para handleCollectionStage.
+   */
   private async handleCheckout(
     tenantId: string,
     customerPhone: string,
+    conversation: TypedConversation,
   ): Promise<WhatsAppOutboundResponse> {
     try {
       const cart = await this.cartService.getOrCreateCart(tenantId, customerPhone);
@@ -791,12 +832,213 @@ export class WhatsAppService {
         return '🛒 Seu carrinho está vazio! Adicione itens primeiro.';
       }
 
-      // Criar pedido
+      // Inicia a FSM de checkout. Guarda o telefone do contato para usar no pedido.
+      const checkout: CheckoutContext = {
+        stage: 'ask_fulfillment',
+        customer_phone: customerPhone,
+      };
+      await this.conversationService.updateContext(conversation.id, {
+        state: 'collecting_order',
+        checkout,
+      });
+      // Reflete localmente (o objeto em memoria pode ser reutilizado no mesmo turno).
+      conversation.context = { ...conversation.context, state: 'collecting_order', checkout };
+
+      return [
+        '🧾 *Vamos finalizar seu pedido!*',
+        '',
+        'Você prefere *entrega* ou *retirada*?',
+        '',
+        'Responda *entrega* ou *retirada*.',
+      ].join('\n');
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.error('Error during checkout', {
+        error: err.message,
+        tenantId,
+        customerPhone
+      });
+      return '😕 Houve um erro ao processar seu pedido. Tente novamente.';
+    }
+  }
+
+  /**
+   * Conduz a FSM de checkout (entrega) a partir do contexto.
+   * Estagios: ask_fulfillment -> collecting_name -> collecting_phone ->
+   *           collecting_address -> confirming_address -> (cria pedido + PIX).
+   *
+   * INVARIANTE CRITICA (D2): o pedido SO e criado no estagio confirming_address
+   * APOS o cliente responder "sim/confirmar". Qualquer rejeicao volta para
+   * collecting_address e NAO cria pedido.
+   *
+   * Retorna null se a mensagem nao pertence ao fluxo de checkout (deixa o
+   * chamador cair na coleta legada).
+   */
+  private async handleCheckoutStage(
+    tenantId: string,
+    message: string,
+    conversation: TypedConversation,
+  ): Promise<WhatsAppOutboundResponse | null> {
+    const checkout = conversation.context?.checkout as CheckoutContext | undefined;
+    if (!checkout?.stage) {
+      return null;
+    }
+
+    const text = (message || '').trim();
+    const lower = text.toLowerCase();
+
+    const persist = async (updates: Partial<CheckoutContext>, extra?: Record<string, any>) => {
+      const next: CheckoutContext = { ...checkout, ...updates };
+      await this.conversationService.updateContext(conversation.id, { checkout: next, ...(extra || {}) });
+      conversation.context = { ...conversation.context, checkout: next, ...(extra || {}) };
+      return next;
+    };
+
+    switch (checkout.stage) {
+      case 'ask_fulfillment': {
+        if (lower.includes('retir')) {
+          // Branch RETIRADA: placeholder honesto (a retirada completa e a Task 5).
+          // Encerra a coleta para nao prender o cliente num estado morto.
+          await this.conversationService.updateContext(conversation.id, {
+            state: 'idle',
+            checkout: null,
+          });
+          conversation.context = { ...conversation.context, state: 'idle', checkout: undefined };
+          return 'No momento estamos fechando só entregas por aqui — em breve retirada. 🙏';
+        }
+        if (lower.includes('entreg')) {
+          await persist({ stage: 'collecting_name', delivery_type: 'delivery' });
+          return 'Perfeito, entrega! 🛵\n\nQual é o seu *nome*?';
+        }
+        return 'Não entendi. Você prefere *entrega* ou *retirada*?';
+      }
+
+      case 'collecting_name': {
+        await persist({ stage: 'collecting_phone', customer_name: text });
+        return 'Obrigado! Qual é o melhor *telefone* para contato?';
+      }
+
+      case 'collecting_phone': {
+        await persist({ stage: 'collecting_address', contact_phone: text });
+        return [
+          '📍 Agora me passe o *endereço de entrega* numa mensagem só, neste formato:',
+          '',
+          '*Rua, número, bairro, cidade, UF, CEP*',
+          '',
+          'Ex.: Rua das Flores, 123, Centro, São Paulo, SP, 01001-000',
+        ].join('\n');
+      }
+
+      case 'collecting_address': {
+        const parsed = this.parseDeliveryAddress(text);
+        if (!parsed) {
+          return [
+            '😕 Não consegui entender o endereço. Por favor, envie numa mensagem só:',
+            '',
+            '*Rua, número, bairro, cidade, UF, CEP*',
+          ].join('\n');
+        }
+        await persist({ stage: 'confirming_address', delivery_address: parsed });
+        return [
+          '📦 *Confirma este endereço de entrega?*',
+          '',
+          this.formatDeliveryAddress(parsed),
+          '',
+          'Responda *sim* para confirmar ou *não* para corrigir.',
+        ].join('\n');
+      }
+
+      case 'confirming_address': {
+        const confirmed =
+          lower.includes('sim') || lower.includes('confirm') || lower === 'ok' || lower.includes('isso');
+        if (!confirmed) {
+          // Rejeicao: volta para a coleta de endereco. NAO cria pedido.
+          await persist({ stage: 'collecting_address', delivery_address: undefined });
+          return [
+            'Sem problema! Vamos corrigir. 🙂',
+            '',
+            'Me passe o *endereço de entrega* de novo:',
+            '',
+            '*Rua, número, bairro, cidade, UF, CEP*',
+          ].join('\n');
+        }
+        // Confirmado: SO AGORA criamos o pedido e seguimos pro PIX.
+        return this.finalizeDeliveryCheckout(tenantId, conversation, checkout);
+      }
+
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Faz o parsing do endereco de entrega informado numa unica mensagem.
+   * Formato esperado: "Rua, número, bairro, cidade, UF, CEP".
+   * Retorna null se nao houver campos suficientes.
+   */
+  private parseDeliveryAddress(message: string): DeliveryAddressParts | null {
+    const parts = (message || '')
+      .split(',')
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+
+    // Minimo: rua, numero, bairro, cidade, UF, CEP = 6 campos.
+    if (parts.length < 6) {
+      return null;
+    }
+
+    const [street, number, neighborhood, city, state, zipcode] = parts;
+    if (!street || !number || !neighborhood || !city || !state || !zipcode) {
+      return null;
+    }
+
+    return {
+      street,
+      number,
+      neighborhood,
+      city,
+      state: state.toUpperCase().slice(0, 2),
+      zipcode,
+    };
+  }
+
+  /** Monta o endereco para exibir de volta ao cliente. */
+  private formatDeliveryAddress(a: DeliveryAddressParts): string {
+    const linhas = [
+      `${a.street}, ${a.number}`,
+      a.complement ? a.complement : null,
+      `${a.neighborhood} — ${a.city}/${a.state}`,
+      `CEP ${a.zipcode}`,
+    ].filter(Boolean) as string[];
+    return linhas.join('\n');
+  }
+
+  /**
+   * Cria o pedido (PENDENTE_PAGAMENTO) apos a confirmacao do endereco e segue
+   * para o PIX como hoje. A mensagem/imagem do PIX em si e a Task 3 — aqui so
+   * garantimos que o pedido nasce com os dados certos.
+   */
+  private async finalizeDeliveryCheckout(
+    tenantId: string,
+    conversation: TypedConversation,
+    checkout: CheckoutContext,
+  ): Promise<WhatsAppOutboundResponse> {
+    const customerPhone = checkout.customer_phone || conversation.customer_phone || '';
+    try {
+      const cart = await this.cartService.getOrCreateCart(tenantId, customerPhone);
+      if (cart.items.length === 0) {
+        await this.conversationService.updateContext(conversation.id, { state: 'idle', checkout: null });
+        conversation.context = { ...conversation.context, state: 'idle', checkout: undefined };
+        return '🛒 Seu carrinho está vazio! Adicione itens primeiro.';
+      }
+
       const order = await this.ordersService.create(
         {
           channel: CanalVenda.WHATSAPP,
           customer_phone: customerPhone,
-          customer_name: undefined,
+          customer_name: checkout.customer_name,
+          delivery_type: 'delivery',
+          delivery_address: checkout.delivery_address as any,
           items: cart.items.map((item: any) => ({
             produto_id: item.produto_id,
             quantity: item.quantity,
@@ -809,7 +1051,8 @@ export class WhatsAppService {
         tenantId,
       );
 
-      // Criar pagamento PIX
+      // Criar pagamento PIX (geração detalhada é a Task 3 — aqui mantemos o
+      // comportamento atual e só garantimos o fluxo).
       let pixMessage = '';
       try {
         const paymentResult = await this.paymentsService.createPayment(tenantId, {
@@ -820,15 +1063,27 @@ export class WhatsAppService {
         });
 
         if (paymentResult.qr_code) {
-          pixMessage = `\n\n📱 *Pagamento PIX*\n\nEscaneie o QR Code abaixo ou copie a chave:\n\n\`${paymentResult.copy_paste || 'Chave PIX'}\``;
+          pixMessage = `\n\n📱 *Pagamento PIX*\n\nEscaneie o QR Code ou copie a chave:\n\n\`${paymentResult.copy_paste || 'Chave PIX'}\``;
         }
       } catch (paymentError) {
         this.logger.warn('Erro ao criar pagamento PIX, continuando sem PIX', { error: paymentError });
         pixMessage = '\n\n💳 *Forma de pagamento:* PIX (à vista)\nAguarde o link de pagamento.';
       }
 
-      // Atualizar status do carrinho para convertido
       await this.cartService.markAsConverted(cart.id);
+
+      // Encerra a FSM de checkout.
+      await this.conversationService.updateContext(conversation.id, {
+        state: 'waiting_payment',
+        checkout: null,
+        pedido_id: order.id,
+      });
+      conversation.context = {
+        ...conversation.context,
+        state: 'waiting_payment',
+        checkout: undefined,
+        pedido_id: order.id,
+      };
 
       const itemsList = cart.items.map((item: any, i: number) =>
         `${i + 1}. ${item.produto_name} x${item.quantity}`
@@ -840,19 +1095,20 @@ export class WhatsAppService {
         `📦 *Resumo:*`,
         itemsList,
         '',
+        `📍 *Entrega em:*`,
+        this.formatDeliveryAddress(checkout.delivery_address as DeliveryAddressParts),
+        '',
         `💰 *Total: R$ ${Number(order.total_amount).toFixed(2)}*`,
         pixMessage,
-        '',
-        '📍 Agora me diga seu endereço de entrega completo:',
       ].join('\n');
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      this.logger.error('Error during checkout', {
+      this.logger.error('Error finalizing delivery checkout', {
         error: err.message,
         tenantId,
-        customerPhone
+        customerPhone,
       });
-      return '😕 Houve um erro ao processar seu pedido. Tente novamente.';
+      return '😕 Houve um erro ao finalizar seu pedido. Tente novamente.';
     }
   }
 
@@ -924,6 +1180,13 @@ export class WhatsAppService {
     message: string,
     conversation: TypedConversation,
   ): Promise<WhatsAppOutboundResponse> {
+    // FSM de checkout (S2a) tem prioridade: se ha um checkout em andamento,
+    // ela conduz a coleta de entrega com confirmacao antes de criar o pedido.
+    const checkoutResponse = await this.handleCheckoutStage(tenantId, message, conversation);
+    if (checkoutResponse !== null) {
+      return checkoutResponse;
+    }
+
     // Simplificado - apenas coletar informações básicas
     const currentState =
       (conversation.context?.state as ConversationState) || 'collecting_order';
@@ -1581,8 +1844,14 @@ export class WhatsAppService {
         }
         return '😕 Produto não encontrado.';
 
-      case 'finalize':
-        return this.handleCheckout(tenantId, customerPhone);
+      case 'finalize': {
+        // Carrega a conversa para a FSM de checkout guardar/ler o estagio.
+        const conversation = await this.conversationService.getOrCreateConversation(
+          tenantId,
+          customerPhone,
+        );
+        return this.handleCheckout(tenantId, customerPhone, conversation as TypedConversation);
+      }
 
       case 'clear':
         const cart = await this.cartService.getOrCreateCart(tenantId, customerPhone);

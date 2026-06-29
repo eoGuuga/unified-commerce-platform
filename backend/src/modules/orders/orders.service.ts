@@ -125,8 +125,24 @@ export class OrdersService {
     if (deliveryType && deliveryType !== 'delivery' && deliveryType !== 'pickup') {
       throw new BadRequestException(`delivery_type inválido: ${deliveryTypeRaw}`);
     }
-    if (deliveryType === 'delivery' && !deliveryAddress) {
-      throw new BadRequestException('delivery_address é obrigatório quando delivery_type=delivery');
+    // Guarda do CONFIRMADO: entrega exige endereco COMPLETO. Um pedido de
+    // entrega sem todos os campos obrigatorios nao pode nascer — e o que
+    // impede entregar no lugar errado. complement e opcional.
+    if (deliveryType === 'delivery') {
+      const a = deliveryAddress;
+      const completo =
+        !!a &&
+        !!a.street &&
+        !!a.number &&
+        !!a.neighborhood &&
+        !!a.city &&
+        !!a.state &&
+        !!a.zipcode;
+      if (!completo) {
+        throw new BadRequestException(
+          'Pedido de entrega exige endereço completo (rua, número, bairro, cidade, UF e CEP).',
+        );
+      }
     }
 
     const shipping = createOrderDto.shipping_amount || 0;
