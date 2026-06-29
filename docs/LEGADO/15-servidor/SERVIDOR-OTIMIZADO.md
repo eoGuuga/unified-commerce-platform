@@ -4,7 +4,7 @@
 
 ## ðŸ“Š STATUS DO SERVIDOR
 
-**Servidor:** `37.59.118.210` (OVH VPS)
+**Servidor:** `<IP_DO_SERVIDOR>` (OVH VPS)
 **DomÃ­nio:** `gtsofthub.com.br`
 **Status:** ðŸŸ¢ **PRODUÃ‡ÃƒO - TOTALMENTE OTIMIZADO**
 
@@ -116,7 +116,7 @@ bash /opt/ucm/deploy/scripts/restore-drill-offsite.sh
 ### Acesso SSH
 ```bash
 # Com chave SSH (obrigatÃ³rio)
-ssh ubuntu@37.59.118.210
+ssh ubuntu@<IP_DO_SERVIDOR>
 
 # Senha DESABILITADA por seguranÃ§a
 ```
@@ -221,7 +221,7 @@ Com o servidor perfeitamente otimizado:
 ## ðŸ“ž CONTATO E SUPORTE
 
 **EmergÃªncia:**
-- SSH: `ubuntu@37.59.118.210` (chave obrigatÃ³ria)
+- SSH: `ubuntu@<IP_DO_SERVIDOR>` (chave obrigatÃ³ria)
 - Logs: `/var/log/ucm/monitor.log`
 - Status: `/opt/ucm/SERVER-STATUS.md`
 

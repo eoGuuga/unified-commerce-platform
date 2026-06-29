@@ -8,7 +8,7 @@ Write-Host "==================================" -ForegroundColor Magenta
 Write-Host ""
 
 # Configurações do servidor
-$serverHost = "37.59.118.210"
+$serverHost = "<IP_DO_SERVIDOR>"
 $serverUser = "ubuntu"
 $serverPath = "/home/ubuntu/unified-commerce-platform"
 

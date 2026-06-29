@@ -2,7 +2,7 @@
 > Servidor/comandos: docs/CONSOLIDADO/10-SERVIDOR-COMANDOS.md
 # SERVIDOR HARDENED - ROOT (RESUMO)
 
-Servidor: 37.59.118.210 (OVH VPS)
+Servidor: <IP_DO_SERVIDOR> (OVH VPS)
 Status: HARDENED (jan/2026)
 
 ---
@@ -16,7 +16,7 @@ Status: HARDENED (jan/2026)
 
 Login:
 ```
-ssh ubuntu@37.59.118.210
+ssh ubuntu@<IP_DO_SERVIDOR>
 sudo -i
 ```
 

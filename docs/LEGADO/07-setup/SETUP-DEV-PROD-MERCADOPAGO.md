@@ -8,7 +8,7 @@ payments/webhooks deployment on the server.
 
 ## Scope (server)
 
-- Host: 37.59.118.210
+- Host: <IP_DO_SERVIDOR>
 - Dev stack: `/opt/ucm-test-repo/deploy` (docker-compose.test.yml)
 - Prod stack: `/opt/ucm/deploy` (docker-compose.prod.yml)
 - Nginx entry: `ucm-nginx` handles both prod + dev domains

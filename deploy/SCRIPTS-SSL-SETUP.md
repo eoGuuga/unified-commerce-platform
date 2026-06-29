@@ -16,7 +16,9 @@ nslookup gtsofthub.com.br
 nslookup www.gtsofthub.com.br
 ```
 
-Ambos devem retornar o IP do VPS (`37.59.118.210`).
+Ambos devem retornar o IP do VPS (`<IP_DO_SERVIDOR>`).
+
+> Nota: `<IP_DO_SERVIDOR>` é um placeholder — o endereço real fica fora do repositório (gerenciador de senhas / doc privado).
 
 ---
 

@@ -14,7 +14,7 @@
 
 ### ProduÃ§Ã£o (VPS)
 - **Servidor/VPS**: OVHcloud (Ubuntu)
-- **IP pÃºblico (VPS)**: `37.59.118.210` *(atual no momento desta fase)*
+- **IP pÃºblico (VPS)**: `<IP_DO_SERVIDOR>` *(atual no momento desta fase)*
 - **Hostname (VPS)**: `vps-0e3446f6.vps.ovh.net` *(referÃªncia operacional)*
 - **Path do projeto no servidor**: `/opt/ucm`
 - **ServiÃ§os (Docker)**:
@@ -344,7 +344,7 @@ Script â€œfaz-tudoâ€ (dev):
 
 ## 10) DomÃ­nio e HTTPS (gtsofthub.com.br)
 ### 10.1 SituaÃ§Ã£o atual (2026-01-14)
-- DNS ativo (A `@` e A `www` apontando para `37.59.118.210`).
+- DNS ativo (A `@` e A `www` apontando para `<IP_DO_SERVIDOR>`).
 - HTTPS ativo (443 liberado no UFW + certificados Let's Encrypt).
 - Nginx com redirect HTTP â†’ HTTPS e www â†’ sem www.
 - `FRONTEND_URL` ajustado para `https://gtsofthub.com.br`.

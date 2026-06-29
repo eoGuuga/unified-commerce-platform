@@ -27,7 +27,7 @@ cat ~/.ssh/deploy_key
 
 ```powershell
 # Copie a chave pública para o servidor
-cat ~/.ssh/deploy_key.pub | ssh -i ~/.ssh/id_ed25519 ubuntu@37.59.118.210 "cat >> ~/.ssh/authorized_keys"
+cat ~/.ssh/deploy_key.pub | ssh -i ~/.ssh/id_ed25519 ubuntu@<IP_DO_SERVIDOR> "cat >> ~/.ssh/authorized_keys"
 ```
 
 ---
@@ -40,9 +40,11 @@ cat ~/.ssh/deploy_key.pub | ssh -i ~/.ssh/id_ed25519 ubuntu@37.59.118.210 "cat >
 
 ### Secrets Obrigatórios:
 
+> Nota: `<IP_DO_SERVIDOR>` é um placeholder — o endereço real fica fora do repositório (gerenciador de senhas / doc privado).
+
 | Nome | Valor |
 |------|-------|
-| `VPS_HOST` | `37.59.118.210` |
+| `VPS_HOST` | `<IP_DO_SERVIDOR>` |
 | `VPS_USER` | `ubuntu` |
 | `VPS_SSH_KEY` | **(cole a chave privada inteira)** |
 | `GHCR_TOKEN` | **(token do GitHub)** |
@@ -98,7 +100,7 @@ git push origin main
 
 ```powershell
 # Testar health
-curl -k https://37.59.118.210/api/v1/health
+curl -k https://<IP_DO_SERVIDOR>/api/v1/health
 
 # Esperado:
 # {"status":"ok",...}

@@ -21,9 +21,11 @@ Você precisa configurar os seguintes secrets no repositório GitHub:
 
 2. Clique em **"New repository secret"** e adicione:
 
+> Nota: `<IP_DO_SERVIDOR>` é um placeholder — o endereço real fica fora do repositório (gerenciador de senhas / doc privado).
+
 | Secret Name | Valor |
 |-------------|-------|
-| `VPS_HOST` | `37.59.118.210` |
+| `VPS_HOST` | `<IP_DO_SERVIDOR>` |
 | `VPS_USER` | `ubuntu` |
 | `VPS_SSH_KEY` | Chave privada SSH (código completo) |
 | `GHCR_TOKEN` | Token para GitHub Container Registry |
@@ -45,7 +47,7 @@ Você precisa configurar os seguintes secrets no repositório GitHub:
 ssh-keygen -t ed25519 -C "deploy@gtsofthub" -f ~/.ssh/deploy_key
 
 # Copie a chave pública para o servidor
-cat ~/.ssh/deploy_key.pub | ssh -i ~/.ssh/id_ed25519 ubuntu@37.59.118.210 "cat >> ~/.ssh/authorized_keys"
+cat ~/.ssh/deploy_key.pub | ssh -i ~/.ssh/id_ed25519 ubuntu@<IP_DO_SERVIDOR> "cat >> ~/.ssh/authorized_keys"
 ```
 
 ### No Servidor VPS:
@@ -158,7 +160,7 @@ docker image prune -a -f
 
 ### Deploy falhou?
 1. Verifique os logs no GitHub Actions
-2. Teste SSH manual: `ssh -i ~/.ssh/deploy_key ubuntu@37.59.118.210`
+2. Teste SSH manual: `ssh -i ~/.ssh/deploy_key ubuntu@<IP_DO_SERVIDOR>`
 3. Verifique se o container está rodando: `docker ps`
 
 ### Container não inicia?

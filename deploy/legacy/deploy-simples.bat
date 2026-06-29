@@ -21,7 +21,7 @@ if exist "ucm-deploy.tar.gz" (
 
 echo.
 echo 2. Enviando para servidor...
-scp ucm-deploy.tar.gz ubuntu@37.59.118.210:/home/ubuntu/
+scp ucm-deploy.tar.gz ubuntu@<IP_DO_SERVIDOR>:/home/ubuntu/
 
 if %errorlevel% neq 0 (
     echo ERRO: Falha no upload
@@ -31,7 +31,7 @@ if %errorlevel% neq 0 (
 
 echo.
 echo 3. Extraindo no servidor...
-ssh ubuntu@37.59.118.210 "cd /home/ubuntu && tar -xzf ucm-deploy.tar.gz && ls -la | grep unified-commerce-platform"
+ssh ubuntu@<IP_DO_SERVIDOR> "cd /home/ubuntu && tar -xzf ucm-deploy.tar.gz && ls -la | grep unified-commerce-platform"
 
 echo.
 echo 4. Limpando arquivo local...
@@ -47,7 +47,7 @@ echo   cd unified-commerce-platform
 echo   ./INICIAR-DEV.ps1
 echo.
 echo Ambientes:
-echo   Frontend DEV: http://37.59.118.210:3003
-echo   Backend DEV:  http://37.59.118.210:3002
+echo   Frontend DEV: http://<IP_DO_SERVIDOR>:3003
+echo   Backend DEV:  http://<IP_DO_SERVIDOR>:3002
 echo.
 pause

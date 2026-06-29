@@ -9,7 +9,7 @@ Write-Host ""
 # Verificar se estamos conectados
 Write-Host "🔍 Verificando conexão SSH..." -ForegroundColor Yellow
 
-$sshTest = ssh ubuntu@37.59.118.210 "echo 'SSH funcionando'"
+$sshTest = ssh ubuntu@<IP_DO_SERVIDOR> "echo 'SSH funcionando'"
 if ($sshTest -match "SSH funcionando") {
     Write-Host "✅ SSH funcionando - podemos prosseguir!" -ForegroundColor Green
     $hasSSH = $true
@@ -34,7 +34,7 @@ Write-Host "🔧 Desbloqueando IP: $ipToUnban" -ForegroundColor Yellow
 # Executar desbloqueio
 # Seguranca: nunca embutir senha no script. O 'ssh -t' aloca TTY e o 'sudo'
 # pede a senha interativamente no momento do uso.
-$unbanResult = ssh -t ubuntu@37.59.118.210 "sudo fail2ban-client set sshd unbanip $ipToUnban"
+$unbanResult = ssh -t ubuntu@<IP_DO_SERVIDOR> "sudo fail2ban-client set sshd unbanip $ipToUnban"
 
 if ($unbanResult -match "1") {
     Write-Host "✅ IP $ipToUnban desbloqueado com sucesso!" -ForegroundColor Green
@@ -47,7 +47,7 @@ Write-Host ""
 
 # Verificar status
 Write-Host "📊 Verificando status do Fail2Ban..." -ForegroundColor Yellow
-$statusResult = ssh -t ubuntu@37.59.118.210 "sudo fail2ban-client status sshd"
+$statusResult = ssh -t ubuntu@<IP_DO_SERVIDOR> "sudo fail2ban-client status sshd"
 Write-Host $statusResult
 
 Write-Host ""
@@ -55,7 +55,7 @@ Write-Host ""
 # Teste final
 Write-Host "🧪 Teste final - tentando conectar do computador principal..." -ForegroundColor Cyan
 Write-Host "Agora volte ao seu computador principal e execute:" -ForegroundColor White
-Write-Host "ssh ubuntu@37.59.118.210" -ForegroundColor Yellow
+Write-Host "ssh ubuntu@<IP_DO_SERVIDOR>" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Se funcionar, parabéns! 🎉" -ForegroundColor Green
 Write-Host ""

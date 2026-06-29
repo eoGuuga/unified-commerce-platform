@@ -1,5 +1,5 @@
 param(
-  [string]$ServerHost = "37.59.118.210",
+  [string]$ServerHost = "<IP_DO_SERVIDOR>",
   [string]$User = "ubuntu",
   [string]$KeyPath = "$HOME\.ssh\ucm_ovh_ed25519",
   [string]$RepoPath = "/opt/ucm-test-repo",
