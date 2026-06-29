@@ -23,11 +23,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let message = 'Internal server error';
     let error = 'Internal Server Error';
     let details: any = null;
+    // Codigo de erro tipado opcional (ex.: INSUFFICIENT_STOCK) — preservado p/ o frontend.
+    let code: string | null = null;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      
+
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
         error = exception.constructor.name;
@@ -36,6 +38,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message = responseObj.message || exception.message;
         error = responseObj.error || exception.constructor.name;
         details = responseObj.details || null;
+        code = responseObj.code || null;
       }
     } else if (exception instanceof Error) {
       message = exception.message;
@@ -74,6 +77,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
       message,
+      ...(code && { code }),
       ...(isDevelopment && { error, ...(details && { details }) }),
     };
 

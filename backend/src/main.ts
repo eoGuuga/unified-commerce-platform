@@ -111,6 +111,7 @@ async function bootstrap() {
     'Authorization',
     'X-CSRF-Token',
     'Idempotency-Key',
+    'Cache-Control',
   ];
   if (allowTenantHeader) {
     allowedHeaders.push('x-tenant-id');
