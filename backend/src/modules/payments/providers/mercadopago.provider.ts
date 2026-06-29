@@ -100,6 +100,27 @@ function assertTokenMatchesEnv(token: string): void {
   }
 }
 
+/**
+ * Expiracao do PIX no formato que o Mercado Pago exige: datetime COMPLETO
+ * com offset explicito de Brasilia (`-03:00`).
+ *
+ * Por que NAO reaproveitar o formato do boleto: o boleto usa
+ * `new Date(...).toISOString().split('T')[0]` — so a data (`2026-07-02`),
+ * sem hora e sem timezone, o que nao serve pro PIX. E `.toISOString()` cru
+ * devolve UTC com `Z`; o MP rejeita/interpreta errado a expiracao do PIX
+ * sem offset. Aqui expressamos o MESMO instante (agora + TTL) deslocado pro
+ * horario de Brasilia (-03:00, sem horario de verao) e anexamos o offset.
+ *
+ * Decisao de produto: offset fixo Brasilia (-03:00), correto pra loja-alvo.
+ */
+export function formatPixExpiration(nowMs: number, ttlMin: number): string {
+  const instant = nowMs + ttlMin * 60 * 1000;
+  const offsetMin = -3 * 60; // -03:00
+  // Expressa o MESMO instante em horario -03:00 e anexa o offset.
+  const local = new Date(instant + offsetMin * 60 * 1000);
+  return local.toISOString().replace('Z', '-03:00');
+}
+
 @Injectable()
 export class MercadoPagoProvider {
   private readonly logger = new Logger(MercadoPagoProvider.name);
@@ -153,6 +174,12 @@ export class MercadoPagoProvider {
           email: payerEmail || 'customer@example.com',
         },
         external_reference: externalReference,
+        // Expiracao alinhada ao TTL existente (ORDER_PAYMENT_TTL_MINUTES, default 60),
+        // formatada com offset -03:00 que o MP exige pro PIX (ver formatPixExpiration).
+        date_of_expiration: formatPixExpiration(
+          Date.now(),
+          Number(this.configService.get('ORDER_PAYMENT_TTL_MINUTES')) || 60,
+        ),
         notification_url: this.configService.get<string>('MERCADOPAGO_WEBHOOK_URL') || undefined,
         ...(metadata ? { metadata } : {}),
       };

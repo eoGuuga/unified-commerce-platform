@@ -30,6 +30,7 @@ import { ProductsModule } from '../products/products.module';
 import { AuthModule } from '../auth/auth.module';
 import { CommonModule } from '../common/common.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentsModule } from './payments.module';
 import { PaymentsService } from './payments.service';
 import { MercadoPagoProvider } from './providers/mercadopago.provider';
@@ -686,6 +687,294 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
       await qr.release();
 
       jest.restoreAllMocks();
+    });
+  });
+
+  /**
+   * Task 4 (marco central): Webhook `approved` → pedido CONFIRMADO.
+   *
+   * Criterio de aceitacao da frente PIX. Confirmar pagamento NAO baixa nem
+   * libera estoque (commitSale/baixa de VENDA so acontece no PRONTO —
+   * orders.service.ts:647-648, fora deste escopo). Por isso assertamos
+   * RIGOROSAMENTE que current_stock E reserved_stock ficam INTACTOS e que
+   * NENHUM movimento tipo 'VENDA' entra no ledger.
+   *
+   * Mesmo padrao de seed direto (SQL bruto, sem RLS) do bloco Task 8.
+   */
+  describe('Webhook approved → CONFIRMADO (S4, marco central)', () => {
+    const produtoIdApr   = 'aaa00000-0000-0000-0000-000000000002';
+    const pedidoIdApr     = 'bbb00000-0000-0000-0000-000000000002';
+    const pagamentoIdApr  = 'ccc00000-0000-0000-0000-000000000002';
+    const mpPaymentIdApr  = 'mp-fake-approved-002';
+
+    /**
+     * Semeia: produto, registro de estoque com reserva, pedido ecommerce
+     * pendente_pagamento, item, pagamento PENDING vinculado por transaction_id
+     * com tenant_id no metadata.
+     */
+    async function seedPedidoPendente(opts: {
+      currentStock: number;
+      reservedStock: number;
+      quantity: number;
+      unitPrice: number;
+    }): Promise<void> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+
+      await qr.query(
+        `DELETE FROM movimentacoes_estoque_historico WHERE order_id = $1`,
+        [pedidoIdApr],
+      );
+      await qr.query(
+        `DELETE FROM movimentacoes_estoque WHERE produto_id = $1 AND tenant_id = $2`,
+        [produtoIdApr, tenantId],
+      );
+      await qr.query(`DELETE FROM itens_pedido WHERE pedido_id = $1`, [pedidoIdApr]);
+      await qr.query(`DELETE FROM pagamentos WHERE id = $1`, [pagamentoIdApr]);
+      await qr.query(`DELETE FROM pedidos WHERE id = $1`, [pedidoIdApr]);
+      await qr.query(`DELETE FROM produtos WHERE id = $1`, [produtoIdApr]);
+
+      await qr.query(
+        `INSERT INTO produtos (id, tenant_id, name, price, unit, is_active, created_at, updated_at)
+         VALUES ($1, $2, 'Produto Webhook Approved', $3, 'unidade', true, now(), now())`,
+        [produtoIdApr, tenantId, opts.unitPrice],
+      );
+
+      // Estoque COM reserva de pe (reserved_stock > 0)
+      await qr.query(
+        `INSERT INTO movimentacoes_estoque (id, tenant_id, produto_id, current_stock, reserved_stock, min_stock, last_updated)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, 0, now())`,
+        [tenantId, produtoIdApr, opts.currentStock, opts.reservedStock],
+      );
+
+      const totalPedido = opts.unitPrice * opts.quantity;
+      await qr.query(
+        `INSERT INTO pedidos (id, tenant_id, order_no, status, channel, customer_name, subtotal, total_amount, created_at, updated_at)
+         VALUES ($1, $2, $3, 'pendente_pagamento', 'ecommerce', 'Cliente Approved', $4, $4, now(), now())`,
+        [pedidoIdApr, tenantId, `ORD-APR-${Date.now()}`, totalPedido],
+      );
+
+      await qr.query(
+        `INSERT INTO itens_pedido (id, pedido_id, produto_id, quantity, unit_price, subtotal, created_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, now())`,
+        [pedidoIdApr, produtoIdApr, opts.quantity, opts.unitPrice, opts.unitPrice * opts.quantity],
+      );
+
+      // Pagamento PENDING vinculado por transaction_id, metadata com tenant_id
+      await qr.query(
+        `INSERT INTO pagamentos (id, tenant_id, pedido_id, method, amount, status, transaction_id, metadata, created_at, updated_at)
+         VALUES ($1, $2, $3, 'pix', $4, 'pending', $5, $6::jsonb, now(), now())`,
+        [
+          pagamentoIdApr,
+          tenantId,
+          pedidoIdApr,
+          opts.unitPrice * opts.quantity,
+          mpPaymentIdApr,
+          JSON.stringify({ provider: 'mercadopago', tenant_id: tenantId }),
+        ],
+      );
+
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+    }
+
+    function buildWebhookPayload(mpPaymentId: string): Record<string, any> {
+      return {
+        action: 'payment.updated',
+        api_version: 'v1',
+        data: { id: mpPaymentId },
+        date_created: new Date().toISOString(),
+        id: `notif-${mpPaymentId}`,
+        live_mode: false,
+        type: 'payment',
+        user_id: '12345',
+      };
+    }
+
+    /** Le current_stock e reserved_stock do produto direto no banco. */
+    async function currentAndReserved(produtoId: string): Promise<{ current: number; reserved: number }> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+      const rows = await qr.query(
+        `SELECT current_stock, reserved_stock FROM movimentacoes_estoque WHERE produto_id = $1 AND tenant_id = $2`,
+        [produtoId, tenantId],
+      );
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+      return {
+        current: Number(rows[0].current_stock),
+        reserved: Number(rows[0].reserved_stock),
+      };
+    }
+
+    /** Conta linhas de um tipo de movimento (ex.: 'VENDA') no ledger para o pedido. */
+    async function countLedger(pedidoId: string, tipo: string): Promise<number> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+      const rows = await qr.query(
+        `SELECT COUNT(*)::int AS n FROM movimentacoes_estoque_historico WHERE order_id = $1 AND tipo = $2`,
+        [pedidoId, tipo],
+      );
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+      return Number(rows[0].n);
+    }
+
+    /** Le o status atual do pedido direto no banco. */
+    async function pedidoStatus(pedidoId: string): Promise<string> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+      const rows = await qr.query(`SELECT status FROM pedidos WHERE id = $1`, [pedidoId]);
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+      return rows[0].status;
+    }
+
+    /** Le o status atual do pagamento direto no banco. */
+    async function pagamentoStatus(pagamentoId: string): Promise<string> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+      const rows = await qr.query(`SELECT status FROM pagamentos WHERE id = $1`, [pagamentoId]);
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+      return rows[0].status;
+    }
+
+    beforeEach(async () => {
+      if (!app) return;
+      await seedPedidoPendente({
+        currentStock:  10,
+        reservedStock: 2,
+        quantity:  2,
+        unitPrice: 50,
+      });
+    });
+
+    afterEach(async () => {
+      if (!dataSource) return;
+      jest.restoreAllMocks();
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+      await qr.query(
+        `DELETE FROM movimentacoes_estoque_historico WHERE order_id = $1`,
+        [pedidoIdApr],
+      );
+      await qr.query(
+        `DELETE FROM movimentacoes_estoque WHERE produto_id = $1 AND tenant_id = $2`,
+        [produtoIdApr, tenantId],
+      );
+      await qr.query(`DELETE FROM itens_pedido WHERE pedido_id = $1`, [pedidoIdApr]);
+      await qr.query(`DELETE FROM pagamentos WHERE id = $1`, [pagamentoIdApr]);
+      await qr.query(`DELETE FROM pedidos WHERE id = $1`, [pedidoIdApr]);
+      await qr.query(`DELETE FROM produtos WHERE id = $1`, [produtoIdApr]);
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+    });
+
+    it('approved: pagamento PAID, pedido CONFIRMADO, notifica, estoque INTACTO, SEM VENDA no ledger', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste S4 approved - app nao inicializado');
+        return;
+      }
+
+      const paymentsService = moduleFixture.get<PaymentsService>(PaymentsService);
+      const mpProvider = moduleFixture.get<MercadoPagoProvider>(MercadoPagoProvider);
+      const notificationsService = moduleFixture.get<NotificationsService>(NotificationsService);
+
+      // Mock: MercadoPago retorna status 'approved'
+      jest.spyOn(mpProvider, 'isConfigured').mockReturnValue(true);
+      jest.spyOn(mpProvider, 'getPaymentDetails').mockResolvedValue({
+        status: 'approved',
+        status_detail: 'accredited',
+        metadata: { tenant_id: tenantId },
+        external_reference: pedidoIdApr,
+        payment_method_id: 'pix',
+      });
+      const notifySpy = jest
+        .spyOn(notificationsService, 'notifyPaymentConfirmed')
+        .mockResolvedValue(undefined as any);
+
+      // Snapshot do estoque ANTES
+      const stockBefore = await currentAndReserved(produtoIdApr);
+      const vendasBefore = await countLedger(pedidoIdApr, 'VENDA');
+
+      const payload = buildWebhookPayload(mpPaymentIdApr);
+      const result = await paymentsService.handleMercadoPagoWebhook(payload, { token: '' });
+
+      expect(result.status).toBe('ok');
+
+      // Pagamento PAID, pedido CONFIRMADO
+      expect(await pagamentoStatus(pagamentoIdApr)).toBe('paid');
+      expect(await pedidoStatus(pedidoIdApr)).toBe('confirmado');
+
+      // notifyPaymentConfirmed chamado
+      expect(notifySpy).toHaveBeenCalledTimes(1);
+
+      // ESTOQUE INTACTO: current_stock E reserved_stock iguais (confirmar
+      // pagamento nao baixa nem libera — a reserva continua de pe).
+      const stockAfter = await currentAndReserved(produtoIdApr);
+      expect(stockAfter).toEqual(stockBefore);
+      expect(stockAfter.current).toBe(10);
+      expect(stockAfter.reserved).toBe(2);
+
+      // SEM VENDA no ledger: nenhum movimento de baixa entrou (commitSale e no PRONTO).
+      const vendasAfter = await countLedger(pedidoIdApr, 'VENDA');
+      expect(vendasAfter).toBe(vendasBefore);
+      expect(vendasAfter).toBe(0);
+    });
+
+    it('approved reenviado: idempotente (nao dupla-confirma, notifica 1x, estoque intacto, sem VENDA nova)', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste S4 idempotencia - app nao inicializado');
+        return;
+      }
+
+      const paymentsService = moduleFixture.get<PaymentsService>(PaymentsService);
+      const mpProvider = moduleFixture.get<MercadoPagoProvider>(MercadoPagoProvider);
+      const notificationsService = moduleFixture.get<NotificationsService>(NotificationsService);
+
+      jest.spyOn(mpProvider, 'isConfigured').mockReturnValue(true);
+      jest.spyOn(mpProvider, 'getPaymentDetails').mockResolvedValue({
+        status: 'approved',
+        status_detail: 'accredited',
+        metadata: { tenant_id: tenantId },
+        external_reference: pedidoIdApr,
+        payment_method_id: 'pix',
+      });
+      const notifySpy = jest
+        .spyOn(notificationsService, 'notifyPaymentConfirmed')
+        .mockResolvedValue(undefined as any);
+
+      const payload = buildWebhookPayload(mpPaymentIdApr);
+
+      // Primeira confirmacao
+      await paymentsService.handleMercadoPagoWebhook(payload, { token: '' });
+      expect(await pedidoStatus(pedidoIdApr)).toBe('confirmado');
+      const stockAfterFirst = await currentAndReserved(produtoIdApr);
+      const vendasAfterFirst = await countLedger(pedidoIdApr, 'VENDA');
+
+      // Reenvio do MESMO webhook approved
+      const result2 = await paymentsService.handleMercadoPagoWebhook(payload, { token: '' });
+      expect(result2.status).toBe('ok');
+
+      // Nao dupla-confirma: pedido segue confirmado, notifica so na 1a vez.
+      expect(await pedidoStatus(pedidoIdApr)).toBe('confirmado');
+      expect(await pagamentoStatus(pagamentoIdApr)).toBe('paid');
+      expect(notifySpy).toHaveBeenCalledTimes(1);
+
+      // Estoque segue intacto (current/reserved iguais), sem VENDA nova.
+      const stockAfterSecond = await currentAndReserved(produtoIdApr);
+      expect(stockAfterSecond).toEqual(stockAfterFirst);
+      expect(stockAfterSecond.current).toBe(10);
+      expect(stockAfterSecond.reserved).toBe(2);
+      expect(await countLedger(pedidoIdApr, 'VENDA')).toBe(vendasAfterFirst);
+      expect(await countLedger(pedidoIdApr, 'VENDA')).toBe(0);
     });
   });
 });
