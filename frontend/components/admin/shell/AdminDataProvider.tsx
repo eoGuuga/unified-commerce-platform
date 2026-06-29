@@ -3,29 +3,25 @@
 /**
  * AdminDataProvider — contexto compartilhado do painel admin.
  *
- * Chama UMA instância de useOrders() e expõe os dados + stubs de estoque
- * (os campos de estoque são preenchidos pela T5a com useStock()).
+ * Chama UMA instância de useOrders() e UMA instância de useStock().
+ * Todos os consumidores (selo, Início, StockManager) leem o MESMO estado.
  *
- * IMPORTANTE: erros de fetch NÃO propagam para o React error boundary —
+ * Erros de fetch NÃO propagam para o React error boundary —
  * o provider sempre renderiza children; consumers exibem seus próprios erros.
+ *
+ * stockError NÃO-FATAL: um erro em getStockSummary seta stockError,
+ * attentionCount vira undefined (selo de Estoque some) e as demais telas
+ * (Pedidos, Produtos) continuam vivas — a casca não é derrubada.
  */
 
 import React, { createContext, useContext, useMemo } from 'react';
 import { useOrders } from '@/hooks/useOrders';
+import { useStock } from '@/hooks/useStock';
 import type { Order, OrderStatus } from '@/lib/types/order';
+import type { StockSummary } from '@/lib/types/product';
+import type { StockHistoryItem } from '@/hooks/useStock';
 
-// ---- Tipos de estoque (stubs por ora; T5a preenche com useStock) ----
-
-export interface StockSummary {
-  totalSkus: number;
-  attentionCount: number;
-  [key: string]: unknown;
-}
-
-export interface StockHistoryItem {
-  id: string;
-  [key: string]: unknown;
-}
+export type { StockHistoryItem };
 
 export interface StockHistoryResult {
   items: StockHistoryItem[];
@@ -45,13 +41,15 @@ export interface AdminDataContextValue {
   /** Nº de pedidos novos/pendentes (para o selo da aba Pedidos). */
   pedidosCount: number;
 
-  // Estoque — stubs explícitos; T5a substitui com useStock()
+  // Estoque — preenchidos pelo useStock() real (T5a)
   summary: StockSummary | null;
   stockLoading: boolean;
   stockError: string | null;
-  /** Nº de SKUs em atenção; undefined até T5a preencher. */
-  attentionCount: undefined | number;
-  history: (page?: number, limit?: number) => Promise<StockHistoryResult>;
+  refetchStock: () => Promise<void>;
+  /** Nº de SKUs em atenção; undefined quando fetch falhou (badge some). */
+  attentionCount: number | undefined;
+  history: (productId: string, limit?: number, offset?: number) => Promise<StockHistoryResult>;
+  /** Stubs para T5b — preenchidos com mutações reais na T5b. */
   adjustStock: (productId: string, delta: number, reason?: string) => Promise<void>;
   setMin: (productId: string, min: number) => Promise<void>;
 }
@@ -75,17 +73,10 @@ export function useAdminData(): AdminDataContextValue {
   return ctx;
 }
 
-// ---- Stubs de estoque ----
-
-const stubHistory: AdminDataContextValue['history'] = async () => ({ items: [], total: 0 });
-const stubAdjustStock: AdminDataContextValue['adjustStock'] = async () => {};
-const stubSetMin: AdminDataContextValue['setMin'] = async () => {};
-
 // ---- Provider ----
 
 export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   // Uma única chamada useOrders() para todo o painel.
-  // Erros ficam em ordersError — nunca são jogados para cima.
   const {
     orders,
     loading: ordersLoading,
@@ -94,6 +85,20 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     updateStatus: updateOrderStatus,
     updatingId: updatingOrderId,
   } = useOrders();
+
+  // Uma única chamada useStock() para todo o painel.
+  // stockError é NÃO-FATAL: attentionCount → undefined (badge some),
+  // as demais telas seguem vivas.
+  const {
+    summary,
+    stockLoading,
+    stockError,
+    refetchStock,
+    attentionCount,
+    history,
+    adjustStock,
+    setMin,
+  } = useStock();
 
   const pedidosCount = useMemo(
     () => orders.filter((o) => STATUS_NOVOS.includes(o.status)).length,
@@ -111,16 +116,33 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       updatingOrderId,
       pedidosCount,
 
-      // Estoque — stubs (T5a preenche)
-      summary: null,
-      stockLoading: false,
-      stockError: null,
-      attentionCount: undefined,
-      history: stubHistory,
-      adjustStock: stubAdjustStock,
-      setMin: stubSetMin,
+      // Estoque — dados reais do useStock() (T5a)
+      summary,
+      stockLoading,
+      stockError,
+      refetchStock,
+      attentionCount,
+      history,
+      adjustStock,
+      setMin,
     }),
-    [orders, ordersLoading, ordersError, refetchOrders, updateOrderStatus, updatingOrderId, pedidosCount],
+    [
+      orders,
+      ordersLoading,
+      ordersError,
+      refetchOrders,
+      updateOrderStatus,
+      updatingOrderId,
+      pedidosCount,
+      summary,
+      stockLoading,
+      stockError,
+      refetchStock,
+      attentionCount,
+      history,
+      adjustStock,
+      setMin,
+    ],
   );
 
   // Provider SEMPRE renderiza children — erros de fetch ficam em value.*Error

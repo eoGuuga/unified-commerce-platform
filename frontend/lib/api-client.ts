@@ -345,6 +345,25 @@ class ApiClient {
     return this.request<StockSummary>('/products/stock-summary');
   }
 
+  async getStockHistory(
+    productId: string,
+    limit = 50,
+    offset = 0,
+  ): Promise<{
+    items: Array<{
+      tipo: string;
+      delta: number;
+      saldo_resultante: number;
+      motivo: string | null;
+      created_at: string;
+    }>;
+    total: number;
+  }> {
+    return this.request(`/products/${productId}/stock-history`, {
+      params: { limit: String(limit), offset: String(offset) },
+    });
+  }
+
   async adjustStock(
     productId: string,
     quantity: number,
