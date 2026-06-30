@@ -199,50 +199,51 @@ function CaixaScreen() {
   const trimmedName = customerName.trim();
 
   return (
-    <div className="flex h-screen flex-col bg-slate-50 text-slate-900">
-      {/* Topbar */}
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 py-3">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex size-9 items-center justify-center rounded-2xl bg-slate-900 text-white">
-            <Store className="size-5" />
+    <div className="flex h-screen flex-col overflow-hidden bg-slate-100 text-slate-900">
+      {/* Topbar — enxuta (ferramenta, nao landing). */}
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-2">
+        <div className="flex items-center gap-2.5">
+          <span className="inline-flex size-8 items-center justify-center rounded-xl bg-slate-900 text-white">
+            <Store className="size-4" />
           </span>
-          <div>
-            <h1 className="text-lg font-semibold leading-tight text-slate-950">Caixa</h1>
-            <p className="text-xs text-slate-500">Venda de balcão</p>
+          <div className="leading-tight">
+            <h1 className="text-sm font-semibold text-slate-950">Caixa</h1>
+            <p className="text-[11px] text-slate-500">Venda de balcão</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
-            <span className="hidden sm:inline uppercase tracking-[0.16em]">Cliente</span>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
+            <span className="hidden uppercase tracking-[0.16em] md:inline">Cliente</span>
             <input
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               placeholder={DEFAULT_PDV_CUSTOMER_NAME}
               aria-label="Nome do cliente"
-              className="h-10 w-44 rounded-full border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+              className="h-9 w-40 rounded-full border border-slate-200 bg-white px-3.5 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
             />
           </label>
           <Link
             href="/admin"
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
           >
-            <LogOut className="size-4" />
+            <LogOut className="size-3.5" />
             Sair → Admin
           </Link>
         </div>
       </header>
 
-      {/* Layout 2 paineis */}
-      <main className="grid flex-1 grid-cols-1 gap-4 overflow-hidden p-4 lg:grid-cols-[1.4fr,1fr]">
+      {/* Layout 2 painÃ©is: produtos (flex-1, esquerda) + carrinho FIXO a direita.
+          h-screen sem scroll de pagina — so a grade e a lista do carrinho rolam. */}
+      <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_380px]">
         <section
           ref={searchInputRef}
-          className="flex min-h-0 flex-col rounded-[24px] border border-slate-200 bg-white p-5"
+          className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-3"
         >
           <PdvProductSearch products={products} onAdd={sale.addProduct} />
         </section>
 
-        <section className="flex min-h-0 flex-col">
+        <section className="flex min-h-0 flex-col overflow-hidden">
           <PdvCart
             items={sale.items}
             total={sale.total}

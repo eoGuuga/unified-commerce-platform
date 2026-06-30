@@ -92,10 +92,10 @@ export function PdvProductSearch({
   }
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Busca */}
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+    <div className="flex h-full min-h-0 flex-col">
+      {/* Busca — compacta, foco de teclado visivel. */}
+      <div className="relative shrink-0">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -103,20 +103,21 @@ export function PdvProductSearch({
           placeholder="Buscar produto pelo nome…"
           aria-label="Buscar produto"
           autoFocus
-          className="h-14 w-full rounded-[24px] border border-slate-200 bg-white pl-12 pr-4 text-base text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+          className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
         />
       </div>
 
-      {/* Grade */}
-      <div className="mt-5 flex-1 overflow-y-auto">
+      {/* Grade DENSA: 3 col estreito -> 4 (sm) -> 5 (xl, ~1366) -> 6 (2xl, ~1920).
+          Ver muitos produtos de uma vez, como caixa de mercado. So a grade rola. */}
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-0.5">
         {filtered.length === 0 ? (
-          <div className="flex min-h-[160px] items-center justify-center rounded-[24px] border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500">
+          <div className="flex min-h-[160px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500">
             {products.length === 0
               ? 'Nenhum produto cadastrado.'
               : 'Nenhum produto encontrado para essa busca.'}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {filtered.map((product) => {
               const stock = availableStock(product);
               const esgotado = stock <= 0;
@@ -124,10 +125,10 @@ export function PdvProductSearch({
               return (
                 <div
                   key={product.id}
-                  className={`relative rounded-[24px] border-2 bg-white p-4 transition ${
+                  className={`relative rounded-xl border bg-white transition ${
                     esgotado
-                      ? 'border-slate-200 opacity-60'
-                      : 'border-slate-200 hover:border-cyan-400 hover:shadow-[0_12px_26px_rgba(8,145,178,0.10)]'
+                      ? 'border-slate-200 opacity-55'
+                      : 'border-slate-200 hover:border-cyan-400 hover:shadow-[0_6px_16px_rgba(8,145,178,0.10)]'
                   }`}
                 >
                   {/* Estrela de favorito */}
@@ -136,37 +137,37 @@ export function PdvProductSearch({
                     onClick={() => handleToggleFavorite(product.id)}
                     aria-label={`Favoritar ${product.name}`}
                     aria-pressed={isFav}
-                    className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-300 transition hover:bg-slate-50 hover:text-amber-400"
+                    className="absolute right-1 top-1 inline-flex size-6 items-center justify-center rounded-full text-slate-300 transition hover:bg-slate-50 hover:text-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
                   >
                     <Star
-                      className={`h-4 w-4 ${isFav ? 'fill-amber-400 text-amber-400' : ''}`}
+                      className={`size-3.5 ${isFav ? 'fill-amber-400 text-amber-400' : ''}`}
                     />
                   </button>
 
-                  {/* Card clicável = adicionar */}
+                  {/* Card clicável = adicionar. Linha enxuta: nome, preco, estoque. */}
                   <button
                     type="button"
                     onClick={() => handleAdd(product)}
                     disabled={esgotado}
                     aria-label={`Adicionar ${product.name}`}
-                    className="flex w-full flex-col items-start gap-1 pr-8 text-left disabled:cursor-not-allowed"
+                    className="flex w-full flex-col items-start gap-0.5 rounded-xl px-2.5 py-2 pr-6 text-left disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
                   >
                     <span
                       data-testid="pdv-product-name"
-                      className="text-sm font-semibold text-slate-950"
+                      className="line-clamp-2 text-xs font-semibold leading-tight text-slate-950"
                     >
                       {product.name}
                     </span>
-                    <span className="text-sm text-slate-600">
+                    <span className="text-sm font-semibold tabular-nums text-slate-900">
                       {currencyFormatter.format(toNumber(product.price))}
                     </span>
                     {esgotado ? (
-                      <span className="mt-1 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700">
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
                         Esgotado
                       </span>
                     ) : (
-                      <span className="mt-1 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                        {stock} em estoque
+                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-emerald-700">
+                        {stock} un
                       </span>
                     )}
                   </button>

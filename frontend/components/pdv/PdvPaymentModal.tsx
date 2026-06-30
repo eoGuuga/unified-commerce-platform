@@ -224,7 +224,7 @@ export function PdvPaymentModal({
 }: PdvPaymentModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-3xl rounded-[30px] border border-white/10 bg-white p-6 shadow-[0_40px_120px_rgba(15,23,42,0.4)] sm:p-8">
+      <div className="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-white p-5 shadow-[0_40px_120px_rgba(15,23,42,0.4)] sm:p-6">
         {completedSale ? (
           <CompletedSaleView
             completedSale={completedSale}
@@ -301,13 +301,23 @@ function PaymentFormView({
 }) {
   // Troco negativo (dinheiro): valor recebido < total -> bloqueia finalizar (spec §4.6/§10).
   const insufficientCash = paymentMethod === 'dinheiro' && cashChange < 0;
+  // Cards de metodo compactos numa fileira (4-up): pix/debito/credito = acento cyan,
+  // dinheiro = acento emerald (a unica acao com calculo extra de troco).
+  const methodBtn = (active: boolean, accent: 'cyan' | 'emerald') =>
+    active
+      ? accent === 'emerald'
+        ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-[0_6px_16px_rgba(16,185,129,0.14)]'
+        : 'border-cyan-500 bg-cyan-50 text-cyan-900 shadow-[0_6px_16px_rgba(8,145,178,0.14)]'
+      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300';
   return (
     <>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Fechamento da venda</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-950">Pagamento</h2>
-          <p className="mt-2 text-sm text-slate-600">Total: {currencyFormatter.format(saleSummaryTotal)}</p>
+      {/* Cabecalho enxuto: titulo + total a vista + Fechar. */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-xl font-semibold text-slate-950">Pagamento</h2>
+          <p className="text-sm text-slate-600">
+            Total: <strong className="font-semibold tabular-nums text-slate-900">{currencyFormatter.format(saleSummaryTotal)}</strong>
+          </p>
           {orderData?.orderNo && (
             <p className="text-xs text-slate-400">Pedido: {orderData.orderNo}</p>
           )}
@@ -315,135 +325,146 @@ function PaymentFormView({
         <button
           onClick={onClose}
           disabled={paymentLoading}
-          className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Fechar
         </button>
       </div>
 
-      <div className="mt-8 grid gap-4 lg:grid-cols-[1fr,0.9fr]">
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              onClick={() => onPaymentMethodChange('pix')}
-              className={`rounded-[24px] border-2 px-5 py-4 text-left transition ${
-                paymentMethod === 'pix'
-                  ? 'border-cyan-500 bg-cyan-50 shadow-[0_12px_26px_rgba(8,145,178,0.12)]'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
-            >
-              <p className="text-sm font-semibold text-slate-950">PIX</p>
-              <p className="mt-1 text-xs text-slate-500">
-                {fastPass
-                  ? 'Cliente paga no QR/maquininha — confirme quando vir o pagamento'
-                  : 'QR code e copia e cola'}
-              </p>
-            </button>
-            <button
-              onClick={() => onPaymentMethodChange('dinheiro')}
-              className={`rounded-[24px] border-2 px-5 py-4 text-left transition ${
-                paymentMethod === 'dinheiro'
-                  ? 'border-emerald-500 bg-emerald-50 shadow-[0_12px_26px_rgba(16,185,129,0.12)]'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
-            >
-              <p className="text-sm font-semibold text-slate-950">Dinheiro</p>
-              <p className="mt-1 text-xs text-slate-500">Valor recebido e troco calculado</p>
-            </button>
-            <button
-              onClick={() => onPaymentMethodChange('debito')}
-              className={`rounded-[24px] border-2 px-5 py-4 text-left transition ${
-                paymentMethod === 'debito'
-                  ? 'border-cyan-500 bg-cyan-50 shadow-[0_12px_26px_rgba(8,145,178,0.12)]'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
-            >
-              <p className="text-sm font-semibold text-slate-950">Débito</p>
-              <p className="mt-1 text-xs text-slate-500">Passe na maquininha — confirme quando aprovar</p>
-            </button>
-            <button
-              onClick={() => onPaymentMethodChange('credito')}
-              className={`rounded-[24px] border-2 px-5 py-4 text-left transition ${
-                paymentMethod === 'credito'
-                  ? 'border-cyan-500 bg-cyan-50 shadow-[0_12px_26px_rgba(8,145,178,0.12)]'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
-            >
-              <p className="text-sm font-semibold text-slate-950">Crédito</p>
-              <p className="mt-1 text-xs text-slate-500">Passe na maquininha — confirme quando aprovar</p>
-            </button>
-          </div>
+      {/* Tudo numa olhada, SEM scroll interno: metodos -> valor/troco -> resumo -> Confirmar. */}
+      <div className="mt-4 space-y-4">
+        {/* 4 metodos em fileira compacta. */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <button
+            onClick={() => onPaymentMethodChange('pix')}
+            className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${methodBtn(paymentMethod === 'pix', 'cyan')}`}
+          >
+            PIX
+          </button>
+          <button
+            onClick={() => onPaymentMethodChange('dinheiro')}
+            className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 ${methodBtn(paymentMethod === 'dinheiro', 'emerald')}`}
+          >
+            Dinheiro
+          </button>
+          <button
+            onClick={() => onPaymentMethodChange('debito')}
+            className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${methodBtn(paymentMethod === 'debito', 'cyan')}`}
+          >
+            Débito
+          </button>
+          <button
+            onClick={() => onPaymentMethodChange('credito')}
+            className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${methodBtn(paymentMethod === 'credito', 'cyan')}`}
+          >
+            Crédito
+          </button>
+        </div>
 
-          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-            <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Parametros</p>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {showCoupon && (
-                <div>
-                  <label className="text-xs uppercase tracking-[0.24em] text-slate-500">Cupom</label>
-                  <input
-                    value={couponCode}
-                    onChange={(e) => onCouponCodeChange(e.target.value)}
-                    disabled={Boolean(orderData?.id)}
-                    placeholder="EX: PROMO10"
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                  />
-                  {orderData?.id && (
-                    <p className="mt-2 text-xs text-slate-500">
-                      O pedido ja foi criado. Agora vamos apenas regenerar o pagamento com seguranca.
-                    </p>
-                  )}
-                </div>
-              )}
-              {paymentMethod === 'dinheiro' && (
-                <div>
-                  <label className="text-xs uppercase tracking-[0.24em] text-slate-500">Valor recebido</label>
-                  <input
-                    value={cashReceived}
-                    onChange={(e) => onCashReceivedChange(e.target.value)}
-                    placeholder="0,00"
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  />
-                  {cashReceived && (
-                    <p className="mt-2 text-xs text-slate-500">Troco: {currencyFormatter.format(cashChange)}</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <p className="text-xs leading-6 text-slate-500">
-            Ambiente de teste: o Pix funciona com comprador de teste do Mercado Pago.
+        {/* Dica do metodo + parametros (cupom opcional / valor recebido) numa fileira enxuta. */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <p className="flex-1 text-xs leading-5 text-slate-500">
+            {paymentMethod === 'pix'
+              ? fastPass
+                ? 'Cliente paga no QR/maquininha — confirme quando vir o pagamento.'
+                : 'QR code e copia e cola.'
+              : paymentMethod === 'dinheiro'
+                ? 'Informe o valor recebido — o troco é calculado.'
+                : 'Passe na maquininha — confirme quando aprovar.'}
           </p>
-
-          {paymentError && (
-            <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {paymentError}
+          {showCoupon && (
+            <div className="sm:w-44">
+              <label className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Cupom</label>
+              <input
+                value={couponCode}
+                onChange={(e) => onCouponCodeChange(e.target.value)}
+                disabled={Boolean(orderData?.id)}
+                placeholder="EX: PROMO10"
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              />
             </div>
           )}
-
-          {fastPass ? (
-            // Fast-pass (PDV): 1 passo, sem QR. Um unico botao marca pago e finaliza.
-            // Troco negativo (dinheiro) bloqueia finalizar — a operadora ve o porque.
-            <div className="space-y-2">
-              <button
-                onClick={onCreateOrderAndPayment}
-                disabled={paymentLoading || insufficientCash}
-                className="inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-4 text-base font-semibold text-white shadow-[0_16px_32px_rgba(16,185,129,0.24)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
-              >
-                {paymentLoading ? 'Registrando…' : 'Confirmar pagamento e finalizar'}
-              </button>
-              {insufficientCash && (
-                <p className="text-center text-xs font-medium text-rose-600">
-                  Valor recebido insuficiente
-                </p>
-              )}
+          {paymentMethod === 'dinheiro' && (
+            <div className="sm:w-44">
+              <label className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Valor recebido</label>
+              <input
+                value={cashReceived}
+                onChange={(e) => onCashReceivedChange(e.target.value)}
+                placeholder="0,00"
+                inputMode="decimal"
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm tabular-nums text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+              />
             </div>
-          ) : (
+          )}
+        </div>
+
+        {/* Troco enxuto (so dinheiro, quando ha valor). */}
+        {paymentMethod === 'dinheiro' && cashReceived && (
+          <div
+            className={`flex items-center justify-between rounded-xl border px-4 py-2 text-sm ${
+              insufficientCash
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+            }`}
+          >
+            <span className="font-medium">Troco</span>
+            <strong className="text-base font-bold tabular-nums">{currencyFormatter.format(cashChange)}</strong>
+          </div>
+        )}
+
+        {/* Resumo condensado da venda (escuro = ancora visual, reusa a linguagem). */}
+        <div className="rounded-xl border border-slate-200 bg-slate-950 px-4 py-3 text-white">
+          <div className="max-h-28 space-y-1 overflow-y-auto">
+            {saleSummaryItems.map((item) => (
+              <div key={item.id} className="flex items-center justify-between gap-3 text-sm">
+                <p className="min-w-0 flex-1 truncate text-slate-200">
+                  <span className="tabular-nums text-slate-400">{item.quantity}×</span> {item.name}
+                </p>
+                <strong className="shrink-0 font-semibold tabular-nums text-white">
+                  {currencyFormatter.format(item.price * item.quantity)}
+                </strong>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex items-baseline justify-between border-t border-white/10 pt-2">
+            <span className="text-xs uppercase tracking-[0.18em] text-slate-300">Total final</span>
+            <strong className="text-2xl font-bold tabular-nums text-white">
+              {currencyFormatter.format(saleSummaryTotal)}
+            </strong>
+          </div>
+        </div>
+
+        {paymentError && (
+          <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
+            {paymentError}
+          </div>
+        )}
+
+        {/* Confirmar SEMPRE visivel (sem scroll). */}
+        {fastPass ? (
+          // Fast-pass (PDV): 1 passo, sem QR. Um unico botao marca pago e finaliza.
+          // Troco negativo (dinheiro) bloqueia finalizar — a operadora ve o porque.
+          <div className="space-y-2">
+            <button
+              onClick={onCreateOrderAndPayment}
+              disabled={paymentLoading || insufficientCash}
+              className="inline-flex w-full items-center justify-center rounded-xl bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-3.5 text-base font-bold text-white shadow-[0_12px_28px_rgba(16,185,129,0.24)] transition hover:translate-y-[-1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none disabled:hover:translate-y-0"
+            >
+              {paymentLoading ? 'Registrando…' : 'Confirmar pagamento e finalizar'}
+            </button>
+            {insufficientCash && (
+              <p className="text-center text-xs font-medium text-rose-600">
+                Valor recebido insuficiente
+              </p>
+            )}
+          </div>
+        ) : (
+          <>
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
                 onClick={onCreateOrderAndPayment}
                 disabled={paymentLoading}
-                className="inline-flex flex-1 items-center justify-center rounded-full bg-[linear-gradient(135deg,#0891b2_0%,#0f766e_100%)] px-6 py-4 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(8,145,178,0.22)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                className="inline-flex flex-1 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#0891b2_0%,#0f766e_100%)] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(8,145,178,0.22)] transition hover:translate-y-[-1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
               >
                 {paymentLoading
                   ? 'Processando...'
@@ -455,66 +476,42 @@ function PaymentFormView({
                 <button
                   onClick={onConfirmPayment}
                   disabled={paymentLoading}
-                  className="inline-flex flex-1 items-center justify-center rounded-full bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-4 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(34,197,94,0.2)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                  className="inline-flex flex-1 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(34,197,94,0.2)] transition hover:translate-y-[-1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
                 >
                   Confirmar pagamento
                 </button>
               )}
             </div>
-          )}
-        </div>
-
-        <div className="rounded-[24px] border border-slate-200 bg-slate-950 p-6 text-white">
-          <p className="text-xs uppercase tracking-[0.28em] text-cyan-100/70">Resumo da venda</p>
-          <div className="mt-4 space-y-3">
-            {saleSummaryItems.map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-white">{item.name}</p>
-                  <p className="mt-1 text-xs text-slate-300">{item.quantity} x {currencyFormatter.format(item.price)}</p>
-                </div>
-                <strong className="text-sm font-semibold text-white">
-                  {currencyFormatter.format(item.price * item.quantity)}
-                </strong>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-5">
-            <span className="text-sm text-slate-300">Total final</span>
-            <strong className="text-2xl font-semibold text-white">{currencyFormatter.format(saleSummaryTotal)}</strong>
-          </div>
-
-          {!fastPass && paymentData && (
-            <div className="mt-6 rounded-[22px] border border-white/10 bg-white/5 p-4">
-              {paymentData.message && (
-                <p className="text-sm whitespace-pre-line text-slate-300">{paymentData.message}</p>
-              )}
-              {paymentMethod === 'pix' && paymentData.qr_code && (
-                <div className="mt-4 flex flex-col items-center gap-4">
-                  <Image
-                    src={paymentData.qr_code}
-                    alt="QR Code Pix"
-                    width={192}
-                    height={192}
-                    unoptimized
-                    className="h-48 w-48 rounded-2xl border border-white/10 bg-white p-3"
-                  />
-                  {paymentData.copy_paste && (
-                    <div className="w-full">
-                      <label className="text-xs uppercase tracking-[0.24em] text-slate-400">Copia e cola</label>
+            {/* QR (fluxo de 2 passos, fora do PDV). */}
+            {paymentData && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                {paymentData.message && (
+                  <p className="whitespace-pre-line text-sm text-slate-600">{paymentData.message}</p>
+                )}
+                {paymentMethod === 'pix' && paymentData.qr_code && (
+                  <div className="mt-3 flex flex-col items-center gap-3">
+                    <Image
+                      src={paymentData.qr_code}
+                      alt="QR Code Pix"
+                      width={160}
+                      height={160}
+                      unoptimized
+                      className="h-40 w-40 rounded-xl border border-slate-200 bg-white p-2"
+                    />
+                    {paymentData.copy_paste && (
                       <textarea
                         readOnly
-                        className="mt-2 h-28 w-full rounded-2xl border border-white/10 bg-slate-950/70 p-3 text-xs text-slate-200 outline-none"
+                        aria-label="Copia e cola"
+                        className="h-20 w-full rounded-xl border border-slate-200 bg-white p-2 text-xs text-slate-700 outline-none"
                         value={paymentData.copy_paste}
                       />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </>
   );
