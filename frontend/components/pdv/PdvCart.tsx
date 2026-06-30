@@ -1,14 +1,7 @@
 'use client';
 
-import { Minus, Plus, Trash2, ShoppingCart, Maximize2, ChevronUp } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingCart, Maximize2 } from 'lucide-react';
 import type { PdvCartItem } from '@/lib/pdv/cart';
-
-/**
- * Quantos itens INTEIROS o carrinho compacto mostra. Nunca clipa meia-linha:
- * quando ha mais que isto (e ha overlay), mostramos os ULTIMOS VISIBLE itens
- * completos + um indicador "+N · ver todos" que abre o overlay Expandir.
- */
-const VISIBLE = 3;
 
 export interface PdvCartProps {
   items: PdvCartItem[];
@@ -85,11 +78,10 @@ export function PdvCart({
         </div>
       </div>
 
-      {/* Lista compacta: NUNCA mostra item cortado. Capamos em VISIBLE linhas
-          INTEIRAS (os mais recentes) + um indicador "+N · ver todos" que abre o
-          overlay — sem scroll interno que clipa meia-linha. Sem onExpand (uso
-          legado/teste) caimos no comportamento antigo: todos os itens. */}
-      <div className="min-h-0 flex-1 px-3 py-2.5">
+      {/* Lista do carrinho: renderiza TODOS os itens e rola DENTRO desta area
+          (scroll interno) quando passa da altura — o header e o rodape ficam
+          fixos. O botao "Expandir" no header continua como opcao. */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2.5">
         {isEmpty ? (
           <div className="flex h-full min-h-40 flex-col items-center justify-center gap-3 text-center">
             <div className="inline-flex size-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-400">
@@ -101,19 +93,7 @@ export function PdvCart({
           </div>
         ) : (
           <ul className="space-y-2">
-            {onExpand && items.length > VISIBLE && (
-              <li>
-                <button
-                  type="button"
-                  onClick={onExpand}
-                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-cyan-400 hover:bg-cyan-50/60 hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
-                >
-                  <ChevronUp className="size-3.5" />
-                  +{items.length - VISIBLE} {items.length - VISIBLE === 1 ? 'item' : 'itens'} · ver todos
-                </button>
-              </li>
-            )}
-            {(onExpand ? items.slice(-VISIBLE) : items).map((item) => {
+            {items.map((item) => {
               const subtotal = item.unit_price * item.quantity;
               return (
                 <li

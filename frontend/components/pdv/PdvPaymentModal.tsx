@@ -94,48 +94,48 @@ function CompletedSaleView({
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[1.05fr,0.95fr]">
-      <div className="rounded-[28px] border border-emerald-400/30 bg-[linear-gradient(160deg,#064e3b_0%,#0f172a_62%)] p-6 text-white shadow-[0_20px_48px_rgba(2,16,12,0.45)]">
+      <div className="self-start rounded-[28px] border border-emerald-400/30 bg-[linear-gradient(160deg,#064e3b_0%,#0f172a_62%)] p-6 text-white shadow-[0_20px_48px_rgba(2,16,12,0.45)]">
         {/* Sucesso inequivoco e instantaneo: titulo grande, sem ambiguidade. */}
         <div className="flex items-center gap-3">
-          <span className="inline-flex size-14 items-center justify-center rounded-3xl border border-emerald-300/30 bg-emerald-400/15 text-emerald-100">
+          <span className="inline-flex size-11 items-center justify-center rounded-3xl border border-emerald-300/30 bg-emerald-400/15 text-emerald-100">
             <CheckCircle2 className="size-8" />
           </span>
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-emerald-100/80">
               venda confirmada
             </p>
-            <h2 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">
+            <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
               <span aria-hidden="true">✅ </span>Venda registrada
             </h2>
           </div>
         </div>
-        <p className="mt-4 text-sm leading-7 text-emerald-50/90">
+        <p className="mt-3 text-sm leading-6 text-emerald-50/90">
           Pode chamar o proximo. A venda foi gravada com seguranca.
         </p>
 
-        <div className="mt-7 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
-            <p className="text-xs uppercase tracking-[0.22em] text-slate-300">pedido</p>
-            <p className="mt-2 text-2xl font-bold text-white">
+        <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-300">pedido</p>
+            <p className="mt-2 text-xl font-bold text-white">
               {completedSale.orderNo || 'Venda confirmada'}
             </p>
           </div>
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
-            <p className="text-xs uppercase tracking-[0.22em] text-slate-300">total</p>
-            <p className="mt-2 text-2xl font-bold text-white">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-300">total</p>
+            <p className="mt-2 text-xl font-bold text-white">
               {currencyFormatter.format(completedSale.total)}
             </p>
           </div>
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
-            <p className="text-xs uppercase tracking-[0.22em] text-slate-300">itens</p>
-            <p className="mt-2 text-2xl font-bold text-white">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-300">itens</p>
+            <p className="mt-2 text-xl font-bold text-white">
               {completedSale.itemsCount}
             </p>
           </div>
           {typeof completedSale.changeAmount === 'number' && (
-            <div className="rounded-[24px] border border-emerald-300/30 bg-emerald-400/10 p-4">
-              <p className="text-xs uppercase tracking-[0.22em] text-emerald-100">troco</p>
-              <p className="mt-2 text-2xl font-bold text-white">
+            <div className="rounded-2xl border border-emerald-300/30 bg-emerald-400/10 p-3">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-100">troco</p>
+              <p className="mt-2 text-xl font-bold text-white">
                 {currencyFormatter.format(completedSale.changeAmount)}
               </p>
             </div>
@@ -174,7 +174,7 @@ function CompletedSaleView({
           <button
             onClick={onNewSale}
             autoFocus
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-5 text-base font-bold text-white shadow-[0_16px_32px_rgba(16,185,129,0.24)] transition hover:translate-y-[-1px]"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-4 text-base font-bold text-white shadow-[0_16px_32px_rgba(16,185,129,0.24)] transition hover:translate-y-[-1px]"
           >
             Nova venda
             <ArrowRight className="size-5" />
@@ -225,7 +225,7 @@ export function PdvPaymentModal({
 }: PdvPaymentModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm">
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-white p-5 shadow-[0_40px_120px_rgba(15,23,42,0.4)] sm:p-6">
+      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-white p-5 shadow-[0_40px_120px_rgba(15,23,42,0.4)] sm:p-6">
         {completedSale ? (
           <CompletedSaleView
             completedSale={completedSale}
@@ -319,9 +319,9 @@ function PaymentFormView({
         : 'border-cyan-500 bg-cyan-50 text-cyan-900 shadow-[0_6px_16px_rgba(8,145,178,0.14)]'
       : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300';
   return (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Cabecalho enxuto: titulo + total a vista + Fechar. */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex shrink-0 items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
           <h2 className="text-xl font-semibold text-slate-950">Pagamento</h2>
           <p className="text-sm text-slate-600">
@@ -340,8 +340,9 @@ function PaymentFormView({
         </button>
       </div>
 
-      {/* Tudo numa olhada, SEM scroll interno: metodos -> valor/troco -> resumo -> Confirmar. */}
-      <div className="mt-4 space-y-4">
+      {/* Miolo rolavel: metodos -> valor/troco -> resumo -> QR (2-passos).
+          O botao Confirmar fica FIXO no rodape (fora deste scroll). */}
+      <div className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pr-0.5">
         {/* 4 metodos em fileira compacta. */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <button
@@ -463,7 +464,38 @@ function PaymentFormView({
           </div>
         )}
 
-        {/* Confirmar SEMPRE visivel (sem scroll). */}
+        {/* QR (fluxo de 2 passos, fora do PDV) — DENTRO do scroll, acima do rodape fixo. */}
+        {!fastPass && paymentData && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            {paymentData.message && (
+              <p className="whitespace-pre-line text-sm text-slate-600">{paymentData.message}</p>
+            )}
+            {paymentMethod === 'pix' && paymentData.qr_code && (
+              <div className="mt-3 flex flex-col items-center gap-3">
+                <Image
+                  src={paymentData.qr_code}
+                  alt="QR Code Pix"
+                  width={160}
+                  height={160}
+                  unoptimized
+                  className="h-40 w-40 rounded-xl border border-slate-200 bg-white p-2"
+                />
+                {paymentData.copy_paste && (
+                  <textarea
+                    readOnly
+                    aria-label="Copia e cola"
+                    className="h-20 w-full rounded-xl border border-slate-200 bg-white p-2 text-xs text-slate-700 outline-none"
+                    value={paymentData.copy_paste}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Rodape FIXO: o botao Confirmar fica SEMPRE visivel, em todos os metodos. */}
+      <div className="mt-4 shrink-0 border-t border-slate-100 pt-4">
         {fastPass ? (
           // Fast-pass (PDV): 1 passo, sem QR. Um unico botao marca pago e finaliza.
           // Troco negativo (dinheiro) bloqueia finalizar — a operadora ve o porque.
@@ -482,60 +514,30 @@ function PaymentFormView({
             )}
           </div>
         ) : (
-          <>
-            <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={onCreateOrderAndPayment}
+              disabled={paymentLoading}
+              className="inline-flex flex-1 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#0891b2_0%,#0f766e_100%)] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(8,145,178,0.22)] transition hover:translate-y-[-1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+            >
+              {paymentLoading
+                ? 'Processando...'
+                : orderData?.id
+                  ? 'Gerar pagamento novamente'
+                  : 'Gerar pagamento'}
+            </button>
+            {paymentData?.pagamento?.id && (
               <button
-                onClick={onCreateOrderAndPayment}
+                onClick={onConfirmPayment}
                 disabled={paymentLoading}
-                className="inline-flex flex-1 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#0891b2_0%,#0f766e_100%)] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(8,145,178,0.22)] transition hover:translate-y-[-1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                className="inline-flex flex-1 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(34,197,94,0.2)] transition hover:translate-y-[-1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
               >
-                {paymentLoading
-                  ? 'Processando...'
-                  : orderData?.id
-                    ? 'Gerar pagamento novamente'
-                    : 'Gerar pagamento'}
+                Confirmar pagamento
               </button>
-              {paymentData?.pagamento?.id && (
-                <button
-                  onClick={onConfirmPayment}
-                  disabled={paymentLoading}
-                  className="inline-flex flex-1 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(34,197,94,0.2)] transition hover:translate-y-[-1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
-                >
-                  Confirmar pagamento
-                </button>
-              )}
-            </div>
-            {/* QR (fluxo de 2 passos, fora do PDV). */}
-            {paymentData && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                {paymentData.message && (
-                  <p className="whitespace-pre-line text-sm text-slate-600">{paymentData.message}</p>
-                )}
-                {paymentMethod === 'pix' && paymentData.qr_code && (
-                  <div className="mt-3 flex flex-col items-center gap-3">
-                    <Image
-                      src={paymentData.qr_code}
-                      alt="QR Code Pix"
-                      width={160}
-                      height={160}
-                      unoptimized
-                      className="h-40 w-40 rounded-xl border border-slate-200 bg-white p-2"
-                    />
-                    {paymentData.copy_paste && (
-                      <textarea
-                        readOnly
-                        aria-label="Copia e cola"
-                        className="h-20 w-full rounded-xl border border-slate-200 bg-white p-2 text-xs text-slate-700 outline-none"
-                        value={paymentData.copy_paste}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
             )}
-          </>
+          </div>
         )}
       </div>
-    </>
+    </div>
   );
 }
