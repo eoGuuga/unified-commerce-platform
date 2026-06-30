@@ -50,6 +50,14 @@ export interface PdvPaymentModalProps {
   paymentError: string | null;
   paymentData: PaymentResult | null;
   completedSale: CompletedSaleState | null;
+  /**
+   * Fast-pass (PDV): 1 passo, sem QR. Quando true, o pagamento e marcado pago
+   * numa unica acao (`onCreateOrderAndPayment`) — o bloco de QR e o 2o botao
+   * (`onConfirmPayment`) ficam ocultos. Default `false` = fluxo de 2 passos atual.
+   */
+  fastPass?: boolean;
+  /** Mostra o campo de cupom. Default `true`; o PDV passa `false` (oculto no v1). */
+  showCoupon?: boolean;
   onCreateOrderAndPayment: () => void;
   onConfirmPayment: () => void;
   onCopyReceipt: () => void;
@@ -61,6 +69,14 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
   currency: 'BRL',
 });
+
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  pix: 'Pix',
+  dinheiro: 'Dinheiro',
+  debito: 'Débito',
+  credito: 'Crédito',
+  boleto: 'Boleto',
+};
 
 function CompletedSaleView({
   completedSale,
@@ -77,115 +93,106 @@ function CompletedSaleView({
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[1.05fr,0.95fr]">
-      <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(160deg,rgba(16,185,129,0.18)_0%,rgba(56,189,248,0.14)_45%,rgba(15,23,42,0.98)_100%)] p-6 text-white">
-        <div className="inline-flex size-14 items-center justify-center rounded-3xl border border-emerald-300/20 bg-emerald-400/10 text-emerald-100">
-          <CheckCircle2 className="size-7" />
+      <div className="rounded-[28px] border border-emerald-300/30 bg-[linear-gradient(160deg,rgba(16,185,129,0.22)_0%,rgba(56,189,248,0.14)_45%,rgba(15,23,42,0.98)_100%)] p-6 text-white">
+        {/* Sucesso inequivoco e instantaneo: titulo grande, sem ambiguidade. */}
+        <div className="flex items-center gap-3">
+          <span className="inline-flex size-14 items-center justify-center rounded-3xl border border-emerald-300/30 bg-emerald-400/15 text-emerald-100">
+            <CheckCircle2 className="size-8" />
+          </span>
+          <div>
+            <p className="text-xs uppercase tracking-[0.28em] text-emerald-100/80">
+              venda confirmada
+            </p>
+            <h2 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">
+              <span aria-hidden="true">✅ </span>Venda registrada
+            </h2>
+          </div>
         </div>
-        <p className="mt-6 text-xs uppercase tracking-[0.28em] text-emerald-100/80">
-          venda confirmada
-        </p>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight">
-          Caixa concluido com a serenidade de uma operacao madura.
-        </h2>
-        <p className="mt-4 text-sm leading-7 text-slate-200/85">
-          Pedido, total e recebimento ficaram claros do primeiro clique ate a confirmacao final.
+        <p className="mt-4 text-sm leading-7 text-emerald-50/90">
+          Pode chamar o proximo. A venda foi gravada com seguranca.
         </p>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-3">
+        <div className="mt-7 grid gap-4 sm:grid-cols-2">
           <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
             <p className="text-xs uppercase tracking-[0.22em] text-slate-300">pedido</p>
-            <p className="mt-2 text-lg font-semibold text-white">
+            <p className="mt-2 text-2xl font-bold text-white">
               {completedSale.orderNo || 'Venda confirmada'}
             </p>
           </div>
           <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
             <p className="text-xs uppercase tracking-[0.22em] text-slate-300">total</p>
-            <p className="mt-2 text-lg font-semibold text-white">
+            <p className="mt-2 text-2xl font-bold text-white">
               {currencyFormatter.format(completedSale.total)}
             </p>
           </div>
           <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
             <p className="text-xs uppercase tracking-[0.22em] text-slate-300">itens</p>
-            <p className="mt-2 text-lg font-semibold text-white">
+            <p className="mt-2 text-2xl font-bold text-white">
               {completedSale.itemsCount}
             </p>
           </div>
+          {typeof completedSale.changeAmount === 'number' && (
+            <div className="rounded-[24px] border border-emerald-300/30 bg-emerald-400/10 p-4">
+              <p className="text-xs uppercase tracking-[0.22em] text-emerald-100">troco</p>
+              <p className="mt-2 text-2xl font-bold text-white">
+                {currencyFormatter.format(completedSale.changeAmount)}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6">
-        <p className="text-xs uppercase tracking-[0.28em] text-slate-500">pos-venda</p>
-        <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-          O operador sai com clareza e pronto para a proxima venda.
-        </h3>
-
-        <div className="mt-6 rounded-[24px] border border-slate-200 bg-white p-5">
+      <div className="flex flex-col rounded-[28px] border border-slate-200 bg-slate-50 p-6">
+        <div className="rounded-[24px] border border-slate-200 bg-white p-5">
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-4">
               <span className="text-sm text-slate-500">Metodo</span>
               <strong className="text-sm font-semibold text-slate-950">
-                {completedSale.paymentMethod === 'pix' ? 'Pix' : 'Dinheiro'}
+                {PAYMENT_METHOD_LABELS[completedSale.paymentMethod] ?? completedSale.paymentMethod}
               </strong>
             </div>
-            {typeof completedSale.changeAmount === 'number' && (
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm text-slate-500">Troco</span>
-                <strong className="text-sm font-semibold text-slate-950">
-                  {currencyFormatter.format(completedSale.changeAmount)}
-                </strong>
-              </div>
-            )}
             <div className="flex items-center justify-between gap-4">
               <span className="text-sm text-slate-500">Total confirmado</span>
               <strong className="text-base font-semibold text-slate-950">
                 {currencyFormatter.format(completedSale.total)}
               </strong>
             </div>
+            {typeof completedSale.changeAmount === 'number' && (
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm text-slate-500">Troco</span>
+                <strong className="text-base font-semibold text-emerald-700">
+                  {currencyFormatter.format(completedSale.changeAmount)}
+                </strong>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3">
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">ritmo</p>
-            <p className="mt-2 text-sm font-medium text-slate-900">
-              O fechamento terminou sem esconder risco, valor ou proximo passo.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">proxima venda</p>
-            <p className="mt-2 text-sm font-medium text-slate-900">
-              O caixa ja pode voltar para a busca com o mesmo fluxo premium.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">comprovante</p>
-            <p className="mt-2 text-sm font-medium text-slate-900">
-              O resumo da venda pode ser copiado em um clique para registro ou envio interno.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-6 flex flex-col gap-3">
-          <button
-            onClick={onCopyReceipt}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-          >
-            <Copy className="size-4" />
-            Copiar comprovante
-          </button>
+        {/* "Nova venda" e a acao primaria obvia para o balcao com fila. */}
+        <div className="mt-auto flex flex-col gap-3 pt-6">
           <button
             onClick={onNewSale}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            autoFocus
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-5 text-base font-bold text-white shadow-[0_16px_32px_rgba(16,185,129,0.24)] transition hover:translate-y-[-1px]"
           >
             Nova venda
-            <ArrowRight className="size-4" />
+            <ArrowRight className="size-5" />
           </button>
-          <button
-            onClick={onClose}
-            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-          >
-            Fechar resumo
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={onCopyReceipt}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              <Copy className="size-4" />
+              Copiar comprovante
+            </button>
+            <button
+              onClick={onClose}
+              className="inline-flex flex-1 items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Fechar resumo
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -207,6 +214,8 @@ export function PdvPaymentModal({
   paymentError,
   paymentData,
   completedSale,
+  fastPass = false,
+  showCoupon = true,
   onCreateOrderAndPayment,
   onConfirmPayment,
   onCopyReceipt,
@@ -239,6 +248,8 @@ export function PdvPaymentModal({
             paymentLoading={paymentLoading}
             paymentError={paymentError}
             paymentData={paymentData}
+            fastPass={fastPass}
+            showCoupon={showCoupon}
             onCreateOrderAndPayment={onCreateOrderAndPayment}
             onConfirmPayment={onConfirmPayment}
             onClose={onClose}
@@ -263,6 +274,8 @@ function PaymentFormView({
   paymentLoading,
   paymentError,
   paymentData,
+  fastPass,
+  showCoupon,
   onCreateOrderAndPayment,
   onConfirmPayment,
   onClose,
@@ -280,6 +293,8 @@ function PaymentFormView({
   paymentLoading: boolean;
   paymentError: string | null;
   paymentData: PaymentResult | null;
+  fastPass: boolean;
+  showCoupon: boolean;
   onCreateOrderAndPayment: () => void;
   onConfirmPayment: () => void;
   onClose: () => void;
@@ -306,7 +321,7 @@ function PaymentFormView({
 
       <div className="mt-8 grid gap-4 lg:grid-cols-[1fr,0.9fr]">
         <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4">
             <button
               onClick={() => onPaymentMethodChange('pix')}
               className={`rounded-[24px] border-2 px-5 py-4 text-left transition ${
@@ -316,7 +331,11 @@ function PaymentFormView({
               }`}
             >
               <p className="text-sm font-semibold text-slate-950">PIX</p>
-              <p className="mt-1 text-xs text-slate-500">QR code e copia e cola</p>
+              <p className="mt-1 text-xs text-slate-500">
+                {fastPass
+                  ? 'Cliente paga no QR/maquininha — confirme quando vir o pagamento'
+                  : 'QR code e copia e cola'}
+              </p>
             </button>
             <button
               onClick={() => onPaymentMethodChange('dinheiro')}
@@ -327,28 +346,52 @@ function PaymentFormView({
               }`}
             >
               <p className="text-sm font-semibold text-slate-950">Dinheiro</p>
-              <p className="mt-1 text-xs text-slate-500">Troco calculado automaticamente</p>
+              <p className="mt-1 text-xs text-slate-500">Valor recebido e troco calculado</p>
+            </button>
+            <button
+              onClick={() => onPaymentMethodChange('debito')}
+              className={`rounded-[24px] border-2 px-5 py-4 text-left transition ${
+                paymentMethod === 'debito'
+                  ? 'border-cyan-500 bg-cyan-50 shadow-[0_12px_26px_rgba(8,145,178,0.12)]'
+                  : 'border-slate-200 bg-white hover:border-slate-300'
+              }`}
+            >
+              <p className="text-sm font-semibold text-slate-950">Débito</p>
+              <p className="mt-1 text-xs text-slate-500">Passe na maquininha — confirme quando aprovar</p>
+            </button>
+            <button
+              onClick={() => onPaymentMethodChange('credito')}
+              className={`rounded-[24px] border-2 px-5 py-4 text-left transition ${
+                paymentMethod === 'credito'
+                  ? 'border-cyan-500 bg-cyan-50 shadow-[0_12px_26px_rgba(8,145,178,0.12)]'
+                  : 'border-slate-200 bg-white hover:border-slate-300'
+              }`}
+            >
+              <p className="text-sm font-semibold text-slate-950">Crédito</p>
+              <p className="mt-1 text-xs text-slate-500">Passe na maquininha — confirme quando aprovar</p>
             </button>
           </div>
 
           <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
             <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Parametros</p>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-xs uppercase tracking-[0.24em] text-slate-500">Cupom</label>
-                <input
-                  value={couponCode}
-                  onChange={(e) => onCouponCodeChange(e.target.value)}
-                  disabled={Boolean(orderData?.id)}
-                  placeholder="EX: PROMO10"
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                />
-                {orderData?.id && (
-                  <p className="mt-2 text-xs text-slate-500">
-                    O pedido ja foi criado. Agora vamos apenas regenerar o pagamento com seguranca.
-                  </p>
-                )}
-              </div>
+              {showCoupon && (
+                <div>
+                  <label className="text-xs uppercase tracking-[0.24em] text-slate-500">Cupom</label>
+                  <input
+                    value={couponCode}
+                    onChange={(e) => onCouponCodeChange(e.target.value)}
+                    disabled={Boolean(orderData?.id)}
+                    placeholder="EX: PROMO10"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  />
+                  {orderData?.id && (
+                    <p className="mt-2 text-xs text-slate-500">
+                      O pedido ja foi criado. Agora vamos apenas regenerar o pagamento com seguranca.
+                    </p>
+                  )}
+                </div>
+              )}
               {paymentMethod === 'dinheiro' && (
                 <div>
                   <label className="text-xs uppercase tracking-[0.24em] text-slate-500">Valor recebido</label>
@@ -376,28 +419,39 @@ function PaymentFormView({
             </div>
           )}
 
-          <div className="flex flex-col gap-3 sm:flex-row">
+          {fastPass ? (
+            // Fast-pass (PDV): 1 passo, sem QR. Um unico botao marca pago e finaliza.
             <button
               onClick={onCreateOrderAndPayment}
               disabled={paymentLoading}
-              className="inline-flex flex-1 items-center justify-center rounded-full bg-[linear-gradient(135deg,#0891b2_0%,#0f766e_100%)] px-6 py-4 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(8,145,178,0.22)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+              className="inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-4 text-base font-semibold text-white shadow-[0_16px_32px_rgba(16,185,129,0.24)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
             >
-              {paymentLoading
-                ? 'Processando...'
-                : orderData?.id
-                  ? 'Gerar pagamento novamente'
-                  : 'Gerar pagamento'}
+              {paymentLoading ? 'Registrando…' : 'Confirmar pagamento e finalizar'}
             </button>
-            {paymentData?.pagamento?.id && (
+          ) : (
+            <div className="flex flex-col gap-3 sm:flex-row">
               <button
-                onClick={onConfirmPayment}
+                onClick={onCreateOrderAndPayment}
                 disabled={paymentLoading}
-                className="inline-flex flex-1 items-center justify-center rounded-full bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-4 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(34,197,94,0.2)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                className="inline-flex flex-1 items-center justify-center rounded-full bg-[linear-gradient(135deg,#0891b2_0%,#0f766e_100%)] px-6 py-4 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(8,145,178,0.22)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
               >
-                Confirmar pagamento
+                {paymentLoading
+                  ? 'Processando...'
+                  : orderData?.id
+                    ? 'Gerar pagamento novamente'
+                    : 'Gerar pagamento'}
               </button>
-            )}
-          </div>
+              {paymentData?.pagamento?.id && (
+                <button
+                  onClick={onConfirmPayment}
+                  disabled={paymentLoading}
+                  className="inline-flex flex-1 items-center justify-center rounded-full bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-4 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(34,197,94,0.2)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                >
+                  Confirmar pagamento
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="rounded-[24px] border border-slate-200 bg-slate-950 p-6 text-white">
@@ -421,7 +475,7 @@ function PaymentFormView({
             <strong className="text-2xl font-semibold text-white">{currencyFormatter.format(saleSummaryTotal)}</strong>
           </div>
 
-          {paymentData && (
+          {!fastPass && paymentData && (
             <div className="mt-6 rounded-[22px] border border-white/10 bg-white/5 p-4">
               {paymentData.message && (
                 <p className="text-sm whitespace-pre-line text-slate-300">{paymentData.message}</p>

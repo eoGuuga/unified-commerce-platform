@@ -79,10 +79,11 @@ function describeSaleError(error: unknown): string {
   if (/diverg/i.test(message)) {
     return 'O preço de um item mudou. Atualize o produto e confira o total antes de cobrar.';
   }
-  // Generico (rede/servidor): nao auto-refaz; orienta verificar antes de refazer.
+  // Generico (rede/servidor): incentiva o retry seguro — a Idempotency-Key
+  // estavel por venda evita cobranca dupla mesmo reenviando a mesma tentativa.
   return message
     ? `Não foi possível registrar a venda: ${message}`
-    : 'Não foi possível registrar a venda. Verifique em Pedidos antes de tentar de novo.';
+    : 'Não foi possível registrar a venda. Pode tentar de novo — a idempotência evita cobrança dupla.';
 }
 
 function newIdempotencyKey(): string {

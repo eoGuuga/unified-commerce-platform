@@ -135,4 +135,89 @@ describe('PdvPaymentModal', () => {
 
     expect(screen.getByText('Troco')).toBeInTheDocument();
   });
+
+  // ---- Task 5: debito/credito, fast-pass, cupom oculto, sucesso inequivoco ----
+
+  it('renderiza botoes Debito e Credito e os seleciona via onPaymentMethodChange', () => {
+    render(<PdvPaymentModal {...baseProps} />);
+
+    const debito = screen.getByText('Débito');
+    const credito = screen.getByText('Crédito');
+    expect(debito).toBeInTheDocument();
+    expect(credito).toBeInTheDocument();
+
+    fireEvent.click(debito);
+    expect(baseProps.onPaymentMethodChange).toHaveBeenCalledWith('debito');
+
+    fireEvent.click(credito);
+    expect(baseProps.onPaymentMethodChange).toHaveBeenCalledWith('credito');
+  });
+
+  it('com showCoupon={false} nao renderiza o campo de cupom', () => {
+    const { container } = render(<PdvPaymentModal {...baseProps} showCoupon={false} />);
+    expect(screen.queryByText('Cupom')).not.toBeInTheDocument();
+    expect(container.querySelector('input[placeholder="EX: PROMO10"]')).toBeNull();
+  });
+
+  it('por padrao (showCoupon default) renderiza o campo de cupom', () => {
+    render(<PdvPaymentModal {...baseProps} />);
+    expect(screen.getByText('Cupom')).toBeInTheDocument();
+  });
+
+  it('fast-pass: nao mostra QR e usa um unico botao que chama onCreateOrderAndPayment', () => {
+    const paymentData = {
+      pagamento: { id: 'pay-1', status: 'pending', method: 'pix' as const, amount: 45.3 },
+      qr_code: 'data:image/png;base64,abc',
+      copy_paste: '000201...',
+    };
+
+    render(
+      <PdvPaymentModal
+        {...baseProps}
+        fastPass
+        orderData={null}
+        paymentData={paymentData}
+      />,
+    );
+
+    // Sem QR no fast-pass mesmo com paymentData presente.
+    expect(screen.queryByAltText('QR Code Pix')).toBeNull();
+    // Sem o 2o botao de confirmar (passo de QR).
+    expect(screen.queryByText('Confirmar pagamento')).toBeNull();
+
+    // Botao unico de fast-pass.
+    const single = screen.getByText('Confirmar pagamento e finalizar');
+    fireEvent.click(single);
+    expect(baseProps.onCreateOrderAndPayment).toHaveBeenCalled();
+    expect(baseProps.onConfirmPayment).not.toHaveBeenCalled();
+  });
+
+  it('completedSale renderiza "Venda registrada" + troco + "Nova venda" proeminente', () => {
+    const completedSale = {
+      orderNo: 'PDV-009',
+      total: 50.0,
+      paymentMethod: 'dinheiro' as const,
+      itemsCount: 3,
+      changeAmount: 10.0,
+    };
+
+    render(<PdvPaymentModal {...baseProps} completedSale={completedSale} />);
+
+    expect(screen.getByText('Venda registrada')).toBeInTheDocument();
+    expect(screen.getByText('PDV-009')).toBeInTheDocument();
+    // Total e troco visiveis (o troco "R$ 10,00" aparece no destaque e no resumo).
+    expect(screen.getByText('Troco')).toBeInTheDocument();
+    expect(screen.getAllByText('R$ 10,00').length).toBeGreaterThan(0);
+    // Nova venda como acao primaria obvia.
+    expect(screen.getByText('Nova venda')).toBeInTheDocument();
+  });
+
+  it('fast-pass com paymentLoading mostra "registrando..." e desabilita o botao', () => {
+    render(<PdvPaymentModal {...baseProps} fastPass paymentLoading />);
+
+    const button = screen.getByRole('button', { name: /registrando/i });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(baseProps.onCreateOrderAndPayment).not.toHaveBeenCalled();
+  });
 });
