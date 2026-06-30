@@ -26,6 +26,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProducts } from '@/hooks/useProducts';
 import { usePdvSale } from '@/hooks/usePdvSale';
 import { DEFAULT_PDV_CUSTOMER_NAME } from '@/lib/pdv/build-order';
+import { cashDigitsToReais, formatCashInput } from '@/lib/pdv/cash-input';
 import { PdvProductSearch } from '@/components/pdv/PdvProductSearch';
 import { PdvCart } from '@/components/pdv/PdvCart';
 import { PdvCartExpanded } from '@/components/pdv/PdvCartExpanded';
@@ -130,10 +131,10 @@ function CaixaScreen() {
 
   const handleCashReceivedChange = useCallback(
     (value: string) => {
-      setCashReceivedInput(value);
-      // Aceita "5", "5,50" ou "5.50" -> number (troco e calculo de tela).
-      const parsed = Number(value.replace(',', '.'));
-      sale.setCashReceived(Number.isFinite(parsed) ? parsed : 0);
+      // Campo de moeda BR: os digitos preenchem os CENTAVOS da direita pra esquerda.
+      // Ex.: "123312" = R$ 1.233,12 (NAO R$ 123.312,00). Exibe mascarado; troco usa reais.
+      setCashReceivedInput(formatCashInput(value));
+      sale.setCashReceived(cashDigitsToReais(value));
     },
     [sale],
   );

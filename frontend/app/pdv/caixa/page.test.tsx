@@ -137,9 +137,10 @@ describe('CaixaPage — /pdv/caixa', () => {
     expect(screen.getByText('Pagamento')).toBeInTheDocument();
 
     // Escolhe Dinheiro e informa o valor recebido (R$ 5,00 -> troco R$ 2,50).
+    // Mascara de moeda BR: os digitos enchem os centavos -> "500" = R$ 5,00.
     fireEvent.click(screen.getByText('Dinheiro'));
     const cashInput = screen.getByPlaceholderText('0,00');
-    fireEvent.change(cashInput, { target: { value: '5' } });
+    fireEvent.change(cashInput, { target: { value: '500' } });
 
     // Confirma o pagamento e finaliza.
     fireEvent.click(screen.getByText('Confirmar pagamento e finalizar'));
@@ -185,7 +186,8 @@ describe('CaixaPage — /pdv/caixa', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Adicionar Brigadeiro' }));
     fireEvent.click(screen.getByRole('button', { name: /PAGAR/i }));
     fireEvent.click(screen.getByText('Dinheiro'));
-    fireEvent.change(screen.getByPlaceholderText('0,00'), { target: { value: '5' } });
+    // Mascara de moeda BR: "500" = R$ 5,00.
+    fireEvent.change(screen.getByPlaceholderText('0,00'), { target: { value: '500' } });
     fireEvent.click(screen.getByText('Confirmar pagamento e finalizar'));
     expect(await screen.findByText('Venda registrada')).toBeInTheDocument();
 
