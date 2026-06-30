@@ -16,6 +16,9 @@ export type OrderStatus =
 
 export type SalesChannel = 'pdv' | 'ecommerce' | 'whatsapp';
 
+/** Metodos de pagamento aceitos no PDV (fast-pass). Boleto e proibido. */
+export type PdvPaymentMethod = 'dinheiro' | 'pix' | 'debito' | 'credito';
+
 export interface DeliveryAddress {
   street: string;
   number: string;
@@ -72,6 +75,8 @@ export interface CreateOrderItemInput {
 export interface CreateOrderInput {
   channel: SalesChannel;
   items: CreateOrderItemInput[];
+  /** Pagamento do PDV (fast-pass). O backend recalcula o valor; so o metodo vai no payload. */
+  payment?: { method: PdvPaymentMethod };
   customer_name?: string;
   customer_email?: string;
   customer_phone?: string;
