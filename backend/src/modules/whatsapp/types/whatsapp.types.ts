@@ -167,6 +167,7 @@ export interface ConversationContext {
   last_processed_response_payload?: string;
   address_draft_parts?: string[] | null;
   intelligence_memory?: ConversationIntelligenceMemory;
+  checkout?: unknown | null; // Estado da FSM de checkout (S2a) — tipado no whatsapp.service
   [key: string]: unknown; // Para permitir extensibilidade
 }
 

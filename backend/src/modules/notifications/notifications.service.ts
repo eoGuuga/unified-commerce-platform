@@ -4,6 +4,8 @@ import { WhatsappConversation } from '../../database/entities/WhatsappConversati
 import { WhatsappMessage } from '../../database/entities/WhatsappMessage.entity';
 import { Pedido, PedidoStatus, CanalVenda } from '../../database/entities/Pedido.entity';
 import { Pagamento, MetodoPagamento } from '../../database/entities/Pagamento.entity';
+import { Tenant } from '../../database/entities/Tenant.entity';
+import { Usuario } from '../../database/entities/Usuario.entity';
 import { DbContextService } from '../common/services/db-context.service';
 import { WhatsappSender } from '../whatsapp/config/whatsapp-sender.service';
 
@@ -222,6 +224,89 @@ export class NotificationsService {
 
     if (!whatsappSent && !emailSent) {
       this.logger.warn(`No delivery channel available for payment reminder of ${pedido.order_no}`);
+    }
+  }
+
+  /**
+   * Notifica o LOJISTA diretamente quando a geracao do PIX falha (sem depender
+   * do Admin). Resolve o contato do dono do tenant (owner -> Usuario: telefone/
+   * e-mail) e envia via WhatsApp e/ou e-mail.
+   *
+   * BEST-EFFORT / NAO-FATAL: tudo dentro de try/catch. Esta funcao NUNCA lanca —
+   * o checkout do cliente jamais pode quebrar porque o aviso ao lojista falhou.
+   */
+  async notifyMerchantPaymentIssue(tenantId: string, pedido: Pedido): Promise<void> {
+    try {
+      const ref = pedido.order_no || pedido.id;
+      const msg =
+        `⚠️ Pagamento PIX falhou no pedido ${ref}. ` +
+        `O cliente foi avisado; entre em contato para concluir a venda.`;
+
+      // Resolve o dono do tenant (owner) e seu contato.
+      const tenant = await this.db
+        .getRepository(Tenant)
+        .findOne({ where: { id: tenantId } });
+
+      let ownerPhone: string | undefined;
+      let ownerEmail: string | undefined;
+
+      if (tenant?.owner_id) {
+        const owner = await this.db
+          .getRepository(Usuario)
+          .findOne({ where: { id: tenant.owner_id, tenant_id: tenantId } });
+        ownerPhone = owner?.phone?.trim() || undefined;
+        ownerEmail = owner?.email?.trim() || undefined;
+      }
+
+      // WhatsApp ao dono (best-effort).
+      if (ownerPhone) {
+        try {
+          await this.whatsappSender.sendText(tenantId, ownerPhone, msg);
+        } catch (whatsappError) {
+          this.logger.warn('Falha ao avisar lojista por WhatsApp (payment_issue)', {
+            error:
+              whatsappError instanceof Error
+                ? whatsappError.message
+                : String(whatsappError),
+            tenantId,
+            pedidoId: pedido.id,
+          });
+        }
+      }
+
+      // E-mail ao dono (best-effort).
+      if (ownerEmail) {
+        try {
+          await this.sendEmail(
+            ownerEmail,
+            `Falha no pagamento PIX - Pedido ${ref}`,
+            `<p>${this.escapeHtml(msg)}</p>`,
+          );
+        } catch (emailError) {
+          this.logger.warn('Falha ao avisar lojista por e-mail (payment_issue)', {
+            error:
+              emailError instanceof Error
+                ? emailError.message
+                : String(emailError),
+            tenantId,
+            pedidoId: pedido.id,
+          });
+        }
+      }
+
+      if (!ownerPhone && !ownerEmail) {
+        this.logger.warn('Sem contato do lojista para avisar falha de PIX', {
+          tenantId,
+          pedidoId: pedido.id,
+        });
+      }
+    } catch (error) {
+      // Blindagem final: jamais propaga (nao pode quebrar o checkout).
+      this.logger.error('notifyMerchantPaymentIssue falhou (ignorado, nao-fatal)', {
+        error: error instanceof Error ? error.message : String(error),
+        tenantId,
+        pedidoId: pedido?.id,
+      });
     }
   }
 

@@ -125,8 +125,47 @@ export class OrdersService {
     if (deliveryType && deliveryType !== 'delivery' && deliveryType !== 'pickup') {
       throw new BadRequestException(`delivery_type inválido: ${deliveryTypeRaw}`);
     }
-    if (deliveryType === 'delivery' && !deliveryAddress) {
-      throw new BadRequestException('delivery_address é obrigatório quando delivery_type=delivery');
+    // Guarda do CONFIRMADO: entrega exige endereco COMPLETO. Um pedido de
+    // entrega sem todos os campos obrigatorios nao pode nascer — e o que
+    // impede entregar no lugar errado. complement e opcional.
+    if (deliveryType === 'delivery') {
+      const a = deliveryAddress;
+      const completo =
+        !!a &&
+        !!a.street &&
+        !!a.number &&
+        !!a.neighborhood &&
+        !!a.city &&
+        !!a.state &&
+        !!a.zipcode;
+      if (!completo) {
+        throw new BadRequestException(
+          'Pedido de entrega exige endereço completo (rua, número, bairro, cidade, UF e CEP).',
+        );
+      }
+    }
+
+    // Guarda de RETIRADA (espelha a de entrega, fail-fast pre-transacao): pickup
+    // exige scheduled_at presente e valido. A validacao do horario contra o
+    // funcionamento da loja e feita no bot (no fuso da loja); aqui garantimos que
+    // nenhum pedido pickup nasce sem um instante agendado bem-definido.
+    //
+    // DIVIDA CONHECIDA (inativa hoje): esta guarda valida PRESENCA/validade do
+    // scheduled_at, nao que ele caia DENTRO do business_hours. Hoje o unico caller
+    // e o bot, que so passa slot gerado do business_hours (valido por construcao),
+    // entao a janela esta garantida na origem. SE algum dia surgir um SEGUNDO caller
+    // de pickup (API publica, import, PDV) que monte scheduled_at por fora do bot,
+    // adicione AQUI a validacao da janela (isWithinBusinessHours no fuso da loja),
+    // senao a janela fica aberta para esse caller. Ver handoff PIX-no-bot.
+    if (deliveryType === 'pickup') {
+      const s = createOrderDto.scheduled_at
+        ? new Date(createOrderDto.scheduled_at)
+        : null;
+      if (!s || Number.isNaN(s.getTime())) {
+        throw new BadRequestException(
+          'Pedido de retirada exige um horário de retirada (scheduled_at) válido.',
+        );
+      }
     }
 
     const shipping = createOrderDto.shipping_amount || 0;
@@ -292,6 +331,11 @@ export class OrdersService {
       pedido.total_amount = total;
       pedido.delivery_type = deliveryType;
       pedido.delivery_address = deliveryType === 'delivery' ? (deliveryAddress as NonNullable<typeof pedido.delivery_address>) : undefined;
+      // scheduled_at so faz sentido para retirada (pickup).
+      pedido.scheduled_at =
+        deliveryType === 'pickup' && createOrderDto.scheduled_at
+          ? new Date(createOrderDto.scheduled_at)
+          : null;
 
       const savedPedido = await manager.save(pedido);
 

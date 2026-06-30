@@ -562,6 +562,58 @@ describe('OrdersService', () => {
       expect(result.total_amount).toBe(107.5); // 112.5 - 10 + 5
     });
 
+    // INVARIANTE CRITICA (guarda do CONFIRMADO): um pedido de ENTREGA sem
+    // endereco completo nao pode ser criado. A guarda e fail-fast (antes da
+    // transacao), entao nem chega a tocar o banco.
+    it('deve rejeitar entrega sem endereco completo (falta city/state/zipcode)', async () => {
+      const entregaIncompleta: CreateOrderDto = {
+        channel: CanalVenda.WHATSAPP,
+        customer_name: 'Maria',
+        delivery_type: 'delivery',
+        // Faltam neighborhood, city, state, zipcode -> deve barrar.
+        delivery_address: {
+          street: 'Rua das Flores',
+          number: '123',
+        } as any,
+        items: [{ produto_id: produtoId1, quantity: 1, unit_price: 10.5 }],
+      };
+
+      await expect(service.create(entregaIncompleta, tenantId)).rejects.toThrow(
+        BadRequestException,
+      );
+      // Fail-fast: nao abriu transacao.
+      expect(mockDbContextService.runInTransaction).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar entrega sem nenhum endereco', async () => {
+      const semEndereco: CreateOrderDto = {
+        channel: CanalVenda.WHATSAPP,
+        customer_name: 'Maria',
+        delivery_type: 'delivery',
+        items: [{ produto_id: produtoId1, quantity: 1, unit_price: 10.5 }],
+      };
+
+      await expect(service.create(semEndereco, tenantId)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('deve rejeitar retirada (pickup) sem scheduled_at (fail-fast, sem abrir transacao)', async () => {
+      const pickupSemHorario: CreateOrderDto = {
+        channel: CanalVenda.WHATSAPP,
+        customer_name: 'Maria',
+        delivery_type: 'pickup',
+        // Sem scheduled_at -> deve barrar.
+        items: [{ produto_id: produtoId1, quantity: 1, unit_price: 10.5 }],
+      };
+
+      await expect(service.create(pickupSemHorario, tenantId)).rejects.toThrow(
+        BadRequestException,
+      );
+      // Fail-fast: nao abriu transacao.
+      expect(mockDbContextService.runInTransaction).not.toHaveBeenCalled();
+    });
+
     it('deve definir status correto baseado no canal (sempre PENDENTE_PAGAMENTO)', async () => {
       // Arrange
       const estoqueQueryBuilder = {
