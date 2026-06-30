@@ -257,15 +257,15 @@ function CaixaScreen() {
 
       {/* Layout 2 painÃ©is: produtos (flex-1, esquerda) + carrinho FIXO a direita.
           h-screen sem scroll de pagina — so a grade e a lista do carrinho rolam. */}
-      <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_380px]">
+      <main className="flex min-h-0 flex-1 gap-3 overflow-hidden p-3">
         <section
           ref={searchInputRef}
-          className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-3"
+          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-3"
         >
           <PdvProductSearch products={products} onAdd={sale.addProduct} />
         </section>
 
-        <section className="flex min-h-0 flex-col overflow-hidden">
+        <section className="flex w-[340px] min-h-0 shrink-0 flex-col overflow-hidden lg:w-[380px] xl:w-[400px]">
           <PdvCart
             items={sale.items}
             total={sale.total}
