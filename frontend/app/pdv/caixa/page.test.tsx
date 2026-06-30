@@ -169,6 +169,93 @@ describe('CaixaPage — /pdv/caixa', () => {
     expect(mockApi.createOrder).toHaveBeenCalledTimes(1);
   });
 
+  it('"Fechar resumo" reseta a venda: carrinho vazio + ao adicionar produto e pagar mostra o FORMULARIO (nao o resumo antigo)', async () => {
+    authOk();
+    productsOk();
+    mockApi.createOrder.mockResolvedValue({
+      id: 'order-1',
+      order_no: 'PDV-77',
+      status: 'entregue',
+      channel: 'pdv',
+    });
+
+    render(<CaixaPage />);
+
+    // Conclui uma venda -> resumo visivel.
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar Brigadeiro' }));
+    fireEvent.click(screen.getByRole('button', { name: /PAGAR/i }));
+    fireEvent.click(screen.getByText('Dinheiro'));
+    fireEvent.change(screen.getByPlaceholderText('0,00'), { target: { value: '5' } });
+    fireEvent.click(screen.getByText('Confirmar pagamento e finalizar'));
+    expect(await screen.findByText('Venda registrada')).toBeInTheDocument();
+
+    // "Fechar resumo" -> carrinho vazio + resumo fechado (mesmo caminho da "Nova venda").
+    fireEvent.click(screen.getByText('Fechar resumo'));
+    await waitFor(() =>
+      expect(screen.queryByText('Venda registrada')).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('pdv-cart-item-name')).not.toBeInTheDocument();
+
+    // Adicionar produto e abrir o pagamento mostra o FORMULARIO — nao reabre o resumo antigo.
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar Beijinho' }));
+    fireEvent.click(screen.getByRole('button', { name: /PAGAR/i }));
+    expect(screen.getByText('Pagamento')).toBeInTheDocument();
+    expect(screen.queryByText('Venda registrada')).not.toBeInTheDocument();
+  });
+
+  it('carrinho expansível: abre overlay com todos os itens; −/+/remover funcionam; PAGAR no expandido abre o pagamento; fechar volta', async () => {
+    authOk();
+    productsOk();
+
+    render(<CaixaPage />);
+
+    // Dois itens no carrinho.
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar Brigadeiro' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar Beijinho' }));
+
+    // Expandir abre o overlay com TODOS os itens.
+    fireEvent.click(screen.getByRole('button', { name: /expandir/i }));
+    const overlay = screen.getByRole('dialog', { name: /carrinho completo/i });
+    expect(within(overlay).getAllByTestId('pdv-cart-expanded-item')).toHaveLength(2);
+    expect(within(overlay).getByText('Brigadeiro')).toBeInTheDocument();
+    expect(within(overlay).getByText('Beijinho')).toBeInTheDocument();
+
+    // + no Brigadeiro (1 -> 2) reflete a quantidade no expandido.
+    const brigadeiroRow = within(overlay)
+      .getByText('Brigadeiro')
+      .closest('[data-testid="pdv-cart-expanded-item"]') as HTMLElement;
+    fireEvent.click(within(brigadeiroRow).getByRole('button', { name: /aumentar brigadeiro/i }));
+    expect(
+      within(brigadeiroRow).getByTestId('pdv-cart-expanded-item-qty'),
+    ).toHaveTextContent('2');
+
+    // Remover o Beijinho some do overlay (resta 1 item).
+    fireEvent.click(within(overlay).getByRole('button', { name: /remover beijinho/i }));
+    expect(within(overlay).getAllByTestId('pdv-cart-expanded-item')).toHaveLength(1);
+
+    // PAGAR no expandido fecha o overlay e abre o pagamento.
+    fireEvent.click(within(overlay).getByRole('button', { name: /PAGAR/i }));
+    expect(screen.queryByRole('dialog', { name: /carrinho completo/i })).not.toBeInTheDocument();
+    expect(screen.getByText('Pagamento')).toBeInTheDocument();
+  });
+
+  it('carrinho expansível: "Fechar" volta ao modo compacto', async () => {
+    authOk();
+    productsOk();
+
+    render(<CaixaPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar Brigadeiro' }));
+    fireEvent.click(screen.getByRole('button', { name: /expandir/i }));
+    expect(screen.getByRole('dialog', { name: /carrinho completo/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /fechar carrinho completo/i }));
+    expect(
+      screen.queryByRole('dialog', { name: /carrinho completo/i }),
+    ).not.toBeInTheDocument();
+    // O carrinho compacto continua com o item.
+    expect(screen.getByTestId('pdv-cart-item-name')).toHaveTextContent('Brigadeiro');
+  });
+
   it('sem auth: redireciona para /login', async () => {
     mockUseAuth.mockReturnValue({
       user: null,

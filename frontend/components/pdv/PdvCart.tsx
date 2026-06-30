@@ -1,6 +1,6 @@
 'use client';
 
-import { Minus, Plus, Trash2, ShoppingCart } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingCart, Maximize2 } from 'lucide-react';
 import type { PdvCartItem } from '@/lib/pdv/cart';
 
 export interface PdvCartProps {
@@ -13,6 +13,11 @@ export interface PdvCartProps {
   onPay: () => void;
   /** A página passa `items.length === 0`. */
   payDisabled: boolean;
+  /**
+   * Abre o overlay "carrinho completo" (modo expandido). Opcional: quando ausente,
+   * o botao "Expandir" nao e renderizado (compatibilidade com usos sem expansao).
+   */
+  onExpand?: () => void;
 }
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -29,6 +34,7 @@ export function PdvCart({
   onClear,
   onPay,
   payDisabled,
+  onExpand,
 }: PdvCartProps) {
   const isEmpty = items.length === 0;
 
@@ -49,15 +55,27 @@ export function PdvCart({
             Carrinho
           </h2>
         </div>
-        <button
-          type="button"
-          onClick={handleClear}
-          disabled={isEmpty}
-          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Trash2 className="size-3.5" />
-          Limpar
-        </button>
+        <div className="flex items-center gap-1.5">
+          {onExpand && (
+            <button
+              type="button"
+              onClick={onExpand}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+            >
+              <Maximize2 className="size-3.5" />
+              Expandir
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={isEmpty}
+            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Trash2 className="size-3.5" />
+            Limpar
+          </button>
+        </div>
       </div>
 
       {/* So a lista rola; o rodapé (TOTAL + PAGAR) fica sempre visivel. */}

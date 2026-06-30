@@ -28,6 +28,7 @@ import { usePdvSale } from '@/hooks/usePdvSale';
 import { DEFAULT_PDV_CUSTOMER_NAME } from '@/lib/pdv/build-order';
 import { PdvProductSearch } from '@/components/pdv/PdvProductSearch';
 import { PdvCart } from '@/components/pdv/PdvCart';
+import { PdvCartExpanded } from '@/components/pdv/PdvCartExpanded';
 import { PdvPaymentModal } from '@/components/pdv/PdvPaymentModal';
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -76,6 +77,8 @@ function CaixaScreen() {
   const sale = usePdvSale({ customerName });
 
   const [paymentOpen, setPaymentOpen] = useState(false);
+  // Overlay "carrinho completo" (mesma tela; sem rota nova).
+  const [cartExpanded, setCartExpanded] = useState(false);
   // Input de valor recebido = string local (o modal espera string); espelha no hook (number).
   const [cashReceivedInput, setCashReceivedInput] = useState('');
 
@@ -84,8 +87,13 @@ function CaixaScreen() {
   const openPayment = useCallback(() => {
     if (sale.items.length === 0) return;
     sale.beginPayment();
+    // Fecha o overlay (se aberto) e abre o pagamento — sem dois overlays empilhados.
+    setCartExpanded(false);
     setPaymentOpen(true);
   }, [sale]);
+
+  const openCartExpanded = useCallback(() => setCartExpanded(true), []);
+  const closeCartExpanded = useCallback(() => setCartExpanded(false), []);
 
   const closePayment = useCallback(() => {
     // Fecha sem finalizar — carrinho intacto (spec §5.1 onClose).
@@ -100,6 +108,18 @@ function CaixaScreen() {
     const input = searchInputRef.current?.querySelector('input');
     input?.focus();
   }, [sale]);
+
+  // Saida UNICA do modal (fonte de verdade p/ "Fechar resumo", Esc e onClose):
+  //  - com resumo aberto (completedSale) -> reset COMPLETO via handleNewSale
+  //    (limpa completedSale + carrinho), pra nunca reabrir o resumo da venda anterior;
+  //  - sem resumo (so o formulario) -> closePayment mantem o carrinho intacto.
+  const handleCloseModal = useCallback(() => {
+    if (sale.completedSale) {
+      handleNewSale();
+    } else {
+      closePayment();
+    }
+  }, [sale.completedSale, handleNewSale, closePayment]);
 
   const handleClearSale = useCallback(() => {
     if (sale.items.length === 0) return;
@@ -128,12 +148,13 @@ function CaixaScreen() {
       }
       if (e.key === 'Escape') {
         if (paymentOpen) {
-          // No modal: Esc fecha (sem finalizar). Apos sucesso, fecha o resumo.
-          if (sale.completedSale) {
-            handleNewSale();
-          } else {
-            closePayment();
-          }
+          // No modal: Esc usa a MESMA saida unica do botao "Fechar resumo".
+          handleCloseModal();
+          return;
+        }
+        if (cartExpanded) {
+          // No overlay do carrinho: Esc apenas volta ao modo compacto.
+          closeCartExpanded();
           return;
         }
         // Na tela: Esc limpa a venda (confirma se houver itens).
@@ -142,7 +163,7 @@ function CaixaScreen() {
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [paymentOpen, sale.completedSale, openPayment, closePayment, handleNewSale, handleClearSale]);
+  }, [paymentOpen, cartExpanded, openPayment, handleCloseModal, closeCartExpanded, handleClearSale]);
 
   // Foco inicial na busca (o input ja tem autoFocus; reforça apos montar).
   useEffect(() => {
@@ -253,9 +274,24 @@ function CaixaScreen() {
             onClear={handleClearSale}
             onPay={openPayment}
             payDisabled={sale.items.length === 0}
+            onExpand={openCartExpanded}
           />
         </section>
       </main>
+
+      {/* Overlay "carrinho completo" — mesma tela, mesmos callbacks do usePdvSale. */}
+      {cartExpanded && (
+        <PdvCartExpanded
+          items={sale.items}
+          total={sale.total}
+          onInc={sale.inc}
+          onDec={sale.dec}
+          onRemove={sale.remove}
+          onPay={openPayment}
+          payDisabled={sale.items.length === 0}
+          onClose={closeCartExpanded}
+        />
+      )}
 
       {/* Modal de pagamento (overlay) */}
       {paymentOpen && (
@@ -280,7 +316,7 @@ function CaixaScreen() {
           onConfirmPayment={() => {}}
           onCopyReceipt={handleCopyReceipt}
           onNewSale={handleNewSale}
-          onClose={closePayment}
+          onClose={handleCloseModal}
         />
       )}
 
