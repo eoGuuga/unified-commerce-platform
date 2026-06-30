@@ -168,7 +168,7 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
     await request(app.getHttpServer())
       .post(`/api/v1/products/${productId}/adjust-stock`)
       .set('Authorization', `Bearer ${jwtToken}`)
-      .send({ quantity: opts.stock, reason: 'Bootstrap e2e' })
+      .send({ tipo: 'COMPRA', delta: opts.stock, motivo: 'Bootstrap e2e' })
       .expect(201);
 
     const orderRes = await request(app.getHttpServer())
@@ -181,6 +181,8 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
         customer_email: `cliente.${opts.productLabel.toLowerCase()}@test.com`,
         customer_phone: '11999998888',
         delivery_type: 'pickup',
+        // Task 5 (S2b) passou a exigir scheduled_at em retirada; valor futuro valido.
+        scheduled_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         items: [
           {
             produto_id: productId,
@@ -294,7 +296,7 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
       await request(app.getHttpServer())
         .post(`/api/v1/products/${productRes.body.id}/adjust-stock`)
         .set('Authorization', `Bearer ${jwtToken}`)
-        .send({ quantity: 3, reason: 'Bootstrap' })
+        .send({ tipo: 'COMPRA', delta: 3, motivo: 'Bootstrap' })
         .expect(201);
 
       const orderRes = await request(app.getHttpServer())
@@ -303,6 +305,8 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
         .send({
           channel: 'pdv',
           customer_name: 'Cliente PDV',
+          // PDV nasce ENTREGUE e exige payment.method (venda sincrona de balcao).
+          payment: { method: 'dinheiro' },
           items: [
             {
               produto_id: productRes.body.id,

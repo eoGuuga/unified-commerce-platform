@@ -140,7 +140,7 @@ describe('Orders Integration Tests (e2e)', () => {
       await request(app.getHttpServer())
         .post(`/api/v1/products/${productId}/adjust-stock`)
         .set('Authorization', `Bearer ${jwtToken}`)
-        .send({ quantity: 10, reason: 'Teste de integracao' })
+        .send({ tipo: 'COMPRA', delta: 10, motivo: 'Teste de integracao' })
         .expect(201);
 
       // Criar pedido (canal whatsapp = pendente_pagamento; PDV agora nasce ENTREGUE)
@@ -201,7 +201,7 @@ describe('Orders Integration Tests (e2e)', () => {
       await request(app.getHttpServer())
         .post(`/api/v1/products/${productId}/adjust-stock`)
         .set('Authorization', `Bearer ${jwtToken}`)
-        .send({ quantity: 8, reason: 'Teste de checkout publico' })
+        .send({ tipo: 'COMPRA', delta: 8, motivo: 'Teste de checkout publico' })
         .expect(201);
 
       const orderResponse = await request(app.getHttpServer())
@@ -214,6 +214,8 @@ describe('Orders Integration Tests (e2e)', () => {
           customer_email: 'cliente.publico@test.com',
           customer_phone: '11999999999',
           delivery_type: 'pickup',
+          // Task 5 (S2b) do PIX passou a exigir scheduled_at em retirada.
+          scheduled_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
           items: [
             {
               produto_id: productId,
