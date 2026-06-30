@@ -2,12 +2,15 @@
  * Testes do usePdvSale — o coracao testavel da venda do PDV.
  *
  * Casos que o dono quer ver com atencao:
- *  - 422 INSUFFICIENT_STOCK PRESERVA o carrinho (a operadora ajusta o item, nao perde a venda).
+ *  - Estoque insuficiente PRESERVA o carrinho (a operadora ajusta o item, nao perde a venda).
  *  - Idempotencia: a Idempotency-Key e gerada UMA vez por venda e reusada no retry apos erro;
  *    `newSale` regenera. Sem duplo-POST com paymentLoading em voo.
  *
- * O api-client.request() superficia o erro 422 como Error com `.code='INSUFFICIENT_STOCK'`
- * e `.message`; o preco divergente vem como Error 400 com message contendo "divergente" e SEM code.
+ * Erro REAL do PDV para estoque insuficiente: BadRequestException 400 com message
+ * "Estoque insuficiente para produto ..." e SEM `code` (pre-check do orders.service +
+ * reserve do stock-engine). O `code='INSUFFICIENT_STOCK'` (422) vem do endpoint de
+ * movimento MANUAL de estoque — o PDV nao usa, fica como fallback defensivo.
+ * O preco divergente vem como Error 400 com message contendo "divergente" e SEM code.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -137,16 +140,16 @@ describe('usePdvSale — submitSale sucesso', () => {
   });
 });
 
-describe('usePdvSale — 422 INSUFFICIENT_STOCK preserva o carrinho', () => {
+describe('usePdvSale — estoque insuficiente preserva o carrinho', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
   afterEach(() => vi.restoreAllMocks());
 
-  it('CASO 1 — 422 INSUFFICIENT_STOCK preserva o carrinho e seta paymentError claro', async () => {
-    const err = Object.assign(new Error('Estoque insuficiente para esta saída.'), {
-      code: 'INSUFFICIENT_STOCK',
-    });
+  it('CASO 1 — erro REAL do PDV (400 SEM code, message "Estoque insuficiente para produto") preserva o carrinho e seta paymentError claro', async () => {
+    // O caminho real do PDV: BadRequestException 400, message nomeando o produto,
+    // SEM code. O describeSaleError casa via regex /estoque insuficiente/i.
+    const err = new Error('Estoque insuficiente para produto Brigadeiro. Disponível: 0.');
     mockApi.createOrder.mockRejectedValueOnce(err);
 
     const { result } = renderHook(() => usePdvSale());
@@ -161,8 +164,30 @@ describe('usePdvSale — 422 INSUFFICIENT_STOCK preserva o carrinho', () => {
     expect(result.current.total).toBe(5.5);
     // Nao houve sucesso.
     expect(result.current.completedSale).toBeNull();
-    // Mensagem clara mencionando estoque.
+    // Mensagem amigavel mencionando estoque (veio pela regex, sem code).
     expect(result.current.paymentError).toBeTruthy();
+    expect(result.current.paymentError).toMatch(/estoque/i);
+    expect(result.current.paymentLoading).toBe(false);
+  });
+
+  it('CASO 1b (defesa) — fallback 422 com code INSUFFICIENT_STOCK tambem preserva o carrinho', async () => {
+    // Outro endpoint (movimento manual de estoque) usa code 422; o PDV nao,
+    // mas o hook trata os dois — mantemos como rede de seguranca.
+    const err = Object.assign(new Error('Estoque insuficiente para esta saída.'), {
+      code: 'INSUFFICIENT_STOCK',
+    });
+    mockApi.createOrder.mockRejectedValueOnce(err);
+
+    const { result } = renderHook(() => usePdvSale());
+    seedSale(result); // 2 itens, total 5.5
+
+    await act(async () => {
+      await result.current.submitSale();
+    });
+
+    expect(result.current.items).toHaveLength(2);
+    expect(result.current.total).toBe(5.5);
+    expect(result.current.completedSale).toBeNull();
     expect(result.current.paymentError).toMatch(/estoque/i);
     expect(result.current.paymentLoading).toBe(false);
   });

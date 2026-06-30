@@ -220,4 +220,62 @@ describe('PdvPaymentModal', () => {
     fireEvent.click(button);
     expect(baseProps.onCreateOrderAndPayment).not.toHaveBeenCalled();
   });
+
+  // ---- Troco negativo (dinheiro) bloqueia finalizar no fast-pass (spec §4.6/§10) ----
+
+  it('fast-pass dinheiro com troco negativo desabilita finalizar e mostra dica', () => {
+    render(
+      <PdvPaymentModal
+        {...baseProps}
+        fastPass
+        paymentMethod="dinheiro"
+        cashReceived="40,00"
+        cashChange={-5.3}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: /confirmar pagamento e finalizar/i });
+    expect(button).toBeDisabled();
+    // Dica visivel para a operadora entender o bloqueio.
+    expect(screen.getByText('Valor recebido insuficiente')).toBeInTheDocument();
+    // Clicar nao dispara a finalizacao.
+    fireEvent.click(button);
+    expect(baseProps.onCreateOrderAndPayment).not.toHaveBeenCalled();
+  });
+
+  it('fast-pass dinheiro com troco >= 0 mantem finalizar habilitado (sem dica)', () => {
+    render(
+      <PdvPaymentModal
+        {...baseProps}
+        fastPass
+        paymentMethod="dinheiro"
+        cashReceived="50,00"
+        cashChange={4.7}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: /confirmar pagamento e finalizar/i });
+    expect(button).toBeEnabled();
+    expect(screen.queryByText('Valor recebido insuficiente')).toBeNull();
+    fireEvent.click(button);
+    expect(baseProps.onCreateOrderAndPayment).toHaveBeenCalled();
+  });
+
+  it('fast-pass: troco negativo em outro metodo (pix) NAO bloqueia finalizar', () => {
+    // cashChange<0 so importa para dinheiro; outros metodos nao sao afetados.
+    render(
+      <PdvPaymentModal
+        {...baseProps}
+        fastPass
+        paymentMethod="pix"
+        cashChange={-5.3}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: /confirmar pagamento e finalizar/i });
+    expect(button).toBeEnabled();
+    expect(screen.queryByText('Valor recebido insuficiente')).toBeNull();
+    fireEvent.click(button);
+    expect(baseProps.onCreateOrderAndPayment).toHaveBeenCalled();
+  });
 });

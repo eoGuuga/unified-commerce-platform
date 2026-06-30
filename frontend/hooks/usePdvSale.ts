@@ -10,7 +10,11 @@
  *  - Idempotency-Key (UUID) gerada UMA vez por venda; retry apos erro REUSA a mesma key
  *    (anti-cobranca-dupla). `newSale` regenera a key para a proxima venda.
  *  - `paymentLoading` em voo bloqueia um 2o submit (duplo-clique nao dispara 2 POSTs).
- *  - Erro 422 INSUFFICIENT_STOCK PRESERVA o carrinho — a operadora ajusta e tenta de novo.
+ *  - Estoque insuficiente PRESERVA o carrinho — a operadora ajusta e tenta de novo.
+ *    O caminho REAL do PDV e um 400 (BadRequestException) com a mensagem "Estoque
+ *    insuficiente para produto ..." (pre-check do orders.service + reserve do
+ *    stock-engine), SEM `code`. O `code:'INSUFFICIENT_STOCK'` (422) so existe no
+ *    endpoint de movimento MANUAL de estoque, que o PDV nao usa — fica como fallback.
  *  - Preco divergente -> mensagem especifica de re-sync; carrinho preservado.
  */
 
@@ -76,7 +80,9 @@ function describeSaleError(error: unknown): string {
         ? String((error as { message?: unknown }).message ?? '')
         : '';
 
-  // Estoque insuficiente (422 tipado, ou a mensagem amigavel do backend).
+  // Estoque insuficiente. No PDV o backend volta 400 com a mensagem "Estoque
+  // insuficiente para produto ..." (sem code) — daí o match por regex. O
+  // code:'INSUFFICIENT_STOCK' (422) vem de outro endpoint e fica como fallback.
   if (code === 'INSUFFICIENT_STOCK' || /estoque insuficiente/i.test(message)) {
     return 'Estoque insuficiente — ajuste a quantidade ou remova o item e tente de novo.';
   }

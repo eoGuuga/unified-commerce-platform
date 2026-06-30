@@ -299,6 +299,8 @@ function PaymentFormView({
   onConfirmPayment: () => void;
   onClose: () => void;
 }) {
+  // Troco negativo (dinheiro): valor recebido < total -> bloqueia finalizar (spec §4.6/§10).
+  const insufficientCash = paymentMethod === 'dinheiro' && cashChange < 0;
   return (
     <>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -421,13 +423,21 @@ function PaymentFormView({
 
           {fastPass ? (
             // Fast-pass (PDV): 1 passo, sem QR. Um unico botao marca pago e finaliza.
-            <button
-              onClick={onCreateOrderAndPayment}
-              disabled={paymentLoading}
-              className="inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-4 text-base font-semibold text-white shadow-[0_16px_32px_rgba(16,185,129,0.24)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
-            >
-              {paymentLoading ? 'Registrando…' : 'Confirmar pagamento e finalizar'}
-            </button>
+            // Troco negativo (dinheiro) bloqueia finalizar — a operadora ve o porque.
+            <div className="space-y-2">
+              <button
+                onClick={onCreateOrderAndPayment}
+                disabled={paymentLoading || insufficientCash}
+                className="inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-4 text-base font-semibold text-white shadow-[0_16px_32px_rgba(16,185,129,0.24)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+              >
+                {paymentLoading ? 'Registrando…' : 'Confirmar pagamento e finalizar'}
+              </button>
+              {insufficientCash && (
+                <p className="text-center text-xs font-medium text-rose-600">
+                  Valor recebido insuficiente
+                </p>
+              )}
+            </div>
           ) : (
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
