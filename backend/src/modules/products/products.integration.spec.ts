@@ -19,7 +19,10 @@ describe('Products Integration Tests (e2e)', () => {
   let dataSource: DataSource;
   let jwtToken: string;
   const tenantId = '00000000-0000-0000-0000-000000000000';
-  const productName = 'Produto Teste E2E Produtos';
+  // Sufixo único por execução: evita colisão de SKU no banco compartilhado (ucm_test_motor)
+  // quando produtos de runs anteriores acumulam e esgotam os sufixos do retry (MAX_TENTATIVAS=5).
+  const runToken = Date.now().toString(36);
+  const productName = `Produto Teste E2E Produtos ${runToken}`;
 
   beforeAll(async () => {
     try {
@@ -95,6 +98,22 @@ describe('Products Integration Tests (e2e)', () => {
   });
 
   afterAll(async () => {
+    // Limpar produtos criados por este run (nome contém o runToken único)
+    // para que o banco compartilhado não acumule dados entre execuções.
+    if (dataSource && dataSource.isInitialized) {
+      try {
+        const qr = dataSource.createQueryRunner();
+        await qr.connect();
+        await qr.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+        await qr.query(
+          `DELETE FROM produtos WHERE tenant_id = $1 AND name LIKE $2`,
+          [tenantId, `%${runToken}%`],
+        );
+        await qr.release();
+      } catch {
+        // cleanup não-fatal — falha silenciosa para não mascarar erros reais dos testes
+      }
+    }
     if (app) {
       await app.close();
     }
@@ -203,6 +222,33 @@ describe('Products Integration Tests (e2e)', () => {
 
       expect(response.body).toHaveProperty('message');
     });
+
+    it('dois produtos com mesmo nome (sku vazio) devem receber SKUs distintos', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste - app não inicializado');
+        return;
+      }
+      const nomeDuplicado = `Trufa SKU Teste ${Date.now()}`;
+
+      const res1 = await request(app.getHttpServer())
+        .post(`/api/v1/products`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ name: nomeDuplicado, price: 5.0 })
+        .expect(201);
+
+      const res2 = await request(app.getHttpServer())
+        .post(`/api/v1/products`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ name: nomeDuplicado, price: 5.0 })
+        .expect(201);
+
+      // Ambos devem ter SKU definido e SKUs distintos
+      expect(res1.body.sku).toBeTruthy();
+      expect(res2.body.sku).toBeTruthy();
+      expect(res1.body.sku).not.toBe(res2.body.sku);
+      // O segundo deve ter sufixo numérico (backstop de 23505)
+      expect(res2.body.sku).toMatch(/-\d+$/);
+    });
   });
 
   describe('GET /products/stock-summary - Resumo de Estoque', () => {
@@ -231,6 +277,339 @@ describe('Products Integration Tests (e2e)', () => {
       await request(app.getHttpServer())
         .get(`/api/v1/products/stock-summary`)
         .expect(401);
+    });
+  });
+
+  describe('Admin estoque — adjust-stock ledger-correto', () => {
+    let produtoId: string;
+
+    beforeEach(async () => {
+      if (!app) return;
+      // Criar produto + seed de estoque via SQL direto
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const prod = await queryRunner.query(
+        `INSERT INTO produtos (id, tenant_id, name, price, is_active, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, 'Produto Adjust Test', 10.0, true, now(), now())
+         RETURNING id`,
+        [tenantId],
+      );
+      produtoId = prod[0].id;
+      // Estoque inicial = 10
+      await queryRunner.query(
+        `INSERT INTO movimentacoes_estoque (id, tenant_id, produto_id, current_stock, reserved_stock, min_stock, last_updated)
+         VALUES (uuid_generate_v4(), $1, $2, 10, 0, 0, now())`,
+        [tenantId, produtoId],
+      );
+      await queryRunner.release();
+    });
+
+    it('COMPRA grava ledger e mantem invariante', async () => {
+      if (!app) return;
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'COMPRA', delta: 5, motivo: 'reposicao' });
+      expect(res.status).toBe(201);
+      expect(res.body.saldo_resultante).toBe(15);
+
+      // Verificar ledger
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const ledger = await queryRunner.query(
+        `SELECT tipo, delta, saldo_resultante FROM movimentacoes_estoque_historico
+         WHERE produto_id = $1 AND tipo = 'COMPRA'`,
+        [produtoId],
+      );
+      await queryRunner.release();
+      expect(ledger.length).toBeGreaterThanOrEqual(1);
+      expect(Number(ledger[0].delta)).toBe(5);
+      expect(Number(ledger[0].saldo_resultante)).toBe(15);
+    });
+
+    it('rejeita sinal incoerente (COMPRA com delta negativo) -> 400', async () => {
+      if (!app) return;
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'COMPRA', delta: -5 });
+      expect(res.status).toBe(400);
+    });
+
+    it('saida maior que saldo -> 422 INSUFFICIENT_STOCK', async () => {
+      if (!app) return;
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'PERDA', delta: -50 });
+      expect(res.status).toBe(422);
+      expect(res.body.code).toBe('INSUFFICIENT_STOCK');
+    });
+
+    it('rejeita tipo INVENTARIO_INICIAL no wire -> 400', async () => {
+      if (!app) return;
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'INVENTARIO_INICIAL', delta: 5 });
+      expect(res.status).toBe(400);
+    });
+
+    it('criar produto com initial_stock grava UMA linha INVENTARIO_INICIAL (sem 2x)', async () => {
+      if (!app) return;
+      // Nome único por run: evita colisão de SKU "trufa" no banco compartilhado acumulado
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/products`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ name: `Trufa ${runToken}`, price: 5.0, initial_stock: 10 });
+      expect(res.status).toBe(201);
+
+      const novoProdutoId = res.body.id;
+
+      // Verificar que estoque = 10
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const estoque = await queryRunner.query(
+        `SELECT current_stock FROM movimentacoes_estoque WHERE produto_id = $1`,
+        [novoProdutoId],
+      );
+      const ledger = await queryRunner.query(
+        `SELECT tipo, delta FROM movimentacoes_estoque_historico WHERE produto_id = $1`,
+        [novoProdutoId],
+      );
+      await queryRunner.release();
+
+      expect(Number(estoque[0].current_stock)).toBe(10);
+      // Exatamente UMA linha INVENTARIO_INICIAL — sem double-count
+      expect(ledger.length).toBe(1);
+      expect(ledger[0].tipo).toBe('INVENTARIO_INICIAL');
+      expect(Number(ledger[0].delta)).toBe(10);
+    });
+  });
+
+  describe('GET /products?include_inactive — filtro Ativos/Inativos/Todos', () => {
+    let produtoAtivoId: string;
+    let produtoInativoId: string;
+
+    beforeEach(async () => {
+      if (!app) return;
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+
+      // Criar um produto ativo e um inativo diretamente no banco
+      const ativo = await queryRunner.query(
+        `INSERT INTO produtos (id, tenant_id, name, price, is_active, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, 'Produto Ativo FilterTest', 10.0, true, now(), now())
+         RETURNING id`,
+        [tenantId],
+      );
+      produtoAtivoId = ativo[0].id;
+
+      const inativo = await queryRunner.query(
+        `INSERT INTO produtos (id, tenant_id, name, price, is_active, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, 'Produto Inativo FilterTest', 7.0, false, now(), now())
+         RETURNING id`,
+        [tenantId],
+      );
+      produtoInativoId = inativo[0].id;
+
+      await queryRunner.release();
+    });
+
+    it('GET /products sem include_inactive NÃO retorna produto inativo', async () => {
+      if (!app) return;
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/products')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .expect(200);
+
+      const ids: string[] = Array.isArray(res.body)
+        ? res.body.map((p: any) => p.id)
+        : (res.body.data ?? []).map((p: any) => p.id);
+
+      expect(ids).toContain(produtoAtivoId);
+      expect(ids).not.toContain(produtoInativoId);
+    });
+
+    it('GET /products?include_inactive=true retorna ativo E inativo', async () => {
+      if (!app) return;
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/products?include_inactive=true')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .expect(200);
+
+      const ids: string[] = Array.isArray(res.body)
+        ? res.body.map((p: any) => p.id)
+        : (res.body.data ?? []).map((p: any) => p.id);
+
+      expect(ids).toContain(produtoAtivoId);
+      expect(ids).toContain(produtoInativoId);
+    });
+
+    it('produto desativado via PATCH is_active=false pode ser reativado (reaparece em include_inactive)', async () => {
+      if (!app) return;
+      // Desativar via PATCH
+      await request(app.getHttpServer())
+        .patch(`/api/v1/products/${produtoAtivoId}`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ is_active: false })
+        .expect(200);
+
+      // Sem flag: não aparece
+      const semFlag = await request(app.getHttpServer())
+        .get('/api/v1/products')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .expect(200);
+
+      const idsSemFlag: string[] = Array.isArray(semFlag.body)
+        ? semFlag.body.map((p: any) => p.id)
+        : (semFlag.body.data ?? []).map((p: any) => p.id);
+      expect(idsSemFlag).not.toContain(produtoAtivoId);
+
+      // Com flag: aparece mesmo inativo
+      const comFlag = await request(app.getHttpServer())
+        .get('/api/v1/products?include_inactive=true')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .expect(200);
+
+      const idsComFlag: string[] = Array.isArray(comFlag.body)
+        ? comFlag.body.map((p: any) => p.id)
+        : (comFlag.body.data ?? []).map((p: any) => p.id);
+      expect(idsComFlag).toContain(produtoAtivoId);
+
+      // Reativar via PATCH
+      await request(app.getHttpServer())
+        .patch(`/api/v1/products/${produtoAtivoId}`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ is_active: true })
+        .expect(200);
+
+      // Sem flag: reativado volta a aparecer
+      const reativado = await request(app.getHttpServer())
+        .get('/api/v1/products')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .expect(200);
+
+      const idsReativado: string[] = Array.isArray(reativado.body)
+        ? reativado.body.map((p: any) => p.id)
+        : (reativado.body.data ?? []).map((p: any) => p.id);
+      expect(idsReativado).toContain(produtoAtivoId);
+    });
+  });
+
+  describe('Admin estoque — extrato (stock-history) e categories', () => {
+    let produtoId: string;
+
+    beforeEach(async () => {
+      if (!app) return;
+      // Criar produto com estoque inicial via SQL direto
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      const prod = await queryRunner.query(
+        `INSERT INTO produtos (id, tenant_id, name, price, is_active, category, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, 'Produto Extrato Test', 10.0, true, 'Trufas', now(), now())
+         RETURNING id`,
+        [tenantId],
+      );
+      produtoId = prod[0].id;
+      // Estoque inicial = 10
+      await queryRunner.query(
+        `INSERT INTO movimentacoes_estoque (id, tenant_id, produto_id, current_stock, reserved_stock, min_stock, last_updated)
+         VALUES (uuid_generate_v4(), $1, $2, 10, 0, 0, now())`,
+        [tenantId, produtoId],
+      );
+      await queryRunner.release();
+    });
+
+    it('extrato retorna movimentacoes do produto, recentes primeiro, paginado', async () => {
+      if (!app) return;
+      // Seed de 3 movimentos no ledger via endpoint adjust-stock
+      await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'COMPRA', delta: 5, motivo: 'reposicao' });
+      await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'AJUSTE', delta: -2, motivo: 'correcao' });
+      await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'PERDA', delta: -1, motivo: 'avaria' });
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${produtoId}/stock-history?limit=2&offset=0`)
+        .set('Authorization', `Bearer ${jwtToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(2);
+      // ordenado created_at DESC (mais recente primeiro)
+      expect(res.body.total).toBeGreaterThanOrEqual(3);
+      // Verifica ordenação real: primeiro item deve ser ao menos tão recente quanto o segundo.
+      // O seed insere COMPRA, AJUSTE, PERDA em sequência — PERDA é a mais recente,
+      // portanto items[0].tipo deve ser 'PERDA' (tiebreaker id DESC garante ordem determinística).
+      expect(new Date(res.body.items[0].created_at).getTime())
+        .toBeGreaterThanOrEqual(new Date(res.body.items[1].created_at).getTime());
+      expect(res.body.items[0].tipo).toBe('PERDA');
+    });
+
+    it('AJUSTE com delta negativo mantém invariante (bidirectionality)', async () => {
+      if (!app) return;
+      // Seed produto com estoque = 50 via SQL direto
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      // Ajustar estoque para 50 via SQL
+      await queryRunner.query(
+        `UPDATE movimentacoes_estoque SET current_stock = 50 WHERE produto_id = $1`,
+        [produtoId],
+      );
+      await queryRunner.release();
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/products/${produtoId}/adjust-stock`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ tipo: 'AJUSTE', delta: -3, motivo: 'correcao negativa' });
+      expect(res.status).toBeGreaterThanOrEqual(200);
+      expect(res.status).toBeLessThan(300);
+      expect(res.body.saldo_resultante).toBe(47);
+    });
+
+    it('categories retorna DISTINCT por tenant', async () => {
+      if (!app) return;
+      // Seed: 2 produtos com category 'Trufas' (1 já criado no beforeEach) e 1 com 'Bombons'
+      const queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      // Inserir produto com categoria Trufas (duplicado — DISTINCT deve retornar só 1)
+      await queryRunner.query(
+        `INSERT INTO produtos (id, tenant_id, name, price, is_active, category, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, 'Produto Trufas 2', 5.0, true, 'Trufas', now(), now())`,
+        [tenantId],
+      );
+      // Inserir produto com categoria Bombons
+      await queryRunner.query(
+        `INSERT INTO produtos (id, tenant_id, name, price, is_active, category, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, 'Produto Bombons', 8.0, true, 'Bombons', now(), now())`,
+        [tenantId],
+      );
+      await queryRunner.release();
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/categories`)
+        .set('Authorization', `Bearer ${jwtToken}`);
+      expect(res.status).toBe(200);
+      // Deve conter pelo menos 'Bombons' e 'Trufas' (pode ter outros de testes anteriores)
+      expect(Array.isArray(res.body)).toBe(true);
+      const sorted = res.body.sort();
+      expect(sorted).toContain('Bombons');
+      expect(sorted).toContain('Trufas');
+      // Valida que DISTINCT está funcionando: sem categorias duplicadas na resposta
+      expect(new Set(res.body).size).toBe(res.body.length);
     });
   });
 });

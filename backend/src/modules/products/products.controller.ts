@@ -15,6 +15,7 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { PaginationDto } from './dto/pagination.dto';
+import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../common/decorators/tenant.decorator';
@@ -38,18 +39,20 @@ export class ProductsController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Listar produtos',
-    description: 'Lista produtos com paginação opcional. Sem parâmetros de paginação, retorna todos os produtos (compatibilidade).',
+    description: 'Lista produtos com paginação opcional. Sem parâmetros de paginação, retorna todos os produtos (compatibilidade). Passar include_inactive=true retorna também produtos inativos (uso exclusivo do admin).',
   })
   findAll(
     @CurrentTenant() tenantId: string,
     @Query() pagination: PaginationDto,
+    @Query('include_inactive') includeInactiveRaw: string,
     @Request() req: TypedRequest,
   ) {
     const hasPagination =
       typeof req?.query?.page !== 'undefined' || typeof req?.query?.limit !== 'undefined';
-    return this.productsService.findAll(tenantId, hasPagination ? pagination : undefined);
+    const includeInactive = includeInactiveRaw === 'true';
+    return this.productsService.findAll(tenantId, hasPagination ? pagination : undefined, includeInactive);
   }
 
   @Get('search')
@@ -68,11 +71,39 @@ export class ProductsController {
     return this.productsService.getStockSummary(tenantId);
   }
 
+  @Get('categories')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Retorna categorias DISTINCT dos produtos do tenant' })
+  @ApiResponse({ status: 200, description: 'Lista de categorias' })
+  getCategories(@CurrentTenant() tenantId: string) {
+    return this.productsService.getCategories(tenantId);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Buscar produto por ID' })
   findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     return this.productsService.findOne(id, tenantId);
+  }
+
+  @Get(':id/stock-history')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Extrato paginado de movimentações de estoque do produto' })
+  @ApiResponse({ status: 200, description: 'Extrato retornado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Produto não encontrado' })
+  getStockHistory(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.productsService.getStockHistory(
+      id,
+      tenantId,
+      Number(limit) || 50,
+      Number(offset) || 0,
+    );
   }
 
   @Post()
@@ -155,26 +186,25 @@ export class ProductsController {
 
   @Post(':id/adjust-stock')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Ajustar estoque (adicionar ou remover quantidade)' })
-  @ApiResponse({ status: 200, description: 'Estoque ajustado com sucesso' })
-  @ApiResponse({ status: 400, description: 'Quantidade inválida ou estoque insuficiente' })
+  @ApiOperation({ summary: 'Ajustar estoque via ledger (COMPRA/PERDA/DEVOLUCAO/AJUSTE)' })
+  @ApiResponse({ status: 201, description: 'Estoque ajustado com sucesso via ledger' })
+  @ApiResponse({ status: 400, description: 'Tipo ou sinal inválido' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 404, description: 'Produto não encontrado' })
+  @ApiResponse({ status: 422, description: 'Estoque insuficiente (INSUFFICIENT_STOCK)' })
   adjustStock(
     @Param('id') id: string,
-    @Body() adjustStockDto: { quantity: number; reason?: string },
+    @Body() dto: AdjustStockDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: Usuario,
-    @Request() req: TypedRequest,
   ) {
-    return this.productsService.adjustStock(
+    return this.productsService.adjustStockLedger(
       id,
-      adjustStockDto.quantity,
+      dto.tipo as unknown as any,
+      dto.delta,
+      dto.motivo ?? null,
       tenantId,
-      adjustStockDto.reason,
-      user?.id,
-      getClientIp(req),
-      getUserAgent(req),
+      user?.id ?? null,
     );
   }
 

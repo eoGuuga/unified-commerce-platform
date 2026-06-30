@@ -38,6 +38,9 @@ export class Produto {
   @Column({ length: 100, nullable: true })
   sku?: string;
 
+  @Column({ length: 100, nullable: true })
+  category?: string;
+
   @Column({ length: 255 })
   name: string;
 

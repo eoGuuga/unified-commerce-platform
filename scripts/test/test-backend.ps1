@@ -164,8 +164,9 @@ if ($productId) {
 if ($productId) {
     Write-Host "[6/6] Ajustando estoque e criando pedido..." -ForegroundColor Yellow
     $adjustStockBody = @{
-        quantity = 50
-        reason = "Teste automatizado"
+        tipo  = 'COMPRA'
+        delta = 50
+        motivo = 'reposicao teste'
     } | ConvertTo-Json
     try {
         Invoke-UcmRequest -Uri "$baseUrl/products/$productId/adjust-stock" -Method POST -Body $adjustStockBody -Headers (@{"Authorization"="Bearer $token"} + $tenantHeader) | Out-Null

@@ -351,7 +351,7 @@ if (-not $global:authToken) {
     if ($global:testProductId) {
         Wait-ForRateLimit
         $adjustStock = Invoke-ApiRequest -Method "POST" -Uri "$baseUrl/products/$($global:testProductId)/adjust-stock" `
-            -Headers @{"Authorization"="Bearer $global:authToken"} -Body @{quantity=10; reason="Ajuste de teste"}
+            -Headers @{"Authorization"="Bearer $global:authToken"} -Body @{tipo='COMPRA'; delta=10; motivo='reposicao teste'}
         if ($adjustStock.Success) {
             Write-TestResult $true "Ajustar estoque OK" "10 unidades adicionadas"
         } else {

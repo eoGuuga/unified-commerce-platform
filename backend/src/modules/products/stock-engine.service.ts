@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque.entity';
 import {
@@ -144,6 +144,15 @@ export class StockEngineService {
     if (!Number.isInteger(delta) || delta === 0) {
       throw new BadRequestException('Delta inválido para movimento manual.');
     }
+    // Validacao sinal x tipo (chokepoint unico: cobre endpoint, criacao e callers internos).
+    const exigePositivo = [LedgerTipo.COMPRA, LedgerTipo.DEVOLUCAO, LedgerTipo.INVENTARIO_INICIAL];
+    if (exigePositivo.includes(tipo) && delta <= 0) {
+      throw new BadRequestException(`Tipo ${tipo} exige delta positivo.`);
+    }
+    if (tipo === LedgerTipo.PERDA && delta >= 0) {
+      throw new BadRequestException('PERDA exige delta negativo.');
+    }
+    // AJUSTE: bidirecional (qualquer sinal); o delta != 0 ja e garantido pelo guard acima.
     // manager.query() com RETURNING retorna tupla [[linhas], rowCount] neste TypeORM+pg; unwrap obrigatorio antes de ler campos.
     const rawUpdate = await manager.query(
       `UPDATE movimentacoes_estoque
@@ -157,9 +166,10 @@ export class StockEngineService {
       ? rawUpdate[0]
       : rawUpdate;
     if (!updatedRows || updatedRows.length === 0) {
-      throw new BadRequestException(
-        `Movimento inválido: estoque ficaria negativo (produto ${produtoId}).`,
-      );
+      throw new UnprocessableEntityException({
+        code: 'INSUFFICIENT_STOCK',
+        message: 'Estoque insuficiente para esta saída.',
+      });
     }
     const saldo = Number(updatedRows[0].current_stock);
     await manager

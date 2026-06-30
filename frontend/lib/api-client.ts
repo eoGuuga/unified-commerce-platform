@@ -14,7 +14,6 @@ import type {
   PublicOrderTrackingResponse,
   RegisterInput,
   SalesReport,
-  StockAdjustmentResponse,
   StockReservationResponse,
   StockSummary,
   UpdateProductInput,
@@ -93,7 +92,10 @@ class ApiClient {
       const errorBody = (await response
         .json()
         .catch(() => ({}))) as ApiErrorResponse;
-      throw new Error(errorBody.message || 'Request failed');
+      const err = new Error(errorBody.message || 'Request failed');
+      // Preserva body.code para que hooks recebam erros tipados (ex.: INSUFFICIENT_STOCK).
+      (err as Error & { code?: string }).code = (errorBody as { code?: string }).code;
+      throw err;
     }
 
     return (await response.json()) as T;
@@ -133,8 +135,14 @@ class ApiClient {
   // Products
   // ---------------------------------------------------------------------------
 
-  async getProducts(_tenantId: string): Promise<Product[]> {
-    return this.request<Product[]>('/products');
+  async getProducts(_tenantId: string, options?: { includeInactive?: boolean }): Promise<Product[]> {
+    // Quando includeInactive=true o admin recebe todos os produtos (ativos + inativos),
+    // permitindo que os filtros Ativos/Inativos/Todos e o toggle de reativação funcionem.
+    const params: Record<string, string> = {};
+    if (options?.includeInactive) {
+      params.include_inactive = 'true';
+    }
+    return this.request<Product[]>('/products', Object.keys(params).length ? { params } : undefined);
   }
 
   async getPublicStoreProducts(tenantId?: string): Promise<Product[]> {
@@ -176,6 +184,11 @@ class ApiClient {
       method: 'PATCH',
       body: JSON.stringify(product),
     });
+  }
+
+  async getCategories(): Promise<string[]> {
+    // Retorna lista de categorias disponíveis para os produtos do tenant.
+    return this.request<string[]>('/products/categories');
   }
 
   // ---------------------------------------------------------------------------
@@ -334,22 +347,46 @@ class ApiClient {
     return this.request<StockSummary>('/products/stock-summary');
   }
 
+  async getStockHistory(
+    productId: string,
+    limit = 50,
+    offset = 0,
+  ): Promise<{
+    items: Array<{
+      tipo: string;
+      delta: number;
+      saldo_resultante: number;
+      motivo: string | null;
+      created_at: string;
+    }>;
+    total: number;
+  }> {
+    return this.request(`/products/${productId}/stock-history`, {
+      params: { limit: String(limit), offset: String(offset) },
+    });
+  }
+
+  /**
+   * Ajuste de estoque com tipo tipado.
+   * Corpo: { tipo, delta, motivo? }
+   * Em erro 422 com code INSUFFICIENT_STOCK, o erro carrega err.code para o hook.
+   */
   async adjustStock(
     productId: string,
-    quantity: number,
-    _tenantId: string,
-    reason?: string,
-  ): Promise<StockAdjustmentResponse> {
-    return this.request<StockAdjustmentResponse>(
+    tipo: 'COMPRA' | 'PERDA' | 'DEVOLUCAO' | 'AJUSTE',
+    delta: number,
+    motivo?: string,
+  ): Promise<{ saldo_resultante: number }> {
+    return this.request<{ saldo_resultante: number }>(
       `/products/${productId}/adjust-stock`,
-      { method: 'POST', body: JSON.stringify({ quantity, reason }) },
+      { method: 'POST', body: JSON.stringify({ tipo, delta, motivo }) },
     );
   }
 
+  /** Define o estoque mínimo de um produto (PATCH /products/:id/min-stock). */
   async setMinStock(
     productId: string,
     minStock: number,
-    _tenantId: string,
   ): Promise<Product> {
     return this.request<Product>(`/products/${productId}/min-stock`, {
       method: 'PATCH',

@@ -44,6 +44,9 @@ export interface CreateProductInput {
   unit?: string;
   is_active?: boolean;
   categoria_id?: string;
+  category?: string;
+  initial_stock?: number;
+  image_url?: string;
   metadata?: Record<string, unknown>;
 }
 

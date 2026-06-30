@@ -3,14 +3,32 @@ import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Produto } from '../../database/entities/Produto.entity';
 import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque.entity';
+import { LedgerTipo, MovimentacaoEstoqueHistorico } from '../../database/entities/MovimentacaoEstoqueHistorico.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CacheService } from '../common/services/cache.service';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { DbContextService } from '../common/services/db-context.service';
+import { StockEngineService } from './stock-engine.service';
 import { PaginatedResult, createPaginatedResult } from '../common/types/pagination.types';
 import { PaginationDto } from './dto/pagination.dto';
 import { ProductWithStock } from './types/product.types';
+
+/**
+ * Gera um slug de SKU a partir do nome do produto:
+ * lowercase, acentos removidos, caracteres não-alfanuméricos substituídos por hífen,
+ * hífens consecutivos colapsados, hífens nas bordas removidos.
+ * Exemplo: "Brigadeiro Gourmet!" → "brigadeiro-gourmet"
+ */
+function gerarSlugSku(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // remove diacríticos
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')    // não-alfanum → hífen
+    .replace(/^-+|-+$/g, '')        // bordas
+    .replace(/-{2,}/g, '-');        // hífens duplos
+}
 
 @Injectable()
 export class ProductsService {
@@ -26,20 +44,31 @@ export class ProductsService {
     private cacheService: CacheService,
     private auditLogService: AuditLogService,
     private readonly db: DbContextService,
+    private readonly stockEngine: StockEngineService,
   ) {}
 
-  async findAll(tenantId: string, pagination?: PaginationDto): Promise<ProductWithStock[] | PaginatedResult<ProductWithStock>> {
+  async findAll(
+    tenantId: string,
+    pagination?: PaginationDto,
+    includeInactive = false,
+  ): Promise<ProductWithStock[] | PaginatedResult<ProductWithStock>> {
     const page = pagination?.page || 1;
     const limit = pagination?.limit || 50;
     const skip = (page - 1) * limit;
     const produtosRepository = this.db.getRepository(Produto);
     const estoqueRepository = this.db.getRepository(MovimentacaoEstoque);
 
-    // ✅ CACHE: Tentar buscar do cache primeiro (apenas sem paginação)
-    if (!pagination) {
-      const cached = await this.cacheService.getCachedProducts(tenantId);
-      if (cached) {
-        return cached;
+    // ✅ CACHE: Tentar buscar do cache primeiro (apenas sem paginação e sem inativos) — não-fatal
+    if (!pagination && !includeInactive) {
+      try {
+        const cached = await this.cacheService.getCachedProducts(tenantId);
+        if (cached) {
+          return cached;
+        }
+      } catch (error) {
+        this.logger.warn('Cache read falhou em findAll (não-fatal)', {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -54,8 +83,12 @@ export class ProductsService {
         { tenantId },
       )
       .where('produto.tenant_id = :tenantId', { tenantId })
-      .andWhere('produto.is_active = :isActive', { isActive: true })
       .orderBy('produto.name', 'ASC');
+
+    // Filtrar apenas ativos quando não for requisição admin (compatibilidade retroativa)
+    if (!includeInactive) {
+      queryBuilder.andWhere('produto.is_active = :isActive', { isActive: true });
+    }
 
     // Se paginação foi solicitada, aplicar skip/take e retornar resultado paginado
     if (pagination) {
@@ -127,8 +160,16 @@ export class ProductsService {
       };
     });
 
-    // ✅ CACHE: Salvar no cache (TTL: 5 minutos)
-    await this.cacheService.cacheProducts(tenantId, produtosComEstoque, 300);
+    // ✅ CACHE: Salvar no cache (TTL: 5 minutos) — não-fatal; apenas para listagem de ativos
+    if (!includeInactive) {
+      try {
+        await this.cacheService.cacheProducts(tenantId, produtosComEstoque, 300);
+      } catch (error) {
+        this.logger.warn('Cache write falhou em findAll (não-fatal)', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     return produtosComEstoque;
   }
@@ -153,29 +194,108 @@ export class ProductsService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<Produto> {
-    const produtoRepo = this.db.getRepository(Produto);
-    const produto = produtoRepo.create({
-      ...createProductDto,
-      tenant_id: tenantId,
-    });
+    // Normalizar category: trim, colapsar espaços, vazio → null
+    const category = createProductDto.category?.trim().replace(/\s+/g, ' ') || null;
 
-    const savedProduto = await produtoRepo.save(produto);
-    const estoqueRepo = this.db.getRepository(MovimentacaoEstoque);
-    const existingStock = await estoqueRepo.findOne({
-      where: { tenant_id: tenantId, produto_id: savedProduto.id },
-    });
+    // Determinar o SKU base: fornecido pelo usuário ou gerado a partir do nome.
+    const skuBase = createProductDto.sku?.trim()
+      ? createProductDto.sku.trim()
+      : gerarSlugSku(createProductDto.name);
 
-    if (!existingStock) {
-      await estoqueRepo.save(
-        estoqueRepo.create({
-          tenant_id: tenantId,
-          produto_id: savedProduto.id,
-          current_stock: 0,
-          reserved_stock: 0,
-          min_stock: 0,
-        }),
+    // Executar criação do produto + estoque inicial em uma transação atômica.
+    // Backstop de colisão de SKU (23505): usa SAVEPOINT para retentar dentro da
+    // mesma transação (o interceptor pode já ter aberto uma tx externa; não podemos
+    // abrir outra — usamos savepoints do Postgres para isolar cada tentativa).
+    const savedProduto = await this.db.runInTransaction(async (manager) => {
+      const MAX_TENTATIVAS = 5;
+
+      for (let tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
+        const skuTentativa = tentativa === 1 ? skuBase : `${skuBase}-${tentativa}`;
+        const savepointNome = `sku_insert_${tentativa}`;
+
+        // SAVEPOINT antes da tentativa: em caso de 23505, fazemos ROLLBACK TO SAVEPOINT
+        // para desfazer apenas o INSERT sem abortar a transação inteira.
+        await manager.query(`SAVEPOINT ${savepointNome}`);
+
+        try {
+          const produtoData: Record<string, any> = {
+            ...createProductDto,
+            category,
+            tenant_id: tenantId,
+            sku: skuTentativa,
+          };
+          // initial_stock não é coluna do produto — remover antes de persistir
+          delete produtoData.initial_stock;
+
+          const produto = manager.getRepository(Produto).create(produtoData as Partial<Produto>);
+          const p = await manager.getRepository(Produto).save(produto);
+
+          // Confirmar savepoint (limpa o stack de savepoints no Postgres)
+          await manager.query(`RELEASE SAVEPOINT ${savepointNome}`);
+
+          // Sempre criar a linha de estoque com current_stock=0
+          await manager.getRepository(MovimentacaoEstoque).insert({
+            tenant_id: tenantId,
+            produto_id: p.id,
+            current_stock: 0,
+            reserved_stock: 0,
+            min_stock: 0,
+          });
+
+          // Se initial_stock > 0, registrar INVENTARIO_INICIAL via motor (nunca setar direct)
+          if (createProductDto.initial_stock && createProductDto.initial_stock > 0) {
+            await this.stockEngine.recordManualMovement(
+              manager,
+              tenantId,
+              p.id,
+              LedgerTipo.INVENTARIO_INICIAL,
+              createProductDto.initial_stock,
+              'Inventário inicial',
+              userId ?? null,
+            );
+          }
+
+          return p; // sucesso — retornar produto criado
+        } catch (err: any) {
+          // Verificar se é violação de unique (23505) no índice [tenant_id, sku]
+          const isUniqueViolation =
+            err?.code === '23505' ||
+            (err?.driverError?.code === '23505');
+
+          const detailStr: string =
+            (err?.detail as string | undefined) ||
+            (err?.driverError?.detail as string | undefined) ||
+            '';
+          const constraintStr: string =
+            (err?.constraint as string | undefined) ||
+            (err?.driverError?.constraint as string | undefined) ||
+            '';
+
+          // Só retentar se a colisão for especificamente no campo SKU
+          const ehColisaoSku =
+            isUniqueViolation &&
+            (detailStr.toLowerCase().includes('sku') ||
+              constraintStr.toLowerCase().includes('sku') ||
+              constraintStr.toLowerCase().includes('tenant_sku'));
+
+          if (!ehColisaoSku || tentativa >= MAX_TENTATIVAS) {
+            // Erro não relacionado a SKU — desfazer savepoint e propagar
+            try { await manager.query(`ROLLBACK TO SAVEPOINT ${savepointNome}`); } catch { /* ignore */ }
+            throw err;
+          }
+
+          // Colisão de SKU: desfazer apenas o INSERT problemático e tentar próximo sufixo
+          await manager.query(`ROLLBACK TO SAVEPOINT ${savepointNome}`);
+          this.logger.warn(
+            `Colisão de SKU "${skuTentativa}" (tentativa ${tentativa}/${MAX_TENTATIVAS}): tentando sufixo -${tentativa + 1}`,
+          );
+        }
+      }
+
+      throw new BadRequestException(
+        `Não foi possível gerar um SKU único para "${createProductDto.name}" após ${MAX_TENTATIVAS} tentativas.`,
       );
-    }
+    });
 
     // ✅ AUDIT LOG: Registrar criação de produto
     try {
@@ -197,12 +317,18 @@ export class ProductsService {
       this.logger.error('Erro ao registrar audit log', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
-        context: { tenantId, userId, produtoId: savedProduto.id, action: 'UPDATE' },
+        context: { tenantId, userId, produtoId: savedProduto.id, action: 'CREATE' },
       });
     }
 
-    // ✅ CACHE: Invalidar cache de produtos
-    await this.cacheService.invalidateProductsCache(tenantId);
+    // ✅ CACHE: Invalidar cache — não-fatal (Redis pode estar indisponível em testes)
+    try {
+      await this.cacheService.invalidateProductsCache(tenantId);
+    } catch (error) {
+      this.logger.warn('Cache invalidation falhou em create (não-fatal)', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     return savedProduto;
   }
@@ -217,6 +343,9 @@ export class ProductsService {
   ): Promise<Produto> {
     const produto = await this.findOne(id, tenantId);
     const oldData = { ...produto };
+
+    // SKU é imutável pós-criação: ignorar qualquer tentativa de alteração via API.
+    delete (updateProductDto as any).sku;
 
     Object.assign(produto, updateProductDto);
 
@@ -247,12 +376,18 @@ export class ProductsService {
       this.logger.error('Erro ao registrar audit log', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
-        context: { tenantId, userId, produtoId: savedProduto.id, action: 'CREATE' },
+        context: { tenantId, userId, produtoId: savedProduto.id, action: 'UPDATE' },
       });
     }
 
-    // ✅ CACHE: Invalidar cache de produtos
-    await this.cacheService.invalidateProductsCache(tenantId);
+    // ✅ CACHE: Invalidar cache — não-fatal
+    try {
+      await this.cacheService.invalidateProductsCache(tenantId);
+    } catch (error) {
+      this.logger.warn('Cache invalidation falhou em update (não-fatal)', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     return savedProduto;
   }
@@ -292,8 +427,14 @@ export class ProductsService {
       });
     }
 
-    // ✅ CACHE: Invalidar cache de produtos
-    await this.cacheService.invalidateProductsCache(tenantId);
+    // ✅ CACHE: Invalidar cache — não-fatal
+    try {
+      await this.cacheService.invalidateProductsCache(tenantId);
+    } catch (error) {
+      this.logger.warn('Cache invalidation falhou em remove (não-fatal)', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   async search(tenantId: string, query: string): Promise<Produto[]> {
@@ -578,80 +719,31 @@ export class ProductsService {
   }
 
   /**
-   * Ajustar estoque (adicionar ou remover)
+   * Ajusta estoque via ledger (COMPRA/PERDA/DEVOLUCAO/AJUSTE). Ledger-correto.
    */
-  async adjustStock(
+  async adjustStockLedger(
     produtoId: string,
-    quantity: number,
+    tipo: LedgerTipo,
+    delta: number,
+    motivo: string | null,
     tenantId: string,
-    reason?: string,
-    userId?: string,
-    ipAddress?: string,
-    userAgent?: string,
-  ): Promise<MovimentacaoEstoque> {
-    // Verificar se produto existe
+    usuarioId: string | null,
+  ): Promise<{ saldo_resultante: number }> {
+    // 404 se produto não existe ou não pertence ao tenant
     await this.findOne(produtoId, tenantId);
-
-    // Buscar ou criar estoque
-    const estoqueRepo = this.db.getRepository(MovimentacaoEstoque);
-    let estoque = await estoqueRepo.findOne({
-      where: { tenant_id: tenantId, produto_id: produtoId },
-    });
-
-    const oldStock = estoque?.current_stock || 0;
-
-    if (!estoque) {
-      // Criar estoque se não existir
-      estoque = estoqueRepo.create({
-        tenant_id: tenantId,
-        produto_id: produtoId,
-        current_stock: 0,
-        reserved_stock: 0,
-        min_stock: 0,
-      });
-    }
-
-    // Ajustar estoque
-    const newStock = estoque.current_stock + quantity;
-
-    if (newStock < 0) {
-      throw new BadRequestException(
-        `Não é possível remover ${Math.abs(quantity)} unidades. Estoque atual: ${estoque.current_stock}`,
-      );
-    }
-
-    estoque.current_stock = newStock;
-    estoque.last_updated = new Date();
-
-    const savedEstoque = await estoqueRepo.save(estoque);
-
-    // ✅ AUDIT LOG: Registrar ajuste de estoque
+    const res = await this.db.runInTransaction((manager) =>
+      this.stockEngine.recordManualMovement(manager, tenantId, produtoId, tipo, delta, motivo, usuarioId),
+    );
+    // ✅ CACHE: Invalidar cache — não-fatal
     try {
-      await this.auditLogService.log({
-        tenantId,
-        userId,
-        action: 'UPDATE',
-        tableName: 'movimentacoes_estoque',
-        recordId: savedEstoque.id,
-        oldData: { current_stock: oldStock },
-        newData: { current_stock: newStock },
-        ipAddress,
-        userAgent,
-        metadata: { reason, quantity, produto_id: produtoId },
-      });
+      await this.cacheService.invalidateProductsCache(tenantId);
+      await this.cacheService.invalidateStockCache(tenantId, produtoId);
     } catch (error) {
-      this.logger.error('Erro ao registrar audit log', {
+      this.logger.warn('Cache invalidation falhou em adjustStockLedger (não-fatal)', {
         error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        context: { tenantId, userId, produtoId, estoqueId: savedEstoque.id, action: 'UPDATE' },
       });
     }
-
-    // ✅ CACHE: Invalidar cache de produtos
-    await this.cacheService.invalidateProductsCache(tenantId);
-    await this.cacheService.invalidateStockCache(tenantId, produtoId);
-
-    return savedEstoque;
+    return res;
   }
 
   /**
@@ -678,5 +770,55 @@ export class ProductsService {
     }
 
     return estoqueRepo.save(estoque);
+  }
+
+  /**
+   * Retorna o extrato paginado de movimentações de estoque de um produto.
+   * Ordenado por created_at DESC, id DESC (determinístico).
+   * Exclui usuario_id do payload por privacidade.
+   */
+  async getStockHistory(
+    produtoId: string,
+    tenantId: string,
+    limit = 50,
+    offset = 0,
+  ): Promise<{ items: Array<{ tipo: string; delta: number; saldo_resultante: number; motivo: string | null; created_at: Date }>; total: number }> {
+    // Garante que o produto pertence ao tenant (lança 404 se não existir)
+    await this.findOne(produtoId, tenantId);
+    const repo = this.db.getRepository(MovimentacaoEstoqueHistorico);
+    const [rows, total] = await repo
+      .createQueryBuilder('h')
+      .where('h.tenant_id = :tenantId', { tenantId })
+      .andWhere('h.produto_id = :produtoId', { produtoId })
+      .orderBy('h.created_at', 'DESC')
+      .addOrderBy('h.id', 'DESC')
+      .limit(Math.min(limit, 200))
+      .offset(offset)
+      .getManyAndCount();
+    return {
+      items: rows.map((h) => ({
+        tipo: h.tipo,
+        delta: h.delta,
+        saldo_resultante: h.saldo_resultante,
+        motivo: h.motivo,
+        created_at: h.created_at,
+      })),
+      total,
+    };
+  }
+
+  /**
+   * Retorna categorias DISTINCT de todos os produtos do tenant, ordenadas alfabeticamente.
+   */
+  async getCategories(tenantId: string): Promise<string[]> {
+    const rows = await this.db
+      .getRepository(Produto)
+      .createQueryBuilder('p')
+      .select('DISTINCT p.category', 'category')
+      .where('p.tenant_id = :tenantId', { tenantId })
+      .andWhere('p.category IS NOT NULL')
+      .orderBy('p.category', 'ASC')
+      .getRawMany();
+    return rows.map((r) => r.category as string).filter(Boolean);
   }
 }
