@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { ArrowRight, CheckCircle2, Copy } from 'lucide-react';
 
@@ -93,7 +94,7 @@ function CompletedSaleView({
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[1.05fr,0.95fr]">
-      <div className="rounded-[28px] border border-emerald-300/30 bg-[linear-gradient(160deg,rgba(16,185,129,0.22)_0%,rgba(56,189,248,0.14)_45%,rgba(15,23,42,0.98)_100%)] p-6 text-white">
+      <div className="rounded-[28px] border border-emerald-400/30 bg-[linear-gradient(160deg,#064e3b_0%,#0f172a_62%)] p-6 text-white shadow-[0_20px_48px_rgba(2,16,12,0.45)]">
         {/* Sucesso inequivoco e instantaneo: titulo grande, sem ambiguidade. */}
         <div className="flex items-center gap-3">
           <span className="inline-flex size-14 items-center justify-center rounded-3xl border border-emerald-300/30 bg-emerald-400/15 text-emerald-100">
@@ -301,6 +302,14 @@ function PaymentFormView({
 }) {
   // Troco negativo (dinheiro): valor recebido < total -> bloqueia finalizar (spec §4.6/§10).
   const insufficientCash = paymentMethod === 'dinheiro' && cashChange < 0;
+  // Dinheiro = acao principal: o foco do teclado vai DIRETO pro valor recebido,
+  // pra a operadora ja digitar quanto a cliente deu (troco calculado na hora).
+  const cashInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (paymentMethod === 'dinheiro') {
+      cashInputRef.current?.focus();
+    }
+  }, [paymentMethod]);
   // Cards de metodo compactos numa fileira (4-up): pix/debito/credito = acento cyan,
   // dinheiro = acento emerald (a unica acao com calculo extra de troco).
   const methodBtn = (active: boolean, accent: 'cyan' | 'emerald') =>
@@ -384,31 +393,45 @@ function PaymentFormView({
               />
             </div>
           )}
-          {paymentMethod === 'dinheiro' && (
-            <div className="sm:w-44">
-              <label className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Valor recebido</label>
+        </div>
+
+        {/* Dinheiro = acao principal: VALOR RECEBIDO grande/central + TROCO em destaque.
+            So aparece no dinheiro (pix/debito/credito nao precisam de troco). */}
+        {paymentMethod === 'dinheiro' && (
+          <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/60 p-4 sm:p-5">
+            <label
+              htmlFor="pdv-cash-received"
+              className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-800"
+            >
+              Valor recebido
+            </label>
+            <div className="relative mt-2">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-slate-400 sm:text-3xl">
+                R$
+              </span>
               <input
+                id="pdv-cash-received"
+                ref={cashInputRef}
                 value={cashReceived}
                 onChange={(e) => onCashReceivedChange(e.target.value)}
                 placeholder="0,00"
                 inputMode="decimal"
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm tabular-nums text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                aria-label="Valor recebido"
+                className="w-full rounded-xl border-2 border-emerald-300 bg-white py-3 pl-14 pr-4 text-3xl font-bold tabular-nums text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-4xl"
               />
             </div>
-          )}
-        </div>
-
-        {/* Troco enxuto (so dinheiro, quando ha valor). */}
-        {paymentMethod === 'dinheiro' && cashReceived && (
-          <div
-            className={`flex items-center justify-between rounded-xl border px-4 py-2 text-sm ${
-              insufficientCash
-                ? 'border-rose-200 bg-rose-50 text-rose-700'
-                : 'border-emerald-200 bg-emerald-50 text-emerald-800'
-            }`}
-          >
-            <span className="font-medium">Troco</span>
-            <strong className="text-base font-bold tabular-nums">{currencyFormatter.format(cashChange)}</strong>
+            {cashReceived && (
+              <div
+                className={`mt-3 flex items-center justify-between rounded-xl px-4 py-3 ${
+                  insufficientCash ? 'bg-rose-100 text-rose-700' : 'bg-emerald-600 text-white'
+                }`}
+              >
+                <span className="text-sm font-semibold uppercase tracking-[0.14em]">Troco</span>
+                <strong className="text-3xl font-extrabold tabular-nums sm:text-4xl">
+                  {currencyFormatter.format(cashChange)}
+                </strong>
+              </div>
+            )}
           </div>
         )}
 
