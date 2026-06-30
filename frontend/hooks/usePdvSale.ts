@@ -58,6 +58,11 @@ export interface UsePdvSaleResult {
   newSale: () => void;
 }
 
+/** Opcoes da venda (nome do cliente do balcao, opcional — default "Cliente Balcão"). */
+export interface UsePdvSaleOptions {
+  customerName?: string;
+}
+
 /** Mensagem amigavel por tipo de erro do backend (spec §7). */
 function describeSaleError(error: unknown): string {
   const code =
@@ -90,7 +95,7 @@ function newIdempotencyKey(): string {
   return crypto.randomUUID();
 }
 
-export function usePdvSale(): UsePdvSaleResult {
+export function usePdvSale(options?: UsePdvSaleOptions): UsePdvSaleResult {
   const [items, dispatch] = useReducer(cartReducer, [] as PdvCartItem[]);
   const [method, setMethod] = useState<PdvPaymentMethod>('dinheiro');
   const [cashReceived, setCashReceived] = useState(0);
@@ -143,7 +148,7 @@ export function usePdvSale(): UsePdvSaleResult {
     const saleChange = saleMethod === 'dinheiro' ? calcChange(saleTotal, cashReceived) : 0;
 
     try {
-      const payload = buildPdvOrderPayload(items, saleMethod);
+      const payload = buildPdvOrderPayload(items, saleMethod, options?.customerName);
       const order = await api.createOrder(payload, { idempotencyKey });
       setCompletedSale({
         order_no: order.order_no,
@@ -158,7 +163,7 @@ export function usePdvSale(): UsePdvSaleResult {
       inFlightRef.current = false;
       setPaymentLoading(false);
     }
-  }, [items, total, method, cashReceived]);
+  }, [items, total, method, cashReceived, options?.customerName]);
 
   const newSale = useCallback(() => {
     apply({ type: 'clear' });
