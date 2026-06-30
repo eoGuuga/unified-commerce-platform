@@ -40,7 +40,7 @@ cat ~/.ssh/deploy_key.pub | ssh -i ~/.ssh/id_ed25519 ubuntu@<IP_DO_SERVIDOR> "ca
 
 ### Secrets Obrigatórios:
 
-> Nota: `<IP_DO_SERVIDOR>` é um placeholder — o endereço real fica fora do repositório (gerenciador de senhas / doc privado).
+> Nota: `<IP_DO_SERVIDOR>`, `SENHA` e "(...)" são placeholders. Os **valores reais** (IP, senhas de DB/Redis, `JWT_SECRET`, chave SSH, token) ficam **fora do repositório** — no gerenciador de senhas / `.env` do servidor — e **nunca** são versionados.
 
 | Nome | Valor |
 |------|-------|
@@ -48,9 +48,9 @@ cat ~/.ssh/deploy_key.pub | ssh -i ~/.ssh/id_ed25519 ubuntu@<IP_DO_SERVIDOR> "ca
 | `VPS_USER` | `ubuntu` |
 | `VPS_SSH_KEY` | **(cole a chave privada inteira)** |
 | `GHCR_TOKEN` | **(token do GitHub)** |
-| `DATABASE_URL` | `postgresql://ucm_app:94bFHROpoaUcT68tW6EMmCvbcWCWYaKCD8iHtETiJnW2IcOb@postgres:5432/ucm` |
-| `REDIS_URL` | `redis://:701e38acffa0f3a0e632f3697124dcbd@redis:6379` |
-| `JWT_SECRET` | `b8439503c443103c234fb61c0d950e412cb2d39ff9f7d4e02ef427d922baec22` |
+| `DATABASE_URL` | `postgresql://ucm_app:SENHA@postgres:5432/ucm` |
+| `REDIS_URL` | `redis://:SENHA@redis:6379` |
+| `JWT_SECRET` | **(chave secreta JWT, 64+ caracteres — gerar)** |
 | `CORS_ORIGINS` | `https://gtsofthub.com.br` |
 | `FRONTEND_URL` | `https://gtsofthub.com.br` |
 | `NEXT_PUBLIC_API_URL` | `https://gtsofthub.com.br/api` |
