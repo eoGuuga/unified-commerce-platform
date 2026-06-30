@@ -106,7 +106,7 @@ docker logs ucm-backend -f
 docker logs ucm-nginx -f
 
 ## Como testar health:
-curl -k https://37.59.118.210/api/v1/health
+curl -k https://<IP_DO_SERVIDOR>/api/v1/health
 EOF
 
 log "Informações de deploy salvas em /home/ubuntu/deploy-info.md"
@@ -154,7 +154,7 @@ echo "2. Adicione a chave pública ao authorized_keys:"
 echo "   cat ~/.ssh/deploy_key.pub >> ~/.ssh/authorized_keys"
 echo ""
 echo "3. Configure os secrets no GitHub:"
-echo "   - VPS_HOST: 37.59.118.210"
+echo "   - VPS_HOST: <IP_DO_SERVIDOR>"
 echo "   - VPS_USER: ubuntu"
 echo "   - VPS_SSH_KEY: conteúdo da chave privada"
 echo "   - GHCR_TOKEN: token do GitHub"
