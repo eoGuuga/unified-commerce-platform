@@ -1375,5 +1375,62 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
       expect(await readStockEnd(produtoId)).toEqual(stockBefore);
       expect(await countLedgerEnd(pedidoId, 'VENDA')).toBe(0);
     });
+
+    // 4a — OBSERVABILIDADE (achado IMPORTANTE-1): pagamento vira PAID para um
+    // pedido em estado INESPERADO (nem PENDENTE_PAGAMENTO nem CANCELADO). Hoje
+    // isso e um buraco silencioso: sem log, sem aviso. O ramo `else` deve deixar
+    // rastro no log (logger.warn) sem notificar cliente nem lojista e sem tocar
+    // o pedido. Semeamos pendente e MOVEMOS o pedido para CONFIRMADO (transicao
+    // valida) SEM tocar o pagamento (segue PENDING); confirmPayment cai no ramo
+    // inesperado.
+    it('4a: pagamento PAID para pedido em estado inesperado → warn logado, não notifica, pedido inalterado', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste 4a - app nao inicializado');
+        return;
+      }
+
+      const paymentsService = moduleFixture.get<PaymentsService>(PaymentsService);
+      const notificationsService = moduleFixture.get<NotificationsService>(NotificationsService);
+      const ordersService = moduleFixture.get<OrdersService>(OrdersService);
+
+      const { pedidoId, pagamentoId } = await seedPendingOrderWithPendingPayment();
+
+      // Move o pedido para CONFIRMADO por transicao valida, SEM tocar o
+      // pagamento (segue PENDING). confirmPayment vera um estado que nao e
+      // PENDENTE_PAGAMENTO nem CANCELADO -> ramo inesperado.
+      await ordersService.updateStatus(pedidoId, PedidoStatus.CONFIRMADO, tenantId, {
+        suppressNotification: true,
+      });
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CONFIRMADO);
+
+      const warnSpy = jest.spyOn((paymentsService as any).logger, 'warn');
+      const custSpy = jest
+        .spyOn(notificationsService, 'notifyPaymentConfirmed')
+        .mockResolvedValue(undefined as any);
+      const merchantSpy = jest
+        .spyOn(notificationsService, 'notifyMerchantPaymentForCancelledOrder')
+        .mockResolvedValue(undefined as any);
+
+      await paymentsService.confirmPayment(pagamentoId, tenantId);
+
+      // (a) warn emitido com o id do pagamento e mencao ao estado inesperado
+      expect(warnSpy).toHaveBeenCalled(); // <- FALHA hoje (ramo else nao existe)
+      const warnCall = warnSpy.mock.calls.find((call) => {
+        const msg = String(call[0] ?? '');
+        return msg.includes(pagamentoId) || /estado inesperado/i.test(msg);
+      });
+      expect(warnCall).toBeDefined();
+      expect(String(warnCall![0])).toContain(pagamentoId);
+      expect(String(warnCall![0])).toMatch(/estado inesperado/i);
+
+      // (b) o dinheiro entrou — pagamento PAID (continua PAID)
+      expect(await reloadPagamentoStatus(pagamentoId)).toBe(PagamentoStatus.PAID);
+      // (c) pedido inalterado — segue CONFIRMADO (nao ressuscita nem regride)
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CONFIRMADO);
+      // (d) cliente NAO notificado (nao passou por transicao limpa)
+      expect(custSpy).not.toHaveBeenCalled();
+      // (e) lojista NAO notificado (esse aviso e so do caso CANCELADO)
+      expect(merchantSpy).not.toHaveBeenCalled();
+    });
   });
 });

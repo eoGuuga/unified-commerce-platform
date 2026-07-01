@@ -694,6 +694,10 @@ export class PaymentsService {
           pedido: pagamento.pedido,
           didConfirm: false,
           paidForCancelled: false,
+          // Idempotencia (ja PAID -> early return) NAO eh o caso novo do Task 4:
+          // nao logamos o warn de "estado inesperado" aqui.
+          paidUnexpectedState: false,
+          unexpectedPedidoStatus: null,
         };
       }
 
@@ -719,6 +723,16 @@ export class PaymentsService {
       // NAO ressuscitar o pedido; apenas avisar o lojista (provavel reembolso).
       // Lemos o status do pedido TRAVADO (relation carregada sob o lock).
       let paidForCancelled = false;
+      // paidUnexpectedState (Task 4 / achado IMPORTANTE-1): o pagamento virou
+      // PAID (passo 3) mas o pedido NAO estava num estado que este fluxo trata
+      // com transicao limpa — nem PENDENTE_PAGAMENTO (confirmacao) nem CANCELADO
+      // (aviso de reembolso). Cai aqui se o pedido esta num estado intermediario
+      // (CONFIRMADO/EM_PRODUCAO/PRONTO/EM_TRANSITO/ENTREGUE) OU se o pedido eh
+      // null. Sem este ramo, o pagamento viraria PAID sem NENHUM rastro (buraco
+      // silencioso). Capturamos o estado sob o lock e logamos FORA do callback.
+      // NAO notifica cliente nem lojista e NAO altera o pedido — so deixa rastro.
+      let paidUnexpectedState = false;
+      let unexpectedPedidoStatus: PedidoStatus | null = null;
       if (pedido && pedido.status === PedidoStatus.PENDENTE_PAGAMENTO) {
         pedido = await this.db.runWithManager(manager, () =>
           this.ordersService.updateStatus(
@@ -733,9 +747,21 @@ export class PaymentsService {
       } else if (pedido && pedido.status === PedidoStatus.CANCELADO) {
         // Pedido ja cancelado: pagamento fica PAID, pedido NAO transiciona.
         paidForCancelled = true;
+      } else {
+        // Estado inesperado (pedido null OU nem PENDENTE nem CANCELADO): o
+        // pagamento continua PAID, mas isto precisa deixar rastro no log.
+        paidUnexpectedState = true;
+        unexpectedPedidoStatus = pedido?.status ?? null;
       }
 
-      return { pagamento, pedido, didConfirm, paidForCancelled };
+      return {
+        pagamento,
+        pedido,
+        didConfirm,
+        paidForCancelled,
+        paidUnexpectedState,
+        unexpectedPedidoStatus,
+      };
     });
 
     // 5. Notificacao unica, FORA do callback (pos-commit quando standalone; igual
@@ -793,6 +819,26 @@ export class PaymentsService {
           },
         );
       }
+    }
+
+    // 7. Observabilidade (Task 4 / achado IMPORTANTE-1): pagamento virou PAID
+    // mas o pedido NAO passou por uma transicao limpa (nem confirmacao, nem
+    // cancelado-tratado). Regra: qualquer PAID sem transicao limpa TEM que
+    // deixar rastro no log. NAO notifica cliente nem lojista e NAO altera o
+    // pedido — o pagamento continua PAID. Cobre pedido null e estados
+    // intermediarios (CONFIRMADO/EM_PRODUCAO/PRONTO/EM_TRANSITO/ENTREGUE).
+    if (result.paidUnexpectedState) {
+      const estado = result.unexpectedPedidoStatus;
+      this.logger.warn(
+        `Pagamento ${result.pagamento.id} marcado PAID para pedido ${result.pedido?.id ?? 'nao encontrado'} em estado inesperado ${estado ?? 'N/A (pedido null)'} — requer atencao`,
+        {
+          tenantId: result.pagamento.tenant_id,
+          pagamentoId: result.pagamento.id,
+          pedidoId: result.pedido?.id ?? null,
+          pedidoStatus: estado,
+          amount: result.pagamento.amount,
+        },
+      );
     }
 
     return result.pagamento;
