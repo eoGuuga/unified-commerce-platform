@@ -148,6 +148,124 @@ describe('ConfiguracoesManager', () => {
     expect(arg.loja.store_name).toBe('Doceria Renovada');
   });
 
+  // ---- (b2) FIX 1: salvar Loja com so o nome -> omite logo_url/primary_color vazios ----
+
+  it('salvar Loja com so o nome (logo e cor vazios) chama update sem logo_url nem primary_color', async () => {
+    const update = vi.fn().mockResolvedValue({ ok: true });
+    // Projecao de lojista novo: logo/cor/tagline/descricao vazios (null).
+    mockUseTenantSettings.mockReturnValue(
+      makeHook({
+        update,
+        settings: makeProjection({
+          loja: {
+            store_name: null,
+            tagline: null,
+            description: null,
+            logo_url: null,
+            favicon_url: null,
+            primary_color: null,
+          } as never,
+        }),
+      }),
+    );
+    render(<ConfiguracoesManager />);
+
+    const nome = screen.getByLabelText(/Nome da loja/i);
+    fireEvent.change(nome, { target: { value: 'Minha Loja' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Salvar loja/i }));
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledTimes(1);
+    });
+    const arg = update.mock.calls[0][0];
+    // So o nome vai no payload; campos vazios sao OMITIDOS (nao mandados como '').
+    expect(arg).toEqual({ loja: { store_name: 'Minha Loja' } });
+    expect(Object.prototype.hasOwnProperty.call(arg.loja, 'logo_url')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(arg.loja, 'primary_color')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(arg.loja, 'tagline')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(arg.loja, 'description')).toBe(false);
+  });
+
+  it('salvar Pagamento com pix vazio omite pix_key e pix_merchant_name', async () => {
+    const update = vi.fn().mockResolvedValue({ ok: true });
+    mockUseTenantSettings.mockReturnValue(
+      makeHook({
+        update,
+        settings: makeProjection({
+          pagamento: {
+            metodos: [],
+            pix_key: null,
+            pix_merchant_name: null,
+          } as never,
+        }),
+      }),
+    );
+    render(<ConfiguracoesManager />);
+
+    // Marca so o metodo Dinheiro (sem preencher PIX).
+    fireEvent.click(screen.getByLabelText(/Dinheiro/i));
+    fireEvent.click(screen.getByRole('button', { name: /Salvar pagamento/i }));
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledTimes(1);
+    });
+    const arg = update.mock.calls[0][0];
+    expect(arg.pagamento.metodos).toEqual(['dinheiro']);
+    expect(Object.prototype.hasOwnProperty.call(arg.pagamento, 'pix_key')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(arg.pagamento, 'pix_merchant_name')).toBe(false);
+  });
+
+  // ---- (b3) FIX 2: desmarcar todos os dias -> business_hours: null (nao mapa vazio) ----
+
+  it('desmarcar todos os dias e salvar chama update com business_hours: null', async () => {
+    const update = vi.fn().mockResolvedValue({ ok: true });
+    // Projecao com um dia aberto (segunda), para termos algo para desmarcar.
+    mockUseTenantSettings.mockReturnValue(
+      makeHook({
+        update,
+        settings: makeProjection({
+          horario: {
+            business_hours: {
+              tz: 'America/Sao_Paulo',
+              days: { '1': { open: '09:00', close: '18:00' } },
+            },
+          } as never,
+        }),
+      }),
+    );
+    render(<ConfiguracoesManager />);
+
+    // Segunda (dow 1) esta aberta -> desmarca.
+    const linhaSegunda = screen.getByTestId('dia-1');
+    const toggleSegunda = within(linhaSegunda).getByRole('checkbox', { name: /aberto/i });
+    fireEvent.click(toggleSegunda);
+
+    fireEvent.click(screen.getByRole('button', { name: /Salvar horário/i }));
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledTimes(1);
+    });
+    const arg = update.mock.calls[0][0];
+    expect(arg).toHaveProperty('horario');
+    // Nenhum dia aberto -> null (limpar), NAO um mapa vazio.
+    expect(arg.horario.business_hours).toBeNull();
+  });
+
+  it('sem nenhum dia aberto mostra aviso de loja sem horario', () => {
+    mockUseTenantSettings.mockReturnValue(
+      makeHook({
+        settings: makeProjection({
+          horario: { business_hours: null } as never,
+          status: { hasBusinessHours: true } as never,
+        }),
+      }),
+    );
+    render(<ConfiguracoesManager />);
+    // Aviso coerente com o bot: sem horario -> retirada nao oferecida.
+    expect(screen.getByText(/retirada não será oferecida/i)).toBeInTheDocument();
+  });
+
   // ---- (c) HORARIO POR-DIA: sabado presente, domingo ausente ----
 
   it('horario por-dia: sabado 09:00-13:00 aberto + domingo fechado -> mapa com "6" e sem "0"', async () => {

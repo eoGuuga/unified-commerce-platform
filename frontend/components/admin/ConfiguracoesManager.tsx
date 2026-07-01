@@ -117,7 +117,9 @@ function ConfiguracoesForm({
   const [tagline, setTagline] = useState(loja.tagline ?? '');
   const [descricao, setDescricao] = useState(loja.description ?? '');
   const [logoUrl, setLogoUrl] = useState(loja.logo_url ?? '');
-  const [primaryColor, setPrimaryColor] = useState(loja.primary_color ?? '#b8654a');
+  // Seeda fiel a projecao (vazio quando null): assim uma cor NAO tocada e omitida
+  // do payload. O swatch abaixo cai para #b8654a so na EXIBICAO (isHex()).
+  const [primaryColor, setPrimaryColor] = useState(loja.primary_color ?? '');
 
   // ---- Estado: Horario (por-dia) ----
   const [tz, setTz] = useState(horario.business_hours?.tz ?? DEFAULT_TZ);
@@ -164,27 +166,33 @@ function ConfiguracoesForm({
   }
 
   function salvarLoja() {
+    // Só inclui no payload os campos com valor: o DTO backend (@IsUrl/@Matches)
+    // rejeita string vazia, e @IsOptional só pula null/undefined — mandar '' daria
+    // 400. Omitir o campo vazio = "não tocar" (contrato PATCH por seção).
     void salvar('loja', {
       loja: {
-        store_name: storeName.trim(),
-        tagline: tagline.trim(),
-        description: descricao.trim(),
-        logo_url: logoUrl.trim(),
-        primary_color: primaryColor.trim(),
+        ...(storeName.trim() ? { store_name: storeName.trim() } : {}),
+        ...(tagline.trim() ? { tagline: tagline.trim() } : {}),
+        ...(descricao.trim() ? { description: descricao.trim() } : {}),
+        ...(logoUrl.trim() ? { logo_url: logoUrl.trim() } : {}),
+        ...(primaryColor.trim() ? { primary_color: primaryColor.trim() } : {}),
       },
     });
   }
 
   function salvarHorario() {
+    // Nenhum dia aberto -> limpar horário (business_hours: null). Um mapa vazio
+    // ({tz, days:{}}) seria rejeitado pelo DTO (fail-closed exige >=1 dia).
     void salvar('horario', { horario: { business_hours: montarBusinessHours(tz, dias) } });
   }
 
   function salvarPagamento() {
+    // Mesma regra do salvarLoja: pix vazio é OMITIDO (não mandado como '').
     void salvar('pagamento', {
       pagamento: {
         metodos,
-        pix_key: pixKey.trim(),
-        pix_merchant_name: pixMerchant.trim(),
+        ...(pixKey.trim() ? { pix_key: pixKey.trim() } : {}),
+        ...(pixMerchant.trim() ? { pix_merchant_name: pixMerchant.trim() } : {}),
       },
     });
   }
@@ -209,6 +217,12 @@ function ConfiguracoesForm({
 
   // Avisos de sinalizacao (onboarding).
   const avisos = useMemo(() => buildAvisos(status), [status]);
+
+  // Nenhum dia aberto -> a loja fica sem horario (o bot nao oferece retirada).
+  const nenhumDiaAberto = useMemo(
+    () => !DIAS.some(({ dow }) => dias[dow]?.aberto),
+    [dias],
+  );
 
   return (
     <div className="mx-auto max-w-[900px] px-6 py-10">
@@ -393,6 +407,14 @@ function ConfiguracoesForm({
             );
           })}
         </div>
+        {nenhumDiaAberto && (
+          <div
+            role="status"
+            className="rounded-[4px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800"
+          >
+            Loja sem horário definido — retirada não será oferecida.
+          </div>
+        )}
         <p className="text-[12px] text-[#1a1814]/50">
           Dias marcados como Fechado ficam de fora do horário — o bot não afirma horário nesses dias.
         </p>
@@ -524,14 +546,19 @@ function initDias(bh: BusinessHours | null | undefined): Record<string, DiaEstad
 /**
  * Monta o BusinessHours SO com os dias marcados como Aberto.
  * Dias Fechados ficam AUSENTES do mapa (contrato: ausente = fechado).
+ * NENHUM dia aberto -> null (limpar horario): o DTO rejeita um mapa vazio
+ * (fail-closed exige >=1 dia), mas aceita null como "sem horario definido".
  */
-function montarBusinessHours(tz: string, dias: Record<string, DiaEstado>): BusinessHours {
+function montarBusinessHours(tz: string, dias: Record<string, DiaEstado>): BusinessHours | null {
   const days: { [dow: string]: DayHours } = {};
   for (const { dow } of DIAS) {
     const d = dias[dow];
     if (d?.aberto) {
       days[dow] = { open: d.open, close: d.close };
     }
+  }
+  if (Object.keys(days).length === 0) {
+    return null;
   }
   return { tz: tz || DEFAULT_TZ, days };
 }

@@ -728,3 +728,206 @@ describe('Tenants Settings Integration (e2e) — PATCH /tenants/settings', () =>
     expect(res.body.status.hasPixMerchantName).toBe(true);
   });
 });
+
+/**
+ * FIX 3 (MENOR-3) — ISOLAMENTO CROSS-TENANT.
+ *
+ * Prova explicita da garantia: o endpoint SEMPRE opera no tenant do JWT (nao ha
+ * como mirar outro tenant pelo body/header) + RLS reforca. Semeamos DOIS tenants
+ * (A e B) com settings DISTINTOS, autenticamos como admin do tenant A e provamos:
+ *   (a) GET /tenants/settings devolve o settings de A (nunca o de B);
+ *   (b) PATCH /tenants/settings altera A e o settings de B permanece INTACTO
+ *       (confirmado lendo B por outra via, sob o contexto RLS de B).
+ *
+ * Reusa o mesmo harness de auth (seed de tenant isolado com UUID v4 estrito +
+ * JWT assinado pelo JwtService). Nao muda nenhum codigo de producao.
+ */
+describe('Tenants Settings Integration (e2e) — cross-tenant isolation', () => {
+  let app: INestApplication | null = null;
+  let dataSource: DataSource;
+
+  // Dois tenants DEDICADOS/ISOLADOS. UUIDs v4 estritos (aceitos pelo guard).
+  const tenantAId = '7c1d9f2a-3b4e-4c5d-8e6f-1a2b3c4d5e6f';
+  const tenantBId = '2f8e7d6c-5b4a-4938-8271-6a5b4c3d2e1f';
+  const adminAId = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
+
+  const settingsA = {
+    store_name: 'Loja A',
+    tagline: 'Tagline A',
+    pix_key: 'a@pix.com',
+    metodos: ['pix'],
+    business_hours: {
+      tz: 'America/Sao_Paulo',
+      days: { '1': { open: '08:00', close: '17:00' } },
+    },
+  };
+  const settingsB = {
+    store_name: 'Loja B',
+    tagline: 'Tagline B',
+    pix_key: 'b@pix.com',
+    metodos: ['dinheiro'],
+    business_hours: {
+      tz: 'America/Sao_Paulo',
+      days: { '2': { open: '10:00', close: '20:00' } },
+    },
+  };
+
+  let adminAToken: string;
+
+  // Le o settings bruto de um tenant sob o contexto RLS DELE (outra via, alheia
+  // ao endpoint) — usada para confirmar que B nao foi tocado.
+  async function readRawSettings(tenantId: string): Promise<Record<string, unknown>> {
+    const qr = dataSource.createQueryRunner();
+    await qr.connect();
+    await qr.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+    const rows = await qr.query('SELECT settings FROM tenants WHERE id = $1', [tenantId]);
+    await qr.release();
+    return rows?.[0]?.settings ?? {};
+  }
+
+  beforeAll(async () => {
+    try {
+      process.env.SUPPRESS_TENANT_RLS_LOGS = 'true';
+      const moduleFixture: TestingModule = await Test.createTestingModule({
+        imports: [
+          ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+          TypeOrmModule.forRootAsync(databaseConfig),
+          CommonModule,
+          AuthModule,
+          TenantsModule,
+        ],
+        providers: [
+          {
+            provide: APP_INTERCEPTOR,
+            useClass: TenantDbContextInterceptor,
+          },
+        ],
+      }).compile();
+
+      dataSource = moduleFixture.get<DataSource>(DataSource);
+
+      app = moduleFixture.createNestApplication();
+      app.useGlobalPipes(
+        new ValidationPipe({
+          whitelist: true,
+          forbidNonWhitelisted: true,
+          transform: true,
+        }),
+      );
+      app.setGlobalPrefix('api/v1');
+      await app.init();
+
+      const hashed = await bcrypt.hash('test123', 10);
+
+      // Seed do tenant A (com admin) sob RLS de A.
+      const qrA = dataSource.createQueryRunner();
+      await qrA.connect();
+      await qrA.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantAId]);
+      await qrA.query(
+        `INSERT INTO tenants (id, name, slug, settings, is_active)
+         VALUES ($1, $2, $3, $4::jsonb, true)
+         ON CONFLICT (id) DO UPDATE SET settings = $4::jsonb, is_active = true`,
+        [tenantAId, 'Tenant A', 'tenant-a-iso', JSON.stringify(settingsA)],
+      );
+      const existingAdminA = await qrA.query(
+        'SELECT id FROM usuarios WHERE id = $1 AND tenant_id = $2',
+        [adminAId, tenantAId],
+      );
+      if (!existingAdminA || existingAdminA.length === 0) {
+        await qrA.query(
+          `INSERT INTO usuarios (id, tenant_id, email, encrypted_password, full_name, role, is_active)
+           VALUES ($1, $2, $3, $4, $5, $6, true)`,
+          [adminAId, tenantAId, 'admin-a-iso@test.com', hashed, 'Admin A', UserRole.ADMIN],
+        );
+      }
+      await qrA.release();
+
+      // Seed do tenant B (sem usuario — o admin de A nunca pode alcanca-lo) sob RLS de B.
+      const qrB = dataSource.createQueryRunner();
+      await qrB.connect();
+      await qrB.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantBId]);
+      await qrB.query(
+        `INSERT INTO tenants (id, name, slug, settings, is_active)
+         VALUES ($1, $2, $3, $4::jsonb, true)
+         ON CONFLICT (id) DO UPDATE SET settings = $4::jsonb, is_active = true`,
+        [tenantBId, 'Tenant B', 'tenant-b-iso', JSON.stringify(settingsB)],
+      );
+      await qrB.release();
+
+      const jwtService = moduleFixture.get<JwtService>(JwtService);
+      adminAToken = jwtService.sign({
+        sub: adminAId,
+        email: 'admin-a-iso@test.com',
+        role: UserRole.ADMIN,
+        tenant_id: tenantAId,
+      });
+    } catch (error) {
+      console.error('❌ Erro ao inicializar testes de isolamento cross-tenant:', error);
+      app = null;
+    }
+  });
+
+  afterAll(async () => {
+    if (dataSource && dataSource.isInitialized) {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      try {
+        await qr.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantAId]);
+        await qr.query('DELETE FROM usuarios WHERE tenant_id = $1', [tenantAId]);
+        await qr.query('DELETE FROM tenants WHERE id = $1', [tenantAId]);
+        await qr.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantBId]);
+        await qr.query('DELETE FROM tenants WHERE id = $1', [tenantBId]);
+      } catch {
+        /* limpeza best-effort */
+      }
+      await qr.release();
+    }
+    if (app) {
+      await app.close();
+    }
+  });
+
+  it('ISOLAMENTO: admin de A le o settings de A (nunca o de B) e patchar A nao toca B', async () => {
+    if (!app) {
+      console.log('⏭️ Pulando teste - app não inicializado');
+      return;
+    }
+
+    // (a) GET como admin de A -> devolve A, nao B.
+    const getRes = await request(app.getHttpServer())
+      .get('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminAToken}`)
+      .expect(200);
+    expect(getRes.body.loja.store_name).toBe('Loja A');
+    expect(getRes.body.loja.tagline).toBe('Tagline A');
+    expect(getRes.body.pagamento.pix_key).toBe('a@pix.com');
+    expect(getRes.body.pagamento.metodos).toEqual(['pix']);
+    // Nada de B pode aparecer.
+    expect(getRes.body.loja.store_name).not.toBe('Loja B');
+    expect(getRes.body.pagamento.pix_key).not.toBe('b@pix.com');
+
+    // (b) PATCH como admin de A -> altera A.
+    await request(app.getHttpServer())
+      .patch('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminAToken}`)
+      .send({ loja: { store_name: 'Loja A Editada' }, pagamento: { pix_key: 'a-novo@pix.com' } })
+      .expect(200);
+
+    // A foi alterado (lido pelo endpoint, sob o contexto do JWT de A).
+    const afterA = await request(app.getHttpServer())
+      .get('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminAToken}`)
+      .expect(200);
+    expect(afterA.body.loja.store_name).toBe('Loja A Editada');
+    expect(afterA.body.pagamento.pix_key).toBe('a-novo@pix.com');
+
+    // B permanece INTACTO — lido por outra via, sob o contexto RLS de B.
+    const rawB = await readRawSettings(tenantBId);
+    expect(rawB.store_name).toBe('Loja B');
+    expect(rawB.tagline).toBe('Tagline B');
+    expect(rawB.pix_key).toBe('b@pix.com');
+    expect(rawB.metodos).toEqual(['dinheiro']);
+    // E o business_hours de B segue o do seed (patch de A nao vazou para B).
+    expect(rawB.business_hours).toEqual(settingsB.business_hours);
+  });
+});
