@@ -82,6 +82,13 @@ export class BotConfigService {
       settings.business_hours as BusinessHours,
     );
 
+    // Formas de pagamento = campo canonico settings.metodos (o que o lojista marca na tela).
+    // Fallback pro valor atual (DEFAULT_STORE / whatsapp_bot.store) quando ausente/vazio.
+    const paymentMethods =
+      Array.isArray(settings.metodos) && settings.metodos.length > 0
+        ? settings.metodos
+        : botSettings.store?.payment_methods || DEFAULT_STORE.payment_methods;
+
     // Decisao F: name/description vem dos campos canonicos (settings.store_name / settings.description),
     // com fallback pro tenant.name (nome) e descricao atual (description). Sem depender da duplicata em whatsapp_bot.store.
     const store: BotStoreConfig = {
@@ -89,6 +96,7 @@ export class BotConfigService {
       ...(botSettings.store || {}),
       name: settings.store_name || tenant?.name || DEFAULT_STORE.name,
       description: settings.description || DEFAULT_STORE.description,
+      payment_methods: paymentMethods,
       business_hours: businessHours,
     };
 

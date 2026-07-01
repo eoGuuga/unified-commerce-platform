@@ -90,4 +90,45 @@ describe('BotConfigService', () => {
       expect(config.store.name).toBe('Nome do Tenant');
     });
   });
+
+  describe('loadConfig — payment_methods wired to settings.metodos', () => {
+    it('(d) KEY: derives store.payment_methods from settings.metodos (what the shopkeeper marked)', async () => {
+      findOneById.mockResolvedValue({
+        name: 'Doceria da Ana',
+        settings: {
+          // Distinct from DEFAULT_STORE.payment_methods (['pix','dinheiro']) so a
+          // passing assertion proves settings.metodos was READ, not the default.
+          metodos: ['pix', 'cartao'],
+        },
+      });
+
+      const config = await service.loadConfig('tenant-1');
+
+      // The screen saves settings.metodos; it MUST reach the bot (prompt via
+      // llm-router / action-executor). Before the fix this array was ignored.
+      expect(config.store.payment_methods).toEqual(['pix', 'cartao']);
+    });
+
+    it('(d) falls back to default payment_methods when settings.metodos absent', async () => {
+      findOneById.mockResolvedValue({
+        name: 'Loja sem metodos',
+        settings: {},
+      });
+
+      const config = await service.loadConfig('tenant-1');
+
+      expect(config.store.payment_methods).toEqual(['pix', 'dinheiro']);
+    });
+
+    it('(d) falls back to default when settings.metodos is an empty array', async () => {
+      findOneById.mockResolvedValue({
+        name: 'Loja metodos vazio',
+        settings: { metodos: [] },
+      });
+
+      const config = await service.loadConfig('tenant-1');
+
+      expect(config.store.payment_methods).toEqual(['pix', 'dinheiro']);
+    });
+  });
 });
