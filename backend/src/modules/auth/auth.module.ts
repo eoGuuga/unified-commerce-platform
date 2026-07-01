@@ -9,6 +9,7 @@ import { AuthService } from './auth.service';
 import { Usuario } from '../../database/entities/Usuario.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
 import { CommonModule } from '../common/common.module';
 
 @Module({
@@ -39,7 +40,7 @@ import { CommonModule } from '../common/common.module';
     CommonModule, // Importar CommonModule para usar AuditLogService
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard],
-  exports: [AuthService, JwtAuthGuard],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
+  exports: [AuthService, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

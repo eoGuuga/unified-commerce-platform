@@ -313,3 +313,418 @@ describe('Tenants Settings Integration (e2e) — GET /tenants/settings', () => {
     await request(app.getHttpServer()).get('/api/v1/tenants/settings').expect(401);
   });
 });
+
+/**
+ * Task 4 — PATCH /tenants/settings (autenticado + guard admin + DTO por secao).
+ *
+ * O teste-mestre desta task e o de SEGURANCA (guard admin): um usuario autenticado
+ * NAO-admin do tenant recebe 403; um usuario ADMIN do tenant recebe 200 e aplica.
+ * Alem disso: merge por SECAO (patchar horario nao toca loja/pagamento), validacao
+ * fail-closed (rejeita cor/URL/business_hours/metodos invalidos), e round-trip com o
+ * GET da T3.
+ *
+ * Reusa o harness de auth: seed de tenant isolado (UUID v4 estrito) + JWT assinado
+ * direto pelo JwtService, com o mesmo `role` do usuario semeado.
+ */
+describe('Tenants Settings Integration (e2e) — PATCH /tenants/settings', () => {
+  let app: INestApplication | null = null;
+  let dataSource: DataSource;
+
+  // Tenant DEDICADO/ISOLADO desta suite. UUIDs v4 estritos.
+  const tenantId = '4eaf7c16-2d0f-4b17-b231-2be4ae04fcef';
+  const adminUserId = 'abc4bc88-b0cc-4989-9772-121708f5f4ac';
+  const sellerUserId = '05229d68-6c79-46e8-a47b-8fbab8225309';
+
+  // Settings iniciais com as 3 secoes preenchidas (para provar que o merge por
+  // secao NAO toca as secoes ausentes do patch).
+  const seedBusinessHours = {
+    tz: 'America/Sao_Paulo',
+    days: {
+      '1': { open: '08:00', close: '17:00' },
+      '2': { open: '08:00', close: '17:00' },
+    },
+  };
+  const seedSettings = {
+    store_name: 'Loja Base',
+    tagline: 'Tagline base',
+    description: 'Descricao base',
+    primary_color: '#abcdef',
+    business_hours: seedBusinessHours,
+    metodos: ['pix', 'dinheiro'],
+    pix_key: 'base@pix.com',
+    pix_merchant_name: 'Loja Base LTDA',
+  };
+
+  let adminToken: string;
+  let sellerToken: string;
+  let jwtService: JwtService;
+
+  // Re-semeia o settings do tenant para o estado base antes de cada teste
+  // (isola os testes de merge/round-trip entre si).
+  async function reseedSettings(settings: Record<string, unknown>): Promise<void> {
+    const qr = dataSource.createQueryRunner();
+    await qr.connect();
+    await qr.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+    await qr.query(`UPDATE tenants SET settings = $2::jsonb WHERE id = $1`, [
+      tenantId,
+      JSON.stringify(settings),
+    ]);
+    await qr.release();
+  }
+
+  beforeAll(async () => {
+    try {
+      process.env.SUPPRESS_TENANT_RLS_LOGS = 'true';
+      const moduleFixture: TestingModule = await Test.createTestingModule({
+        imports: [
+          ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+          TypeOrmModule.forRootAsync(databaseConfig),
+          CommonModule,
+          AuthModule,
+          TenantsModule,
+        ],
+        providers: [
+          {
+            provide: APP_INTERCEPTOR,
+            useClass: TenantDbContextInterceptor,
+          },
+        ],
+      }).compile();
+
+      dataSource = moduleFixture.get<DataSource>(DataSource);
+
+      app = moduleFixture.createNestApplication();
+      app.useGlobalPipes(
+        new ValidationPipe({
+          whitelist: true,
+          forbidNonWhitelisted: true,
+          transform: true,
+        }),
+      );
+      app.setGlobalPrefix('api/v1');
+      await app.init();
+
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+
+      await qr.query(
+        `INSERT INTO tenants (id, name, slug, settings, is_active)
+         VALUES ($1, $2, $3, $4::jsonb, true)
+         ON CONFLICT (id) DO UPDATE
+           SET settings = $4::jsonb, is_active = true`,
+        [tenantId, 'Tenant Patch Teste', 'tenant-patch-teste', JSON.stringify(seedSettings)],
+      );
+
+      const hashed = await bcrypt.hash('test123', 10);
+
+      // Usuario ADMIN (deve poder PATCH -> 200).
+      const existingAdmin = await qr.query(
+        'SELECT id FROM usuarios WHERE id = $1 AND tenant_id = $2',
+        [adminUserId, tenantId],
+      );
+      if (!existingAdmin || existingAdmin.length === 0) {
+        await qr.query(
+          `INSERT INTO usuarios (id, tenant_id, email, encrypted_password, full_name, role, is_active)
+           VALUES ($1, $2, $3, $4, $5, $6, true)`,
+          [adminUserId, tenantId, 'admin-patch@test.com', hashed, 'Admin Patch', UserRole.ADMIN],
+        );
+      }
+
+      // Usuario NAO-admin (SELLER) do MESMO tenant (deve receber 403 no PATCH).
+      const existingSeller = await qr.query(
+        'SELECT id FROM usuarios WHERE id = $1 AND tenant_id = $2',
+        [sellerUserId, tenantId],
+      );
+      if (!existingSeller || existingSeller.length === 0) {
+        await qr.query(
+          `INSERT INTO usuarios (id, tenant_id, email, encrypted_password, full_name, role, is_active)
+           VALUES ($1, $2, $3, $4, $5, $6, true)`,
+          [sellerUserId, tenantId, 'seller-patch@test.com', hashed, 'Seller Patch', UserRole.SELLER],
+        );
+      }
+
+      await qr.release();
+
+      jwtService = moduleFixture.get<JwtService>(JwtService);
+      adminToken = jwtService.sign({
+        sub: adminUserId,
+        email: 'admin-patch@test.com',
+        role: UserRole.ADMIN,
+        tenant_id: tenantId,
+      });
+      sellerToken = jwtService.sign({
+        sub: sellerUserId,
+        email: 'seller-patch@test.com',
+        role: UserRole.SELLER,
+        tenant_id: tenantId,
+      });
+    } catch (error) {
+      console.error('❌ Erro ao inicializar testes de PATCH tenants settings:', error);
+      app = null;
+    }
+  });
+
+  beforeEach(async () => {
+    if (!app) return;
+    await reseedSettings(seedSettings);
+  });
+
+  afterAll(async () => {
+    if (dataSource && dataSource.isInitialized) {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      try {
+        await qr.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+        await qr.query('DELETE FROM usuarios WHERE tenant_id = $1', [tenantId]);
+        await qr.query('DELETE FROM tenants WHERE id = $1', [tenantId]);
+      } catch {
+        /* limpeza best-effort */
+      }
+      await qr.release();
+    }
+    if (app) {
+      await app.close();
+    }
+  });
+
+  // ----------------------------------------------------------------------------
+  // 1) SEGURANCA — guard admin (o teste que nao pode falhar)
+  // ----------------------------------------------------------------------------
+  it('SEGURANCA: usuario NAO-admin (seller) do tenant -> PATCH retorna 403', async () => {
+    if (!app) {
+      console.log('⏭️ Pulando teste - app não inicializado');
+      return;
+    }
+
+    await request(app.getHttpServer())
+      .patch('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({ loja: { store_name: 'Hackeada pelo seller' } })
+      .expect(403);
+
+    // E o settings NAO pode ter mudado (o seller nao gravou nada).
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(res.body.loja.store_name).toBe('Loja Base');
+  });
+
+  it('SEGURANCA: usuario ADMIN do tenant -> PATCH retorna 200 e aplica', async () => {
+    if (!app) {
+      console.log('⏭️ Pulando teste - app não inicializado');
+      return;
+    }
+
+    await request(app.getHttpServer())
+      .patch('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ loja: { store_name: 'Loja do Admin' } })
+      .expect(200);
+
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(res.body.loja.store_name).toBe('Loja do Admin');
+  });
+
+  it('auth: 401 sem token', async () => {
+    if (!app) {
+      console.log('⏭️ Pulando teste - app não inicializado');
+      return;
+    }
+    await request(app.getHttpServer())
+      .patch('/api/v1/tenants/settings')
+      .send({ loja: { store_name: 'x' } })
+      .expect(401);
+  });
+
+  // ----------------------------------------------------------------------------
+  // 2a) MERGE POR SECAO — patchar uma secao nao toca as outras
+  // ----------------------------------------------------------------------------
+  it('merge: PATCH so com `horario` grava business_hours e NAO toca loja/pagamento', async () => {
+    if (!app) {
+      console.log('⏭️ Pulando teste - app não inicializado');
+      return;
+    }
+
+    const novoHorario = {
+      tz: 'America/Sao_Paulo',
+      days: {
+        '6': { open: '09:00', close: '13:00' },
+      },
+    };
+
+    await request(app.getHttpServer())
+      .patch('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ horario: { business_hours: novoHorario } })
+      .expect(200);
+
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    // horario mudou...
+    expect(res.body.horario.business_hours).toEqual(novoHorario);
+    // ...mas loja e pagamento seguem IGUAIS ao seed (secao ausente = nao toca).
+    expect(res.body.loja.store_name).toBe('Loja Base');
+    expect(res.body.loja.tagline).toBe('Tagline base');
+    expect(res.body.loja.primary_color).toBe('#abcdef');
+    expect(res.body.pagamento.metodos).toEqual(['pix', 'dinheiro']);
+    expect(res.body.pagamento.pix_key).toBe('base@pix.com');
+    expect(res.body.pagamento.pix_merchant_name).toBe('Loja Base LTDA');
+  });
+
+  it('merge: PATCH so com `loja` nao toca horario/pagamento', async () => {
+    if (!app) {
+      console.log('⏭️ Pulando teste - app não inicializado');
+      return;
+    }
+
+    await request(app.getHttpServer())
+      .patch('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ loja: { store_name: 'Loja Nova', tagline: 'Nova tagline' } })
+      .expect(200);
+
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    expect(res.body.loja.store_name).toBe('Loja Nova');
+    expect(res.body.loja.tagline).toBe('Nova tagline');
+    // horario e pagamento intocados.
+    expect(res.body.horario.business_hours).toEqual(seedBusinessHours);
+    expect(res.body.pagamento.metodos).toEqual(['pix', 'dinheiro']);
+    expect(res.body.pagamento.pix_key).toBe('base@pix.com');
+  });
+
+  it('merge: PATCH so com `pagamento` nao toca loja/horario', async () => {
+    if (!app) {
+      console.log('⏭️ Pulando teste - app não inicializado');
+      return;
+    }
+
+    await request(app.getHttpServer())
+      .patch('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ pagamento: { metodos: ['pix', 'credito'], pix_key: 'novo@pix.com' } })
+      .expect(200);
+
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    expect(res.body.pagamento.metodos).toEqual(['pix', 'credito']);
+    expect(res.body.pagamento.pix_key).toBe('novo@pix.com');
+    // loja e horario intocados.
+    expect(res.body.loja.store_name).toBe('Loja Base');
+    expect(res.body.horario.business_hours).toEqual(seedBusinessHours);
+  });
+
+  // ----------------------------------------------------------------------------
+  // 2b) VALIDACAO — rejeita invalidos com 400 (fail-closed)
+  // ----------------------------------------------------------------------------
+  it('validacao 400: cor primaria nao-hex', async () => {
+    if (!app) return;
+    await request(app.getHttpServer())
+      .patch('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ loja: { primary_color: 'vermelho' } })
+      .expect(400);
+  });
+
+  it('validacao 400: logo_url invalida', async () => {
+    if (!app) return;
+    await request(app.getHttpServer())
+      .patch('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ loja: { logo_url: 'nao-e-url' } })
+      .expect(400);
+  });
+
+  it('validacao 400: business_hours com chave "7" (fora de 0..6)', async () => {
+    if (!app) return;
+    await request(app.getHttpServer())
+      .patch('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        horario: {
+          business_hours: {
+            tz: 'America/Sao_Paulo',
+            days: { '7': { open: '09:00', close: '13:00' } },
+          },
+        },
+      })
+      .expect(400);
+  });
+
+  it('validacao 400: business_hours com open "9h" (nao HH:MM)', async () => {
+    if (!app) return;
+    await request(app.getHttpServer())
+      .patch('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        horario: {
+          business_hours: {
+            tz: 'America/Sao_Paulo',
+            days: { '1': { open: '9h', close: '18:00' } },
+          },
+        },
+      })
+      .expect(400);
+  });
+
+  it('validacao 400: metodos com valor fora do enum', async () => {
+    if (!app) return;
+    await request(app.getHttpServer())
+      .patch('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ pagamento: { metodos: ['pix', 'boleto'] } })
+      .expect(400);
+  });
+
+  // ----------------------------------------------------------------------------
+  // 2c) ROUND-TRIP — PATCH grava -> GET (T3) reflete
+  // ----------------------------------------------------------------------------
+  it('round-trip: PATCH grava e o GET (T3) reflete o que foi gravado', async () => {
+    if (!app) return;
+
+    const businessHours = {
+      tz: 'America/Sao_Paulo',
+      days: {
+        '1': { open: '10:00', close: '19:00' },
+        '6': { open: '10:00', close: '14:00' },
+      },
+    };
+
+    await request(app.getHttpServer())
+      .patch('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        loja: { store_name: 'Round Trip Store', primary_color: '#00ff00' },
+        horario: { business_hours: businessHours },
+        pagamento: { metodos: ['pix', 'debito'], pix_merchant_name: 'RT Merchant' },
+      })
+      .expect(200);
+
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/tenants/settings')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    expect(res.body.loja.store_name).toBe('Round Trip Store');
+    expect(res.body.loja.primary_color).toBe('#00ff00');
+    expect(res.body.horario.business_hours).toEqual(businessHours);
+    expect(res.body.pagamento.metodos).toEqual(['pix', 'debito']);
+    expect(res.body.pagamento.pix_merchant_name).toBe('RT Merchant');
+    expect(res.body.status.hasBusinessHours).toBe(true);
+    expect(res.body.status.hasPixMerchantName).toBe(true);
+  });
+});

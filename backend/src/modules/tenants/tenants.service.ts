@@ -5,6 +5,7 @@ import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
 import { DbContextService } from '../common/services/db-context.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateBrandingDto } from './dto/update-branding.dto';
+import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { BusinessHours } from '../whatsapp/utils/business-hours';
 
 /**
@@ -270,6 +271,56 @@ export class TenantsService {
   async getSettingsForTenant(tenantId: string): Promise<TenantSettingsProjection> {
     const tenant = await this.findOneById(tenantId);
     return this.buildSettingsProjection(tenant);
+  }
+
+  /**
+   * Aplica um PATCH por SECAO (§2.2). Monta o objeto de merge SO com as chaves das
+   * secoes PRESENTES no DTO — secao ausente = nao toca; campo ausente na secao =
+   * nao toca aquela chave. O objeto resultante e mesclado via `updateSettings`
+   * (`settings = COALESCE(settings,'{}') || $2::jsonb`, escopado por RLS).
+   *
+   * O tenantId vem SEMPRE do JWT (user.tenant_id), nunca do body/header.
+   * Retorna a mesma projecao allow-list do GET (T3) — round-trip consistente.
+   */
+  async updateSettingsSectioned(
+    tenantId: string,
+    dto: UpdateTenantSettingsDto,
+  ): Promise<TenantSettingsProjection> {
+    const merge: Record<string, unknown> = {};
+
+    // Secao Loja -> chaves de branding + descricao.
+    if (dto.loja) {
+      const { store_name, tagline, description, logo_url, favicon_url, primary_color } = dto.loja;
+      if (store_name !== undefined) merge.store_name = store_name;
+      if (tagline !== undefined) merge.tagline = tagline;
+      if (description !== undefined) merge.description = description;
+      if (logo_url !== undefined) merge.logo_url = logo_url;
+      if (favicon_url !== undefined) merge.favicon_url = favicon_url;
+      if (primary_color !== undefined) merge.primary_color = primary_color;
+    }
+
+    // Secao Horario -> business_hours (fonte unica). null limpa; ausente nao toca.
+    if (dto.horario) {
+      if (dto.horario.business_hours !== undefined) {
+        merge.business_hours = dto.horario.business_hours;
+      }
+    }
+
+    // Secao Pagamento -> metodos / pix_key / pix_merchant_name.
+    if (dto.pagamento) {
+      const { metodos, pix_key, pix_merchant_name } = dto.pagamento;
+      if (metodos !== undefined) merge.metodos = metodos;
+      if (pix_key !== undefined) merge.pix_key = pix_key;
+      if (pix_merchant_name !== undefined) merge.pix_merchant_name = pix_merchant_name;
+    }
+
+    // Nada a mesclar (DTO vazio ou secoes sem campos) -> so devolve a projecao atual.
+    if (Object.keys(merge).length === 0) {
+      return this.getSettingsForTenant(tenantId);
+    }
+
+    const updated = await this.updateSettings(tenantId, merge);
+    return this.buildSettingsProjection(updated);
   }
 
   async createTenantWithAdmin(dto: CreateTenantDto): Promise<TenantSignupResult> {
