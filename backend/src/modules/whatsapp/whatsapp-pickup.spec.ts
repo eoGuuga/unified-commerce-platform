@@ -631,4 +631,129 @@ describe('Retirada + agendamento + horario de funcionamento (S2b)', () => {
       expect(conversation.context.checkout?.stage).toBe('selecting_pickup_slot');
     });
   });
+
+  // ============== TASK 5: BACKSTOP consulta exceçoes (cinto-e-suspensorio) ==============
+  // isWithinBusinessHours e o backstop que valida o slot ESCOLHIDO na confirmacao
+  // (~L1082, estagio selecting_pickup_slot). O gate (Task 3) ja filtra na oferta, mas
+  // no cenario raro (slot fechado por exceçao que escapou) o backstop TAMBEM consulta
+  // exceçoes para NUNCA confirmar pedido em data fechada.
+  //
+  // A funcao continua PURA: recebe a Map de exceçoes por PARAMETRO (chave "YYYY-MM-DD"
+  // no fuso da loja, a MESMA do gate). Testamos passando a Map direto — sem I/O.
+  describe('isWithinBusinessHours — backstop consulta exceçoes (Map por parametro, puro)', () => {
+    type ExcLite = {
+      kind: 'closed' | 'custom_hours';
+      open?: string | null;
+      close?: string | null;
+    };
+    const mapOf = (entries: Array<[string, ExcLite]>): Map<string, ExcLite> =>
+      new Map<string, ExcLite>(entries);
+
+    it('(a) exceçao "closed" na data do slot -> false (mesmo que o recorrente do dia estivesse ABERTO)', () => {
+      // 2026-06-29 e SEGUNDA, recorrente 09-18 (aberto). 16:00 local = 19:00 UTC:
+      // sem exceçao passaria (coberto no baseline abaixo). Com a exceçao closed de
+      // 2026-06-29, o backstop RECUSA.
+      const scheduled = new Date('2026-06-29T19:00:00.000Z'); // 16:00 BRT, segunda
+      // Baseline (sem exceçao): recorrente aberto -> true.
+      expect(service.isWithinBusinessHours(scheduled, BUSINESS_HOURS)).toBe(true);
+
+      const exceptions = mapOf([['2026-06-29', { kind: 'closed' }]]);
+      expect(service.isWithinBusinessHours(scheduled, BUSINESS_HOURS, exceptions)).toBe(false);
+    });
+
+    it('(b) exceçao "custom_hours" 09:00-13:00 -> aceita 10:00 e RECUSA 15:00 (valida contra a EXCEÇAO, nao o recorrente 09-18)', () => {
+      // 2026-06-29 (segunda), recorrente 09-18. A exceçao reduz para 09-13.
+      const exceptions = mapOf([
+        ['2026-06-29', { kind: 'custom_hours', open: '09:00', close: '13:00' }],
+      ]);
+
+      // 10:00 local (= 13:00 UTC): dentro de 09-13 (exceçao) -> ACEITO.
+      const dentro = new Date('2026-06-29T13:00:00.000Z');
+      expect(service.isWithinBusinessHours(dentro, BUSINESS_HOURS, exceptions)).toBe(true);
+
+      // 15:00 local (= 18:00 UTC): fora de 09-13 (exceçao), MAS dentro de 09-18
+      // (recorrente). Se validasse contra o recorrente aceitaria — o teste exige RECUSA.
+      const fora = new Date('2026-06-29T18:00:00.000Z');
+      expect(service.isWithinBusinessHours(fora, BUSINESS_HOURS, exceptions)).toBe(false);
+      // Prova de que o recorrente sozinho aceitaria as 15:00 (garante que a recusa acima
+      // vem da exceçao, nao de "15:00 estar fora do recorrente").
+      expect(service.isWithinBusinessHours(fora, BUSINESS_HOURS)).toBe(true);
+    });
+
+    it('(c) sem exceçao para a data do slot -> comportamento atual (recorrente) inalterado', () => {
+      // Segunda 16:00 local, sem exceçao nenhuma na Map -> recorrente 09-18 -> true.
+      const scheduled = new Date('2026-06-29T19:00:00.000Z');
+      const exceptions = mapOf([
+        // exceçao em OUTRA data (sabado 27) — nao afeta a segunda 29.
+        ['2026-06-27', { kind: 'closed' }],
+      ]);
+      expect(service.isWithinBusinessHours(scheduled, BUSINESS_HOURS, exceptions)).toBe(true);
+
+      // Fora do recorrente (20:00 local) continua RECUSADO, com ou sem Map.
+      const foraRecorrente = new Date('2026-06-29T23:00:00.000Z'); // 20:00 BRT
+      expect(service.isWithinBusinessHours(foraRecorrente, BUSINESS_HOURS, exceptions)).toBe(false);
+      // Map vazia == sem exceçoes: identico ao comportamento historico.
+      expect(service.isWithinBusinessHours(scheduled, BUSINESS_HOURS, new Map())).toBe(true);
+    });
+  });
+
+  // ============== TASK 5: BACKSTOP no fluxo (selecting_pickup_slot) recusa/ajusta ==============
+  // O backstop L1082 chama isWithinBusinessHours com a Map carregada no caller
+  // (mesmo padrao do gate: availabilityService.findByDateRange). Um slot que caia
+  // numa data com exceçao `closed` NAO cria pedido — re-mostra a lista.
+  describe('backstop no fluxo — slot em data "closed" nao cria pedido', () => {
+    // Data civil (YYYY-MM-DD) no fuso da loja de um instante.
+    const civilDateSP = (d: Date): string =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d);
+
+    async function reachSlotStage(): Promise<void> {
+      await start();
+      await step('retirada');
+      await step('Maria Souza');
+      await step('11988887777');
+    }
+
+    it('escolher um slot cuja data virou "closed" (backstop) -> NAO cria pedido, re-mostra a lista', async () => {
+      // Gate real ofertou os slots normalmente (sem exceçao na oferta).
+      await reachSlotStage();
+      expect(conversation.context.checkout?.stage).toBe('selecting_pickup_slot');
+      const slots = conversation.context.checkout.pickup_slots as Array<{
+        label: string;
+        scheduled_at: string;
+      }>;
+      expect(slots.length).toBeGreaterThanOrEqual(1);
+
+      // Cenario raro: entre a oferta e a confirmacao, o lojista fechou a data do slot 1.
+      // O findByDateRange (consultado no backstop) agora devolve `closed` para essa data.
+      const dataDoSlot1 = civilDateSP(new Date(slots[0].scheduled_at));
+      service.availabilityService.findByDateRange = jest
+        .fn()
+        .mockResolvedValue([{ date: dataDoSlot1, kind: 'closed', open: null, close: null }]);
+
+      const r = await step('1');
+
+      // Backstop recusa: NAO cria pedido, re-mostra a lista.
+      expect(createSpy).not.toHaveBeenCalled();
+      expect(String(r).toLowerCase()).toMatch(/fora do nosso funcionamento|n[uú]mero/);
+      expect(conversation.context.checkout?.stage).toBe('selecting_pickup_slot');
+    });
+
+    it('sem exceçao na confirmaçao -> backstop passa e cria o pedido (regressao)', async () => {
+      await reachSlotStage();
+      const slots = conversation.context.checkout.pickup_slots as Array<{
+        label: string;
+        scheduled_at: string;
+      }>;
+      const slot1Iso = slots[0].scheduled_at;
+      // findByDateRange volta vazio (padrao) -> backstop passa.
+      await step('1');
+      expect(createSpy).toHaveBeenCalledTimes(1);
+      expect(createSpy.mock.calls[0][0].scheduled_at).toEqual(new Date(slot1Iso));
+    });
+  });
 });

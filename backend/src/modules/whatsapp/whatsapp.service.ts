@@ -1077,9 +1077,29 @@ export class WhatsAppService {
 
         const slot = slots[choice - 1];
         const scheduledAt = new Date(slot.scheduled_at);
+        // CAMADA 2: carrega as exceçoes por-data (mesmo padrao do gate) para o backstop
+        // TAMBEM consultar exceçoes antes de confirmar. O I/O mora AQUI, no caller;
+        // isWithinBusinessHours continua PURO (recebe a Map por parametro). Cobrimos do
+        // AGORA ate a data do slot (a mais distante que precisamos), com folga de 1 dia.
+        const nowConfirm = new Date();
+        const toConfirm = new Date(
+          Math.max(scheduledAt.getTime(), nowConfirm.getTime()) + 24 * 60 * 60 * 1000,
+        );
+        const excRows = await this.availabilityService.findByDateRange(
+          tenantId,
+          nowConfirm,
+          toConfirm,
+        );
+        const excMap = new Map<
+          string,
+          { kind: 'closed' | 'custom_hours'; open?: string | null; close?: string | null }
+        >(
+          excRows.map((e) => [e.date, { kind: e.kind, open: e.open, close: e.close }]),
+        );
         // BACKSTOP (defesa-em-profundidade): por construcao o slot ja esta dentro do
-        // funcionamento, mas revalidamos antes de criar o pedido (cinto-e-suspensorio).
-        if (!this.isWithinBusinessHours(scheduledAt, businessHours)) {
+        // funcionamento (o gate ja filtra exceçoes na oferta), mas revalidamos antes de
+        // criar o pedido — inclusive contra exceçoes — (cinto-e-suspensorio).
+        if (!this.isWithinBusinessHours(scheduledAt, businessHours, excMap)) {
           return [
             `😕 Esse horário está fora do nosso funcionamento (${this.describeBusinessHours(businessHours)}).`,
             '',
@@ -1564,7 +1584,14 @@ export class WhatsAppService {
    * Ex.: 16:00 em America/Sao_Paulo (= 19:00 UTC) deve ser ACEITO contra 09-18 local —
    * comparar a hora UTC (19h) contra "fecha 18h" rejeitaria errado.
    */
-  private isWithinBusinessHours(scheduledAt: Date, businessHours: BusinessHours): boolean {
+  private isWithinBusinessHours(
+    scheduledAt: Date,
+    businessHours: BusinessHours,
+    exceptions?: Map<
+      string,
+      { kind: 'closed' | 'custom_hours'; open?: string | null; close?: string | null }
+    >,
+  ): boolean {
     if (!scheduledAt || Number.isNaN(scheduledAt.getTime())) {
       return false;
     }
@@ -1588,8 +1615,23 @@ export class WhatsAppService {
     if (dow === undefined) {
       return false;
     }
-    // Faixa PROPRIA do dia (shape por-dia); dia AUSENTE = fechado -> recusa.
-    const dh = businessHours.days[String(dow)];
+    // CAMADA 2 (backstop por-data, PURO): a exceçao vem por parametro (sem I/O aqui).
+    // Chave = data civil "YYYY-MM-DD" do slot NO FUSO da loja — a MESMA do gate.
+    //  - `closed` -> recusa confirmar (nunca cria pedido em data fechada).
+    //  - `custom_hours` -> valida contra a janela da EXCEÇAO (nao o recorrente).
+    //  - sem exceçao -> faixa recorrente (Camada 1, intacta) abaixo.
+    const civil = this.localDateParts(scheduledAt, businessHours.tz);
+    const dateKey = `${civil.year}-${String(civil.month).padStart(2, '0')}-${String(civil.day).padStart(2, '0')}`;
+    const exc = exceptions?.get(dateKey);
+    if (exc?.kind === 'closed') {
+      return false;
+    }
+    // Faixa PROPRIA do dia: exceçao `custom_hours` sobrepoe; senao o recorrente
+    // (shape por-dia; dia AUSENTE = fechado -> recusa).
+    const dh =
+      exc?.kind === 'custom_hours'
+        ? { open: exc.open!, close: exc.close! }
+        : businessHours.days[String(dow)];
     if (!dh) {
       return false;
     }
