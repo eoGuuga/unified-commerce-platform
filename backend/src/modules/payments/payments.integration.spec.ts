@@ -1190,16 +1190,23 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
       // houver transacao/rollback, o pagamento fica PAID orfao (o furo).
       // (Nao usamos mockImplementationOnce porque a 1a chamada de save eh a do
       // pagamento — precisamos discriminar pelo alvo, o pedido em CONFIRMADO.)
+      // Varremos TODOS os args porque a transicao agora passa pela state-machine
+      // (orders.updateStatus -> Repository.save), que chama
+      // EntityManager.save(target, entity, options) — a entidade vem em args[1],
+      // nao em args[0]. O save direto do pagamento usa a forma save(entity) com
+      // a entidade em args[0]. Detectamos o pedido->CONFIRMADO em qualquer forma.
       const realSave = EntityManager.prototype.save;
       const saveSpy = jest
         .spyOn(EntityManager.prototype, 'save')
         .mockImplementation(function (this: EntityManager, ...args: any[]) {
-          const entity = args[0];
-          if (
-            entity &&
-            !Array.isArray(entity) &&
-            entity.status === PedidoStatus.CONFIRMADO
-          ) {
+          const savingConfirmedPedido = args.some(
+            (a) =>
+              a &&
+              typeof a === 'object' &&
+              !Array.isArray(a) &&
+              a.status === PedidoStatus.CONFIRMADO,
+          );
+          if (savingConfirmedPedido) {
             throw new Error('boom no save da transição do pedido');
           }
           return (realSave as any).apply(this, args);
@@ -1255,6 +1262,50 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
       expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CONFIRMADO);
       expect(await reloadPagamentoStatus(pagamentoId)).toBe(PagamentoStatus.PAID);
       expect(notifySpy).toHaveBeenCalledTimes(1);
+    });
+
+    // 2a — TRANSICAO PELA STATE-MACHINE + notificacao unica. O confirmPayment
+    // deve transicionar o pedido via ordersService.updateStatus (respeitando
+    // assertStatusTransition + lock), com suppressNotification:true, de modo que
+    // o cliente receba UMA unica mensagem (notifyPaymentConfirmed) e NAO a de
+    // status (notifyOrderStatusChange). CRITICO: o updateStatus roda na MESMA
+    // transacao do confirmPayment (via runWithManager reusando o manager corrente).
+    it('2a: transição vai pela state-machine (updateStatus) e NÃO dupla-notifica', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste 2a - app nao inicializado');
+        return;
+      }
+
+      const paymentsService = moduleFixture.get<PaymentsService>(PaymentsService);
+      const notificationsService = moduleFixture.get<NotificationsService>(NotificationsService);
+      const ordersService = moduleFixture.get<OrdersService>(OrdersService);
+
+      const { pedidoId, pagamentoId } = await seedPendingOrderWithPendingPayment();
+
+      const paySpy = jest
+        .spyOn(notificationsService, 'notifyPaymentConfirmed')
+        .mockResolvedValue(undefined as any);
+      const statusSpy = jest
+        .spyOn(notificationsService, 'notifyOrderStatusChange')
+        .mockResolvedValue(undefined as any);
+      const updSpy = jest.spyOn(ordersService, 'updateStatus');
+
+      await paymentsService.confirmPayment(pagamentoId, tenantId);
+
+      // (a) transicao passou pela state-machine com supressao da notificacao de status
+      expect(updSpy).toHaveBeenCalledWith(
+        pedidoId,
+        PedidoStatus.CONFIRMADO,
+        tenantId,
+        expect.objectContaining({ suppressNotification: true }),
+      );
+      // (b) UMA unica mensagem ao cliente
+      expect(paySpy).toHaveBeenCalledTimes(1);
+      // (c) a notificacao de status NAO foi disparada (evita dupla notificacao)
+      expect(statusSpy).not.toHaveBeenCalled(); // <- FALHA hoje (dispara a de status tambem)
+      // (d) pedido efetivamente CONFIRMADO
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CONFIRMADO);
+      expect(await reloadPagamentoStatus(pagamentoId)).toBe(PagamentoStatus.PAID);
     });
   });
 });

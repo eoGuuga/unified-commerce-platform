@@ -696,12 +696,28 @@ export class PaymentsService {
       pagamento.status = PagamentoStatus.PAID;
       await manager.save(pagamento);
 
-      // 4. Transicao do pedido — nesta task, ainda o save direto (mudara na T2).
-      const pedido = pagamento.pedido;
+      // 4. Transicao do pedido pela state-machine (assertStatusTransition + lock
+      // + no-op idempotente + commit/release conforme o alvo). CRITICO: rodamos
+      // dentro de runWithManager(manager) porque runInTransaction NAO instala o
+      // manager no ALS ao abrir transacao nova (db-context L33-39 so passa o
+      // manager como argumento). Sem isso, updateStatus resolveria seus repos
+      // pelo manager default (getManager()/ALS) e escaparia da transacao ->
+      // quebraria a atomicidade do passo 3 (o rollback do 1b deixaria de valer).
+      // Com runWithManager, updateStatus reusa a MESMA transacao/lock (o proprio
+      // runInTransaction interno dele encontra o store e reusa o manager).
+      // suppressNotification:true: a notificacao ao cliente e a unica
+      // notifyPaymentConfirmed (passo 5), evitando dupla notificacao.
+      let pedido = pagamento.pedido;
       let didConfirm = false;
       if (pedido && pedido.status === PedidoStatus.PENDENTE_PAGAMENTO) {
-        pedido.status = PedidoStatus.CONFIRMADO;
-        await manager.save(pedido); // 2º write, MESMA transacao -> atomico com o 1º
+        pedido = await this.db.runWithManager(manager, () =>
+          this.ordersService.updateStatus(
+            pedido!.id,
+            PedidoStatus.CONFIRMADO,
+            tenantId,
+            { suppressNotification: true },
+          ),
+        );
         this.logger.log(`Order ${pedido.order_no} confirmed after payment`);
         didConfirm = true;
       }
