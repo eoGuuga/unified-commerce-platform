@@ -5,7 +5,12 @@ import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import { Usuario } from '../../database/entities/Usuario.entity';
-import { TenantsService, TenantSignupResult, TenantBranding } from './tenants.service';
+import {
+  TenantsService,
+  TenantSignupResult,
+  TenantBranding,
+  TenantSettingsProjection,
+} from './tenants.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateBrandingDto } from './dto/update-branding.dto';
 
@@ -41,6 +46,22 @@ export class TenantsController {
   @ApiResponse({ status: 404, description: 'Tenant nao encontrado' })
   async getBranding(@Param('slug') slug: string): Promise<TenantBranding> {
     return this.tenantsService.getBrandingBySlug(slug);
+  }
+
+  @Get('settings')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Obter configuracoes do tenant autenticado (projecao allow-list)',
+    description:
+      'Retorna a projecao allow-list das configuracoes (loja/horario/pagamento/status) ' +
+      'do tenant do usuario autenticado. NUNCA retorna o settings bruto nem segredos ' +
+      '(apiKey, bot_control_code, tokens, colunas *_encrypted). Escopado por user.tenant_id.',
+  })
+  @ApiResponse({ status: 200, description: 'Projecao das configuracoes do tenant' })
+  @ApiResponse({ status: 401, description: 'Nao autorizado' })
+  async getSettings(@CurrentUser() user: Usuario): Promise<TenantSettingsProjection> {
+    return this.tenantsService.getSettingsForTenant(user.tenant_id);
   }
 
   @Patch('branding')
