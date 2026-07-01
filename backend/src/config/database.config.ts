@@ -17,6 +17,7 @@ import { Pagamento } from '../database/entities/Pagamento.entity';
 import { CupomDesconto } from '../database/entities/CupomDesconto.entity';
 import { EmailConfirmation } from '../database/entities/EmailConfirmation.entity';
 import { MovimentacaoEstoqueHistorico } from '../database/entities/MovimentacaoEstoqueHistorico.entity';
+import { StoreAvailabilityException } from '../database/entities/StoreAvailabilityException.entity';
 // WhatsApp entities
 import {
   WhatsAppCart,
@@ -49,6 +50,7 @@ export const databaseConfig: TypeOrmModuleAsyncOptions = {
       CupomDesconto,
       EmailConfirmation,
       MovimentacaoEstoqueHistorico,
+      StoreAvailabilityException,
       // WhatsApp entities
       WhatsAppCart,
       WhatsAppMessageMetrics,
