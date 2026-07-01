@@ -23,6 +23,10 @@ import type {
   TenantSettingsProjection,
   UpdateTenantSettingsDto,
 } from './types/tenant-settings';
+import type {
+  StoreException,
+  CreateStoreExceptionInput,
+} from './types/store-exception';
 
 interface ApiOptions extends RequestInit {
   params?: Record<string, string>;
@@ -424,6 +428,51 @@ class ApiClient {
       method: 'PATCH',
       body: JSON.stringify(dto),
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Availability exceptions (exceções / feriados — Camada 2)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Lista as exceções FUTURAS (`date >= hoje` no fuso da loja), ordenadas.
+   * Escopo sempre pelo `user.tenant_id` do JWT — o backend nunca lê o tenant do body.
+   * O header `x-tenant-id` e o Bearer já são injetados por `request<T>()`.
+   */
+  async listExceptions(): Promise<StoreException[]> {
+    return this.request<StoreException[]>('/availability-exceptions');
+  }
+
+  /**
+   * Cria (upsert por `(tenant, date)`) uma exceção. Requer role admin (guard no
+   * backend). O backend rejeita datas no passado. Retorna a exceção persistida
+   * (verdade canônica, com id) para o hook refletir no estado.
+   */
+  async createException(
+    input: CreateStoreExceptionInput,
+  ): Promise<StoreException> {
+    return this.request<StoreException>('/availability-exceptions', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  /** Remove a exceção pelo id (escopo do tenant no backend). */
+  async removeException(id: string): Promise<void> {
+    return this.request<void>(`/availability-exceptions/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Atalho: cria (upsert) uma exceção `closed` para hoje (fuso da loja).
+   * Retorna a exceção criada.
+   */
+  async closeToday(): Promise<StoreException> {
+    return this.request<StoreException>(
+      '/availability-exceptions/close-today',
+      { method: 'POST' },
+    );
   }
 }
 
