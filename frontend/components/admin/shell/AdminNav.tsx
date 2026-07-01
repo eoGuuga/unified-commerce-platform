@@ -12,7 +12,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Receipt, Package, Boxes, LogOut } from 'lucide-react';
+import { Home, Receipt, Package, Boxes, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdminData } from './AdminDataProvider';
 
@@ -29,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Pedidos', href: '/admin/pedidos', icon: Receipt, badgeKey: 'pedidosCount' },
   { label: 'Produtos', href: '/admin/produtos', icon: Package },
   { label: 'Estoque', href: '/admin/estoque', icon: Boxes, badgeKey: 'attentionCount' },
+  { label: 'Configurações', href: '/admin/configuracoes', icon: Settings },
 ];
 
 /** Retorna true se o pathname corresponde ao item de nav (match exato para /admin; prefixo para sub-rotas). */

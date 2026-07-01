@@ -5,6 +5,41 @@ import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
 import { DbContextService } from '../common/services/db-context.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateBrandingDto } from './dto/update-branding.dto';
+import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
+import { BusinessHours } from '../whatsapp/utils/business-hours';
+
+/**
+ * Projecao ALLOW-LIST das configuracoes do tenant (§2.1 do spec).
+ *
+ * REGRA DE OURO (§6): a leitura NUNCA retorna o `settings` bruto nem qualquer
+ * segredo (whatsapp.apiKey, bot_control_code, tokens, colunas *_encrypted).
+ * Apenas as chaves explicitamente listadas abaixo sao mapeadas. Campos ausentes
+ * viram null/[]. Booleanos de `status` sinalizam presenca — nunca expoem o valor.
+ */
+export interface TenantSettingsProjection {
+  loja: {
+    store_name: string | null;
+    tagline: string | null;
+    description: string | null;
+    logo_url: string | null;
+    favicon_url: string | null;
+    primary_color: string | null;
+  };
+  horario: {
+    business_hours: BusinessHours | null;
+  };
+  pagamento: {
+    metodos: string[];
+    pix_key: string | null;
+    pix_merchant_name: string | null;
+  };
+  status: {
+    hasBusinessHours: boolean;
+    hasPixKey: boolean;
+    hasPixMerchantName: boolean;
+    hasWhatsappNumber: boolean;
+  };
+}
 
 export interface TenantBranding {
   tenant_id: string;
@@ -172,6 +207,120 @@ export class TenantsService {
 
       return updatedTenant;
     });
+  }
+
+  /**
+   * Mapeia o tenant para a projecao allow-list (§2.1). SO as chaves listadas.
+   * Puro/sincrono: nunca toca o banco, nunca inclui segredo.
+   */
+  buildSettingsProjection(tenant: Tenant): TenantSettingsProjection {
+    const settings = tenant.settings || {};
+
+    const nullIfBlank = (v: unknown): string | null =>
+      typeof v === 'string' && v.length > 0 ? v : null;
+
+    // business_hours: aceita SO se for objeto com `days`; senao null (fail-closed).
+    const rawBh = settings.business_hours;
+    const businessHours: BusinessHours | null =
+      rawBh && typeof rawBh === 'object' && !Array.isArray(rawBh) && rawBh.days
+        ? (rawBh as BusinessHours)
+        : null;
+
+    const rawMetodos = settings.metodos;
+    const metodos: string[] = Array.isArray(rawMetodos)
+      ? rawMetodos.filter((m): m is string => typeof m === 'string')
+      : [];
+
+    const pixKey = nullIfBlank(settings.pix_key);
+    const pixMerchantName = nullIfBlank(settings.pix_merchant_name);
+
+    const rawWhatsappNumbers = settings.whatsappNumbers || settings.whatsapp_numbers;
+    const hasWhatsappNumber =
+      Array.isArray(rawWhatsappNumbers) && rawWhatsappNumbers.length > 0;
+
+    return {
+      loja: {
+        store_name: nullIfBlank(settings.store_name),
+        tagline: nullIfBlank(settings.tagline),
+        description: nullIfBlank(settings.description),
+        logo_url: nullIfBlank(settings.logo_url),
+        favicon_url: nullIfBlank(settings.favicon_url),
+        primary_color: nullIfBlank(settings.primary_color),
+      },
+      horario: {
+        business_hours: businessHours,
+      },
+      pagamento: {
+        metodos,
+        pix_key: pixKey,
+        pix_merchant_name: pixMerchantName,
+      },
+      status: {
+        hasBusinessHours: businessHours !== null,
+        hasPixKey: pixKey !== null,
+        hasPixMerchantName: pixMerchantName !== null,
+        hasWhatsappNumber, // SO o booleano — nunca o numero.
+      },
+    };
+  }
+
+  /**
+   * Le o tenant sob RLS (escopado por tenantId) e retorna a projecao allow-list.
+   * O tenantId vem SEMPRE do JWT (user.tenant_id), nunca do body/header.
+   */
+  async getSettingsForTenant(tenantId: string): Promise<TenantSettingsProjection> {
+    const tenant = await this.findOneById(tenantId);
+    return this.buildSettingsProjection(tenant);
+  }
+
+  /**
+   * Aplica um PATCH por SECAO (§2.2). Monta o objeto de merge SO com as chaves das
+   * secoes PRESENTES no DTO — secao ausente = nao toca; campo ausente na secao =
+   * nao toca aquela chave. O objeto resultante e mesclado via `updateSettings`
+   * (`settings = COALESCE(settings,'{}') || $2::jsonb`, escopado por RLS).
+   *
+   * O tenantId vem SEMPRE do JWT (user.tenant_id), nunca do body/header.
+   * Retorna a mesma projecao allow-list do GET (T3) — round-trip consistente.
+   */
+  async updateSettingsSectioned(
+    tenantId: string,
+    dto: UpdateTenantSettingsDto,
+  ): Promise<TenantSettingsProjection> {
+    const merge: Record<string, unknown> = {};
+
+    // Secao Loja -> chaves de branding + descricao.
+    if (dto.loja) {
+      const { store_name, tagline, description, logo_url, favicon_url, primary_color } = dto.loja;
+      if (store_name !== undefined) merge.store_name = store_name;
+      if (tagline !== undefined) merge.tagline = tagline;
+      if (description !== undefined) merge.description = description;
+      if (logo_url !== undefined) merge.logo_url = logo_url;
+      if (favicon_url !== undefined) merge.favicon_url = favicon_url;
+      if (primary_color !== undefined) merge.primary_color = primary_color;
+    }
+
+    // Secao Horario -> business_hours (fonte unica). null limpa; ausente nao toca.
+    if (dto.horario) {
+      if (dto.horario.business_hours !== undefined) {
+        merge.business_hours = dto.horario.business_hours;
+      }
+    }
+
+    // Secao Pagamento -> metodos / pix_key / pix_merchant_name.
+    if (dto.pagamento) {
+      const { metodos, pix_key, pix_merchant_name } = dto.pagamento;
+      if (metodos !== undefined) merge.metodos = metodos;
+      if (pix_key !== undefined) merge.pix_key = pix_key;
+      if (pix_merchant_name !== undefined) merge.pix_merchant_name = pix_merchant_name;
+    }
+
+    // Nada a mesclar (DTO vazio ou secoes sem campos) -> so devolve a projecao atual.
+    if (Object.keys(merge).length === 0) {
+      return this.getSettingsForTenant(tenantId);
+    }
+
+    const updated = await this.updateSettings(tenantId, merge);
+    return this.buildSettingsProjection(updated);
   }
 
   async createTenantWithAdmin(dto: CreateTenantDto): Promise<TenantSignupResult> {

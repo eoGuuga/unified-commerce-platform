@@ -3,11 +3,19 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/user.decorator';
-import { Usuario } from '../../database/entities/Usuario.entity';
-import { TenantsService, TenantSignupResult, TenantBranding } from './tenants.service';
+import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
+import {
+  TenantsService,
+  TenantSignupResult,
+  TenantBranding,
+  TenantSettingsProjection,
+} from './tenants.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateBrandingDto } from './dto/update-branding.dto';
+import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 
 @ApiTags('Tenants')
 @Controller('tenants')
@@ -41,6 +49,46 @@ export class TenantsController {
   @ApiResponse({ status: 404, description: 'Tenant nao encontrado' })
   async getBranding(@Param('slug') slug: string): Promise<TenantBranding> {
     return this.tenantsService.getBrandingBySlug(slug);
+  }
+
+  @Get('settings')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Obter configuracoes do tenant autenticado (projecao allow-list)',
+    description:
+      'Retorna a projecao allow-list das configuracoes (loja/horario/pagamento/status) ' +
+      'do tenant do usuario autenticado. NUNCA retorna o settings bruto nem segredos ' +
+      '(apiKey, bot_control_code, tokens, colunas *_encrypted). Escopado por user.tenant_id.',
+  })
+  @ApiResponse({ status: 200, description: 'Projecao das configuracoes do tenant' })
+  @ApiResponse({ status: 401, description: 'Nao autorizado' })
+  async getSettings(@CurrentUser() user: Usuario): Promise<TenantSettingsProjection> {
+    return this.tenantsService.getSettingsForTenant(user.tenant_id);
+  }
+
+  @Patch('settings')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Atualizar configuracoes do tenant autenticado (DTO por secao, requer admin)',
+    description:
+      'Atualiza as configuracoes (loja/horario/pagamento) do tenant do usuario autenticado ' +
+      'via DTO por secao — cada secao e opcional e apenas as secoes presentes sao mescladas ' +
+      '(merge JSONB, secao ausente = nao toca). REQUER role ADMIN (guard). ' +
+      'Escopado por user.tenant_id (nunca body). Retorna a mesma projecao allow-list do GET.',
+  })
+  @ApiResponse({ status: 200, description: 'Configuracoes atualizadas (projecao allow-list)' })
+  @ApiResponse({ status: 400, description: 'Payload invalido (validacao fail-closed)' })
+  @ApiResponse({ status: 401, description: 'Nao autorizado' })
+  @ApiResponse({ status: 403, description: 'Acesso restrito: requer role admin' })
+  async updateSettings(
+    @CurrentUser() user: Usuario,
+    @Body() dto: UpdateTenantSettingsDto,
+  ): Promise<TenantSettingsProjection> {
+    return this.tenantsService.updateSettingsSectioned(user.tenant_id, dto);
   }
 
   @Patch('branding')

@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { TenantsService } from '../../tenants/tenants.service';
+import {
+  BusinessHours,
+  describeBusinessHours,
+} from '../utils/business-hours';
 
 export interface BotPersona {
   name: string;
@@ -36,7 +40,9 @@ const DEFAULT_STORE: BotStoreConfig = {
   description: 'Loja online',
   payment_methods: ['pix', 'dinheiro'],
   delivery_options: ['entrega', 'retirada'],
-  business_hours: 'Seg-Sex 9h-18h',
+  // business_hours NAO tem default chumbado: horario e fonte unica
+  // (settings.business_hours). Sem ele, a string fica vazia e o bot nao afirma horario.
+  business_hours: '',
 };
 
 const DEFAULT_RULES: string[] = [
@@ -62,17 +68,36 @@ export class BotConfigService {
       // tenant nao encontrado, usar defaults
     }
 
-    const botSettings = (tenant?.settings as Record<string, any>)?.whatsapp_bot || {};
+    const settings = (tenant?.settings as Record<string, any>) || {};
+    const botSettings = settings.whatsapp_bot || {};
 
     const persona: BotPersona = {
       ...DEFAULT_PERSONA,
       ...(botSettings.persona || {}),
     };
 
+    // Horario = FONTE UNICA: a string do prompt e derivada do objeto canonico
+    // (settings.business_hours) via describeBusinessHours. Ausente/invalido -> '' (bot nao afirma horario).
+    const businessHours = describeBusinessHours(
+      settings.business_hours as BusinessHours,
+    );
+
+    // Formas de pagamento = campo canonico settings.metodos (o que o lojista marca na tela).
+    // Fallback pro valor atual (DEFAULT_STORE / whatsapp_bot.store) quando ausente/vazio.
+    const paymentMethods =
+      Array.isArray(settings.metodos) && settings.metodos.length > 0
+        ? settings.metodos
+        : botSettings.store?.payment_methods || DEFAULT_STORE.payment_methods;
+
+    // Decisao F: name/description vem dos campos canonicos (settings.store_name / settings.description),
+    // com fallback pro tenant.name (nome) e descricao atual (description). Sem depender da duplicata em whatsapp_bot.store.
     const store: BotStoreConfig = {
       ...DEFAULT_STORE,
-      name: botSettings.store?.name || tenant?.name || DEFAULT_STORE.name,
       ...(botSettings.store || {}),
+      name: settings.store_name || tenant?.name || DEFAULT_STORE.name,
+      description: settings.description || DEFAULT_STORE.description,
+      payment_methods: paymentMethods,
+      business_hours: businessHours,
     };
 
     const rules: string[] = Array.isArray(botSettings.rules) && botSettings.rules.length > 0

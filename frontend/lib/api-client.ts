@@ -19,6 +19,10 @@ import type {
   UpdateProductInput,
   User,
 } from './types';
+import type {
+  TenantSettingsProjection,
+  UpdateTenantSettingsDto,
+} from './types/tenant-settings';
 
 interface ApiOptions extends RequestInit {
   params?: Record<string, string>;
@@ -392,6 +396,33 @@ class ApiClient {
     return this.request<Product>(`/products/${productId}/min-stock`, {
       method: 'PATCH',
       body: JSON.stringify({ min_stock: minStock }),
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tenant settings (tela de Configurações da Loja)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Projeção allow-list das configurações do tenant autenticado (§2.1).
+   * O escopo é sempre o `user.tenant_id` do JWT — o backend nunca lê o tenant do body.
+   * O header `x-tenant-id` e o Bearer já são injetados por `request<T>()`.
+   */
+  async getSettings(): Promise<TenantSettingsProjection> {
+    return this.request<TenantSettingsProjection>('/tenants/settings');
+  }
+
+  /**
+   * Atualiza as configurações do tenant por seção (§2.2). Cada seção/campo é opcional;
+   * seção ausente não é tocada. Requer role admin (guard no backend). Retorna a
+   * projeção atualizada (verdade canônica) para o hook refletir no estado.
+   */
+  async updateSettings(
+    dto: UpdateTenantSettingsDto,
+  ): Promise<TenantSettingsProjection> {
+    return this.request<TenantSettingsProjection>('/tenants/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(dto),
     });
   }
 }

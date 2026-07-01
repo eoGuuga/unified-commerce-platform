@@ -19,6 +19,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Pagamento, PagamentoStatus, MetodoPagamento } from '../../database/entities/Pagamento.entity';
 import { CanalVenda, Pedido, PedidoStatus } from '../../database/entities/Pedido.entity';
+import { Tenant } from '../../database/entities/Tenant.entity';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as QRCode from 'qrcode';
@@ -376,7 +377,7 @@ export class PaymentsService {
     }
 
     // Mock (desenvolvimento).
-    const pixData = this.generatePixData(pedido, pagamento);
+    const pixData = await this.generatePixData(pedido, pagamento);
 
     let qrCodeBase64: string | undefined;
     let qrCodeUrl: string | undefined;
@@ -417,7 +418,44 @@ export class PaymentsService {
     };
   }
 
-  private generatePixData(pedido: Pedido, pagamento: Pagamento): string {
+  /**
+   * Resolve o nome do recebedor exibido no PIX estatico (campo 59 do EMV),
+   * escopado por tenant. Ordem de preferencia:
+   *   settings.pix_merchant_name -> settings.store_name -> MERCHANT_NAME (env) -> 'Loja'.
+   *
+   * O tenant e lido pelo repositorio direto sob o contexto RLS corrente
+   * (DbContextService.getRepository) — mesmo padrao dos repos de Pagamento/Pedido,
+   * evitando dependencia circular payments<->tenants.
+   */
+  private async resolvePixMerchantName(tenantId?: string): Promise<string> {
+    let settings: Record<string, any> | undefined;
+    if (tenantId) {
+      try {
+        const tenant = await this.db
+          .getRepository(Tenant)
+          .findOne({ where: { id: tenantId } });
+        settings = tenant?.settings ?? undefined;
+      } catch (error) {
+        // Falha de leitura do tenant nao deve derrubar a geracao do PIX:
+        // cai no fallback global (env) abaixo.
+        this.logger.warn('Falha ao ler settings do tenant para nome do PIX; usando fallback', {
+          error: error instanceof Error ? error.message : String(error),
+          context: { tenantId },
+        });
+      }
+    }
+
+    const fromSettings =
+      (typeof settings?.pix_merchant_name === 'string' && settings.pix_merchant_name.trim()) ||
+      (typeof settings?.store_name === 'string' && settings.store_name.trim()) ||
+      undefined;
+
+    const fromEnv = (this.configService.get<string>('MERCHANT_NAME') || '').trim() || undefined;
+
+    return fromSettings || fromEnv || 'Loja';
+  }
+
+  private async generatePixData(pedido: Pedido, pagamento: Pagamento): Promise<string> {
     const configuredPixKey = (this.configService.get<string>('PIX_KEY') || '').trim();
 
     // FAIL-CLOSED em producao: nunca gerar PIX com chave mock.
@@ -434,7 +472,7 @@ export class PaymentsService {
     const chavePix = configuredPixKey || 'mock-chave-pix-123456789';
     const valor = Number(pagamento.amount).toFixed(2);
     const descricao = `Pedido ${pedido.order_no}`;
-    const merchantName = this.configService.get<string>('MERCHANT_NAME') || 'Loja';
+    const merchantName = await this.resolvePixMerchantName(pagamento.tenant_id);
 
     const payloadFormatIndicator = '01' + '02' + '01';
     const merchantAccountInfo = '26' + String(chavePix.length + 4).padStart(2, '0') + '01' + String(chavePix.length).padStart(2, '0') + chavePix;
