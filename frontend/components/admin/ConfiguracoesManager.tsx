@@ -19,14 +19,20 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Settings } from 'lucide-react';
+import { CalendarX, RefreshCw, Settings, Trash2 } from 'lucide-react';
 import { useTenantSettings } from '@/hooks/useTenantSettings';
+import { useAvailabilityExceptions } from '@/hooks/useAvailabilityExceptions';
 import type {
   BusinessHours,
   DayHours,
   PaymentMethod,
   TenantSettingsProjection,
 } from '@/lib/types/tenant-settings';
+import type {
+  CreateStoreExceptionInput,
+  StoreException,
+  StoreExceptionKind,
+} from '@/lib/types/store-exception';
 
 // ---- Constantes de UI ----
 
@@ -469,7 +475,245 @@ function ConfiguracoesForm({
           />
         </div>
       </Secao>
+
+      {/* ---- Secao: Excecoes / Feriados (mesma familia do Horario) ---- */}
+      <ExcecoesSection />
     </div>
+  );
+}
+
+// ---- Secao: Excecoes / Feriados (4a secao — consome useAvailabilityExceptions) ----
+
+/**
+ * Datas pontuais em que a loja foge do horario recorrente: fechada o dia todo
+ * (`closed`) ou com horario especial (`custom_hours`). v1 = lista de datas
+ * (sem calendario visual). Optimistic + rollback vem do hook (T6); aqui so a UI.
+ */
+function ExcecoesSection() {
+  const { exceptions, loading, error, add, remove, closeToday } =
+    useAvailabilityExceptions();
+
+  // ---- Estado do formulario "adicionar" ----
+  const [date, setDate] = useState('');
+  const [kind, setKind] = useState<StoreExceptionKind>('closed');
+  const [open, setOpen] = useState(DEFAULT_ABRE);
+  const [close, setClose] = useState(DEFAULT_FECHA);
+
+  // ---- Feedback (some sozinho apos 6s no sucesso) + estado "salvando" ----
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (feedback?.kind !== 'ok') return;
+    const id = setTimeout(() => setFeedback(null), 6000);
+    return () => clearTimeout(id);
+  }, [feedback]);
+
+  function report(res: { ok: boolean; error?: string }, sucesso: string) {
+    setFeedback(
+      res.ok
+        ? { kind: 'ok', text: sucesso }
+        : { kind: 'err', text: res.error ?? 'Falha ao salvar.' },
+    );
+  }
+
+  async function adicionar() {
+    if (!date) {
+      setFeedback({ kind: 'err', text: 'Escolha uma data para a exceção.' });
+      return;
+    }
+    // Monta o input: `closed` NAO leva open/close; `custom_hours` leva ambos.
+    const input: CreateStoreExceptionInput =
+      kind === 'custom_hours'
+        ? { date, kind, open, close }
+        : { date, kind };
+    setBusy(true);
+    const res = await add(input);
+    setBusy(false);
+    report(res, 'Exceção adicionada.');
+    if (res.ok) {
+      // Limpa a data (mantem tipo/horas como conveniencia para lancar varias).
+      setDate('');
+    }
+  }
+
+  async function fecharHoje() {
+    setBusy(true);
+    const res = await closeToday();
+    setBusy(false);
+    report(res, 'Loja marcada como fechada hoje.');
+  }
+
+  async function remover(id: string) {
+    setBusy(true);
+    const res = await remove(id);
+    setBusy(false);
+    report(res, 'Exceção removida.');
+  }
+
+  return (
+    <section
+      data-testid="secao-excecoes"
+      className="mt-8 rounded-[6px] border border-[#1a1814]/10 bg-white p-6"
+    >
+      <div className="flex items-center gap-2">
+        <CalendarX className="h-5 w-5 text-[#1a1814]/70" strokeWidth={1.6} />
+        <h2 className="text-[18px] font-medium text-[#1a1814]">Exceções / Feriados</h2>
+      </div>
+      <p className="mt-2 text-[13px] text-[#1a1814]/55">
+        Datas pontuais em que a loja foge do horário normal — fechada o dia todo ou
+        com horário especial.
+      </p>
+
+      {/* ---- Formulario: adicionar exceção ---- */}
+      <div className="mt-5 flex flex-col gap-4 rounded-[4px] border border-[#1a1814]/10 bg-[#f6f3ee] p-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelClass} htmlFor="cfg-exc-date">
+              Data da exceção
+            </label>
+            <input
+              id="cfg-exc-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <span className={labelClass}>Tipo</span>
+            <div className="flex h-11 items-center gap-4">
+              <label className="flex items-center gap-2 text-[14px] text-[#1a1814]">
+                <input
+                  type="radio"
+                  name="cfg-exc-kind"
+                  checked={kind === 'closed'}
+                  onChange={() => setKind('closed')}
+                  aria-label="Fechado"
+                  className="h-4 w-4"
+                />
+                Fechado
+              </label>
+              <label className="flex items-center gap-2 text-[14px] text-[#1a1814]">
+                <input
+                  type="radio"
+                  name="cfg-exc-kind"
+                  checked={kind === 'custom_hours'}
+                  onChange={() => setKind('custom_hours')}
+                  aria-label="Horário especial"
+                  className="h-4 w-4"
+                />
+                Horário especial
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {kind === 'custom_hours' && (
+          <div className="flex items-center gap-2">
+            <div>
+              <label className={labelClass} htmlFor="cfg-exc-open">
+                Abre
+              </label>
+              <input
+                id="cfg-exc-open"
+                type="time"
+                value={open}
+                onChange={(e) => setOpen(e.target.value)}
+                aria-label="Abre"
+                className={`${inputClass} h-9 w-32`}
+              />
+            </div>
+            <span className="mt-6 text-[#1a1814]/40">até</span>
+            <div>
+              <label className={labelClass} htmlFor="cfg-exc-close">
+                Fecha
+              </label>
+              <input
+                id="cfg-exc-close"
+                type="time"
+                value={close}
+                onChange={(e) => setClose(e.target.value)}
+                aria-label="Fecha"
+                className={`${inputClass} h-9 w-32`}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void adicionar()}
+            disabled={busy}
+            className="inline-flex h-11 items-center justify-center rounded-full bg-[#1a1814] px-6 text-[14px] font-medium text-[#f6f3ee] transition hover:bg-[#1a1814]/90 disabled:opacity-50"
+          >
+            {busy ? 'Salvando…' : 'Adicionar'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void fecharHoje()}
+            disabled={busy}
+            className="inline-flex h-11 items-center justify-center rounded-full border border-[#1a1814]/15 px-5 text-[14px] font-medium text-[#1a1814] transition hover:bg-[#1a1814]/5 disabled:opacity-50"
+          >
+            Fechar hoje
+          </button>
+        </div>
+      </div>
+
+      {feedback && (
+        <div
+          className={`mt-5 rounded-[4px] border px-4 py-3 text-[13px] ${
+            feedback.kind === 'ok'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
+          {feedback.text}
+        </div>
+      )}
+
+      {/* ---- Lista das exceções futuras ---- */}
+      <div className="mt-6">
+        <h3 className="text-[13px] font-medium text-[#1a1814]/70">Próximas exceções</h3>
+        {loading ? (
+          <p className="mt-3 text-[13px] text-[#1a1814]/55">Carregando exceções…</p>
+        ) : error ? (
+          <p className="mt-3 text-[13px] text-red-700">{error}</p>
+        ) : exceptions.length === 0 ? (
+          <p className="mt-3 text-[13px] text-[#1a1814]/55">
+            Nenhuma exceção cadastrada.
+          </p>
+        ) : (
+          <ul data-testid="excecoes-lista" className="mt-3 space-y-2">
+            {exceptions.map((exc) => (
+              <li
+                key={exc.id}
+                className="flex items-center justify-between gap-3 rounded-[4px] border border-[#1a1814]/10 bg-[#f6f3ee] px-4 py-3"
+              >
+                <div className="flex flex-col">
+                  <span className="text-[14px] font-medium text-[#1a1814]">
+                    {formatExcDate(exc.date)}
+                  </span>
+                  <span className="text-[13px] text-[#1a1814]/60">
+                    {describeExc(exc)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void remover(exc.id)}
+                  disabled={busy}
+                  className="inline-flex items-center gap-1 rounded-full border border-[#1a1814]/15 px-3 py-1.5 text-[13px] font-medium text-[#1a1814] transition hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" strokeWidth={1.6} />
+                  Remover
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -565,6 +809,23 @@ function montarBusinessHours(tz: string, dias: Record<string, DiaEstado>): Busin
 
 function isHex(v: string): boolean {
   return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v);
+}
+
+/**
+ * Formata a data civil "YYYY-MM-DD" para exibição (dd/mm/aaaa), sem passar por
+ * `new Date()` — evitar o shift de fuso que joga a data um dia pra trás.
+ */
+function formatExcDate(date: string): string {
+  const [y, m, d] = date.split('-');
+  return y && m && d ? `${d}/${m}/${y}` : date;
+}
+
+/** Rótulo curto de uma exceção: "Fechado" ou "09:00–13:00". */
+function describeExc(exc: StoreException): string {
+  if (exc.kind === 'custom_hours' && exc.open && exc.close) {
+    return `${exc.open}–${exc.close}`;
+  }
+  return 'Fechado';
 }
 
 function buildAvisos(status: TenantSettingsProjection['status']): { key: string; text: string }[] {
