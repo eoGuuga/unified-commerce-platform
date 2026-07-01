@@ -46,6 +46,7 @@ import { TenantsModule } from '../tenants/tenants.module';
 import { CouponsModule } from '../coupons/coupons.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CommonModule } from '../common/common.module';
+import { AvailabilityModule } from '../availability/availability.module';
 
 @Module({
   imports: [
@@ -66,6 +67,9 @@ import { CommonModule } from '../common/common.module';
     forwardRef(() => PaymentsModule),
     NotificationsModule,
     CouponsModule,
+    // Camada 2: gate por-data da retirada. Import UNIDIRECIONAL (availability nao
+    // importa whatsapp) — sem ciclo, sem forwardRef.
+    AvailabilityModule,
   ],
   controllers: [WhatsappController, WhatsAppCartController],
   providers: [

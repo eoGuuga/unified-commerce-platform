@@ -91,7 +91,13 @@ describe('Retirada + agendamento + horario de funcionamento (S2b)', () => {
 
     const whatsappSender = { sendImage: jest.fn().mockResolvedValue(undefined) };
 
-    const deps: any[] = new Array(30).fill(undefined);
+    // Camada 2: por padrao SEM exceçoes (retorna []), preservando o comportamento
+    // recorrente (Camada 1). Testes especificos passam a Map direto pra funcao pura.
+    const availabilityService = {
+      findByDateRange: jest.fn().mockResolvedValue([]),
+    };
+
+    const deps: any[] = new Array(31).fill(undefined);
     service = new (WhatsAppService as any)(...deps);
     service.cartService = cartService;
     service.ordersService = ordersService;
@@ -99,6 +105,7 @@ describe('Retirada + agendamento + horario de funcionamento (S2b)', () => {
     service.conversationService = conversationService;
     service.tenantsService = tenantsService;
     service.whatsappSender = whatsappSender;
+    service.availabilityService = availabilityService;
     service.catalogManager = { isCatalogCommand: () => false };
     service.logger = { warn: jest.fn(), error: jest.fn(), log: jest.fn(), debug: jest.fn() };
   });
@@ -422,6 +429,115 @@ describe('Retirada + agendamento + horario de funcionamento (S2b)', () => {
       for (let d = 0; d <= 6; d++) days[String(d)] = { open: '08:00', close: '20:00' };
       const desc = service.describeBusinessHours({ tz: 'America/Sao_Paulo', days });
       expect(desc).toContain('dom-sáb 08:00-20:00');
+    });
+  });
+
+  // ============== TASK 3: GATE POR-DATA (exceçoes) — funcao PURA (Map por parametro) ==============
+  describe('generatePickupSlots — gate por-data (exceptions Map, sem I/O)', () => {
+    // Data civil (YYYY-MM-DD) no fuso da loja de um instante — a MESMA chave do
+    // AvailabilityService, pra provar que a chave da Map bate.
+    const civilDateSP = (d: Date): string =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d);
+
+    const datesOf = (slots: Array<{ scheduledAt: Date }>): string[] =>
+      slots.map((s) => civilDateSP(s.scheduledAt));
+
+    const hoursOnDate = (
+      slots: Array<{ scheduledAt: Date }>,
+      date: string,
+    ): number[] =>
+      slots
+        .filter((s) => civilDateSP(s.scheduledAt) === date)
+        .map((s) => {
+          const h = Number(
+            new Intl.DateTimeFormat('en-US', {
+              timeZone: 'America/Sao_Paulo',
+              hour: '2-digit',
+              hour12: false,
+            })
+              .formatToParts(s.scheduledAt)
+              .find((p) => p.type === 'hour')?.value,
+          );
+          return h === 24 ? 0 : h;
+        });
+
+    // now = sexta 2026-06-26 06:00 local (-03) = 09:00 UTC. Varre a semana:
+    // sex 26, sab 27, seg 29, ter 30... (dom 28 ausente em days).
+    // maxSlots alto pra que multiplos dias apareçam (senao sexta 09-18 ja enche o cap).
+    const NOW = new Date('2026-06-26T09:00:00.000Z');
+    const OPTS = { maxSlots: 60, lookaheadDays: 7 };
+
+    it('(a) exceçao "closed" numa data D -> NENHUM slot em D; os outros dias seguem normais', () => {
+      const D = '2026-06-27'; // sabado, recorrente 09-18
+      // Baseline sem exceçao: sabado 27 TEM slots.
+      const baseline = service.generatePickupSlots(BUSINESS_HOURS, NOW, OPTS);
+      expect(datesOf(baseline)).toContain(D);
+
+      const exceptions = new Map<
+        string,
+        { kind: 'closed' | 'custom_hours'; open?: string | null; close?: string | null }
+      >([[D, { kind: 'closed' }]]);
+
+      const slots = service.generatePickupSlots(BUSINESS_HOURS, NOW, OPTS, exceptions);
+
+      // Nenhum slot na data fechada.
+      expect(datesOf(slots)).not.toContain(D);
+      // Os outros dias que apareciam no baseline continuam aparecendo.
+      const otherBaselineDates = new Set(datesOf(baseline).filter((x) => x !== D));
+      for (const other of otherBaselineDates) {
+        expect(datesOf(slots)).toContain(other);
+      }
+    });
+
+    it('(b) exceçao "custom_hours" 09:00-13:00 numa data cujo recorrente e 09:00-18:00 -> slots so ate 13h', () => {
+      const D = '2026-06-27'; // sabado, recorrente 09-18
+      // Baseline: sem exceçao, sabado vai ate 18h.
+      const baseline = service.generatePickupSlots(BUSINESS_HOURS, NOW, OPTS);
+      const baselineHours = hoursOnDate(baseline, D);
+      expect(Math.max(...baselineHours)).toBe(18);
+
+      const exceptions = new Map<
+        string,
+        { kind: 'closed' | 'custom_hours'; open?: string | null; close?: string | null }
+      >([[D, { kind: 'custom_hours', open: '09:00', close: '13:00' }]]);
+
+      const slots = service.generatePickupSlots(BUSINESS_HOURS, NOW, OPTS, exceptions);
+      const hours = hoursOnDate(slots, D);
+
+      expect(hours.length).toBeGreaterThan(0);
+      // So ate 13h (nao 18h).
+      expect(Math.max(...hours)).toBe(13);
+      expect(hours).not.toContain(14);
+      expect(hours).not.toContain(18);
+      // Comeca as 09h (recorrente da exceçao) e passos de 1h.
+      expect(hours).toEqual([9, 10, 11, 12, 13]);
+    });
+
+    it('(c) Camada 1 intacta: exceçao numa data NAO afeta as outras datas (recorrente mantido)', () => {
+      const D = '2026-06-27'; // sabado com exceçao
+      const OTHER = '2026-06-29'; // segunda SEM exceçao, recorrente 09-18
+
+      // Antes: horas da segunda sem nenhuma exceçao.
+      const before = service.generatePickupSlots(BUSINESS_HOURS, NOW, OPTS);
+      const beforeMon = hoursOnDate(before, OTHER);
+      expect(beforeMon.length).toBeGreaterThan(0);
+
+      // Depois: aplica exceçao SO no sabado.
+      const exceptions = new Map<
+        string,
+        { kind: 'closed' | 'custom_hours'; open?: string | null; close?: string | null }
+      >([[D, { kind: 'custom_hours', open: '09:00', close: '13:00' }]]);
+      const after = service.generatePickupSlots(BUSINESS_HOURS, NOW, OPTS, exceptions);
+      const afterMon = hoursOnDate(after, OTHER);
+
+      // A segunda (sem exceçao) mantem EXATAMENTE o horario recorrente — nao muda.
+      expect(afterMon).toEqual(beforeMon);
+      expect(Math.max(...afterMon)).toBe(18); // recorrente 09-18 intacto
     });
   });
 });
