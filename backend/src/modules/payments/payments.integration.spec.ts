@@ -22,7 +22,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import request from 'supertest';
 import * as bcrypt from 'bcryptjs';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
+import { Pagamento, PagamentoStatus } from '../../database/entities/Pagamento.entity';
+import { PedidoStatus } from '../../database/entities/Pedido.entity';
 import { JwtService } from '@nestjs/jwt';
 import { OrdersModule } from '../orders/orders.module';
 import { OrdersService } from '../orders/orders.service';
@@ -979,6 +981,280 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
       expect(stockAfterSecond.reserved).toBe(2);
       expect(await countLedger(pedidoIdApr, 'VENDA')).toBe(vendasAfterFirst);
       expect(await countLedger(pedidoIdApr, 'VENDA')).toBe(0);
+    });
+  });
+
+  /**
+   * Task 1: endurecimento do confirmPayment (transacional + FOR UPDATE +
+   * idempotencia sob lock + atomicidade). Reusa o mesmo padrao de seed direto
+   * (SQL bruto, sem RLS) dos blocos Task 8 / Webhook approved, com IDs proprios
+   * para nao colidir com o beforeEach daqueles describes.
+   */
+  describe('confirmPayment — endurecimento (transacao + FOR UPDATE + idempotencia sob lock)', () => {
+    const produtoIdEnd  = 'aaa00000-0000-0000-0000-000000000003';
+    const pedidoIdEnd    = 'bbb00000-0000-0000-0000-000000000003';
+    const pagamentoIdEnd = 'ccc00000-0000-0000-0000-000000000003';
+    const mpPaymentIdEnd = 'mp-fake-endurecimento-003';
+
+    /**
+     * Semeia produto, estoque com reserva, pedido ecommerce pendente_pagamento,
+     * item e pagamento PENDING vinculado por transaction_id (para o webhook do 1c).
+     * Retorna os ids do pedido/pagamento semeados.
+     */
+    async function seedPendingOrderWithPendingPayment(): Promise<{
+      pedidoId: string;
+      pagamentoId: string;
+      produtoId: string;
+    }> {
+      const currentStock = 10;
+      const reservedStock = 2;
+      const quantity = 2;
+      const unitPrice = 50;
+
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+
+      await qr.query(
+        `DELETE FROM movimentacoes_estoque_historico WHERE order_id = $1`,
+        [pedidoIdEnd],
+      );
+      await qr.query(
+        `DELETE FROM movimentacoes_estoque WHERE produto_id = $1 AND tenant_id = $2`,
+        [produtoIdEnd, tenantId],
+      );
+      await qr.query(`DELETE FROM itens_pedido WHERE pedido_id = $1`, [pedidoIdEnd]);
+      await qr.query(`DELETE FROM pagamentos WHERE id = $1`, [pagamentoIdEnd]);
+      await qr.query(`DELETE FROM pedidos WHERE id = $1`, [pedidoIdEnd]);
+      await qr.query(`DELETE FROM produtos WHERE id = $1`, [produtoIdEnd]);
+
+      await qr.query(
+        `INSERT INTO produtos (id, tenant_id, name, price, unit, is_active, created_at, updated_at)
+         VALUES ($1, $2, 'Produto Endurecimento', $3, 'unidade', true, now(), now())`,
+        [produtoIdEnd, tenantId, unitPrice],
+      );
+
+      await qr.query(
+        `INSERT INTO movimentacoes_estoque (id, tenant_id, produto_id, current_stock, reserved_stock, min_stock, last_updated)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, 0, now())`,
+        [tenantId, produtoIdEnd, currentStock, reservedStock],
+      );
+
+      const totalPedido = unitPrice * quantity;
+      await qr.query(
+        `INSERT INTO pedidos (id, tenant_id, order_no, status, channel, customer_name, subtotal, total_amount, created_at, updated_at)
+         VALUES ($1, $2, $3, 'pendente_pagamento', 'ecommerce', 'Cliente Endurecimento', $4, $4, now(), now())`,
+        [pedidoIdEnd, tenantId, `ORD-END-${Date.now()}`, totalPedido],
+      );
+
+      await qr.query(
+        `INSERT INTO itens_pedido (id, pedido_id, produto_id, quantity, unit_price, subtotal, created_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, now())`,
+        [pedidoIdEnd, produtoIdEnd, quantity, unitPrice, unitPrice * quantity],
+      );
+
+      await qr.query(
+        `INSERT INTO pagamentos (id, tenant_id, pedido_id, method, amount, status, transaction_id, metadata, created_at, updated_at)
+         VALUES ($1, $2, $3, 'pix', $4, 'pending', $5, $6::jsonb, now(), now())`,
+        [
+          pagamentoIdEnd,
+          tenantId,
+          pedidoIdEnd,
+          unitPrice * quantity,
+          mpPaymentIdEnd,
+          JSON.stringify({ provider: 'mercadopago', tenant_id: tenantId }),
+        ],
+      );
+
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+
+      return { pedidoId: pedidoIdEnd, pagamentoId: pagamentoIdEnd, produtoId: produtoIdEnd };
+    }
+
+    /** Le o status atual do pedido direto no banco. */
+    async function reloadPedidoStatus(pedidoId: string): Promise<string> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+      const rows = await qr.query(`SELECT status FROM pedidos WHERE id = $1`, [pedidoId]);
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+      return rows[0].status;
+    }
+
+    /** Le o status atual do pagamento direto no banco. */
+    async function reloadPagamentoStatus(pagamentoId: string): Promise<string> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+      const rows = await qr.query(`SELECT status FROM pagamentos WHERE id = $1`, [pagamentoId]);
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+      return rows[0].status;
+    }
+
+    /** Conta linhas de um tipo de movimento (ex.: 'VENDA') no ledger para o pedido. */
+    async function countLedgerEnd(pedidoId: string, tipo: string): Promise<number> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+      const rows = await qr.query(
+        `SELECT COUNT(*)::int AS n FROM movimentacoes_estoque_historico WHERE order_id = $1 AND tipo = $2`,
+        [pedidoId, tipo],
+      );
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+      return Number(rows[0].n);
+    }
+
+    function buildWebhookPayloadEnd(mpPaymentId: string): Record<string, any> {
+      return {
+        action: 'payment.updated',
+        api_version: 'v1',
+        data: { id: mpPaymentId },
+        date_created: new Date().toISOString(),
+        id: `notif-${mpPaymentId}`,
+        live_mode: false,
+        type: 'payment',
+        user_id: '12345',
+      };
+    }
+
+    afterEach(async () => {
+      if (!dataSource) return;
+      jest.restoreAllMocks();
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+      await qr.query(
+        `DELETE FROM movimentacoes_estoque_historico WHERE order_id = $1`,
+        [pedidoIdEnd],
+      );
+      await qr.query(
+        `DELETE FROM movimentacoes_estoque WHERE produto_id = $1 AND tenant_id = $2`,
+        [produtoIdEnd, tenantId],
+      );
+      await qr.query(`DELETE FROM itens_pedido WHERE pedido_id = $1`, [pedidoIdEnd]);
+      await qr.query(`DELETE FROM pagamentos WHERE id = $1`, [pagamentoIdEnd]);
+      await qr.query(`DELETE FROM pedidos WHERE id = $1`, [pedidoIdEnd]);
+      await qr.query(`DELETE FROM produtos WHERE id = $1`, [produtoIdEnd]);
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+    });
+
+    // 1a — DOIS confirmPayment MANUAIS concorrentes (hoje sem lock → dupla
+    // confirmacao/notificacao). Sob o lock, deve resultar em 1 CONFIRMADO,
+    // pagamento PAID e UMA notificacao.
+    it('1a: dois confirmPayment concorrentes → pedido CONFIRMADO 1x, pagamento PAID, notifica 1x', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste 1a - app nao inicializado');
+        return;
+      }
+
+      const paymentsService = moduleFixture.get<PaymentsService>(PaymentsService);
+      const notificationsService = moduleFixture.get<NotificationsService>(NotificationsService);
+
+      const { pedidoId, pagamentoId } = await seedPendingOrderWithPendingPayment();
+      const notifySpy = jest
+        .spyOn(notificationsService, 'notifyPaymentConfirmed')
+        .mockResolvedValue(undefined as any);
+
+      await Promise.all([
+        paymentsService.confirmPayment(pagamentoId, tenantId),
+        paymentsService.confirmPayment(pagamentoId, tenantId),
+      ]);
+
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CONFIRMADO);
+      expect(await reloadPagamentoStatus(pagamentoId)).toBe(PagamentoStatus.PAID);
+      expect(notifySpy).toHaveBeenCalledTimes(1); // <- FALHA hoje (dispara 2x)
+      // estoque intacto + 0 VENDA no ledger (confirmar pagamento nao baixa estoque)
+      expect(await countLedgerEnd(pedidoId, 'VENDA')).toBe(0);
+    });
+
+    // 1b — atomicidade: se o 2º write (transicao do pedido) falha, o 1º write
+    // (pagamento PAID) faz ROLLBACK — sem orfao PAID+PENDENTE.
+    it('1b: falha na transição do pedido → rollback, sem órfão PAID+PENDENTE', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste 1b - app nao inicializado');
+        return;
+      }
+
+      const paymentsService = moduleFixture.get<PaymentsService>(PaymentsService);
+
+      const { pedidoId, pagamentoId } = await seedPendingOrderWithPendingPayment();
+
+      // Forca APENAS o save da TRANSICAO do pedido (pedido.status = CONFIRMADO)
+      // a lancar, deixando o 1º save (pagamento PAID) passar. Assim exercitamos
+      // exatamente a atomicidade: o 1º write ja marcou PAID; se o 2º falha e nao
+      // houver transacao/rollback, o pagamento fica PAID orfao (o furo).
+      // (Nao usamos mockImplementationOnce porque a 1a chamada de save eh a do
+      // pagamento — precisamos discriminar pelo alvo, o pedido em CONFIRMADO.)
+      const realSave = EntityManager.prototype.save;
+      const saveSpy = jest
+        .spyOn(EntityManager.prototype, 'save')
+        .mockImplementation(function (this: EntityManager, ...args: any[]) {
+          const entity = args[0];
+          if (
+            entity &&
+            !Array.isArray(entity) &&
+            entity.status === PedidoStatus.CONFIRMADO
+          ) {
+            throw new Error('boom no save da transição do pedido');
+          }
+          return (realSave as any).apply(this, args);
+        });
+
+      await expect(
+        paymentsService.confirmPayment(pagamentoId, tenantId),
+      ).rejects.toThrow();
+
+      saveSpy.mockRestore();
+
+      // Rollback: pagamento volta a PENDING e pedido segue PENDENTE_PAGAMENTO.
+      expect(await reloadPagamentoStatus(pagamentoId)).toBe(PagamentoStatus.PENDING); // <- FALHA hoje (fica PAID orfao)
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.PENDENTE_PAGAMENTO);
+    });
+
+    // 1c — REENTRANCIA: dois WEBHOOKS aprovados concorrentes. O confirmPayment
+    // roda DENTRO do FOR UPDATE do webhook; runInTransaction reusa o manager
+    // corrente e o pessimistic_write recai na MESMA linha ja travada →
+    // reentrante, SEM deadlock. Ja deve passar hoje (o webhook serializa).
+    it('1c: dois webhooks aprovados concorrentes → 1 CONFIRMADO, 1 notificação, SEM deadlock', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste 1c - app nao inicializado');
+        return;
+      }
+
+      const paymentsService = moduleFixture.get<PaymentsService>(PaymentsService);
+      const mpProvider = moduleFixture.get<MercadoPagoProvider>(MercadoPagoProvider);
+      const notificationsService = moduleFixture.get<NotificationsService>(NotificationsService);
+
+      const { pedidoId, pagamentoId } = await seedPendingOrderWithPendingPayment();
+
+      jest.spyOn(mpProvider, 'isConfigured').mockReturnValue(true);
+      jest.spyOn(mpProvider, 'getPaymentDetails').mockResolvedValue({
+        status: 'approved',
+        status_detail: 'accredited',
+        metadata: { tenant_id: tenantId },
+        external_reference: pedidoIdEnd,
+        payment_method_id: 'pix',
+      });
+      const notifySpy = jest
+        .spyOn(notificationsService, 'notifyPaymentConfirmed')
+        .mockResolvedValue(undefined as any);
+
+      const payload = buildWebhookPayloadEnd(mpPaymentIdEnd);
+
+      // Dois webhooks SIMULTANEOS (nao sequenciais). Nao pode lancar deadlock/erro.
+      await Promise.all([
+        paymentsService.handleMercadoPagoWebhook(payload, { token: '' }),
+        paymentsService.handleMercadoPagoWebhook(payload, { token: '' }),
+      ]);
+
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CONFIRMADO);
+      expect(await reloadPagamentoStatus(pagamentoId)).toBe(PagamentoStatus.PAID);
+      expect(notifySpy).toHaveBeenCalledTimes(1);
     });
   });
 });

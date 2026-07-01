@@ -657,51 +657,83 @@ export class PaymentsService {
   }
 
   async confirmPayment(pagamentoId: string, tenantId: string): Promise<Pagamento> {
-    const pagamento = await this.db.getRepository(Pagamento).findOne({
-      where: { id: pagamentoId, tenant_id: tenantId },
-      relations: ['pedido'],
+    // Transacao propria + FOR UPDATE + idempotencia sob lock. Se ja estamos
+    // dentro de uma transacao (ex.: webhook), runInTransaction reusa o manager
+    // corrente (db-context L33-39) e o lock recai na MESMA linha ja travada
+    // pela transacao do webhook -> reentrante, sem deadlock.
+    const result = await this.db.runInTransaction(async (manager) => {
+      // 1. Lock pessimista (FOR UPDATE) na linha do pagamento. O lock e feito
+      // SEM relations (join + FOR UPDATE pode falhar no Postgres — mesmo padrao
+      // do webhook L845 e de orders.updateStatus L665); o pedido e recarregado
+      // em seguida ja sob o lock da transacao.
+      const pagamentoLock = await manager
+        .createQueryBuilder(Pagamento, 'p')
+        .setLock('pessimistic_write')
+        .where('p.id = :id', { id: pagamentoId })
+        .andWhere('p.tenant_id = :tenantId', { tenantId })
+        .getOne();
+
+      if (!pagamentoLock) {
+        throw new NotFoundException('Pagamento nao encontrado');
+      }
+
+      const pagamento = await manager.getRepository(Pagamento).findOne({
+        where: { id: pagamentoLock.id, tenant_id: tenantId },
+        relations: ['pedido'],
+      });
+
+      if (!pagamento) {
+        throw new NotFoundException('Pagamento nao encontrado');
+      }
+
+      // 2. Idempotencia AGORA sob o lock (fecha a corrida de dupla confirmacao).
+      if (pagamento.status === PagamentoStatus.PAID) {
+        this.logger.warn(`Payment ${pagamentoId} already confirmed`);
+        return { pagamento, pedido: pagamento.pedido, didConfirm: false };
+      }
+
+      // 3. Marca pago (1º write, na transacao).
+      pagamento.status = PagamentoStatus.PAID;
+      await manager.save(pagamento);
+
+      // 4. Transicao do pedido — nesta task, ainda o save direto (mudara na T2).
+      const pedido = pagamento.pedido;
+      let didConfirm = false;
+      if (pedido && pedido.status === PedidoStatus.PENDENTE_PAGAMENTO) {
+        pedido.status = PedidoStatus.CONFIRMADO;
+        await manager.save(pedido); // 2º write, MESMA transacao -> atomico com o 1º
+        this.logger.log(`Order ${pedido.order_no} confirmed after payment`);
+        didConfirm = true;
+      }
+
+      return { pagamento, pedido, didConfirm };
     });
 
-    if (!pagamento) {
-      throw new NotFoundException('Pagamento nao encontrado');
-    }
-
-    if (pagamento.status === PagamentoStatus.PAID) {
-      this.logger.warn(`Payment ${pagamentoId} already confirmed`);
-      return pagamento;
-    }
-
-    pagamento.status = PagamentoStatus.PAID;
-    await this.db.getRepository(Pagamento).save(pagamento);
-
-    const pedido = pagamento.pedido;
-    if (pedido.status === PedidoStatus.PENDENTE_PAGAMENTO) {
-      pedido.status = PedidoStatus.CONFIRMADO;
-      await this.db.getRepository(Pedido).save(pedido);
-      this.logger.log(`Order ${pedido.order_no} confirmed after payment`);
-
+    // 5. Notificacao unica, FORA do callback (pos-commit quando standalone; igual
+    // ao de hoje quando aninhado no webhook). So notifica quem efetivamente
+    // transicionou o pedido -> sob o lock, apenas o vencedor entra aqui.
+    if (result.didConfirm) {
       try {
         await this.notificationsService.notifyPaymentConfirmed(
-          pagamento.tenant_id,
-          pagamento,
-          pedido,
+          result.pagamento.tenant_id,
+          result.pagamento,
+          result.pedido,
         );
       } catch (error) {
         this.logger.error('Error sending payment confirmation notification', {
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
           context: {
-            tenantId: pagamento.tenant_id,
-            pagamentoId: pagamento.id,
-            pedidoId: pagamento.pedido_id,
-            status: pagamento.status,
+            tenantId: result.pagamento.tenant_id,
+            pagamentoId: result.pagamento.id,
+            pedidoId: result.pagamento.pedido_id,
+            status: result.pagamento.status,
           },
         });
       }
-
     }
 
-    return pagamento;
+    return result.pagamento;
   }
 
   async findById(pagamentoId: string, tenantId: string): Promise<Pagamento> {
