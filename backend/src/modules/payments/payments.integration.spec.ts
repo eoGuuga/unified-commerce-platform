@@ -1094,6 +1094,26 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
       return rows[0].status;
     }
 
+    /** Le o snapshot de estoque (current/reserved) do produto direto no banco. */
+    async function readStockEnd(
+      produtoId: string,
+    ): Promise<{ current_stock: number; reserved_stock: number }> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+      const rows = await qr.query(
+        `SELECT current_stock, reserved_stock FROM movimentacoes_estoque
+          WHERE produto_id = $1 AND tenant_id = $2`,
+        [produtoId, tenantId],
+      );
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+      return {
+        current_stock: Number(rows[0].current_stock),
+        reserved_stock: Number(rows[0].reserved_stock),
+      };
+    }
+
     /** Conta linhas de um tipo de movimento (ex.: 'VENDA') no ledger para o pedido. */
     async function countLedgerEnd(pedidoId: string, tipo: string): Promise<number> {
       const qr = dataSource.createQueryRunner();
@@ -1306,6 +1326,54 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
       // (d) pedido efetivamente CONFIRMADO
       expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CONFIRMADO);
       expect(await reloadPagamentoStatus(pagamentoId)).toBe(PagamentoStatus.PAID);
+    });
+
+    // 3a — PAGAMENTO PARA PEDIDO JA CANCELADO (decisao §8): o pedido expirou e foi
+    // cancelado ANTES do webhook chegar. O dinheiro entrou de verdade (pagamento
+    // PAID), mas o pedido NAO ressuscita (segue CANCELADO). O LOJISTA e avisado
+    // (provavel reembolso) e o CLIENTE NAO recebe "pagamento confirmado". Estoque
+    // inalterado: a reserva ja foi liberada no cancelamento; confirmar pagamento
+    // nao re-reserva nem baixa (0 VENDA).
+    it('3a: pagamento para pedido CANCELADO → não ressuscita, lojista avisado, pagamento PAID, estoque inalterado', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste 3a - app nao inicializado');
+        return;
+      }
+
+      const paymentsService = moduleFixture.get<PaymentsService>(PaymentsService);
+      const notificationsService = moduleFixture.get<NotificationsService>(NotificationsService);
+      const ordersService = moduleFixture.get<OrdersService>(OrdersService);
+
+      const { pedidoId, pagamentoId, produtoId } = await seedPendingOrderWithPendingPayment();
+
+      // Cancela o pedido pelo CAMINHO REAL da expiracao: status -> CANCELADO,
+      // reserva liberada, stock_released_at preenchido.
+      await ordersService.releaseExpiredPendingOrder(pedidoId);
+
+      // Confirma pre-condicoes: pedido CANCELADO e reserva ja liberada.
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CANCELADO);
+      const stockBefore = await readStockEnd(produtoId);
+
+      const merchantSpy = jest
+        .spyOn(notificationsService, 'notifyMerchantPaymentForCancelledOrder')
+        .mockResolvedValue(undefined as any);
+      const custSpy = jest
+        .spyOn(notificationsService, 'notifyPaymentConfirmed')
+        .mockResolvedValue(undefined as any);
+
+      await paymentsService.confirmPayment(pagamentoId, tenantId);
+
+      // (b) pedido NAO ressuscitou — segue CANCELADO
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CANCELADO);
+      // (a) o dinheiro entrou — pagamento PAID
+      expect(await reloadPagamentoStatus(pagamentoId)).toBe(PagamentoStatus.PAID);
+      // (c) lojista avisado exatamente 1x (provavel reembolso)
+      expect(merchantSpy).toHaveBeenCalledTimes(1); // <- FALHA hoje (metodo nao existe / nao chamado)
+      // (d) cliente NAO recebe "pagamento confirmado"
+      expect(custSpy).not.toHaveBeenCalled();
+      // estoque inalterado (nada de VENDA, nada de re-reserva)
+      expect(await readStockEnd(produtoId)).toEqual(stockBefore);
+      expect(await countLedgerEnd(pedidoId, 'VENDA')).toBe(0);
     });
   });
 });

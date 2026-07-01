@@ -689,7 +689,12 @@ export class PaymentsService {
       // 2. Idempotencia AGORA sob o lock (fecha a corrida de dupla confirmacao).
       if (pagamento.status === PagamentoStatus.PAID) {
         this.logger.warn(`Payment ${pagamentoId} already confirmed`);
-        return { pagamento, pedido: pagamento.pedido, didConfirm: false };
+        return {
+          pagamento,
+          pedido: pagamento.pedido,
+          didConfirm: false,
+          paidForCancelled: false,
+        };
       }
 
       // 3. Marca pago (1º write, na transacao).
@@ -709,6 +714,11 @@ export class PaymentsService {
       // notifyPaymentConfirmed (passo 5), evitando dupla notificacao.
       let pedido = pagamento.pedido;
       let didConfirm = false;
+      // paidForCancelled: o dinheiro entrou (pagamento PAID no passo 3) mas o
+      // pedido ja estava CANCELADO (ex.: expirou antes do webhook). Decisao §8:
+      // NAO ressuscitar o pedido; apenas avisar o lojista (provavel reembolso).
+      // Lemos o status do pedido TRAVADO (relation carregada sob o lock).
+      let paidForCancelled = false;
       if (pedido && pedido.status === PedidoStatus.PENDENTE_PAGAMENTO) {
         pedido = await this.db.runWithManager(manager, () =>
           this.ordersService.updateStatus(
@@ -720,9 +730,12 @@ export class PaymentsService {
         );
         this.logger.log(`Order ${pedido.order_no} confirmed after payment`);
         didConfirm = true;
+      } else if (pedido && pedido.status === PedidoStatus.CANCELADO) {
+        // Pedido ja cancelado: pagamento fica PAID, pedido NAO transiciona.
+        paidForCancelled = true;
       }
 
-      return { pagamento, pedido, didConfirm };
+      return { pagamento, pedido, didConfirm, paidForCancelled };
     });
 
     // 5. Notificacao unica, FORA do callback (pos-commit quando standalone; igual
@@ -746,6 +759,39 @@ export class PaymentsService {
             status: result.pagamento.status,
           },
         });
+      }
+    }
+
+    // 6. Pagamento para pedido JA CANCELADO (decisao §8): NAO ressuscita o
+    // pedido, NAO notifica o cliente ("pagamento confirmado"). Loga o evento e
+    // avisa o LOJISTA (provavel reembolso). Best-effort — nao quebra o fluxo.
+    if (result.paidForCancelled && result.pedido) {
+      this.logger.warn('Payment received for an already-cancelled order', {
+        pedidoId: result.pedido.id,
+        pedidoStatus: result.pedido.status,
+        pagamentoId: result.pagamento.id,
+        amount: result.pagamento.amount,
+        tenantId: result.pagamento.tenant_id,
+      });
+      try {
+        await this.notificationsService.notifyMerchantPaymentForCancelledOrder(
+          result.pagamento.tenant_id,
+          result.pagamento,
+          result.pedido,
+        );
+      } catch (error) {
+        this.logger.error(
+          'Error notifying merchant of payment for cancelled order',
+          {
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            context: {
+              tenantId: result.pagamento.tenant_id,
+              pagamentoId: result.pagamento.id,
+              pedidoId: result.pedido.id,
+            },
+          },
+        );
       }
     }
 

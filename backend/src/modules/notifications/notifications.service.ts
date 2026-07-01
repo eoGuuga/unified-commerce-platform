@@ -310,6 +310,109 @@ export class NotificationsService {
     }
   }
 
+  /**
+   * Notifica o LOJISTA quando entra um pagamento para um pedido que JA foi
+   * CANCELADO (ex.: expirou antes do webhook chegar). Decisao §8: o pedido NAO
+   * ressuscita — o dinheiro entrou (pagamento PAID), mas o pedido segue
+   * cancelado e o estoque ja foi liberado. Isso costuma exigir REEMBOLSO, entao
+   * avisamos o dono do tenant (owner -> Usuario: telefone/e-mail).
+   *
+   * BEST-EFFORT / NAO-FATAL: tudo dentro de try/catch. NUNCA lanca — o fluxo de
+   * confirmacao do pagamento jamais pode quebrar porque o aviso ao lojista falhou.
+   */
+  async notifyMerchantPaymentForCancelledOrder(
+    tenantId: string,
+    pagamento: Pagamento,
+    pedido: Pedido,
+  ): Promise<void> {
+    try {
+      const ref = pedido.order_no || pedido.id;
+      const valor = this.formatCurrency(Number(pagamento.amount));
+      const msg =
+        `⚠️ Entrou um pagamento de ${valor} no pedido ${ref}, que JA foi CANCELADO. ` +
+        `O pedido nao foi reaberto e o estoque ja foi liberado — ` +
+        `verifique se cabe REEMBOLSO ao cliente.`;
+
+      // Resolve o dono do tenant (owner) e seu contato.
+      const tenant = await this.db
+        .getRepository(Tenant)
+        .findOne({ where: { id: tenantId } });
+
+      let ownerPhone: string | undefined;
+      let ownerEmail: string | undefined;
+
+      if (tenant?.owner_id) {
+        const owner = await this.db
+          .getRepository(Usuario)
+          .findOne({ where: { id: tenant.owner_id, tenant_id: tenantId } });
+        ownerPhone = owner?.phone?.trim() || undefined;
+        ownerEmail = owner?.email?.trim() || undefined;
+      }
+
+      // WhatsApp ao dono (best-effort).
+      if (ownerPhone) {
+        try {
+          await this.whatsappSender.sendText(tenantId, ownerPhone, msg);
+        } catch (whatsappError) {
+          this.logger.warn(
+            'Falha ao avisar lojista por WhatsApp (payment_for_cancelled_order)',
+            {
+              error:
+                whatsappError instanceof Error
+                  ? whatsappError.message
+                  : String(whatsappError),
+              tenantId,
+              pedidoId: pedido.id,
+              pagamentoId: pagamento.id,
+            },
+          );
+        }
+      }
+
+      // E-mail ao dono (best-effort).
+      if (ownerEmail) {
+        try {
+          await this.sendEmail(
+            ownerEmail,
+            `Pagamento em pedido cancelado - Pedido ${ref}`,
+            `<p>${this.escapeHtml(msg)}</p>`,
+          );
+        } catch (emailError) {
+          this.logger.warn(
+            'Falha ao avisar lojista por e-mail (payment_for_cancelled_order)',
+            {
+              error:
+                emailError instanceof Error
+                  ? emailError.message
+                  : String(emailError),
+              tenantId,
+              pedidoId: pedido.id,
+              pagamentoId: pagamento.id,
+            },
+          );
+        }
+      }
+
+      if (!ownerPhone && !ownerEmail) {
+        this.logger.warn(
+          'Sem contato do lojista para avisar pagamento em pedido cancelado',
+          { tenantId, pedidoId: pedido.id, pagamentoId: pagamento.id },
+        );
+      }
+    } catch (error) {
+      // Blindagem final: jamais propaga (nao pode quebrar a confirmacao).
+      this.logger.error(
+        'notifyMerchantPaymentForCancelledOrder falhou (ignorado, nao-fatal)',
+        {
+          error: error instanceof Error ? error.message : String(error),
+          tenantId,
+          pedidoId: pedido?.id,
+          pagamentoId: pagamento?.id,
+        },
+      );
+    }
+  }
+
   private generatePaymentConfirmedMessage(
     pedido: Pedido,
     pagamento: Pagamento,
