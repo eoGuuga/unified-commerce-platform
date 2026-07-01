@@ -1014,6 +1014,18 @@ export class WhatsAppService {
               checkout: null,
             });
             conversation.context = { ...conversation.context, state: 'idle', checkout: undefined };
+            // CAMADA 2 — A MENSAGEM NAO PODE MENTIR: a lista-vazia tem causas distintas.
+            // Se a causa REAL e a exceçao `closed` de HOJE (dayOffset===0, data civil
+            // atual no fuso da loja — a MESMA chave zero-padded que o gate usa), damos
+            // a mensagem especifica de fechamento. `custom_hours` (que gera slots) e as
+            // outras causas ("sem business_hours" / "fora do horario agora") NAO caem
+            // aqui: `custom_hours` nao esvazia a lista, e "sem business_hours" ja
+            // encerrou antes (~L947/L975).
+            const t = this.localDateParts(now, businessHours.tz);
+            const hojeKey = `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
+            if (exceptions.get(hojeKey)?.kind === 'closed') {
+              return 'Hoje a loja está fechada 🙏 Volte em breve!';
+            }
             return 'Não há horários disponíveis para retirada em breve. 🙏 Tente novamente mais tarde.';
           }
           const pickupSlots: PickupSlot[] = slots.map((s) => ({

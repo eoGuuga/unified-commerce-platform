@@ -540,4 +540,95 @@ describe('Retirada + agendamento + horario de funcionamento (S2b)', () => {
       expect(Math.max(...afterMon)).toBe(18); // recorrente 09-18 intacto
     });
   });
+
+  // ============== TASK 4: MENSAGEM "fechado hoje" — distincao RIGOROSA das 3 causas ==============
+  // A mensagem NAO pode mentir: "Hoje a loja esta fechada" SO aparece quando a causa
+  // REAL da lista-vazia e a exceçao `closed` de HOJE (fuso da loja). Nunca quando a
+  // lista veio vazia por "sem business_hours" (b) ou por "fora do horario agora" (c).
+  // `custom_hours` (horario reduzido, COM slots) nao dispara nenhuma mensagem especial (d).
+  describe('mensagem "fechado hoje" — a mensagem nao pode mentir (3 causas + custom_hours)', () => {
+    // "hoje" = data civil ATUAL no fuso da loja (a MESMA chave do gate/AvailabilityService).
+    const hojeSP = (): string =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date());
+
+    // Avanca a FSM pela PORTA DA FRENTE ate o ponto de lista-vazia da retirada
+    // (estagio collecting_phone com delivery_type='pickup'): retirada -> nome -> telefone.
+    async function reachPickupSlotStage(): Promise<string> {
+      await start();
+      await step('retirada');
+      await step('Maria Souza');
+      return step('11988887777');
+    }
+
+    it('(a) HOJE com exceçao "closed" + lista vazia -> "Hoje a loja está fechada" (mensagem nova)', async () => {
+      // A causa REAL da lista-vazia e a exceçao closed de HOJE. Isolamos a decisao da
+      // mensagem forçando slots=[] (o gate ja e coberto pelos testes da Task 3) e
+      // fazendo o findByDateRange devolver o `closed` de hoje.
+      service.generatePickupSlots = jest.fn().mockReturnValue([]);
+      service.availabilityService.findByDateRange = jest.fn().mockResolvedValue([
+        { date: hojeSP(), kind: 'closed', open: null, close: null },
+      ]);
+
+      const r = await reachPickupSlotStage();
+
+      expect(String(r)).toContain('Hoje a loja está fechada');
+      // Encerra honesto, sem criar pedido.
+      expect(createSpy).not.toHaveBeenCalled();
+      expect(conversation.context.checkout).toBeFalsy();
+      expect(conversation.context.state).toBe('idle');
+    });
+
+    it('(b) loja SEM business_hours -> mensagem "só entregas" existente, NAO "fechada"', async () => {
+      tenant = { id: tenantId, settings: {} }; // sem business_hours
+
+      // Sem business_hours, a retirada nao e oferecida: a mensagem "so entregas" ja
+      // dispara ao escolher "retirada" (estagio ask_fulfillment, ~L946) — causa distinta
+      // de "fechado por exceçao hoje".
+      await start();
+      const r = await step('retirada');
+
+      expect(String(r).toLowerCase()).toContain('entrega');
+      expect(String(r).toLowerCase()).not.toContain('fechad'); // nem "fechada" nem "fechado"
+      expect(createSpy).not.toHaveBeenCalled();
+      // FSM encerrada honesta (idle, checkout limpo).
+      expect(conversation.context.checkout).toBeFalsy();
+      expect(conversation.context.state).toBe('idle');
+    });
+
+    it('(c) COM horario hoje mas fora do horario agora (lista vazia, SEM exceçao) -> "sem horários em breve", NAO "fechada"', async () => {
+      // Sem exceçao nenhuma (findByDateRange = []) e slots vazios por horario.
+      service.generatePickupSlots = jest.fn().mockReturnValue([]);
+      service.availabilityService.findByDateRange = jest.fn().mockResolvedValue([]);
+
+      const r = await reachPickupSlotStage();
+
+      expect(String(r).toLowerCase()).toMatch(/hor[aá]rios dispon[ií]veis|mais tarde/);
+      expect(String(r).toLowerCase()).not.toContain('fechad');
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+
+    it('(d) custom_hours HOJE (reduzido, COM slots) -> oferece os slots, SEM mensagem de fechamento', async () => {
+      // A exceçao de hoje e custom_hours (nao closed). O gate produz slots (nao vazio),
+      // entao a FSM oferece a lista normalmente — nenhuma mensagem especial.
+      service.availabilityService.findByDateRange = jest.fn().mockResolvedValue([
+        { date: hojeSP(), kind: 'custom_hours', open: '09:00', close: '13:00' },
+      ]);
+      // Slots nao-vazios: o gate real produziria; garantimos o ramo "tem slots".
+      service.generatePickupSlots = jest.fn().mockReturnValue([
+        { label: 'Hoje 9h', scheduledAt: new Date(Date.now() + 3600_000) },
+        { label: 'Hoje 10h', scheduledAt: new Date(Date.now() + 7200_000) },
+      ]);
+
+      const r = await reachPickupSlotStage();
+
+      expect(String(r).toLowerCase()).toMatch(/quando quer retirar|n[uú]mero/);
+      expect(String(r).toLowerCase()).not.toContain('fechad');
+      expect(conversation.context.checkout?.stage).toBe('selecting_pickup_slot');
+    });
+  });
 });
