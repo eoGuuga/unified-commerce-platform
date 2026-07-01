@@ -22,7 +22,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import request from 'supertest';
 import * as bcrypt from 'bcryptjs';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
+import { Pagamento, PagamentoStatus } from '../../database/entities/Pagamento.entity';
+import { PedidoStatus } from '../../database/entities/Pedido.entity';
 import { JwtService } from '@nestjs/jwt';
 import { OrdersModule } from '../orders/orders.module';
 import { OrdersService } from '../orders/orders.service';
@@ -979,6 +981,456 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
       expect(stockAfterSecond.reserved).toBe(2);
       expect(await countLedger(pedidoIdApr, 'VENDA')).toBe(vendasAfterFirst);
       expect(await countLedger(pedidoIdApr, 'VENDA')).toBe(0);
+    });
+  });
+
+  /**
+   * Task 1: endurecimento do confirmPayment (transacional + FOR UPDATE +
+   * idempotencia sob lock + atomicidade). Reusa o mesmo padrao de seed direto
+   * (SQL bruto, sem RLS) dos blocos Task 8 / Webhook approved, com IDs proprios
+   * para nao colidir com o beforeEach daqueles describes.
+   */
+  describe('confirmPayment — endurecimento (transacao + FOR UPDATE + idempotencia sob lock)', () => {
+    const produtoIdEnd  = 'aaa00000-0000-0000-0000-000000000003';
+    const pedidoIdEnd    = 'bbb00000-0000-0000-0000-000000000003';
+    const pagamentoIdEnd = 'ccc00000-0000-0000-0000-000000000003';
+    const mpPaymentIdEnd = 'mp-fake-endurecimento-003';
+
+    /**
+     * Semeia produto, estoque com reserva, pedido ecommerce pendente_pagamento,
+     * item e pagamento PENDING vinculado por transaction_id (para o webhook do 1c).
+     * Retorna os ids do pedido/pagamento semeados.
+     */
+    async function seedPendingOrderWithPendingPayment(): Promise<{
+      pedidoId: string;
+      pagamentoId: string;
+      produtoId: string;
+    }> {
+      const currentStock = 10;
+      const reservedStock = 2;
+      const quantity = 2;
+      const unitPrice = 50;
+
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+
+      await qr.query(
+        `DELETE FROM movimentacoes_estoque_historico WHERE order_id = $1`,
+        [pedidoIdEnd],
+      );
+      await qr.query(
+        `DELETE FROM movimentacoes_estoque WHERE produto_id = $1 AND tenant_id = $2`,
+        [produtoIdEnd, tenantId],
+      );
+      await qr.query(`DELETE FROM itens_pedido WHERE pedido_id = $1`, [pedidoIdEnd]);
+      await qr.query(`DELETE FROM pagamentos WHERE id = $1`, [pagamentoIdEnd]);
+      await qr.query(`DELETE FROM pedidos WHERE id = $1`, [pedidoIdEnd]);
+      await qr.query(`DELETE FROM produtos WHERE id = $1`, [produtoIdEnd]);
+
+      await qr.query(
+        `INSERT INTO produtos (id, tenant_id, name, price, unit, is_active, created_at, updated_at)
+         VALUES ($1, $2, 'Produto Endurecimento', $3, 'unidade', true, now(), now())`,
+        [produtoIdEnd, tenantId, unitPrice],
+      );
+
+      await qr.query(
+        `INSERT INTO movimentacoes_estoque (id, tenant_id, produto_id, current_stock, reserved_stock, min_stock, last_updated)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, 0, now())`,
+        [tenantId, produtoIdEnd, currentStock, reservedStock],
+      );
+
+      const totalPedido = unitPrice * quantity;
+      await qr.query(
+        `INSERT INTO pedidos (id, tenant_id, order_no, status, channel, customer_name, subtotal, total_amount, created_at, updated_at)
+         VALUES ($1, $2, $3, 'pendente_pagamento', 'ecommerce', 'Cliente Endurecimento', $4, $4, now(), now())`,
+        [pedidoIdEnd, tenantId, `ORD-END-${Date.now()}`, totalPedido],
+      );
+
+      await qr.query(
+        `INSERT INTO itens_pedido (id, pedido_id, produto_id, quantity, unit_price, subtotal, created_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, now())`,
+        [pedidoIdEnd, produtoIdEnd, quantity, unitPrice, unitPrice * quantity],
+      );
+
+      await qr.query(
+        `INSERT INTO pagamentos (id, tenant_id, pedido_id, method, amount, status, transaction_id, metadata, created_at, updated_at)
+         VALUES ($1, $2, $3, 'pix', $4, 'pending', $5, $6::jsonb, now(), now())`,
+        [
+          pagamentoIdEnd,
+          tenantId,
+          pedidoIdEnd,
+          unitPrice * quantity,
+          mpPaymentIdEnd,
+          JSON.stringify({ provider: 'mercadopago', tenant_id: tenantId }),
+        ],
+      );
+
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+
+      return { pedidoId: pedidoIdEnd, pagamentoId: pagamentoIdEnd, produtoId: produtoIdEnd };
+    }
+
+    /** Le o status atual do pedido direto no banco. */
+    async function reloadPedidoStatus(pedidoId: string): Promise<string> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+      const rows = await qr.query(`SELECT status FROM pedidos WHERE id = $1`, [pedidoId]);
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+      return rows[0].status;
+    }
+
+    /** Le o status atual do pagamento direto no banco. */
+    async function reloadPagamentoStatus(pagamentoId: string): Promise<string> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+      const rows = await qr.query(`SELECT status FROM pagamentos WHERE id = $1`, [pagamentoId]);
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+      return rows[0].status;
+    }
+
+    /** Le o snapshot de estoque (current/reserved) do produto direto no banco. */
+    async function readStockEnd(
+      produtoId: string,
+    ): Promise<{ current_stock: number; reserved_stock: number }> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+      const rows = await qr.query(
+        `SELECT current_stock, reserved_stock FROM movimentacoes_estoque
+          WHERE produto_id = $1 AND tenant_id = $2`,
+        [produtoId, tenantId],
+      );
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+      return {
+        current_stock: Number(rows[0].current_stock),
+        reserved_stock: Number(rows[0].reserved_stock),
+      };
+    }
+
+    /** Conta linhas de um tipo de movimento (ex.: 'VENDA') no ledger para o pedido. */
+    async function countLedgerEnd(pedidoId: string, tipo: string): Promise<number> {
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+      const rows = await qr.query(
+        `SELECT COUNT(*)::int AS n FROM movimentacoes_estoque_historico WHERE order_id = $1 AND tipo = $2`,
+        [pedidoId, tipo],
+      );
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+      return Number(rows[0].n);
+    }
+
+    function buildWebhookPayloadEnd(mpPaymentId: string): Record<string, any> {
+      return {
+        action: 'payment.updated',
+        api_version: 'v1',
+        data: { id: mpPaymentId },
+        date_created: new Date().toISOString(),
+        id: `notif-${mpPaymentId}`,
+        live_mode: false,
+        type: 'payment',
+        user_id: '12345',
+      };
+    }
+
+    afterEach(async () => {
+      if (!dataSource) return;
+      jest.restoreAllMocks();
+      const qr = dataSource.createQueryRunner();
+      await qr.connect();
+      await qr.query(`SET session_replication_role = replica`);
+      await qr.query(
+        `DELETE FROM movimentacoes_estoque_historico WHERE order_id = $1`,
+        [pedidoIdEnd],
+      );
+      await qr.query(
+        `DELETE FROM movimentacoes_estoque WHERE produto_id = $1 AND tenant_id = $2`,
+        [produtoIdEnd, tenantId],
+      );
+      await qr.query(`DELETE FROM itens_pedido WHERE pedido_id = $1`, [pedidoIdEnd]);
+      await qr.query(`DELETE FROM pagamentos WHERE id = $1`, [pagamentoIdEnd]);
+      await qr.query(`DELETE FROM pedidos WHERE id = $1`, [pedidoIdEnd]);
+      await qr.query(`DELETE FROM produtos WHERE id = $1`, [produtoIdEnd]);
+      await qr.query(`SET session_replication_role = DEFAULT`);
+      await qr.release();
+    });
+
+    // 1a — DOIS confirmPayment MANUAIS concorrentes (hoje sem lock → dupla
+    // confirmacao/notificacao). Sob o lock, deve resultar em 1 CONFIRMADO,
+    // pagamento PAID e UMA notificacao.
+    it('1a: dois confirmPayment concorrentes → pedido CONFIRMADO 1x, pagamento PAID, notifica 1x', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste 1a - app nao inicializado');
+        return;
+      }
+
+      const paymentsService = moduleFixture.get<PaymentsService>(PaymentsService);
+      const notificationsService = moduleFixture.get<NotificationsService>(NotificationsService);
+
+      const { pedidoId, pagamentoId } = await seedPendingOrderWithPendingPayment();
+      const notifySpy = jest
+        .spyOn(notificationsService, 'notifyPaymentConfirmed')
+        .mockResolvedValue(undefined as any);
+
+      await Promise.all([
+        paymentsService.confirmPayment(pagamentoId, tenantId),
+        paymentsService.confirmPayment(pagamentoId, tenantId),
+      ]);
+
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CONFIRMADO);
+      expect(await reloadPagamentoStatus(pagamentoId)).toBe(PagamentoStatus.PAID);
+      expect(notifySpy).toHaveBeenCalledTimes(1); // <- FALHA hoje (dispara 2x)
+      // estoque intacto + 0 VENDA no ledger (confirmar pagamento nao baixa estoque)
+      expect(await countLedgerEnd(pedidoId, 'VENDA')).toBe(0);
+    });
+
+    // 1b — atomicidade: se o 2º write (transicao do pedido) falha, o 1º write
+    // (pagamento PAID) faz ROLLBACK — sem orfao PAID+PENDENTE.
+    it('1b: falha na transição do pedido → rollback, sem órfão PAID+PENDENTE', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste 1b - app nao inicializado');
+        return;
+      }
+
+      const paymentsService = moduleFixture.get<PaymentsService>(PaymentsService);
+
+      const { pedidoId, pagamentoId } = await seedPendingOrderWithPendingPayment();
+
+      // Forca APENAS o save da TRANSICAO do pedido (pedido.status = CONFIRMADO)
+      // a lancar, deixando o 1º save (pagamento PAID) passar. Assim exercitamos
+      // exatamente a atomicidade: o 1º write ja marcou PAID; se o 2º falha e nao
+      // houver transacao/rollback, o pagamento fica PAID orfao (o furo).
+      // (Nao usamos mockImplementationOnce porque a 1a chamada de save eh a do
+      // pagamento — precisamos discriminar pelo alvo, o pedido em CONFIRMADO.)
+      // Varremos TODOS os args porque a transicao agora passa pela state-machine
+      // (orders.updateStatus -> Repository.save), que chama
+      // EntityManager.save(target, entity, options) — a entidade vem em args[1],
+      // nao em args[0]. O save direto do pagamento usa a forma save(entity) com
+      // a entidade em args[0]. Detectamos o pedido->CONFIRMADO em qualquer forma.
+      const realSave = EntityManager.prototype.save;
+      const saveSpy = jest
+        .spyOn(EntityManager.prototype, 'save')
+        .mockImplementation(function (this: EntityManager, ...args: any[]) {
+          const savingConfirmedPedido = args.some(
+            (a) =>
+              a &&
+              typeof a === 'object' &&
+              !Array.isArray(a) &&
+              a.status === PedidoStatus.CONFIRMADO,
+          );
+          if (savingConfirmedPedido) {
+            throw new Error('boom no save da transição do pedido');
+          }
+          return (realSave as any).apply(this, args);
+        });
+
+      await expect(
+        paymentsService.confirmPayment(pagamentoId, tenantId),
+      ).rejects.toThrow();
+
+      saveSpy.mockRestore();
+
+      // Rollback: pagamento volta a PENDING e pedido segue PENDENTE_PAGAMENTO.
+      expect(await reloadPagamentoStatus(pagamentoId)).toBe(PagamentoStatus.PENDING); // <- FALHA hoje (fica PAID orfao)
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.PENDENTE_PAGAMENTO);
+    });
+
+    // 1c — REENTRANCIA: dois WEBHOOKS aprovados concorrentes. O confirmPayment
+    // roda DENTRO do FOR UPDATE do webhook; runInTransaction reusa o manager
+    // corrente e o pessimistic_write recai na MESMA linha ja travada →
+    // reentrante, SEM deadlock. Ja deve passar hoje (o webhook serializa).
+    it('1c: dois webhooks aprovados concorrentes → 1 CONFIRMADO, 1 notificação, SEM deadlock', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste 1c - app nao inicializado');
+        return;
+      }
+
+      const paymentsService = moduleFixture.get<PaymentsService>(PaymentsService);
+      const mpProvider = moduleFixture.get<MercadoPagoProvider>(MercadoPagoProvider);
+      const notificationsService = moduleFixture.get<NotificationsService>(NotificationsService);
+
+      const { pedidoId, pagamentoId } = await seedPendingOrderWithPendingPayment();
+
+      jest.spyOn(mpProvider, 'isConfigured').mockReturnValue(true);
+      jest.spyOn(mpProvider, 'getPaymentDetails').mockResolvedValue({
+        status: 'approved',
+        status_detail: 'accredited',
+        metadata: { tenant_id: tenantId },
+        external_reference: pedidoIdEnd,
+        payment_method_id: 'pix',
+      });
+      const notifySpy = jest
+        .spyOn(notificationsService, 'notifyPaymentConfirmed')
+        .mockResolvedValue(undefined as any);
+
+      const payload = buildWebhookPayloadEnd(mpPaymentIdEnd);
+
+      // Dois webhooks SIMULTANEOS (nao sequenciais). Nao pode lancar deadlock/erro.
+      await Promise.all([
+        paymentsService.handleMercadoPagoWebhook(payload, { token: '' }),
+        paymentsService.handleMercadoPagoWebhook(payload, { token: '' }),
+      ]);
+
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CONFIRMADO);
+      expect(await reloadPagamentoStatus(pagamentoId)).toBe(PagamentoStatus.PAID);
+      expect(notifySpy).toHaveBeenCalledTimes(1);
+    });
+
+    // 2a — TRANSICAO PELA STATE-MACHINE + notificacao unica. O confirmPayment
+    // deve transicionar o pedido via ordersService.updateStatus (respeitando
+    // assertStatusTransition + lock), com suppressNotification:true, de modo que
+    // o cliente receba UMA unica mensagem (notifyPaymentConfirmed) e NAO a de
+    // status (notifyOrderStatusChange). CRITICO: o updateStatus roda na MESMA
+    // transacao do confirmPayment (via runWithManager reusando o manager corrente).
+    it('2a: transição vai pela state-machine (updateStatus) e NÃO dupla-notifica', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste 2a - app nao inicializado');
+        return;
+      }
+
+      const paymentsService = moduleFixture.get<PaymentsService>(PaymentsService);
+      const notificationsService = moduleFixture.get<NotificationsService>(NotificationsService);
+      const ordersService = moduleFixture.get<OrdersService>(OrdersService);
+
+      const { pedidoId, pagamentoId } = await seedPendingOrderWithPendingPayment();
+
+      const paySpy = jest
+        .spyOn(notificationsService, 'notifyPaymentConfirmed')
+        .mockResolvedValue(undefined as any);
+      const statusSpy = jest
+        .spyOn(notificationsService, 'notifyOrderStatusChange')
+        .mockResolvedValue(undefined as any);
+      const updSpy = jest.spyOn(ordersService, 'updateStatus');
+
+      await paymentsService.confirmPayment(pagamentoId, tenantId);
+
+      // (a) transicao passou pela state-machine com supressao da notificacao de status
+      expect(updSpy).toHaveBeenCalledWith(
+        pedidoId,
+        PedidoStatus.CONFIRMADO,
+        tenantId,
+        expect.objectContaining({ suppressNotification: true }),
+      );
+      // (b) UMA unica mensagem ao cliente
+      expect(paySpy).toHaveBeenCalledTimes(1);
+      // (c) a notificacao de status NAO foi disparada (evita dupla notificacao)
+      expect(statusSpy).not.toHaveBeenCalled(); // <- FALHA hoje (dispara a de status tambem)
+      // (d) pedido efetivamente CONFIRMADO
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CONFIRMADO);
+      expect(await reloadPagamentoStatus(pagamentoId)).toBe(PagamentoStatus.PAID);
+    });
+
+    // 3a — PAGAMENTO PARA PEDIDO JA CANCELADO (decisao §8): o pedido expirou e foi
+    // cancelado ANTES do webhook chegar. O dinheiro entrou de verdade (pagamento
+    // PAID), mas o pedido NAO ressuscita (segue CANCELADO). O LOJISTA e avisado
+    // (provavel reembolso) e o CLIENTE NAO recebe "pagamento confirmado". Estoque
+    // inalterado: a reserva ja foi liberada no cancelamento; confirmar pagamento
+    // nao re-reserva nem baixa (0 VENDA).
+    it('3a: pagamento para pedido CANCELADO → não ressuscita, lojista avisado, pagamento PAID, estoque inalterado', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste 3a - app nao inicializado');
+        return;
+      }
+
+      const paymentsService = moduleFixture.get<PaymentsService>(PaymentsService);
+      const notificationsService = moduleFixture.get<NotificationsService>(NotificationsService);
+      const ordersService = moduleFixture.get<OrdersService>(OrdersService);
+
+      const { pedidoId, pagamentoId, produtoId } = await seedPendingOrderWithPendingPayment();
+
+      // Cancela o pedido pelo CAMINHO REAL da expiracao: status -> CANCELADO,
+      // reserva liberada, stock_released_at preenchido.
+      await ordersService.releaseExpiredPendingOrder(pedidoId);
+
+      // Confirma pre-condicoes: pedido CANCELADO e reserva ja liberada.
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CANCELADO);
+      const stockBefore = await readStockEnd(produtoId);
+
+      const merchantSpy = jest
+        .spyOn(notificationsService, 'notifyMerchantPaymentForCancelledOrder')
+        .mockResolvedValue(undefined as any);
+      const custSpy = jest
+        .spyOn(notificationsService, 'notifyPaymentConfirmed')
+        .mockResolvedValue(undefined as any);
+
+      await paymentsService.confirmPayment(pagamentoId, tenantId);
+
+      // (b) pedido NAO ressuscitou — segue CANCELADO
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CANCELADO);
+      // (a) o dinheiro entrou — pagamento PAID
+      expect(await reloadPagamentoStatus(pagamentoId)).toBe(PagamentoStatus.PAID);
+      // (c) lojista avisado exatamente 1x (provavel reembolso)
+      expect(merchantSpy).toHaveBeenCalledTimes(1); // <- FALHA hoje (metodo nao existe / nao chamado)
+      // (d) cliente NAO recebe "pagamento confirmado"
+      expect(custSpy).not.toHaveBeenCalled();
+      // estoque inalterado (nada de VENDA, nada de re-reserva)
+      expect(await readStockEnd(produtoId)).toEqual(stockBefore);
+      expect(await countLedgerEnd(pedidoId, 'VENDA')).toBe(0);
+    });
+
+    // 4a — OBSERVABILIDADE (achado IMPORTANTE-1): pagamento vira PAID para um
+    // pedido em estado INESPERADO (nem PENDENTE_PAGAMENTO nem CANCELADO). Hoje
+    // isso e um buraco silencioso: sem log, sem aviso. O ramo `else` deve deixar
+    // rastro no log (logger.warn) sem notificar cliente nem lojista e sem tocar
+    // o pedido. Semeamos pendente e MOVEMOS o pedido para CONFIRMADO (transicao
+    // valida) SEM tocar o pagamento (segue PENDING); confirmPayment cai no ramo
+    // inesperado.
+    it('4a: pagamento PAID para pedido em estado inesperado → warn logado, não notifica, pedido inalterado', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste 4a - app nao inicializado');
+        return;
+      }
+
+      const paymentsService = moduleFixture.get<PaymentsService>(PaymentsService);
+      const notificationsService = moduleFixture.get<NotificationsService>(NotificationsService);
+      const ordersService = moduleFixture.get<OrdersService>(OrdersService);
+
+      const { pedidoId, pagamentoId } = await seedPendingOrderWithPendingPayment();
+
+      // Move o pedido para CONFIRMADO por transicao valida, SEM tocar o
+      // pagamento (segue PENDING). confirmPayment vera um estado que nao e
+      // PENDENTE_PAGAMENTO nem CANCELADO -> ramo inesperado.
+      await ordersService.updateStatus(pedidoId, PedidoStatus.CONFIRMADO, tenantId, {
+        suppressNotification: true,
+      });
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CONFIRMADO);
+
+      const warnSpy = jest.spyOn((paymentsService as any).logger, 'warn');
+      const custSpy = jest
+        .spyOn(notificationsService, 'notifyPaymentConfirmed')
+        .mockResolvedValue(undefined as any);
+      const merchantSpy = jest
+        .spyOn(notificationsService, 'notifyMerchantPaymentForCancelledOrder')
+        .mockResolvedValue(undefined as any);
+
+      await paymentsService.confirmPayment(pagamentoId, tenantId);
+
+      // (a) warn emitido com o id do pagamento e mencao ao estado inesperado
+      expect(warnSpy).toHaveBeenCalled(); // <- FALHA hoje (ramo else nao existe)
+      const warnCall = warnSpy.mock.calls.find((call) => {
+        const msg = String(call[0] ?? '');
+        return msg.includes(pagamentoId) || /estado inesperado/i.test(msg);
+      });
+      expect(warnCall).toBeDefined();
+      expect(String(warnCall![0])).toContain(pagamentoId);
+      expect(String(warnCall![0])).toMatch(/estado inesperado/i);
+
+      // (b) o dinheiro entrou — pagamento PAID (continua PAID)
+      expect(await reloadPagamentoStatus(pagamentoId)).toBe(PagamentoStatus.PAID);
+      // (c) pedido inalterado — segue CONFIRMADO (nao ressuscita nem regride)
+      expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CONFIRMADO);
+      // (d) cliente NAO notificado (nao passou por transicao limpa)
+      expect(custSpy).not.toHaveBeenCalled();
+      // (e) lojista NAO notificado (esse aviso e so do caso CANCELADO)
+      expect(merchantSpy).not.toHaveBeenCalled();
     });
   });
 });

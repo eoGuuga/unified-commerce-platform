@@ -647,6 +647,7 @@ export class OrdersService {
     id: string,
     status: PedidoStatus,
     tenantId: string,
+    opts?: { suppressNotification?: boolean },
   ): Promise<Pedido> {
     const pedido = await this.findOne(id, tenantId);
     const oldStatus = pedido.status;
@@ -708,7 +709,15 @@ export class OrdersService {
       return manager.getRepository(Pedido).save(lockedPedido);
     });
 
-    // Notificação FORA da transação (sem I/O externo sob lock)
+    // Notificação FORA da transação (sem I/O externo sob lock).
+    // Opt-in `suppressNotification`: quando o chamador ja emite sua propria
+    // notificacao para essa transicao (ex.: confirmPayment dispara
+    // notifyPaymentConfirmed), suprimimos a de status para evitar dupla
+    // notificacao ao cliente. Default (undefined/false) preserva o
+    // comportamento atual para todos os outros chamadores.
+    if (opts?.suppressNotification) {
+      return updatedPedido;
+    }
     try {
       await this.notificationsService.notifyOrderStatusChange(
         tenantId,

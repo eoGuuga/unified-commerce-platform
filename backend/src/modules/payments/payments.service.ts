@@ -657,51 +657,191 @@ export class PaymentsService {
   }
 
   async confirmPayment(pagamentoId: string, tenantId: string): Promise<Pagamento> {
-    const pagamento = await this.db.getRepository(Pagamento).findOne({
-      where: { id: pagamentoId, tenant_id: tenantId },
-      relations: ['pedido'],
+    // Transacao propria + FOR UPDATE + idempotencia sob lock. Se ja estamos
+    // dentro de uma transacao (ex.: webhook), runInTransaction reusa o manager
+    // corrente (db-context L33-39) e o lock recai na MESMA linha ja travada
+    // pela transacao do webhook -> reentrante, sem deadlock.
+    const result = await this.db.runInTransaction(async (manager) => {
+      // 1. Lock pessimista (FOR UPDATE) na linha do pagamento. O lock e feito
+      // SEM relations (join + FOR UPDATE pode falhar no Postgres — mesmo padrao
+      // do webhook L845 e de orders.updateStatus L665); o pedido e recarregado
+      // em seguida ja sob o lock da transacao.
+      const pagamentoLock = await manager
+        .createQueryBuilder(Pagamento, 'p')
+        .setLock('pessimistic_write')
+        .where('p.id = :id', { id: pagamentoId })
+        .andWhere('p.tenant_id = :tenantId', { tenantId })
+        .getOne();
+
+      if (!pagamentoLock) {
+        throw new NotFoundException('Pagamento nao encontrado');
+      }
+
+      const pagamento = await manager.getRepository(Pagamento).findOne({
+        where: { id: pagamentoLock.id, tenant_id: tenantId },
+        relations: ['pedido'],
+      });
+
+      if (!pagamento) {
+        throw new NotFoundException('Pagamento nao encontrado');
+      }
+
+      // 2. Idempotencia AGORA sob o lock (fecha a corrida de dupla confirmacao).
+      if (pagamento.status === PagamentoStatus.PAID) {
+        this.logger.warn(`Payment ${pagamentoId} already confirmed`);
+        return {
+          pagamento,
+          pedido: pagamento.pedido,
+          didConfirm: false,
+          paidForCancelled: false,
+          // Idempotencia (ja PAID -> early return) NAO eh o caso novo do Task 4:
+          // nao logamos o warn de "estado inesperado" aqui.
+          paidUnexpectedState: false,
+          unexpectedPedidoStatus: null,
+        };
+      }
+
+      // 3. Marca pago (1º write, na transacao).
+      pagamento.status = PagamentoStatus.PAID;
+      await manager.save(pagamento);
+
+      // 4. Transicao do pedido pela state-machine (assertStatusTransition + lock
+      // + no-op idempotente + commit/release conforme o alvo). CRITICO: rodamos
+      // dentro de runWithManager(manager) porque runInTransaction NAO instala o
+      // manager no ALS ao abrir transacao nova (db-context L33-39 so passa o
+      // manager como argumento). Sem isso, updateStatus resolveria seus repos
+      // pelo manager default (getManager()/ALS) e escaparia da transacao ->
+      // quebraria a atomicidade do passo 3 (o rollback do 1b deixaria de valer).
+      // Com runWithManager, updateStatus reusa a MESMA transacao/lock (o proprio
+      // runInTransaction interno dele encontra o store e reusa o manager).
+      // suppressNotification:true: a notificacao ao cliente e a unica
+      // notifyPaymentConfirmed (passo 5), evitando dupla notificacao.
+      let pedido = pagamento.pedido;
+      let didConfirm = false;
+      // paidForCancelled: o dinheiro entrou (pagamento PAID no passo 3) mas o
+      // pedido ja estava CANCELADO (ex.: expirou antes do webhook). Decisao §8:
+      // NAO ressuscitar o pedido; apenas avisar o lojista (provavel reembolso).
+      // Lemos o status do pedido TRAVADO (relation carregada sob o lock).
+      let paidForCancelled = false;
+      // paidUnexpectedState (Task 4 / achado IMPORTANTE-1): o pagamento virou
+      // PAID (passo 3) mas o pedido NAO estava num estado que este fluxo trata
+      // com transicao limpa — nem PENDENTE_PAGAMENTO (confirmacao) nem CANCELADO
+      // (aviso de reembolso). Cai aqui se o pedido esta num estado intermediario
+      // (CONFIRMADO/EM_PRODUCAO/PRONTO/EM_TRANSITO/ENTREGUE) OU se o pedido eh
+      // null. Sem este ramo, o pagamento viraria PAID sem NENHUM rastro (buraco
+      // silencioso). Capturamos o estado sob o lock e logamos FORA do callback.
+      // NAO notifica cliente nem lojista e NAO altera o pedido — so deixa rastro.
+      let paidUnexpectedState = false;
+      let unexpectedPedidoStatus: PedidoStatus | null = null;
+      if (pedido && pedido.status === PedidoStatus.PENDENTE_PAGAMENTO) {
+        pedido = await this.db.runWithManager(manager, () =>
+          this.ordersService.updateStatus(
+            pedido!.id,
+            PedidoStatus.CONFIRMADO,
+            tenantId,
+            { suppressNotification: true },
+          ),
+        );
+        this.logger.log(`Order ${pedido.order_no} confirmed after payment`);
+        didConfirm = true;
+      } else if (pedido && pedido.status === PedidoStatus.CANCELADO) {
+        // Pedido ja cancelado: pagamento fica PAID, pedido NAO transiciona.
+        paidForCancelled = true;
+      } else {
+        // Estado inesperado (pedido null OU nem PENDENTE nem CANCELADO): o
+        // pagamento continua PAID, mas isto precisa deixar rastro no log.
+        paidUnexpectedState = true;
+        unexpectedPedidoStatus = pedido?.status ?? null;
+      }
+
+      return {
+        pagamento,
+        pedido,
+        didConfirm,
+        paidForCancelled,
+        paidUnexpectedState,
+        unexpectedPedidoStatus,
+      };
     });
 
-    if (!pagamento) {
-      throw new NotFoundException('Pagamento nao encontrado');
-    }
-
-    if (pagamento.status === PagamentoStatus.PAID) {
-      this.logger.warn(`Payment ${pagamentoId} already confirmed`);
-      return pagamento;
-    }
-
-    pagamento.status = PagamentoStatus.PAID;
-    await this.db.getRepository(Pagamento).save(pagamento);
-
-    const pedido = pagamento.pedido;
-    if (pedido.status === PedidoStatus.PENDENTE_PAGAMENTO) {
-      pedido.status = PedidoStatus.CONFIRMADO;
-      await this.db.getRepository(Pedido).save(pedido);
-      this.logger.log(`Order ${pedido.order_no} confirmed after payment`);
-
+    // 5. Notificacao unica, FORA do callback (pos-commit quando standalone; igual
+    // ao de hoje quando aninhado no webhook). So notifica quem efetivamente
+    // transicionou o pedido -> sob o lock, apenas o vencedor entra aqui.
+    if (result.didConfirm) {
       try {
         await this.notificationsService.notifyPaymentConfirmed(
-          pagamento.tenant_id,
-          pagamento,
-          pedido,
+          result.pagamento.tenant_id,
+          result.pagamento,
+          result.pedido,
         );
       } catch (error) {
         this.logger.error('Error sending payment confirmation notification', {
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
           context: {
-            tenantId: pagamento.tenant_id,
-            pagamentoId: pagamento.id,
-            pedidoId: pagamento.pedido_id,
-            status: pagamento.status,
+            tenantId: result.pagamento.tenant_id,
+            pagamentoId: result.pagamento.id,
+            pedidoId: result.pagamento.pedido_id,
+            status: result.pagamento.status,
           },
         });
       }
-
     }
 
-    return pagamento;
+    // 6. Pagamento para pedido JA CANCELADO (decisao §8): NAO ressuscita o
+    // pedido, NAO notifica o cliente ("pagamento confirmado"). Loga o evento e
+    // avisa o LOJISTA (provavel reembolso). Best-effort — nao quebra o fluxo.
+    if (result.paidForCancelled && result.pedido) {
+      this.logger.warn('Payment received for an already-cancelled order', {
+        pedidoId: result.pedido.id,
+        pedidoStatus: result.pedido.status,
+        pagamentoId: result.pagamento.id,
+        amount: result.pagamento.amount,
+        tenantId: result.pagamento.tenant_id,
+      });
+      try {
+        await this.notificationsService.notifyMerchantPaymentForCancelledOrder(
+          result.pagamento.tenant_id,
+          result.pagamento,
+          result.pedido,
+        );
+      } catch (error) {
+        this.logger.error(
+          'Error notifying merchant of payment for cancelled order',
+          {
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            context: {
+              tenantId: result.pagamento.tenant_id,
+              pagamentoId: result.pagamento.id,
+              pedidoId: result.pedido.id,
+            },
+          },
+        );
+      }
+    }
+
+    // 7. Observabilidade (Task 4 / achado IMPORTANTE-1): pagamento virou PAID
+    // mas o pedido NAO passou por uma transicao limpa (nem confirmacao, nem
+    // cancelado-tratado). Regra: qualquer PAID sem transicao limpa TEM que
+    // deixar rastro no log. NAO notifica cliente nem lojista e NAO altera o
+    // pedido — o pagamento continua PAID. Cobre pedido null e estados
+    // intermediarios (CONFIRMADO/EM_PRODUCAO/PRONTO/EM_TRANSITO/ENTREGUE).
+    if (result.paidUnexpectedState) {
+      const estado = result.unexpectedPedidoStatus;
+      this.logger.warn(
+        `Pagamento ${result.pagamento.id} marcado PAID para pedido ${result.pedido?.id ?? 'nao encontrado'} em estado inesperado ${estado ?? 'N/A (pedido null)'} — requer atencao`,
+        {
+          tenantId: result.pagamento.tenant_id,
+          pagamentoId: result.pagamento.id,
+          pedidoId: result.pedido?.id ?? null,
+          pedidoStatus: estado,
+          amount: result.pagamento.amount,
+        },
+      );
+    }
+
+    return result.pagamento;
   }
 
   async findById(pagamentoId: string, tenantId: string): Promise<Pagamento> {
