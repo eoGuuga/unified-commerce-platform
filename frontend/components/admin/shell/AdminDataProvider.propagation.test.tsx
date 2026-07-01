@@ -85,6 +85,7 @@ vi.mock('lucide-react', () => ({
   Receipt: () => <span data-testid="icon-receipt" />,
   Package: () => <span data-testid="icon-package" />,
   Boxes: () => <span data-testid="icon-boxes" />,
+  Settings: () => <span data-testid="icon-settings" />,
   LogOut: () => <span data-testid="icon-logout" />,
 }));
 
