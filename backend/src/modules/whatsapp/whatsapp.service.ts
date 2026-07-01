@@ -40,6 +40,7 @@ import { WhatsappSender } from './config/whatsapp-sender.service';
 
 import { TypedConversation, ConversationState, CustomerData, PendingOrder } from './types/whatsapp.types';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
+import { BusinessHours, describeBusinessHours } from './utils/business-hours';
 
 export type WhatsAppOutboundResponse =
   | string
@@ -97,17 +98,6 @@ type CheckoutStage =
 interface PickupSlot {
   label: string;
   scheduled_at: string; // ISO
-}
-
-/**
- * Horario de funcionamento da loja, lido de tenant.settings.business_hours.
- * days: 0=domingo .. 6=sabado. open/close em "HH:MM". tz: IANA (ex.: America/Sao_Paulo).
- */
-interface BusinessHours {
-  days: number[];
-  open: string;
-  close: string;
-  tz: string;
 }
 
 /**
@@ -1321,18 +1311,36 @@ export class WhatsAppService {
     try {
       const tenant = await this.tenantsService.findOneById(tenantId);
       const bh = tenant?.settings?.business_hours;
+      // Valida o SHAPE POR-DIA: { tz, days: { "0".."6": { open, close } } }.
+      // Fail-closed: qualquer campo ausente/malformado -> null (sem retirada).
       if (
-        bh &&
-        Array.isArray(bh.days) &&
-        bh.days.length > 0 &&
-        typeof bh.open === 'string' &&
-        typeof bh.close === 'string' &&
-        typeof bh.tz === 'string' &&
-        bh.tz.length > 0
+        !bh ||
+        typeof bh.tz !== 'string' ||
+        bh.tz.length === 0 ||
+        !bh.days ||
+        typeof bh.days !== 'object' ||
+        Array.isArray(bh.days)
       ) {
-        return bh as BusinessHours;
+        return null;
       }
-      return null;
+      const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
+      const entries = Object.entries(bh.days as Record<string, unknown>);
+      const validDays = entries.filter(([dow, dh]) => {
+        if (!/^[0-6]$/.test(dow)) return false;
+        const d = dh as { open?: unknown; close?: unknown };
+        return (
+          !!d &&
+          typeof d.open === 'string' &&
+          typeof d.close === 'string' &&
+          hhmm.test(d.open) &&
+          hhmm.test(d.close)
+        );
+      });
+      // Pelo menos um dia valido; nenhuma chave invalida (fail-closed).
+      if (validDays.length === 0 || validDays.length !== entries.length) {
+        return null;
+      }
+      return bh as BusinessHours;
     } catch (error) {
       this.logger.warn('Falha ao ler business_hours do tenant', {
         error: error instanceof Error ? error.message : String(error),
@@ -1342,11 +1350,9 @@ export class WhatsAppService {
     }
   }
 
-  /** Descreve o horario de funcionamento em texto para o cliente. */
+  /** Descreve o horario de funcionamento em texto para o cliente (via util compartilhado). */
   private describeBusinessHours(bh: BusinessHours): string {
-    const nomes = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
-    const dias = [...bh.days].sort((a, b) => a - b).map((d) => nomes[d] || String(d));
-    return `${dias.join(', ')}, das ${bh.open} às ${bh.close}`;
+    return describeBusinessHours(bh);
   }
 
   /**
@@ -1376,10 +1382,6 @@ export class WhatsAppService {
       const [h, m] = hhmm.split(':').map(Number);
       return { hour: h, minute: m };
     };
-    const open = parseHHMM(businessHours.open);
-    const close = parseHHMM(businessHours.close);
-    const openMin = open.hour * 60 + open.minute;
-    const closeMin = close.hour * 60 + close.minute;
 
     // Componentes da data "hoje" NO FUSO da loja, a partir do instante `now`.
     const todayParts = this.localDateParts(now, tz);
@@ -1398,9 +1400,15 @@ export class WhatsAppService {
       const d = civil.getUTCDate();
       // Dia da semana (0=dom..6=sab) desta data civil.
       const dow = civil.getUTCDay();
-      if (!businessHours.days.includes(dow)) {
-        continue; // dia fora do funcionamento — pula.
+      // Faixa PROPRIA do dia (shape por-dia); dia AUSENTE = fechado -> pula.
+      const dh = businessHours.days[String(dow)];
+      if (!dh) {
+        continue;
       }
+      const open = parseHHMM(dh.open);
+      const close = parseHHMM(dh.close);
+      const openMin = open.hour * 60 + open.minute;
+      const closeMin = close.hour * 60 + close.minute;
 
       for (let min = openMin; min <= closeMin && slots.length < maxSlots; min += 60) {
         const hour = Math.floor(min / 60);
@@ -1518,7 +1526,12 @@ export class WhatsAppService {
       Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
     };
     const dow = weekdayMap[weekdayStr];
-    if (dow === undefined || !businessHours.days.includes(dow)) {
+    if (dow === undefined) {
+      return false;
+    }
+    // Faixa PROPRIA do dia (shape por-dia); dia AUSENTE = fechado -> recusa.
+    const dh = businessHours.days[String(dow)];
+    if (!dh) {
       return false;
     }
 
@@ -1527,8 +1540,8 @@ export class WhatsAppService {
       return hh * 60 + mm;
     };
     const localMin = hour * 60 + minute;
-    const openMin = toMinutes(businessHours.open);
-    const closeMin = toMinutes(businessHours.close);
+    const openMin = toMinutes(dh.open);
+    const closeMin = toMinutes(dh.close);
     // [open, close]: inclui o horario de abertura e o de fechamento.
     return localMin >= openMin && localMin <= closeMin;
   }

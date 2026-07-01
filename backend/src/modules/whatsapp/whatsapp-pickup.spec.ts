@@ -28,12 +28,17 @@ function makeConversation() {
   };
 }
 
-// business_hours seg-sab 09:00-18:00 em America/Sao_Paulo.
+// business_hours seg-sab 09:00-18:00 em America/Sao_Paulo (shape por-dia; dom AUSENTE = fechado).
 const BUSINESS_HOURS = {
-  days: [1, 2, 3, 4, 5, 6],
-  open: '09:00',
-  close: '18:00',
   tz: 'America/Sao_Paulo',
+  days: {
+    '1': { open: '09:00', close: '18:00' },
+    '2': { open: '09:00', close: '18:00' },
+    '3': { open: '09:00', close: '18:00' },
+    '4': { open: '09:00', close: '18:00' },
+    '5': { open: '09:00', close: '18:00' },
+    '6': { open: '09:00', close: '18:00' },
+  },
 };
 
 describe('Retirada + agendamento + horario de funcionamento (S2b)', () => {
@@ -322,6 +327,101 @@ describe('Retirada + agendamento + horario de funcionamento (S2b)', () => {
       expect(slots.length).toBeGreaterThan(0);
       // todos por construcao, mas afirmamos explicitamente para o slot 1 (o escolhido tipico).
       expect(service.isWithinBusinessHours(slots[0].scheduledAt, BUSINESS_HOURS)).toBe(true);
+    });
+  });
+
+  // ============== TASK 1: HORARIO POR-DIA (faixa propria por dia; dia ausente = fechado) ==============
+  describe('shape por-dia — faixa propria por dia + dia ausente = fechado', () => {
+    // Loja que so abre no SABADO, das 09:00 as 13:00. Domingo (e todos os outros
+    // dias) ausentes = fechados.
+    const SAB_9_13 = {
+      tz: 'America/Sao_Paulo',
+      days: {
+        '6': { open: '09:00', close: '13:00' },
+      },
+    };
+
+    it('(a) generatePickupSlots: sabado gera slots so ate 13:00 e NENHUM slot em dia ausente (dom)', () => {
+      // now = sexta 2026-06-26 06:00 local (-03) = 09:00 UTC. Varre a semana inteira.
+      // O unico dia aberto e sabado 2026-06-27, das 09:00 as 13:00.
+      const now = new Date('2026-06-26T09:00:00.000Z');
+      const slots = service.generatePickupSlots(SAB_9_13, now);
+
+      expect(slots.length).toBeGreaterThan(0);
+      for (const slot of slots) {
+        // Todo slot cai num SABADO local e no maximo as 13:00 local.
+        const dtf = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Sao_Paulo',
+          weekday: 'short',
+          hour: '2-digit',
+          hour12: false,
+        });
+        const parts = dtf.formatToParts(slot.scheduledAt);
+        const weekday = parts.find((p) => p.type === 'weekday')?.value;
+        let hour = Number(parts.find((p) => p.type === 'hour')?.value);
+        if (hour === 24) hour = 0;
+        expect(weekday).toBe('Sat'); // nunca domingo nem outro dia ausente
+        expect(hour).toBeLessThanOrEqual(13); // faixa propria do sabado (fecha 13:00)
+        expect(hour).toBeGreaterThanOrEqual(9);
+      }
+
+      // Sabado 09:00-13:00 em passos de 1h = 09,10,11,12,13 = 5 slots (todos num unico sabado).
+      const isos = slots.map((s: { scheduledAt: Date }) => s.scheduledAt.toISOString());
+      expect(isos).toEqual([
+        '2026-06-27T12:00:00.000Z', // 09:00 BRT
+        '2026-06-27T13:00:00.000Z', // 10:00 BRT
+        '2026-06-27T14:00:00.000Z', // 11:00 BRT
+        '2026-06-27T15:00:00.000Z', // 12:00 BRT
+        '2026-06-27T16:00:00.000Z', // 13:00 BRT (inclusive)
+      ]);
+    });
+
+    it('(b) isWithinBusinessHours: rejeita dia ausente (dom) e aceita dentro da faixa do sabado', () => {
+      // Sabado 2026-06-27 11:00 local (-03) = 14:00 UTC -> dentro de 09-13 -> ACEITO.
+      const sabDentro = new Date('2026-06-27T14:00:00.000Z');
+      expect(service.isWithinBusinessHours(sabDentro, SAB_9_13)).toBe(true);
+
+      // Sabado 2026-06-27 14:00 local (-03) = 17:00 UTC -> depois de fechar (13) -> RECUSADO.
+      const sabDepois = new Date('2026-06-27T17:00:00.000Z');
+      expect(service.isWithinBusinessHours(sabDepois, SAB_9_13)).toBe(false);
+
+      // Domingo 2026-06-28 11:00 local (-03) = 14:00 UTC -> dia AUSENTE -> RECUSADO.
+      const domFechado = new Date('2026-06-28T14:00:00.000Z');
+      expect(service.isWithinBusinessHours(domFechado, SAB_9_13)).toBe(false);
+
+      // Segunda 2026-06-29 11:00 local -> tambem ausente -> RECUSADO.
+      const segFechado = new Date('2026-06-29T14:00:00.000Z');
+      expect(service.isWithinBusinessHours(segFechado, SAB_9_13)).toBe(false);
+    });
+  });
+
+  // ============== TASK 1: describeBusinessHours agrupa faixas ==============
+  describe('describeBusinessHours — agrupa dias com mesma faixa, lista faixas distintas', () => {
+    it('seg-sex 09:00-18:00 + sab 09:00-13:00 -> agrupa a semana e separa o sabado', () => {
+      const bh = {
+        tz: 'America/Sao_Paulo',
+        days: {
+          '1': { open: '09:00', close: '18:00' },
+          '2': { open: '09:00', close: '18:00' },
+          '3': { open: '09:00', close: '18:00' },
+          '4': { open: '09:00', close: '18:00' },
+          '5': { open: '09:00', close: '18:00' },
+          '6': { open: '09:00', close: '13:00' },
+        },
+      };
+      const desc = service.describeBusinessHours(bh);
+      // Agrupa seg-sex numa faixa e lista sab separado.
+      expect(desc).toContain('seg-sex 09:00-18:00');
+      expect(desc).toContain('sáb 09:00-13:00');
+      // Domingo ausente -> nao aparece.
+      expect(desc.toLowerCase()).not.toContain('dom');
+    });
+
+    it('todos os dias na mesma faixa -> um unico grupo dom-sáb', () => {
+      const days: Record<string, { open: string; close: string }> = {};
+      for (let d = 0; d <= 6; d++) days[String(d)] = { open: '08:00', close: '20:00' };
+      const desc = service.describeBusinessHours({ tz: 'America/Sao_Paulo', days });
+      expect(desc).toContain('dom-sáb 08:00-20:00');
     });
   });
 });
