@@ -196,15 +196,16 @@ class ApiClient {
   // ---------------------------------------------------------------------------
 
   async createOrder(
-    order: CreateOrderInput,
-    _tenantId: string,
-    idempotencyKey?: string,
+    input: CreateOrderInput,
+    opts?: { idempotencyKey?: string },
   ): Promise<Order> {
     return this.request<Order>('/orders', {
       method: 'POST',
-      body: JSON.stringify(order),
-      headers: idempotencyKey
-        ? { 'Idempotency-Key': idempotencyKey }
+      body: JSON.stringify(input),
+      // Mesmo padrao do checkout publico: encaminha Idempotency-Key quando dado
+      // (anti-cobranca-dupla; o backend autenticado ja honra esse header).
+      headers: opts?.idempotencyKey
+        ? { 'Idempotency-Key': opts.idempotencyKey }
         : undefined,
     });
   }

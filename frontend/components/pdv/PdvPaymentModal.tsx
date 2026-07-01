@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { ArrowRight, CheckCircle2, Copy } from 'lucide-react';
 
@@ -50,6 +51,14 @@ export interface PdvPaymentModalProps {
   paymentError: string | null;
   paymentData: PaymentResult | null;
   completedSale: CompletedSaleState | null;
+  /**
+   * Fast-pass (PDV): 1 passo, sem QR. Quando true, o pagamento e marcado pago
+   * numa unica acao (`onCreateOrderAndPayment`) — o bloco de QR e o 2o botao
+   * (`onConfirmPayment`) ficam ocultos. Default `false` = fluxo de 2 passos atual.
+   */
+  fastPass?: boolean;
+  /** Mostra o campo de cupom. Default `true`; o PDV passa `false` (oculto no v1). */
+  showCoupon?: boolean;
   onCreateOrderAndPayment: () => void;
   onConfirmPayment: () => void;
   onCopyReceipt: () => void;
@@ -61,6 +70,14 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
   currency: 'BRL',
 });
+
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  pix: 'Pix',
+  dinheiro: 'Dinheiro',
+  debito: 'Débito',
+  credito: 'Crédito',
+  boleto: 'Boleto',
+};
 
 function CompletedSaleView({
   completedSale,
@@ -76,113 +93,87 @@ function CompletedSaleView({
   onClose: () => void;
 }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.05fr,0.95fr]">
-      <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(160deg,rgba(16,185,129,0.18)_0%,rgba(56,189,248,0.14)_45%,rgba(15,23,42,0.98)_100%)] p-6 text-white">
-        <div className="inline-flex size-14 items-center justify-center rounded-3xl border border-emerald-300/20 bg-emerald-400/10 text-emerald-100">
-          <CheckCircle2 className="size-7" />
+    <div className="mx-auto flex w-full max-w-lg flex-col">
+      {/* Cabecalho escuro COMPACTO: sucesso inequivoco + faixa enxuta de dados.
+          Pedido/metodo/total/itens sao confirmacao SECUNDARIA -> uma faixa baixa,
+          nao 4 cards altos (era o que estourava a altura e cortava o topo). */}
+      <div className="rounded-2xl border border-emerald-400/30 bg-[linear-gradient(160deg,#064e3b_0%,#0f172a_62%)] p-4 text-white shadow-[0_16px_40px_rgba(2,16,12,0.4)]">
+        <div className="flex items-center gap-2.5">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-2xl border border-emerald-300/30 bg-emerald-400/15 text-emerald-100">
+            <CheckCircle2 className="size-5" />
+          </span>
+          <div className="leading-tight">
+            <p className="text-[10px] uppercase tracking-[0.24em] text-emerald-100/80">
+              venda confirmada
+            </p>
+            <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
+              <span aria-hidden="true">✅ </span>Venda registrada
+            </h2>
+          </div>
         </div>
-        <p className="mt-6 text-xs uppercase tracking-[0.28em] text-emerald-100/80">
-          venda confirmada
-        </p>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight">
-          Caixa concluido com a serenidade de uma operacao madura.
-        </h2>
-        <p className="mt-4 text-sm leading-7 text-slate-200/85">
-          Pedido, total e recebimento ficaram claros do primeiro clique ate a confirmacao final.
-        </p>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
-            <p className="text-xs uppercase tracking-[0.22em] text-slate-300">pedido</p>
-            <p className="mt-2 text-lg font-semibold text-white">
-              {completedSale.orderNo || 'Venda confirmada'}
+        {/* Faixa de dados: rotulo + valor, compacta (nao cards altos). */}
+        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/10 pt-3 text-center sm:grid-cols-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-300">pedido</p>
+            <p className="mt-0.5 truncate text-sm font-bold text-white">
+              {completedSale.orderNo || '—'}
             </p>
           </div>
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
-            <p className="text-xs uppercase tracking-[0.22em] text-slate-300">total</p>
-            <p className="mt-2 text-lg font-semibold text-white">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-300">método</p>
+            <p className="mt-0.5 text-sm font-bold text-white">
+              {PAYMENT_METHOD_LABELS[completedSale.paymentMethod] ?? completedSale.paymentMethod}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-300">total</p>
+            <p className="mt-0.5 text-sm font-bold tabular-nums text-white">
               {currencyFormatter.format(completedSale.total)}
             </p>
           </div>
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
-            <p className="text-xs uppercase tracking-[0.22em] text-slate-300">itens</p>
-            <p className="mt-2 text-lg font-semibold text-white">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-300">itens</p>
+            <p className="mt-0.5 text-sm font-bold tabular-nums text-white">
               {completedSale.itemsCount}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6">
-        <p className="text-xs uppercase tracking-[0.28em] text-slate-500">pos-venda</p>
-        <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-          O operador sai com clareza e pronto para a proxima venda.
-        </h3>
-
-        <div className="mt-6 rounded-[24px] border border-slate-200 bg-white p-5">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-sm text-slate-500">Metodo</span>
-              <strong className="text-sm font-semibold text-slate-950">
-                {completedSale.paymentMethod === 'pix' ? 'Pix' : 'Dinheiro'}
-              </strong>
-            </div>
-            {typeof completedSale.changeAmount === 'number' && (
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm text-slate-500">Troco</span>
-                <strong className="text-sm font-semibold text-slate-950">
-                  {currencyFormatter.format(completedSale.changeAmount)}
-                </strong>
-              </div>
-            )}
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-sm text-slate-500">Total confirmado</span>
-              <strong className="text-base font-semibold text-slate-950">
-                {currencyFormatter.format(completedSale.total)}
-              </strong>
-            </div>
-          </div>
+      {/* Troco em DESTAQUE (so dinheiro) — dado critico do balcao, salta aos olhos. */}
+      {typeof completedSale.changeAmount === 'number' && (
+        <div className="mt-3 flex items-center justify-between rounded-2xl border-2 border-emerald-200 bg-emerald-50 px-4 py-3">
+          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">
+            Troco
+          </span>
+          <strong className="text-2xl font-extrabold tabular-nums text-emerald-700 sm:text-3xl">
+            {currencyFormatter.format(completedSale.changeAmount)}
+          </strong>
         </div>
+      )}
 
-        <div className="mt-5 grid gap-3">
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">ritmo</p>
-            <p className="mt-2 text-sm font-medium text-slate-900">
-              O fechamento terminou sem esconder risco, valor ou proximo passo.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">proxima venda</p>
-            <p className="mt-2 text-sm font-medium text-slate-900">
-              O caixa ja pode voltar para a busca com o mesmo fluxo premium.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">comprovante</p>
-            <p className="mt-2 text-sm font-medium text-slate-900">
-              O resumo da venda pode ser copiado em um clique para registro ou envio interno.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-6 flex flex-col gap-3">
+      {/* Acoes: "Nova venda" em destaque (acao obvia) + Copiar/Fechar secundarios. */}
+      <div className="mt-3 flex flex-col gap-2.5">
+        <button
+          onClick={onNewSale}
+          autoFocus
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-3.5 text-base font-bold text-white shadow-[0_16px_32px_rgba(16,185,129,0.24)] transition hover:translate-y-[-1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2"
+        >
+          Nova venda
+          <ArrowRight className="size-5" />
+        </button>
+        <div className="flex gap-2.5">
           <button
             onClick={onCopyReceipt}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
           >
             <Copy className="size-4" />
             Copiar comprovante
           </button>
           <button
-            onClick={onNewSale}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-          >
-            Nova venda
-            <ArrowRight className="size-4" />
-          </button>
-          <button
             onClick={onClose}
-            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            className="inline-flex flex-1 items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
           >
             Fechar resumo
           </button>
@@ -207,6 +198,8 @@ export function PdvPaymentModal({
   paymentError,
   paymentData,
   completedSale,
+  fastPass = false,
+  showCoupon = true,
   onCreateOrderAndPayment,
   onConfirmPayment,
   onCopyReceipt,
@@ -214,8 +207,11 @@ export function PdvPaymentModal({
   onClose,
 }: PdvPaymentModalProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-3xl rounded-[30px] border border-white/10 bg-white p-6 shadow-[0_40px_120px_rgba(15,23,42,0.4)] sm:p-8">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75 backdrop-blur-sm">
+      {/* Scroll-container + min-h-full/items-center: centraliza quando cabe,
+          e NUNCA corta o topo se o conteudo passar da viewport (rola do topo). */}
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-white p-5 shadow-[0_40px_120px_rgba(15,23,42,0.4)] sm:p-6">
         {completedSale ? (
           <CompletedSaleView
             completedSale={completedSale}
@@ -239,11 +235,14 @@ export function PdvPaymentModal({
             paymentLoading={paymentLoading}
             paymentError={paymentError}
             paymentData={paymentData}
+            fastPass={fastPass}
+            showCoupon={showCoupon}
             onCreateOrderAndPayment={onCreateOrderAndPayment}
             onConfirmPayment={onConfirmPayment}
             onClose={onClose}
           />
         )}
+        </div>
       </div>
     </div>
   );
@@ -263,6 +262,8 @@ function PaymentFormView({
   paymentLoading,
   paymentError,
   paymentData,
+  fastPass,
+  showCoupon,
   onCreateOrderAndPayment,
   onConfirmPayment,
   onClose,
@@ -280,17 +281,39 @@ function PaymentFormView({
   paymentLoading: boolean;
   paymentError: string | null;
   paymentData: PaymentResult | null;
+  fastPass: boolean;
+  showCoupon: boolean;
   onCreateOrderAndPayment: () => void;
   onConfirmPayment: () => void;
   onClose: () => void;
 }) {
+  // Troco negativo (dinheiro): valor recebido < total -> bloqueia finalizar (spec §4.6/§10).
+  const insufficientCash = paymentMethod === 'dinheiro' && cashChange < 0;
+  // Dinheiro = acao principal: o foco do teclado vai DIRETO pro valor recebido,
+  // pra a operadora ja digitar quanto a cliente deu (troco calculado na hora).
+  const cashInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (paymentMethod === 'dinheiro') {
+      cashInputRef.current?.focus();
+    }
+  }, [paymentMethod]);
+  // Cards de metodo compactos numa fileira (4-up): pix/debito/credito = acento cyan,
+  // dinheiro = acento emerald (a unica acao com calculo extra de troco).
+  const methodBtn = (active: boolean, accent: 'cyan' | 'emerald') =>
+    active
+      ? accent === 'emerald'
+        ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-[0_6px_16px_rgba(16,185,129,0.14)]'
+        : 'border-cyan-500 bg-cyan-50 text-cyan-900 shadow-[0_6px_16px_rgba(8,145,178,0.14)]'
+      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300';
   return (
-    <>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Fechamento da venda</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-950">Pagamento</h2>
-          <p className="mt-2 text-sm text-slate-600">Total: {currencyFormatter.format(saleSummaryTotal)}</p>
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Cabecalho enxuto: titulo + total a vista + Fechar. */}
+      <div className="flex shrink-0 items-center justify-between gap-3">
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-xl font-semibold text-slate-950">Pagamento</h2>
+          <p className="text-sm text-slate-600">
+            Total: <strong className="font-semibold tabular-nums text-slate-900">{currencyFormatter.format(saleSummaryTotal)}</strong>
+          </p>
           {orderData?.orderNo && (
             <p className="text-xs text-slate-400">Pedido: {orderData.orderNo}</p>
           )}
@@ -298,89 +321,191 @@ function PaymentFormView({
         <button
           onClick={onClose}
           disabled={paymentLoading}
-          className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Fechar
         </button>
       </div>
 
-      <div className="mt-8 grid gap-4 lg:grid-cols-[1fr,0.9fr]">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <button
-              onClick={() => onPaymentMethodChange('pix')}
-              className={`rounded-[24px] border-2 px-5 py-4 text-left transition ${
-                paymentMethod === 'pix'
-                  ? 'border-cyan-500 bg-cyan-50 shadow-[0_12px_26px_rgba(8,145,178,0.12)]'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
-            >
-              <p className="text-sm font-semibold text-slate-950">PIX</p>
-              <p className="mt-1 text-xs text-slate-500">QR code e copia e cola</p>
-            </button>
-            <button
-              onClick={() => onPaymentMethodChange('dinheiro')}
-              className={`rounded-[24px] border-2 px-5 py-4 text-left transition ${
-                paymentMethod === 'dinheiro'
-                  ? 'border-emerald-500 bg-emerald-50 shadow-[0_12px_26px_rgba(16,185,129,0.12)]'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
-            >
-              <p className="text-sm font-semibold text-slate-950">Dinheiro</p>
-              <p className="mt-1 text-xs text-slate-500">Troco calculado automaticamente</p>
-            </button>
-          </div>
+      {/* Miolo rolavel: metodos -> valor/troco -> resumo -> QR (2-passos).
+          O botao Confirmar fica FIXO no rodape (fora deste scroll). */}
+      <div className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pr-0.5">
+        {/* 4 metodos em fileira compacta. */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <button
+            onClick={() => onPaymentMethodChange('pix')}
+            className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${methodBtn(paymentMethod === 'pix', 'cyan')}`}
+          >
+            PIX
+          </button>
+          <button
+            onClick={() => onPaymentMethodChange('dinheiro')}
+            className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 ${methodBtn(paymentMethod === 'dinheiro', 'emerald')}`}
+          >
+            Dinheiro
+          </button>
+          <button
+            onClick={() => onPaymentMethodChange('debito')}
+            className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${methodBtn(paymentMethod === 'debito', 'cyan')}`}
+          >
+            Débito
+          </button>
+          <button
+            onClick={() => onPaymentMethodChange('credito')}
+            className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${methodBtn(paymentMethod === 'credito', 'cyan')}`}
+          >
+            Crédito
+          </button>
+        </div>
 
-          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-            <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Parametros</p>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-xs uppercase tracking-[0.24em] text-slate-500">Cupom</label>
-                <input
-                  value={couponCode}
-                  onChange={(e) => onCouponCodeChange(e.target.value)}
-                  disabled={Boolean(orderData?.id)}
-                  placeholder="EX: PROMO10"
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                />
-                {orderData?.id && (
-                  <p className="mt-2 text-xs text-slate-500">
-                    O pedido ja foi criado. Agora vamos apenas regenerar o pagamento com seguranca.
-                  </p>
-                )}
-              </div>
-              {paymentMethod === 'dinheiro' && (
-                <div>
-                  <label className="text-xs uppercase tracking-[0.24em] text-slate-500">Valor recebido</label>
-                  <input
-                    value={cashReceived}
-                    onChange={(e) => onCashReceivedChange(e.target.value)}
-                    placeholder="0,00"
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  />
-                  {cashReceived && (
-                    <p className="mt-2 text-xs text-slate-500">Troco: {currencyFormatter.format(cashChange)}</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <p className="text-xs leading-6 text-slate-500">
-            Ambiente de teste: o Pix funciona com comprador de teste do Mercado Pago.
+        {/* Dica do metodo + parametros (cupom opcional / valor recebido) numa fileira enxuta. */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <p className="flex-1 text-xs leading-5 text-slate-500">
+            {paymentMethod === 'pix'
+              ? fastPass
+                ? 'Cliente paga no QR/maquininha — confirme quando vir o pagamento.'
+                : 'QR code e copia e cola.'
+              : paymentMethod === 'dinheiro'
+                ? 'Informe o valor recebido — o troco é calculado.'
+                : 'Passe na maquininha — confirme quando aprovar.'}
           </p>
-
-          {paymentError && (
-            <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {paymentError}
+          {showCoupon && (
+            <div className="sm:w-44">
+              <label className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Cupom</label>
+              <input
+                value={couponCode}
+                onChange={(e) => onCouponCodeChange(e.target.value)}
+                disabled={Boolean(orderData?.id)}
+                placeholder="EX: PROMO10"
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              />
             </div>
           )}
+        </div>
 
+        {/* Dinheiro = acao principal: VALOR RECEBIDO grande/central + TROCO em destaque.
+            So aparece no dinheiro (pix/debito/credito nao precisam de troco). */}
+        {paymentMethod === 'dinheiro' && (
+          <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/60 p-4 sm:p-5">
+            <label
+              htmlFor="pdv-cash-received"
+              className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-800"
+            >
+              Valor recebido
+            </label>
+            <div className="relative mt-2">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-slate-400 sm:text-3xl">
+                R$
+              </span>
+              <input
+                id="pdv-cash-received"
+                ref={cashInputRef}
+                value={cashReceived}
+                onChange={(e) => onCashReceivedChange(e.target.value)}
+                placeholder="0,00"
+                inputMode="decimal"
+                aria-label="Valor recebido"
+                className="w-full rounded-xl border-2 border-emerald-300 bg-white py-3 pl-14 pr-4 text-3xl font-bold tabular-nums text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-4xl"
+              />
+            </div>
+            {cashReceived && (
+              <div
+                className={`mt-3 flex items-center justify-between rounded-xl px-4 py-3 ${
+                  insufficientCash ? 'bg-rose-100 text-rose-700' : 'bg-emerald-600 text-white'
+                }`}
+              >
+                <span className="text-sm font-semibold uppercase tracking-[0.14em]">Troco</span>
+                <strong className="text-3xl font-extrabold tabular-nums sm:text-4xl">
+                  {currencyFormatter.format(cashChange)}
+                </strong>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Resumo condensado da venda (escuro = ancora visual, reusa a linguagem). */}
+        <div className="rounded-xl border border-slate-200 bg-slate-950 px-4 py-3 text-white">
+          <div className="max-h-28 space-y-1 overflow-y-auto">
+            {saleSummaryItems.map((item) => (
+              <div key={item.id} className="flex items-center justify-between gap-3 text-sm">
+                <p className="min-w-0 flex-1 truncate text-slate-200">
+                  <span className="tabular-nums text-slate-400">{item.quantity}×</span> {item.name}
+                </p>
+                <strong className="shrink-0 font-semibold tabular-nums text-white">
+                  {currencyFormatter.format(item.price * item.quantity)}
+                </strong>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex items-baseline justify-between border-t border-white/10 pt-2">
+            <span className="text-xs uppercase tracking-[0.18em] text-slate-300">Total final</span>
+            <strong className="text-2xl font-bold tabular-nums text-white">
+              {currencyFormatter.format(saleSummaryTotal)}
+            </strong>
+          </div>
+        </div>
+
+        {paymentError && (
+          <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
+            {paymentError}
+          </div>
+        )}
+
+        {/* QR (fluxo de 2 passos, fora do PDV) — DENTRO do scroll, acima do rodape fixo. */}
+        {!fastPass && paymentData && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            {paymentData.message && (
+              <p className="whitespace-pre-line text-sm text-slate-600">{paymentData.message}</p>
+            )}
+            {paymentMethod === 'pix' && paymentData.qr_code && (
+              <div className="mt-3 flex flex-col items-center gap-3">
+                <Image
+                  src={paymentData.qr_code}
+                  alt="QR Code Pix"
+                  width={160}
+                  height={160}
+                  unoptimized
+                  className="h-40 w-40 rounded-xl border border-slate-200 bg-white p-2"
+                />
+                {paymentData.copy_paste && (
+                  <textarea
+                    readOnly
+                    aria-label="Copia e cola"
+                    className="h-20 w-full rounded-xl border border-slate-200 bg-white p-2 text-xs text-slate-700 outline-none"
+                    value={paymentData.copy_paste}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Rodape FIXO: o botao Confirmar fica SEMPRE visivel, em todos os metodos. */}
+      <div className="mt-4 shrink-0 border-t border-slate-100 pt-4">
+        {fastPass ? (
+          // Fast-pass (PDV): 1 passo, sem QR. Um unico botao marca pago e finaliza.
+          // Troco negativo (dinheiro) bloqueia finalizar — a operadora ve o porque.
+          <div className="space-y-2">
+            <button
+              onClick={onCreateOrderAndPayment}
+              disabled={paymentLoading || insufficientCash}
+              className="inline-flex w-full items-center justify-center rounded-xl bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-3.5 text-base font-bold text-white shadow-[0_12px_28px_rgba(16,185,129,0.24)] transition hover:translate-y-[-1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none disabled:hover:translate-y-0"
+            >
+              {paymentLoading ? 'Registrando…' : 'Confirmar pagamento e finalizar'}
+            </button>
+            {insufficientCash && (
+              <p className="text-center text-xs font-medium text-rose-600">
+                Valor recebido insuficiente
+              </p>
+            )}
+          </div>
+        ) : (
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
               onClick={onCreateOrderAndPayment}
               disabled={paymentLoading}
-              className="inline-flex flex-1 items-center justify-center rounded-full bg-[linear-gradient(135deg,#0891b2_0%,#0f766e_100%)] px-6 py-4 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(8,145,178,0.22)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+              className="inline-flex flex-1 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#0891b2_0%,#0f766e_100%)] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(8,145,178,0.22)] transition hover:translate-y-[-1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
             >
               {paymentLoading
                 ? 'Processando...'
@@ -392,66 +517,14 @@ function PaymentFormView({
               <button
                 onClick={onConfirmPayment}
                 disabled={paymentLoading}
-                className="inline-flex flex-1 items-center justify-center rounded-full bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-4 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(34,197,94,0.2)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                className="inline-flex flex-1 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(34,197,94,0.2)] transition hover:translate-y-[-1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
               >
                 Confirmar pagamento
               </button>
             )}
           </div>
-        </div>
-
-        <div className="rounded-[24px] border border-slate-200 bg-slate-950 p-6 text-white">
-          <p className="text-xs uppercase tracking-[0.28em] text-cyan-100/70">Resumo da venda</p>
-          <div className="mt-4 space-y-3">
-            {saleSummaryItems.map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-white">{item.name}</p>
-                  <p className="mt-1 text-xs text-slate-300">{item.quantity} x {currencyFormatter.format(item.price)}</p>
-                </div>
-                <strong className="text-sm font-semibold text-white">
-                  {currencyFormatter.format(item.price * item.quantity)}
-                </strong>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-5">
-            <span className="text-sm text-slate-300">Total final</span>
-            <strong className="text-2xl font-semibold text-white">{currencyFormatter.format(saleSummaryTotal)}</strong>
-          </div>
-
-          {paymentData && (
-            <div className="mt-6 rounded-[22px] border border-white/10 bg-white/5 p-4">
-              {paymentData.message && (
-                <p className="text-sm whitespace-pre-line text-slate-300">{paymentData.message}</p>
-              )}
-              {paymentMethod === 'pix' && paymentData.qr_code && (
-                <div className="mt-4 flex flex-col items-center gap-4">
-                  <Image
-                    src={paymentData.qr_code}
-                    alt="QR Code Pix"
-                    width={192}
-                    height={192}
-                    unoptimized
-                    className="h-48 w-48 rounded-2xl border border-white/10 bg-white p-3"
-                  />
-                  {paymentData.copy_paste && (
-                    <div className="w-full">
-                      <label className="text-xs uppercase tracking-[0.24em] text-slate-400">Copia e cola</label>
-                      <textarea
-                        readOnly
-                        className="mt-2 h-28 w-full rounded-2xl border border-white/10 bg-slate-950/70 p-3 text-xs text-slate-200 outline-none"
-                        value={paymentData.copy_paste}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }
