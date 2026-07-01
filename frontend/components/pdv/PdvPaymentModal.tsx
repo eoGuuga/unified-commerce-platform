@@ -93,107 +93,90 @@ function CompletedSaleView({
   onClose: () => void;
 }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.05fr,0.95fr]">
-      <div className="self-start rounded-[28px] border border-emerald-400/30 bg-[linear-gradient(160deg,#064e3b_0%,#0f172a_62%)] p-6 text-white shadow-[0_20px_48px_rgba(2,16,12,0.45)]">
-        {/* Sucesso inequivoco e instantaneo: titulo grande, sem ambiguidade. */}
-        <div className="flex items-center gap-3">
-          <span className="inline-flex size-11 items-center justify-center rounded-3xl border border-emerald-300/30 bg-emerald-400/15 text-emerald-100">
-            <CheckCircle2 className="size-8" />
+    <div className="mx-auto flex w-full max-w-lg flex-col">
+      {/* Cabecalho escuro COMPACTO: sucesso inequivoco + faixa enxuta de dados.
+          Pedido/metodo/total/itens sao confirmacao SECUNDARIA -> uma faixa baixa,
+          nao 4 cards altos (era o que estourava a altura e cortava o topo). */}
+      <div className="rounded-2xl border border-emerald-400/30 bg-[linear-gradient(160deg,#064e3b_0%,#0f172a_62%)] p-4 text-white shadow-[0_16px_40px_rgba(2,16,12,0.4)]">
+        <div className="flex items-center gap-2.5">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-2xl border border-emerald-300/30 bg-emerald-400/15 text-emerald-100">
+            <CheckCircle2 className="size-5" />
           </span>
-          <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-emerald-100/80">
+          <div className="leading-tight">
+            <p className="text-[10px] uppercase tracking-[0.24em] text-emerald-100/80">
               venda confirmada
             </p>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
+            <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
               <span aria-hidden="true">✅ </span>Venda registrada
             </h2>
           </div>
         </div>
-        <p className="mt-3 text-sm leading-6 text-emerald-50/90">
-          Pode chamar o proximo. A venda foi gravada com seguranca.
-        </p>
 
-        <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-300">pedido</p>
-            <p className="mt-2 text-xl font-bold text-white">
-              {completedSale.orderNo || 'Venda confirmada'}
+        {/* Faixa de dados: rotulo + valor, compacta (nao cards altos). */}
+        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/10 pt-3 text-center sm:grid-cols-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-300">pedido</p>
+            <p className="mt-0.5 truncate text-sm font-bold text-white">
+              {completedSale.orderNo || '—'}
             </p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-300">total</p>
-            <p className="mt-2 text-xl font-bold text-white">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-300">método</p>
+            <p className="mt-0.5 text-sm font-bold text-white">
+              {PAYMENT_METHOD_LABELS[completedSale.paymentMethod] ?? completedSale.paymentMethod}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-300">total</p>
+            <p className="mt-0.5 text-sm font-bold tabular-nums text-white">
               {currencyFormatter.format(completedSale.total)}
             </p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-300">itens</p>
-            <p className="mt-2 text-xl font-bold text-white">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-300">itens</p>
+            <p className="mt-0.5 text-sm font-bold tabular-nums text-white">
               {completedSale.itemsCount}
             </p>
           </div>
-          {typeof completedSale.changeAmount === 'number' && (
-            <div className="rounded-2xl border border-emerald-300/30 bg-emerald-400/10 p-3">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-100">troco</p>
-              <p className="mt-2 text-xl font-bold text-white">
-                {currencyFormatter.format(completedSale.changeAmount)}
-              </p>
-            </div>
-          )}
         </div>
       </div>
 
-      <div className="flex flex-col rounded-[28px] border border-slate-200 bg-slate-50 p-6">
-        <div className="rounded-[24px] border border-slate-200 bg-white p-5">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-sm text-slate-500">Metodo</span>
-              <strong className="text-sm font-semibold text-slate-950">
-                {PAYMENT_METHOD_LABELS[completedSale.paymentMethod] ?? completedSale.paymentMethod}
-              </strong>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-sm text-slate-500">Total confirmado</span>
-              <strong className="text-base font-semibold text-slate-950">
-                {currencyFormatter.format(completedSale.total)}
-              </strong>
-            </div>
-            {typeof completedSale.changeAmount === 'number' && (
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm text-slate-500">Troco</span>
-                <strong className="text-base font-semibold text-emerald-700">
-                  {currencyFormatter.format(completedSale.changeAmount)}
-                </strong>
-              </div>
-            )}
-          </div>
+      {/* Troco em DESTAQUE (so dinheiro) — dado critico do balcao, salta aos olhos. */}
+      {typeof completedSale.changeAmount === 'number' && (
+        <div className="mt-3 flex items-center justify-between rounded-2xl border-2 border-emerald-200 bg-emerald-50 px-4 py-3">
+          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">
+            Troco
+          </span>
+          <strong className="text-2xl font-extrabold tabular-nums text-emerald-700 sm:text-3xl">
+            {currencyFormatter.format(completedSale.changeAmount)}
+          </strong>
         </div>
+      )}
 
-        {/* "Nova venda" e a acao primaria obvia para o balcao com fila. */}
-        <div className="mt-auto flex flex-col gap-3 pt-6">
+      {/* Acoes: "Nova venda" em destaque (acao obvia) + Copiar/Fechar secundarios. */}
+      <div className="mt-3 flex flex-col gap-2.5">
+        <button
+          onClick={onNewSale}
+          autoFocus
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-3.5 text-base font-bold text-white shadow-[0_16px_32px_rgba(16,185,129,0.24)] transition hover:translate-y-[-1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2"
+        >
+          Nova venda
+          <ArrowRight className="size-5" />
+        </button>
+        <div className="flex gap-2.5">
           <button
-            onClick={onNewSale}
-            autoFocus
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#22c55e_0%,#0f766e_100%)] px-6 py-4 text-base font-bold text-white shadow-[0_16px_32px_rgba(16,185,129,0.24)] transition hover:translate-y-[-1px]"
+            onClick={onCopyReceipt}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
           >
-            Nova venda
-            <ArrowRight className="size-5" />
+            <Copy className="size-4" />
+            Copiar comprovante
           </button>
-          <div className="flex gap-3">
-            <button
-              onClick={onCopyReceipt}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            >
-              <Copy className="size-4" />
-              Copiar comprovante
-            </button>
-            <button
-              onClick={onClose}
-              className="inline-flex flex-1 items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            >
-              Fechar resumo
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="inline-flex flex-1 items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            Fechar resumo
+          </button>
         </div>
       </div>
     </div>
@@ -224,8 +207,11 @@ export function PdvPaymentModal({
   onClose,
 }: PdvPaymentModalProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-white p-5 shadow-[0_40px_120px_rgba(15,23,42,0.4)] sm:p-6">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75 backdrop-blur-sm">
+      {/* Scroll-container + min-h-full/items-center: centraliza quando cabe,
+          e NUNCA corta o topo se o conteudo passar da viewport (rola do topo). */}
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-white p-5 shadow-[0_40px_120px_rgba(15,23,42,0.4)] sm:p-6">
         {completedSale ? (
           <CompletedSaleView
             completedSale={completedSale}
@@ -256,6 +242,7 @@ export function PdvPaymentModal({
             onClose={onClose}
           />
         )}
+        </div>
       </div>
     </div>
   );
