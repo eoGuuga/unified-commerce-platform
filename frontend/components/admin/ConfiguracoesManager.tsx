@@ -566,8 +566,12 @@ function ExcecoesSection() {
     setBusy(false);
     report(res, 'Exceção adicionada.');
     if (res.ok) {
-      // Limpa a data (mantem tipo/horas como conveniencia para lancar varias).
+      // Reseta o formulario apos sucesso: o tipo volta ao default "Fechado". Sem isto,
+      // o proximo lancamento herda "Horario especial" e a lojista marca o tipo errado (A5).
       setDate('');
+      setKind('closed');
+      setOpen(DEFAULT_ABRE);
+      setClose(DEFAULT_FECHA);
     }
   }
 

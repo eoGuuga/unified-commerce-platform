@@ -569,4 +569,34 @@ describe('ConfiguracoesManager', () => {
       expect(within(secao).getByRole('button', { name: /Adicionar/i })).toBeDisabled();
     });
   });
+
+  // ---- Bloco 2 (polimento) — A5: tipo reseta apos adicionar ----
+
+  describe('A5: tipo da exceção reseta após sucesso', () => {
+    it('após adicionar "Horário especial", o tipo volta ao default "Fechado" (não persiste)', async () => {
+      const add = vi.fn().mockResolvedValue({ ok: true });
+      mockUseTenantSettings.mockReturnValue(makeHook());
+      mockUseAvailabilityExceptions.mockReturnValue(makeExcHook({ add }));
+      render(<ConfiguracoesManager />);
+
+      const secao = screen.getByTestId('secao-excecoes');
+      fireEvent.change(within(secao).getByLabelText(/Data da exceção/i), {
+        target: { value: '2026-12-31' },
+      });
+      fireEvent.click(within(secao).getByLabelText(/Horário especial/i));
+      fireEvent.change(within(secao).getByLabelText(/^Abre$/i), { target: { value: '09:00' } });
+      fireEvent.change(within(secao).getByLabelText(/^Fecha$/i), { target: { value: '13:00' } });
+      fireEvent.click(within(secao).getByRole('button', { name: /Adicionar/i }));
+
+      await waitFor(() => expect(add).toHaveBeenCalledTimes(1));
+
+      // Após o sucesso, o tipo volta a "Fechado" (default) e os campos de horário somem.
+      await waitFor(() => {
+        expect(
+          (within(secao).getByLabelText(/^Fechado$/i) as HTMLInputElement).checked,
+        ).toBe(true);
+      });
+      expect(within(secao).queryByLabelText(/^Abre$/i)).not.toBeInTheDocument();
+    });
+  });
 });

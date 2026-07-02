@@ -23,15 +23,29 @@ const mockedApi = api as unknown as {
 const mockedJwtDecode = jwtDecode as unknown as ReturnType<typeof vi.fn>;
 
 describe('useAuth', () => {
+  // jsdom nao navega — stubamos window.location (o logout chama location.replace).
+  let replaceMock: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     window.localStorage.clear();
     mockedApi.login.mockReset();
     mockedApi.getCurrentUser.mockReset();
     mockedJwtDecode.mockReset();
+    replaceMock = vi.fn();
+    vi.stubGlobal('location', {
+      replace: replaceMock,
+      assign: vi.fn(),
+      href: 'http://localhost:3000/',
+      origin: 'http://localhost:3000',
+      pathname: '/',
+      search: '',
+      hash: '',
+    });
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('inicia nao-autenticado quando nao ha token', async () => {
@@ -123,5 +137,27 @@ describe('useAuth', () => {
     expect(result.current.isAuthenticated).toBe(false);
     expect(result.current.user).toBeNull();
     expect(window.localStorage.getItem('token')).toBeNull();
+  });
+
+  it('logout redireciona para /login (evita o estado "zumbi" com useAuth por-instancia)', async () => {
+    window.localStorage.setItem('token', 'jwt-valido');
+    window.localStorage.setItem('tenant_id', 'tenant-1');
+    mockedJwtDecode.mockReturnValue({
+      tenant_id: 'tenant-1',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
+    mockedApi.getCurrentUser.mockResolvedValue({
+      id: 'u1',
+      email: 'a@b.com',
+      role: 'admin',
+      tenant_id: 'tenant-1',
+    });
+
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+
+    act(() => result.current.logout());
+
+    expect(replaceMock).toHaveBeenCalledWith('/login');
   });
 });
