@@ -8,8 +8,11 @@ import {
   Logger,
   Post,
   Query,
+  RawBodyRequest,
+  Req,
   UnauthorizedException,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { TenantsService } from '../tenants/tenants.service';
@@ -25,16 +28,18 @@ type RawWhatsappWebhookBody = Partial<WhatsappWebhookDto> & Record<string, any>;
  * Verifica assinatura do webhook para garantir autenticidade
  */
 function verifyWebhookSignature(
-  body: string,
+  rawBody: Buffer | string | undefined,
   signature: string | undefined,
   secret: string,
 ): boolean {
-  if (!signature || !secret) {
+  if (!signature || !secret || rawBody == null) {
     return false;
   }
 
+  // HMAC sobre o corpo CRU (bytes originais). A Meta assina o raw body — usar
+  // JSON.stringify(body) nao bate byte-a-byte (ordem/espacos/unicode divergem).
   const expectedSignature = createHmac('sha256', secret)
-    .update(body)
+    .update(rawBody)
     .digest('hex');
 
   try {
@@ -341,6 +346,83 @@ function shouldDispatchOutboundResponse(response: unknown): boolean {
   return false;
 }
 
+/** Extrai o texto util de uma mensagem da Meta (texto ou resposta interativa). */
+function extractMetaMessageText(message: Record<string, any>): string {
+  if (message?.type === 'text') {
+    return String(message.text?.body || '').trim();
+  }
+  if (message?.type === 'interactive') {
+    const interactive = message.interactive || {};
+    const reply = interactive.button_reply || interactive.list_reply || {};
+    // Usa o id da opcao (o bot monta botoes/listas com id proprio); cai pro title.
+    return String(reply.id || reply.title || '').trim();
+  }
+  if (message?.type === 'button') {
+    // Quick-reply de template (formato legado)
+    return String(message.button?.text || message.button?.payload || '').trim();
+  }
+  return '';
+}
+
+/**
+ * Normaliza o payload do WhatsApp Cloud API (Meta) para o formato PLANO que o
+ * resto do pipeline (extractRemoteJid/extractMessageBody/...) ja entende.
+ *
+ * Formato da Meta:
+ *   { object: 'whatsapp_business_account',
+ *     entry: [{ changes: [{ value: {
+ *       metadata: { phone_number_id },
+ *       contacts: [{ profile: { name } }],
+ *       messages: [{ from, id, timestamp, type, text?: { body }, interactive?: {...} }],
+ *       statuses?: [...]   // recibos de entrega/leitura -> ignorar
+ *     } }] }] }
+ *
+ * - Nao-Meta -> retorna o body intacto (Evolution/Twilio seguem funcionando).
+ * - So `statuses` (ou sem `messages`) -> { ignore: true } (recibo, nao e mensagem).
+ * - Com `messages[0]` -> body plano { From, Body, MessageSid, metadata }.
+ */
+export function normalizeMetaCloudPayload(body: RawWhatsappWebhookBody): {
+  body: RawWhatsappWebhookBody;
+  ignore?: boolean;
+  reason?: string;
+} {
+  const isMeta =
+    body?.object === 'whatsapp_business_account' && Array.isArray(body.entry);
+  if (!isMeta) {
+    return { body };
+  }
+
+  const value = body.entry?.[0]?.changes?.[0]?.value;
+  const message = value?.messages?.[0];
+
+  if (!message) {
+    return {
+      body,
+      ignore: true,
+      reason: Array.isArray(value?.statuses)
+        ? 'meta_status_receipt'
+        : 'meta_evento_sem_mensagem',
+    };
+  }
+
+  return {
+    body: {
+      ...body,
+      From: message.from,
+      Body: extractMetaMessageText(message),
+      MessageSid: message.id,
+      messageTimestamp: message.timestamp,
+      metadata: {
+        ...(body.metadata || {}),
+        provider: 'cloud_api',
+        phoneNumberId: value?.metadata?.phone_number_id,
+        contactName: value?.contacts?.[0]?.profile?.name,
+        metaMessageType: message.type,
+      },
+    },
+  };
+}
+
 @ApiTags('WhatsApp')
 @Controller('whatsapp')
 export class WhatsappController {
@@ -350,6 +432,36 @@ export class WhatsappController {
     private readonly whatsappService: WhatsAppService,
     private readonly tenantsService: TenantsService,
   ) {}
+
+  /**
+   * GET /whatsapp/webhook — handshake de verificacao do WhatsApp Cloud API (Meta).
+   *
+   * A Meta chama este endpoint ao registrar o webhook, com:
+   *   ?hub.mode=subscribe&hub.verify_token=<nosso token>&hub.challenge=<numero>
+   * Se o `hub.verify_token` bater com o `WHATSAPP_WEBHOOK_VERIFY_TOKEN` do .env,
+   * devolvemos o `hub.challenge` cru (a Meta confirma a assinatura do webhook).
+   * Sem token configurado ou divergente -> 403 (nao registra).
+   */
+  @Get('webhook')
+  @ApiOperation({ summary: 'Verificacao do webhook do WhatsApp Cloud API (Meta)' })
+  verifyWebhook(@Query() query: Record<string, string>): string {
+    const mode = query['hub.mode'];
+    const token = query['hub.verify_token'];
+    const challenge = query['hub.challenge'];
+    const expected = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+
+    if (mode === 'subscribe' && expected && token === expected) {
+      this.logger.log('Webhook WhatsApp verificado pela Meta com sucesso.');
+      return challenge ?? '';
+    }
+
+    if (!expected) {
+      this.logger.warn(
+        '[SETUP] WHATSAPP_WEBHOOK_VERIFY_TOKEN nao configurado — verificacao do webhook rejeitada. Defina a variavel para registrar o webhook na Meta.',
+      );
+    }
+    throw new ForbiddenException('Falha na verificacao do webhook.');
+  }
 
   /**
    * Comparacao de chaves resistente a timing attack.
@@ -366,42 +478,52 @@ export class WhatsappController {
 
   @Post('webhook')
   @ApiOperation({
-    summary: 'Webhook do Twilio/Evolution API para receber mensagens',
+    summary: 'Webhook para receber mensagens (WhatsApp Cloud API / Evolution / Twilio)',
     description:
-      'Aceita payloads de provedores diferentes e vincula a mensagem ao tenant correto.',
+      'Aceita payloads de provedores diferentes (incl. o formato aninhado da Meta Cloud API) e vincula a mensagem ao tenant correto.',
   })
   async webhook(
-    @Body() body: RawWhatsappWebhookBody,
+    @Body() incomingBody: RawWhatsappWebhookBody,
     @Query('tenantId') tenantIdFromQuery?: string,
     @Headers('x-hub-signature-256') signature?: string,
+    @Req() req?: RawBodyRequest<Request>,
   ) {
     // Verificacao de assinatura do webhook — FAIL-CLOSED em producao.
     // Em prod, o secret e obrigatorio e a assinatura tem que ser valida;
     // sem isso, qualquer um poderia injetar mensagens para qualquer tenant.
+    // A assinatura e conferida sobre o corpo CRU (req.rawBody), como a Meta assina.
     const webhookSecret = process.env.WHATSAPP_WEBHOOK_SECRET;
     const isProduction = process.env.NODE_ENV === 'production';
+    const rawBody = req?.rawBody;
 
     if (isProduction) {
       if (!webhookSecret) {
         this.logger.error(
-          '[SEGURANCA] WHATSAPP_WEBHOOK_SECRET ausente em producao. Webhook bloqueado (fail-closed).',
+          '[SEGURANCA][WHATSAPP] WHATSAPP_WEBHOOK_SECRET ausente em producao — mensagem REJEITADA (fail-closed). Configure o App Secret da Meta para o bot funcionar.',
         );
         throw new ForbiddenException('Webhook nao configurado com seguranca.');
       }
       if (!signature) {
         throw new ForbiddenException('Assinatura do webhook ausente.');
       }
-      const bodyStr = JSON.stringify(body);
-      if (!verifyWebhookSignature(bodyStr, signature, webhookSecret)) {
+      if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
         throw new ForbiddenException('Assinatura do webhook invalida.');
       }
     } else if (webhookSecret && signature) {
       // Dev/test: se houver secret e assinatura, ainda assim valida (defesa em profundidade).
-      const bodyStr = JSON.stringify(body);
-      if (!verifyWebhookSignature(bodyStr, signature, webhookSecret)) {
+      if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
         throw new ForbiddenException('Assinatura do webhook invalida.');
       }
     }
+
+    // Normaliza o formato aninhado da Meta Cloud API (entry[].changes[].value.messages[])
+    // para o formato plano que o restante do pipeline ja entende. Recibos de
+    // status (entregue/lido) sao ignorados aqui.
+    const metaNormalization = normalizeMetaCloudPayload(incomingBody);
+    if (metaNormalization.ignore) {
+      return { success: true, ignored: true, reason: metaNormalization.reason };
+    }
+    const body = metaNormalization.body;
 
     const ignoreDecision = shouldIgnoreWebhook(body);
     if (ignoreDecision.ignore) {

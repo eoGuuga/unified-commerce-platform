@@ -1,7 +1,11 @@
 import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { createHmac } from 'crypto';
 import { TenantsService } from '../tenants/tenants.service';
-import { WhatsappController } from './whatsapp.controller';
+import {
+  WhatsappController,
+  normalizeMetaCloudPayload,
+} from './whatsapp.controller';
 import { WhatsappService } from './whatsapp.service';
 
 describe('WhatsappController', () => {
@@ -392,6 +396,231 @@ describe('WhatsappController', () => {
       success: true,
       request: 'oi',
       response: 'ok',
+    });
+  });
+
+  // Peca 1 — GET verify (handshake do WhatsApp Cloud API / Meta)
+  describe('GET webhook — verificacao da Meta', () => {
+    const original = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+    afterEach(() => {
+      if (original === undefined) {
+        delete process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+      } else {
+        process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = original;
+      }
+    });
+
+    it('ecoa o hub.challenge quando o verify_token bate com o do .env', () => {
+      process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = 'segredo-doceria';
+      const result = controller.verifyWebhook({
+        'hub.mode': 'subscribe',
+        'hub.verify_token': 'segredo-doceria',
+        'hub.challenge': '1158201444',
+      });
+      expect(result).toBe('1158201444');
+    });
+
+    it('rejeita (403) quando o verify_token nao bate', () => {
+      process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = 'segredo-doceria';
+      expect(() =>
+        controller.verifyWebhook({
+          'hub.mode': 'subscribe',
+          'hub.verify_token': 'errado',
+          'hub.challenge': '1158201444',
+        }),
+      ).toThrow(ForbiddenException);
+    });
+
+    it('rejeita (403) quando nosso verify_token nao esta configurado', () => {
+      delete process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+      expect(() =>
+        controller.verifyWebhook({
+          'hub.mode': 'subscribe',
+          'hub.verify_token': 'qualquer',
+          'hub.challenge': '1158201444',
+        }),
+      ).toThrow(ForbiddenException);
+    });
+
+    it('rejeita (403) quando o hub.mode nao e subscribe', () => {
+      process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = 'segredo-doceria';
+      expect(() =>
+        controller.verifyWebhook({
+          'hub.mode': 'unsubscribe',
+          'hub.verify_token': 'segredo-doceria',
+          'hub.challenge': '1158201444',
+        }),
+      ).toThrow(ForbiddenException);
+    });
+  });
+
+  // Peca 2 — parser do formato aninhado da Meta (WhatsApp Cloud API)
+  describe('normalizeMetaCloudPayload — formato da Meta', () => {
+    const metaText = {
+      object: 'whatsapp_business_account',
+      entry: [
+        {
+          id: 'WABA_ID',
+          changes: [
+            {
+              field: 'messages',
+              value: {
+                messaging_product: 'whatsapp',
+                metadata: {
+                  display_phone_number: '15550001111',
+                  phone_number_id: 'PNID-123',
+                },
+                contacts: [{ profile: { name: 'Ana' }, wa_id: '5511988887777' }],
+                messages: [
+                  {
+                    from: '5511988887777',
+                    id: 'wamid.ABC',
+                    timestamp: '1730000000',
+                    type: 'text',
+                    text: { body: 'oi' },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    it('achata mensagem de texto da Meta para From/Body/MessageSid', () => {
+      const { body, ignore } = normalizeMetaCloudPayload(metaText as any);
+      expect(ignore).toBeFalsy();
+      expect(body.From).toBe('5511988887777');
+      expect(body.Body).toBe('oi');
+      expect(body.MessageSid).toBe('wamid.ABC');
+      expect((body.metadata as any).phoneNumberId).toBe('PNID-123');
+    });
+
+    it('ignora recibo de status (statuses, sem messages)', () => {
+      const receipt = {
+        object: 'whatsapp_business_account',
+        entry: [
+          {
+            changes: [
+              {
+                field: 'messages',
+                value: {
+                  statuses: [
+                    { id: 'wamid.X', status: 'delivered', recipient_id: '5511988887777' },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      };
+      const res = normalizeMetaCloudPayload(receipt as any);
+      expect(res.ignore).toBe(true);
+      expect(res.reason).toBe('meta_status_receipt');
+    });
+
+    it('resposta interativa (list_reply) vira o id da opcao no Body', () => {
+      const interactive = {
+        object: 'whatsapp_business_account',
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  messages: [
+                    {
+                      from: '5511988887777',
+                      id: 'wamid.INT',
+                      type: 'interactive',
+                      interactive: {
+                        type: 'list_reply',
+                        list_reply: { id: 'prod-42', title: 'Brigadeiro' },
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      };
+      const { body } = normalizeMetaCloudPayload(interactive as any);
+      expect(body.Body).toBe('prod-42');
+      expect(body.From).toBe('5511988887777');
+    });
+
+    it('payload NAO-Meta (Evolution) passa intacto', () => {
+      const evo = {
+        event: 'messages.upsert',
+        data: { key: { remoteJid: '5511991234567@s.whatsapp.net' } },
+      };
+      const res = normalizeMetaCloudPayload(evo as any);
+      expect(res.ignore).toBeFalsy();
+      expect(res.body).toBe(evo);
+    });
+
+    it('via webhook: texto da Meta chega no processIncomingMessage', async () => {
+      await controller.webhook(metaText as any, 'tenant-loucas');
+      expect(whatsappService.processIncomingMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          from: '5511988887777',
+          body: 'oi',
+          tenantId: 'tenant-loucas',
+        }),
+      );
+    });
+  });
+
+  // Peca 3 — assinatura HMAC sobre o corpo CRU (como a Meta assina de verdade)
+  describe('POST webhook — HMAC por raw-body', () => {
+    const OLD_ENV = process.env.NODE_ENV;
+    const OLD_SECRET = process.env.WHATSAPP_WEBHOOK_SECRET;
+    afterEach(() => {
+      process.env.NODE_ENV = OLD_ENV;
+      if (OLD_SECRET === undefined) {
+        delete process.env.WHATSAPP_WEBHOOK_SECRET;
+      } else {
+        process.env.WHATSAPP_WEBHOOK_SECRET = OLD_SECRET;
+      }
+    });
+
+    const sign = (raw: string, secret: string): string =>
+      'sha256=' + createHmac('sha256', secret).update(raw).digest('hex');
+
+    it('aceita quando a assinatura bate com o RAW body (nao com JSON.stringify)', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.WHATSAPP_WEBHOOK_SECRET = 'app-secret-teste';
+      // Espacos/ordem que JSON.stringify(body) NAO reproduz -> so o raw bate.
+      const raw = '{"from":"5511988887777" ,  "body":"oi"}';
+      const req = { rawBody: Buffer.from(raw, 'utf8') } as any;
+      const res: any = await controller.webhook(
+        JSON.parse(raw),
+        'tenant-loucas',
+        sign(raw, 'app-secret-teste'),
+        req,
+      );
+      expect(res.success).toBe(true);
+      expect(whatsappService.processIncomingMessage).toHaveBeenCalled();
+    });
+
+    it('rejeita (403) quando a assinatura nao bate', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.WHATSAPP_WEBHOOK_SECRET = 'app-secret-teste';
+      const raw = '{"from":"5511988887777","body":"oi"}';
+      const req = { rawBody: Buffer.from(raw, 'utf8') } as any;
+      await expect(
+        controller.webhook(JSON.parse(raw), 'tenant-loucas', 'sha256=deadbeef', req),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('rejeita (403) em producao sem WHATSAPP_WEBHOOK_SECRET (fail-closed)', async () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.WHATSAPP_WEBHOOK_SECRET;
+      const raw = '{"from":"5511988887777","body":"oi"}';
+      const req = { rawBody: Buffer.from(raw, 'utf8') } as any;
+      await expect(
+        controller.webhook(JSON.parse(raw), 'tenant-loucas', 'sha256=whatever', req),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 });
