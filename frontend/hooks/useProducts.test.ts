@@ -2,18 +2,24 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 // Mock do api-client antes de importar o hook
-vi.mock('@/lib/api-client', () => ({
-  default: {
-    getProducts: vi.fn(),
-    createProduct: vi.fn(),
-    updateProduct: vi.fn(),
-  },
-}));
+// Mocka só o default (métodos HTTP), mantendo normalizeApiError real via importActual.
+vi.mock('@/lib/api-client', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
+  return {
+    ...actual,
+    default: {
+      getProducts: vi.fn(),
+      createProduct: vi.fn(),
+      updateProduct: vi.fn(),
+    },
+  };
+});
 
 import { useProducts } from './useProducts';
-import api from '@/lib/api-client';
+import api, { API_ERROR_MESSAGES } from '@/lib/api-client';
 
-const apiMock = api as {
+const apiMock = api as unknown as {
   getProducts: ReturnType<typeof vi.fn>;
   createProduct: ReturnType<typeof vi.fn>;
   updateProduct: ReturnType<typeof vi.fn>;
@@ -121,7 +127,25 @@ describe('useProducts', () => {
       expect(result.current.products[0].is_active).toBe(true);
       // Deve retornar {ok:false}
       expect(toggleResult!.ok).toBe(false);
-      expect(toggleResult!.error).toBe('timeout');
+      // B5: erro sem status vira o fallback amigável (não vaza "timeout" cru).
+      expect(toggleResult!.error).toBe('Falha ao alterar status do produto.');
+    });
+
+    it('B5: erro 403 vira "sem permissão" (distingue os casos, não o genérico)', async () => {
+      apiMock.updateProduct.mockRejectedValue(
+        Object.assign(new Error('Forbidden'), { status: 403 }),
+      );
+
+      const { result } = renderHook(() => useProducts());
+      await act(async () => { await Promise.resolve(); });
+
+      let res: { ok: boolean; error?: string };
+      await act(async () => {
+        res = await result.current.toggleActive('1', false);
+      });
+
+      expect(res!.ok).toBe(false);
+      expect(res!.error).toBe(API_ERROR_MESSAGES.forbidden);
     });
   });
 

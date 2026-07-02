@@ -31,11 +31,17 @@ vi.mock('@/hooks/useProducts', () => ({
   useProducts: vi.fn(),
 }));
 
-vi.mock('@/lib/api-client', () => ({
-  default: {
-    createOrder: vi.fn(),
-  },
-}));
+// Mocka só o default (createOrder), mantendo normalizeApiError real via importActual.
+vi.mock('@/lib/api-client', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
+  return {
+    ...actual,
+    default: {
+      createOrder: vi.fn(),
+    },
+  };
+});
 
 const mockReplace = vi.fn();
 const mockPush = vi.fn();

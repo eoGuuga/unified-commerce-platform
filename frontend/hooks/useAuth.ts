@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import api from '@/lib/api-client';
+import api, { normalizeApiError } from '@/lib/api-client';
 
 interface User {
   id: string;
@@ -61,8 +61,9 @@ export function useAuth() {
           isLoading: false,
           isAuthenticated: true,
         });
-      } catch (error) {
-        console.error('Erro ao carregar usuario:', error);
+      } catch {
+        // Nunca logar o erro cru: pode conter token/PII. A sessão é encerrada.
+        console.error('Não foi possível carregar o usuário da sessão.');
         clearSession();
         resetAuthState();
       }
@@ -100,8 +101,9 @@ export function useAuth() {
       });
 
       void loadUser(token);
-    } catch (error) {
-      console.error('Erro ao decodificar token:', error);
+    } catch {
+      // jwtDecode pode ecoar o token na mensagem de erro — nunca logar o erro cru.
+      console.error('Token inválido no armazenamento local; sessão encerrada.');
       clearSession();
       resetAuthState();
     }
@@ -129,11 +131,15 @@ export function useAuth() {
         await loadUser(response.access_token);
 
         return { success: true, tenantId: extractedTenantId };
-      } catch (error: any) {
-        console.error('Erro no login:', error);
+      } catch (error) {
         clearSession();
         resetAuthState();
-        return { success: false, error: error.message || 'Falha de autenticacao' };
+        // Log sem o erro cru; mensagem amigável ao usuário (nunca "Invalid JWT").
+        console.error('Falha na autenticação de login.');
+        return {
+          success: false,
+          error: normalizeApiError(error, { context: 'login' }),
+        };
       }
     },
     [clearSession, loadUser, resetAuthState]

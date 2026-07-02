@@ -1,20 +1,32 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
-vi.mock('@/lib/api-client', () => ({
-  default: {
-    login: vi.fn(),
-    getCurrentUser: vi.fn(),
-  },
-}));
+// Mocka só o cliente HTTP (default), mantendo normalizeApiError + as mensagens
+// reais (via importActual) — o useAuth passou a traduzir erros de login por elas.
+vi.mock('@/lib/api-client', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
+  return {
+    ...actual,
+    default: {
+      login: vi.fn(),
+      getCurrentUser: vi.fn(),
+    },
+  };
+});
 
 vi.mock('jwt-decode', () => ({
   jwtDecode: vi.fn(),
 }));
 
 import { useAuth } from './useAuth';
-import api from '@/lib/api-client';
+import api, { API_ERROR_MESSAGES } from '@/lib/api-client';
 import { jwtDecode } from 'jwt-decode';
+
+/** Anexa status/code como o request<T>() do api-client faz de verdade. */
+function apiError(message: string, extra: { status?: number; code?: string } = {}) {
+  return Object.assign(new Error(message), extra);
+}
 
 const mockedApi = api as unknown as {
   login: ReturnType<typeof vi.fn>;
@@ -100,7 +112,7 @@ describe('useAuth', () => {
   });
 
   it('login falho retorna success=false e mantem storage limpo', async () => {
-    mockedApi.login.mockRejectedValue(new Error('credenciais invalidas'));
+    mockedApi.login.mockRejectedValue(apiError('Invalid credentials', { status: 401 }));
 
     const { result } = renderHook(() => useAuth());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -111,8 +123,61 @@ describe('useAuth', () => {
     });
 
     expect(resp?.success).toBe(false);
-    expect(resp?.error).toMatch(/credenciais/);
     expect(window.localStorage.getItem('token')).toBeNull();
+  });
+
+  // B1 — o login não pode vazar texto técnico do backend ("Invalid JWT"/401 cru).
+  it('B1: credencial errada (401) vira "E-mail ou senha incorretos", nao vaza tecnico', async () => {
+    mockedApi.login.mockRejectedValue(apiError('Invalid JWT: signature', { status: 401 }));
+
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let resp: { success: boolean; error?: string } | undefined;
+    await act(async () => {
+      resp = await result.current.login('a@b.com', 'wrong');
+    });
+
+    expect(resp?.success).toBe(false);
+    expect(resp?.error).toBe(API_ERROR_MESSAGES.loginCredentials);
+    expect(resp?.error).not.toMatch(/JWT|Invalid/i);
+  });
+
+  it('B1: erro de servidor (500) no login vira mensagem amigavel de servidor', async () => {
+    mockedApi.login.mockRejectedValue(
+      apiError('Internal server error', { status: 500 }),
+    );
+
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let resp: { success: boolean; error?: string } | undefined;
+    await act(async () => {
+      resp = await result.current.login('a@b.com', 'x');
+    });
+
+    expect(resp?.error).toBe(API_ERROR_MESSAGES.loginServer);
+    expect(resp?.error).not.toMatch(/internal|server error/i);
+  });
+
+  // B1 — nunca logar o token no console (jwtDecode pode ecoar o token no erro).
+  it('B1: token invalido no storage nao vaza para o console', async () => {
+    const SECRET = 'eyJhbGciOiJIUzI1NiJ9.PAYLOAD_SUPER_SECRETO.assinatura';
+    window.localStorage.setItem('token', SECRET);
+    mockedJwtDecode.mockImplementation(() => {
+      throw new Error(`Invalid token specified: ${SECRET}`);
+    });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    const loggedText = errorSpy.mock.calls
+      .flat()
+      .map((a) => (a instanceof Error ? `${a.message} ${a.stack}` : String(a)))
+      .join(' ');
+    expect(loggedText).not.toContain(SECRET);
+    expect(loggedText).not.toContain('PAYLOAD_SUPER_SECRETO');
   });
 
   it('logout limpa estado e storage', async () => {

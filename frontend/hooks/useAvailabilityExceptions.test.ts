@@ -2,14 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 // Mock do api-client antes de importar o hook (mesmo padrao de useTenantSettings.test.ts).
-vi.mock('@/lib/api-client', () => ({
-  default: {
-    listExceptions: vi.fn(),
-    createException: vi.fn(),
-    removeException: vi.fn(),
-    closeToday: vi.fn(),
-  },
-}));
+// Mocka só o default (métodos HTTP), mantendo normalizeApiError real via importActual.
+vi.mock('@/lib/api-client', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
+  return {
+    ...actual,
+    default: {
+      listExceptions: vi.fn(),
+      createException: vi.fn(),
+      removeException: vi.fn(),
+      closeToday: vi.fn(),
+    },
+  };
+});
 
 import { useAvailabilityExceptions } from './useAvailabilityExceptions';
 import api from '@/lib/api-client';
@@ -80,7 +86,8 @@ describe('useAvailabilityExceptions', () => {
 
       expect(result.current.loading).toBe(false);
       expect(result.current.exceptions).toEqual([]);
-      expect(result.current.error).toBe('rede caiu');
+      // B5: erro sem status vira o fallback amigável (não vaza o texto cru).
+      expect(result.current.error).toBe('Não foi possível carregar as exceções.');
     });
   });
 
@@ -181,7 +188,7 @@ describe('useAvailabilityExceptions', () => {
         result.current.exceptions.some((e) => e.date === '2026-08-01'),
       ).toBe(false);
       expect(res!.ok).toBe(false);
-      expect(res!.error).toBe('timeout');
+      expect(res!.error).toBe('Falha ao adicionar a exceção.');
     });
 
     it('upsert por data: add de uma data ja existente substitui, nao duplica', async () => {
@@ -281,7 +288,7 @@ describe('useAvailabilityExceptions', () => {
       expect(result.current.exceptions).toHaveLength(2);
       expect(result.current.exceptions.some((e) => e.id === 'exc-1')).toBe(true);
       expect(res!.ok).toBe(false);
-      expect(res!.error).toBe('falhou');
+      expect(res!.error).toBe('Falha ao remover a exceção.');
     });
   });
 
@@ -328,7 +335,7 @@ describe('useAvailabilityExceptions', () => {
 
       expect(result.current.exceptions).toHaveLength(2);
       expect(res!.ok).toBe(false);
-      expect(res!.error).toBe('sem rede');
+      expect(res!.error).toBe('Falha ao fechar a loja hoje.');
     });
   });
 

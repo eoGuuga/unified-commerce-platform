@@ -35,9 +35,17 @@ export function OrderTracking({ orderNo }: { orderNo: string | null }) {
             : { customer_phone: contactValue.trim() }),
         })) as unknown as PublicOrderTrackingResponse;
         setOrder(result);
-      } catch {
+      } catch (err) {
+        const status =
+          typeof err === 'object' && err && 'status' in err
+            ? (err as { status?: number }).status
+            : undefined;
+        // Distingue erro de servidor de "não encontrado" (B6): não escondemos um
+        // 5xx atrás de "confira os dados" — o cliente ficaria conferindo à toa.
         setError(
-          'Pedido não encontrado ou os dados não conferem. Confira o número do pedido e o e-mail/telefone usado na compra.',
+          typeof status === 'number' && status >= 500
+            ? 'Tivemos um problema ao consultar seu pedido. Tente novamente em instantes.'
+            : 'Pedido não encontrado ou os dados não conferem. Confira o número do pedido e o e-mail/telefone usado na compra.',
         );
         setOrder(null);
       } finally {

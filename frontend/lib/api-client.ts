@@ -56,6 +56,103 @@ function hasMessageMatching(error: unknown, pattern: RegExp): boolean {
   return false;
 }
 
+// ---------------------------------------------------------------------------
+// Normalização de erros de API (conserto de raiz — "Internal server error" cru)
+// ---------------------------------------------------------------------------
+
+/**
+ * Mensagens amigáveis em pt-BR. A whitelist é o contrato: normalizeApiError()
+ * NUNCA retorna texto técnico cru do backend (JWT, "Internal server error",
+ * HTML, stack) — só uma destas ou um fallback amigável dado pelo chamador.
+ */
+export const API_ERROR_MESSAGES = {
+  network: 'Sem conexão. Verifique sua internet e tente novamente.',
+  server: 'Não foi possível concluir agora. Tente novamente em instantes.',
+  loginServer: 'Não foi possível entrar. Tente novamente.',
+  loginCredentials: 'E-mail ou senha incorretos.',
+  sessionExpired: 'Sua sessão expirou. Faça login novamente.',
+  forbidden: 'Você não tem permissão para essa ação.',
+  invalid: 'Dados inválidos. Confira os campos e tente novamente.',
+  notFound: 'Não encontramos o que você procura.',
+  rateLimit: 'Muitas tentativas. Aguarde um momento e tente novamente.',
+  generic: 'Algo deu errado. Tente novamente.',
+} as const;
+
+/** Mensagens específicas por código estruturado do backend (têm precedência). */
+export const API_ERROR_CODE_MESSAGES: Record<string, string> = {
+  INSUFFICIENT_STOCK: 'Estoque insuficiente para essa quantidade.',
+};
+
+export interface NormalizeApiErrorOptions {
+  /** 'login': 401/400/422 viram "e-mail ou senha incorretos"; 5xx vira a msg de login. */
+  context?: 'login';
+  /** Fallback amigável do chamador p/ casos não classificáveis (nunca texto cru). */
+  fallback?: string;
+}
+
+function extractStatus(error: unknown): number | undefined {
+  if (typeof error === 'object' && error && 'status' in error) {
+    const s = (error as { status?: unknown }).status;
+    if (typeof s === 'number') return s;
+  }
+  return undefined;
+}
+
+function extractCode(error: unknown): string | undefined {
+  if (typeof error === 'object' && error && 'code' in error) {
+    const c = (error as { code?: unknown }).code;
+    if (typeof c === 'string') return c;
+  }
+  return undefined;
+}
+
+function isNetworkError(error: unknown): boolean {
+  // fetch() rejeita com TypeError quando a rede falha (antes de haver status).
+  if (error instanceof TypeError) return true;
+  if (error instanceof Error) {
+    return /failed to fetch|networkerror|load failed|network request failed/i.test(
+      error.message,
+    );
+  }
+  return false;
+}
+
+/**
+ * Traduz QUALQUER erro de API para uma mensagem amigável em pt-BR. Decide só por
+ * status HTTP + código estruturado, escolhendo de uma whitelist fixa — o texto
+ * cru do backend nunca chega ao usuário.
+ */
+export function normalizeApiError(
+  error: unknown,
+  options: NormalizeApiErrorOptions = {},
+): string {
+  const M = API_ERROR_MESSAGES;
+
+  // 1. Código estruturado do backend tem precedência (mensagem específica conhecida).
+  const code = extractCode(error);
+  if (code && API_ERROR_CODE_MESSAGES[code]) return API_ERROR_CODE_MESSAGES[code];
+
+  // 2. Sem status → rede (fetch não completou) ou erro desconhecido.
+  const status = extractStatus(error);
+  if (status === undefined) {
+    if (isNetworkError(error)) return M.network;
+    return options.fallback ?? M.generic;
+  }
+
+  // 3. Por faixa/código de status HTTP.
+  if (status >= 500) return options.context === 'login' ? M.loginServer : M.server;
+  if (status === 401) {
+    return options.context === 'login' ? M.loginCredentials : M.sessionExpired;
+  }
+  if (status === 400 || status === 422) {
+    return options.context === 'login' ? M.loginCredentials : M.invalid;
+  }
+  if (status === 403) return M.forbidden;
+  if (status === 404) return options.fallback ?? M.notFound;
+  if (status === 429) return M.rateLimit;
+  return options.fallback ?? M.generic;
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -100,9 +197,15 @@ class ApiClient {
       const errorBody = (await response
         .json()
         .catch(() => ({}))) as ApiErrorResponse;
-      const err = new Error(errorBody.message || 'Request failed');
-      // Preserva body.code para que hooks recebam erros tipados (ex.: INSUFFICIENT_STOCK).
-      (err as Error & { code?: string }).code = (errorBody as { code?: string }).code;
+      const err = new Error(errorBody.message || 'Request failed') as Error & {
+        status?: number;
+        code?: string;
+      };
+      // Preserva o status HTTP + body.code para o consumidor classificar via
+      // normalizeApiError (401 → sessão, 403 → permissão, code INSUFFICIENT_STOCK
+      // → mensagem específica) sem depender do texto cru da mensagem.
+      err.status = response.status;
+      err.code = (errorBody as { code?: string }).code;
       throw err;
     }
 

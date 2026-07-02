@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import api from '@/lib/api-client';
+import api, { normalizeApiError } from '@/lib/api-client';
 import type { Order, OrderStatus } from '@/lib/types/order';
 
 interface UseOrdersResult {
@@ -34,7 +34,11 @@ export function useOrders(): UseOrdersResult {
       const list = Array.isArray(raw) ? raw : ((raw as { data?: Order[] })?.data ?? []);
       setOrders(list);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível carregar os pedidos.');
+      setError(
+        normalizeApiError(err, {
+          fallback: 'Não foi possível carregar os pedidos.',
+        }),
+      );
       setOrders([]);
     } finally {
       setLoading(false);
@@ -58,7 +62,7 @@ export function useOrders(): UseOrdersResult {
       } catch (err) {
         return {
           ok: false,
-          error: err instanceof Error ? err.message : 'Falha ao atualizar o status.',
+          error: normalizeApiError(err, { fallback: 'Falha ao atualizar o status.' }),
         };
       } finally {
         setUpdatingId(null);

@@ -20,7 +20,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import api from '@/lib/api-client';
+import api, { normalizeApiError } from '@/lib/api-client';
 import type {
   StoreException,
   CreateStoreExceptionInput,
@@ -45,7 +45,7 @@ export interface UseAvailabilityExceptionsResult {
 }
 
 function messageOf(err: unknown, fallback: string): string {
-  return err instanceof Error ? err.message : fallback;
+  return normalizeApiError(err, { fallback });
 }
 
 /**
