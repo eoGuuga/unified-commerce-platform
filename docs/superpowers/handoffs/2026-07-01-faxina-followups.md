@@ -66,8 +66,8 @@ O `pg_hba` tem `host all all all scram-sha-256`, mas a senha guardada do role `p
 ### F13 — Logout zumbi
 Clicar em "sair" muda o nome pro genérico "usuário" mas **não redireciona nem limpa a sessão** — só sai de fato recarregando a página. Provável: o handler de logout no front não limpa token/estado (`localStorage` `token`/`tenant_id`) e/ou não faz `redirect` pra `/login`. Corrigir o fluxo de logout (limpar + redirecionar).
 
-### F14 — Campo "informar workspace" ainda aparece no login
-Mesmo com o tenant configurado (T3), o campo/botão "informar workspace" ainda aparece no login. O login **funciona** (cosmético). Confirmar se é build/cache velho servido ou lógica remanescente no `LoginExperience.tsx`; ajustar pra o campo ficar oculto no caso single-tenant.
+### F14 — Link "informar workspace" no login (UX, NÃO bug — reclassificado 2026-07-02)
+Validação do dono: o T3 **funcionou** — o workspace está recolhido num **link opcional** "INFORMAR WORKSPACE" (não um campo aberto), e o login funciona sem tocá-lo. Não é bug. Decisão de UX pendente: mostrar/esconder esse link num app single-tenant (o `showWorkspaceField` já é `false` por padrão; o link é o toggle "Informar workspace" no `LoginExperience.tsx:163-167`). Polimento, não-urgente.
 
 ---
 
