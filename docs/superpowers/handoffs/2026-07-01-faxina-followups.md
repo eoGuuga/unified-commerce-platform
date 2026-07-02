@@ -3,6 +3,8 @@
 **Origem:** frente "Faxina completa do servidor" (spec/plano `2026-07-01-server-cleanup*`).
 **Contexto:** o swap (Etapa 4) foi concluído — prod roda de `/opt/gtsofthub` (código = `origin/main`, reproduzível). Estes são os pendentes que **não** entraram no swap.
 
+**STATUS 2026-07-02 — FAXINA COMPLETA (Etapas 4→7).** ✅ FEITOS: swap, banco limpo + seed da doceria (UUID `2675a300-…`), backdoor removido, dev aposentado, **F1** (cert deploy-hook — `certbot renew --dry-run` passou), **F5** (servidor = espelho fiel do GitHub), **`deploy.sh`** (deploy num comando, testado). ⏳ PENDENTES (só polimento, não-urgente): **F8** (flagado — precisa mover `scripts/migrations` p/ `backend/` + `COPY` no Dockerfile + testar migrate-sem-mount), **F6, F10, F11, F12, F13, F14**.
+
 ---
 
 ## 🔴 ESSENCIAL — fechar ANTES de 10/set/2026 (senão o site cai)
