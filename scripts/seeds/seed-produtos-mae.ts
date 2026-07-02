@@ -25,7 +25,7 @@ import { MovimentacaoEstoque } from '../../backend/src/database/entities/Movimen
 import { Pedido } from '../../backend/src/database/entities/Pedido.entity';
 import { ItemPedido } from '../../backend/src/database/entities/ItemPedido.entity';
 
-const TENANT_ID = '00000000-0000-0000-0000-000000000000';
+const TENANT_ID = process.env.SEED_TENANT_ID || '00000000-0000-0000-0000-000000000000';
 
   // Produtos REAIS da Loucas por Brigadeiro
   // ExtraÃ­do de: https://loucasporbrigadeiro.my.canva.site/loucas-por-brigadeiro

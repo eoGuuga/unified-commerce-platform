@@ -1,7 +1,7 @@
 ﻿import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
 import * as path from 'path';
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs'); // mesmo lib do app (auth.service usa bcryptjs); hashes sao cross-compativeis
 
 // Carregar .env
 config({ path: path.join(__dirname, '../../backend/.env') });
@@ -15,9 +15,9 @@ import { MovimentacaoEstoque } from '../../backend/src/database/entities/Movimen
 import { Pedido } from '../../backend/src/database/entities/Pedido.entity';
 import { ItemPedido } from '../../backend/src/database/entities/ItemPedido.entity';
 
-const TENANT_ID = '00000000-0000-0000-0000-000000000000';
-const DEFAULT_EMAIL = 'admin@loja.com';
-const DEFAULT_PASSWORD = 'senha123';
+const TENANT_ID = process.env.SEED_TENANT_ID || '00000000-0000-0000-0000-000000000000';
+const DEFAULT_EMAIL = process.env.SEED_ADMIN_EMAIL || 'admin@loja.com';
+const DEFAULT_PASSWORD = process.env.SEED_ADMIN_PASSWORD || 'senha123';
 
 async function seedUsuarioPadrao() {
   console.log('ðŸ‘¤ Criando usuÃ¡rio padrÃ£o...\n');
@@ -46,8 +46,8 @@ async function seedUsuarioPadrao() {
       console.log('ðŸ“¦ Criando tenant...');
       tenant = manager.create(Tenant, {
         id: TENANT_ID,
-        name: 'Loja Chocola Velha',
-        domain: 'loja-chocola-velha',
+        name: 'Loucas por Brigadeiro',
+        slug: 'loucas-por-brigadeiro',
         is_active: true,
       });
       await manager.save(tenant);
