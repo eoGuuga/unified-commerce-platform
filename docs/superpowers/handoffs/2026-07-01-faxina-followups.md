@@ -3,7 +3,13 @@
 **Origem:** frente "Faxina completa do servidor" (spec/plano `2026-07-01-server-cleanup*`).
 **Contexto:** o swap (Etapa 4) foi concluído — prod roda de `/opt/gtsofthub` (código = `origin/main`, reproduzível). Estes são os pendentes que **não** entraram no swap.
 
-**STATUS 2026-07-02 — FAXINA COMPLETA (Etapas 4→7).** ✅ FEITOS: swap, banco limpo + seed da doceria (UUID `2675a300-…`), backdoor removido, dev aposentado, **F1** (cert deploy-hook — `certbot renew --dry-run` passou), **F5** (servidor = espelho fiel do GitHub), **`deploy.sh`** (deploy num comando, testado). ⏳ PENDENTES (só polimento, não-urgente): **F8** (flagado — precisa mover `scripts/migrations` p/ `backend/` + `COPY` no Dockerfile + testar migrate-sem-mount), **F6, F10, F11, F12, F13, F14**.
+**STATUS 2026-07-02 — FAXINA COMPLETA (Etapas 4→7).** ✅ FEITOS: swap, banco limpo + seed da doceria (UUID `2675a300-…`), backdoor removido, dev aposentado, **F1** (cert deploy-hook — `certbot renew --dry-run` passou), **F5** (servidor = espelho fiel do GitHub), **`deploy.sh`** (deploy num comando, testado). ⏳ PENDENTES INFRA (não-urgente): **F8** (mover `scripts/migrations` p/ `backend/` + `COPY` no Dockerfile), **F6, F9, F10, F12**, **F16** (confiabilidade do `deploy.sh`). **F11 SUBIU de prioridade** (trocar senha admin antes da prod real). **F13** e **F14** resolvidos no polimento.
+
+**STATUS 2026-07-02 — FRENTE DE POLIMENTO (22 bugs) CONCLUÍDA, DEPLOYADA E VALIDADA.** ✅ Os 22 itens do mapa fechados em 4 blocos temáticos (branches `fix/polish-bloco1..4`, mergeadas na `main` com `--no-ff`, ordem 1→2→3→4):
+- **Reais consertados:** K1 (logout redireciona), K3 (horário abre<fecha), A4/A5 (reset de estado), B1–B6 (normalização central de erros de API — nunca vaza técnico), C1–C4 (validações: checkout com CPF/CNPJ/e-mail/telefone, margem negativa, feedback do mínimo, ajuste valida antes), D1 (estados de botão "Atualizando…"/"Salvando…").
+- **Falso-positivos PROVADOS com teste-guarda** (não "consertados" à toa): A1/A2/A3/A6 (React reseta por desmontagem), C5 (máscara BR de moeda já existia e testada).
+- **Voz do produto** (D2/D3/K2): zero jargão "workspace/UUID/end-to-end/ecossistema/bot" no app do lojista; capacidade multi-loja PRESERVADA (só a UI recolhida).
+- **Estado:** código na `main` (`b5bf26b`), pushado, **deployado no ar com build limpo `--no-cache`**, **validado pelo dono no navegador** (login limpo, logout redireciona de verdade, erro amigável "E-mail ou senha incorretos"). **471 testes verdes**, type-check limpo. Detalhe durável nos commits + mensagens de merge.
 
 ---
 
@@ -63,10 +69,17 @@ O `pg_hba` tem `host all all all scram-sha-256`, mas a senha guardada do role `p
 `WebhookEvent.entity.ts` (`webhook_events`) e `UsageLog.entity.ts` (`usage_logs`) existem no código, mas **nenhuma migration cria essas tabelas** — provado: após um `migration:run` do zero, ambas ficam **MISSING**. Mesma classe de bug do 500 da Camada 2 (entidade × tabela ausente), mas **pré-existente** (o prod legado também não as tem; a Etapa 5 não piora — só não resolve estas duas).
 **A fazer:** (1) verificar se o código **consulta** essas entidades em caminho ativo (se sim, esses endpoints hoje dão 500); (2) gerar as migrations que faltam (`migration:generate`) e aplicá-las. Não bloqueia a Etapa 5, mas fecha o mesmo tipo de furo.
 
-## 🟢 Follow-ups de produto (frente de polimento pós-faxina — NÃO agora)
+### F16 — `deploy.sh` faz build CACHEADO + `apply-and-health.sh` aponta pro `/opt/ucm` removido 🟠 (confiabilidade do deploy)
+Descoberto no deploy do polimento (2026-07-02). Dois defeitos que tornam o deploy "num comando" não-confiável:
+- **(a) build cacheado:** `deploy/scripts/deploy.sh` roda `docker compose ... build` **sem `--no-cache`** → risco de subir versão meio-velha (o gotcha Turbopack/cache). No deploy do polimento rodei os passos manualmente com `--no-cache` pra garantir a versão certa no ar. **Fix:** `--no-cache` (ou um flag `--fresh`) no build do deploy.sh, ou garantir rebuild total de backend+frontend.
+- **(b) path morto:** `deploy/scripts/apply-and-health.sh` usa `repo_root="/opt/ucm"` — dir **removido na faxina** (prod agora é `/opt/gtsofthub`). O script está quebrado. **Fix:** atualizar o path pra `/opt/gtsofthub` ou remover o script (o `deploy.sh` já cobre o deploy).
 
-### F13 — Logout zumbi
-Clicar em "sair" muda o nome pro genérico "usuário" mas **não redireciona nem limpa a sessão** — só sai de fato recarregando a página. Provável: o handler de logout no front não limpa token/estado (`localStorage` `token`/`tenant_id`) e/ou não faz `redirect` pra `/login`. Corrigir o fluxo de logout (limpar + redirecionar).
+Sem isso, o próximo deploy automático ou sobe cacheado (a) ou falha (b).
+
+## 🟢 Follow-ups de produto (frente de polimento — ✅ CONCLUÍDA 2026-07-02; resta só F15 pra frente futura)
+
+### F13 — Logout zumbi ✅ RESOLVIDO (Bloco 2 do polimento — K1)
+Clicar em "sair" mudava o nome pro genérico "usuário" mas **não redirecionava nem limpava a sessão** — só saía de fato recarregando a página. **Raiz (K1):** `useAuth` é estado **POR-INSTÂNCIA** (não há context/store compartilhado), então o `logout` resetava só a instância do botão, deixando o resto da tela "zumbi". **Fix:** o `logout` em `useAuth.ts` agora faz `window.location.replace('/login')` (limpa `token`/`tenant_id` + navega pra fora, garantindo o logout limpo). **Validado pelo dono no navegador (2026-07-02).**
 
 ### F14 — Link "informar workspace" no login (UX, NÃO bug — reclassificado 2026-07-02) ✅ RESOLVIDO
 Validação do dono: o T3 **funcionou** — o workspace está recolhido num **link opcional** "INFORMAR WORKSPACE" (não um campo aberto), e o login funciona sem tocá-lo. Não é bug. **Resolvido no Bloco 4 do polimento (voz):** o toggle "Informar workspace" + o campo agora só aparecem no modo **multi-tenant** (`TENANT_ID === SENTINEL`); no single-tenant atual ficam **recolhidos**, com a **lógica multi-loja preservada** (`workspaceSelectable` em `LoginExperience.tsx`). Reativa sozinho se o tenant voltar ao sentinel.
@@ -79,8 +92,8 @@ Validação do dono: o T3 **funcionou** — o workspace está recolhido num **li
 ### F12 — Remover a criação do admin default do código da migration 🟠 (segurança)
 `scripts/migrations/001-initial-schema.sql:365-382` semeia um tenant "Loja de Exemplo" (`000…000`) + admin `admin@exemplo.com` com `crypt('admin123', gen_salt('bf'))` — **backdoor de credencial conhecida** em **qualquer** banco novo (provado na T1: apareceu no banco fresco). O T2.5b remove pra ESTE servidor (DELETE), mas o **código** ainda criaria em bancos futuros. **A fazer:** remover esse INSERT do `001-initial-schema.sql` (ou condicioná-lo a um env de dev, nunca em prod). Fecha o furo na origem, não só neste servidor.
 
-### F11 — Trocar a senha do admin por uma definitiva antes da produção real 🟠 (QA→prod)
-A senha do admin (`admin@loja.com`) gerada na Etapa 5 **passou pelo chat** — serve pra fase de **QA/testes**. Antes de a doceria ir pra **produção real** (a mãe operando, clientes reais), trocar por uma senha definitiva que **nunca** passou por canal registrado (o dono define e aplica via `SEED_ADMIN_PASSWORD` ou troca de senha no app). Não-urgente; é higiene de QA→prod.
+### F11 — Trocar a senha do admin por uma definitiva antes da produção real 🔴 (SUBIU 2026-07-02 — tudo público agora)
+**⬆️ Prioridade elevada:** com o polimento **no ar e público**, a doceria pode ir pra produção real a qualquer momento — esta virou a **próxima ação de segurança antes de clientes reais**. A senha do admin (`admin@loja.com`) gerada na Etapa 5 **passou pelo chat** — serve só pra **QA/testes**. Trocar por uma definitiva que **nunca** passou por canal registrado (o dono define e aplica via `SEED_ADMIN_PASSWORD` ou troca de senha no app).
 
 ---
 
