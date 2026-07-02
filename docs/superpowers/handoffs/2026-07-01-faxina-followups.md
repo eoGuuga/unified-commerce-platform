@@ -68,8 +68,11 @@ O `pg_hba` tem `host all all all scram-sha-256`, mas a senha guardada do role `p
 ### F13 — Logout zumbi
 Clicar em "sair" muda o nome pro genérico "usuário" mas **não redireciona nem limpa a sessão** — só sai de fato recarregando a página. Provável: o handler de logout no front não limpa token/estado (`localStorage` `token`/`tenant_id`) e/ou não faz `redirect` pra `/login`. Corrigir o fluxo de logout (limpar + redirecionar).
 
-### F14 — Link "informar workspace" no login (UX, NÃO bug — reclassificado 2026-07-02)
-Validação do dono: o T3 **funcionou** — o workspace está recolhido num **link opcional** "INFORMAR WORKSPACE" (não um campo aberto), e o login funciona sem tocá-lo. Não é bug. Decisão de UX pendente: mostrar/esconder esse link num app single-tenant (o `showWorkspaceField` já é `false` por padrão; o link é o toggle "Informar workspace" no `LoginExperience.tsx:163-167`). Polimento, não-urgente.
+### F14 — Link "informar workspace" no login (UX, NÃO bug — reclassificado 2026-07-02) ✅ RESOLVIDO
+Validação do dono: o T3 **funcionou** — o workspace está recolhido num **link opcional** "INFORMAR WORKSPACE" (não um campo aberto), e o login funciona sem tocá-lo. Não é bug. **Resolvido no Bloco 4 do polimento (voz):** o toggle "Informar workspace" + o campo agora só aparecem no modo **multi-tenant** (`TENANT_ID === SENTINEL`); no single-tenant atual ficam **recolhidos**, com a **lógica multi-loja preservada** (`workspaceSelectable` em `LoginExperience.tsx`). Reativa sozinho se o tenant voltar ao sentinel.
+
+### F15 — Ligar ou remover o OnboardingPanel (código morto) 🔵 (frente futura)
+`components/admin/OnboardingPanel.tsx` é um painel de onboarding pós-login COMPLETO (welcomeName, trilha de passos, progresso, atalhos PDV/vitrine) mas **não é renderizado em lugar nenhum** (sem import, sem `<OnboardingPanel`). Descoberto na varredura de copy do Bloco 4. Contém o jargão inglês **"command center"** (L74) — que só importa se o painel for ligado. **A fazer (frente futura):** decidir entre **ligar** no AdminShell (onboarding guiado ao lojista) ou **remover** o componente. Se ligar: trocar "command center" por linguagem do lojista e garantir `workspaceLabel` = nome da loja (não UUID). Baixa prioridade.
 
 ---
 
