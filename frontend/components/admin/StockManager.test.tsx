@@ -417,3 +417,32 @@ describe('StockManager — A1: reset de tipo do ModalAjuste entre produtos', () 
     expect(selectB.value).toBe('COMPRA');
   });
 });
+
+// ---- Bloco 2 (polimento) — A3: reabrir o extrato do mesmo produto ----
+
+describe('StockManager — A3: fechar/reabrir o extrato não trava em loading', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('abrir extrato -> fechar -> reabrir o MESMO produto recarrega (não fica em "Carregando…" eterno)', async () => {
+    const historyFn = vi.fn().mockResolvedValue({ items: historyItems, total: 2 });
+    mockUseAdminData.mockReturnValue(makeAdminData({ history: historyFn }));
+    render(<StockManager />);
+
+    // Abre o extrato do primeiro produto e vê os itens.
+    fireEvent.click(screen.getAllByText('Extrato')[0]);
+    await waitFor(() => expect(screen.getByText('COMPRA')).toBeInTheDocument());
+
+    // Fecha o drawer.
+    fireEvent.click(screen.getByLabelText('Fechar'));
+    await waitFor(() =>
+      expect(screen.queryByText('COMPRA')).not.toBeInTheDocument(),
+    );
+
+    // Reabre o MESMO produto: o drawer remonta, o efeito roda de novo -> recarrega.
+    fireEvent.click(screen.getAllByText('Extrato')[0]);
+    await waitFor(() => expect(screen.getByText('COMPRA')).toBeInTheDocument());
+    expect(historyFn).toHaveBeenCalledTimes(2);
+  });
+});

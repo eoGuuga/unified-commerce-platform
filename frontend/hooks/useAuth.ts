@@ -142,6 +142,12 @@ export function useAuth() {
   const logout = useCallback(() => {
     clearSession();
     resetAuthState();
+    // useAuth e estado POR-INSTANCIA (nao ha context/store compartilhado): resetar aqui
+    // so limpa a instancia do botao, deixando o resto da tela "zumbi" (ainda logada ate
+    // um reload). Redirecionar pra /login navega pra fora e garante o logout limpo.
+    if (typeof window !== 'undefined') {
+      window.location.replace('/login');
+    }
   }, [clearSession, resetAuthState]);
 
   return {
