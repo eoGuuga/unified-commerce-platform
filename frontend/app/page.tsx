@@ -634,7 +634,7 @@ export default function HomePage() {
                   <span className="text-[15px] font-medium tracking-[-0.01em] text-[#f6f3ee]" style={{ fontFamily: 'var(--font-display)' }}>GTSoftHub</span>
                 </div>
                 <p className="mt-4 max-w-sm text-[13px] leading-[1.55] text-[#f6f3ee]/60">
-                  Plataforma premium para varejo. Bot de WhatsApp, PDV, estoque e atendimento num só ecossistema.
+                  Plataforma premium para varejo. Bot de WhatsApp, PDV, estoque e atendimento num só lugar.
                 </p>
               </div>
 

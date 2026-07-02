@@ -41,6 +41,7 @@ describe('LoginExperience — voz (D2/K2): sem jargão técnico', () => {
     expect(texto).not.toMatch(/ecossistema/i);
     expect(texto).not.toMatch(/ambiente/i);
     expect(texto).not.toMatch(/workspace/i);
+    expect(texto).not.toMatch(/\bUX\b/);
   });
 
   it('usa a copy simples e acolhedora aprovada', () => {

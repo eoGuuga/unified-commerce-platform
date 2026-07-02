@@ -98,7 +98,7 @@ export default function LoginExperience({ redirectTarget }: { redirectTarget: st
             {[
               { t: 'Seus dados protegidos com segurança' },
               { t: 'Acesso direto a operacao' },
-              { t: 'UX premium em todos os modulos' },
+              { t: 'Experiência premium em todos os módulos' },
             ].map((s) => (
               <div
                 key={s.t}
