@@ -59,6 +59,9 @@ O `pg_hba` tem `host all all all scram-sha-256`, mas a senha guardada do role `p
 `WebhookEvent.entity.ts` (`webhook_events`) e `UsageLog.entity.ts` (`usage_logs`) existem no código, mas **nenhuma migration cria essas tabelas** — provado: após um `migration:run` do zero, ambas ficam **MISSING**. Mesma classe de bug do 500 da Camada 2 (entidade × tabela ausente), mas **pré-existente** (o prod legado também não as tem; a Etapa 5 não piora — só não resolve estas duas).
 **A fazer:** (1) verificar se o código **consulta** essas entidades em caminho ativo (se sim, esses endpoints hoje dão 500); (2) gerar as migrations que faltam (`migration:generate`) e aplicá-las. Não bloqueia a Etapa 5, mas fecha o mesmo tipo de furo.
 
+### F12 — Remover a criação do admin default do código da migration 🟠 (segurança)
+`scripts/migrations/001-initial-schema.sql:365-382` semeia um tenant "Loja de Exemplo" (`000…000`) + admin `admin@exemplo.com` com `crypt('admin123', gen_salt('bf'))` — **backdoor de credencial conhecida** em **qualquer** banco novo (provado na T1: apareceu no banco fresco). O T2.5b remove pra ESTE servidor (DELETE), mas o **código** ainda criaria em bancos futuros. **A fazer:** remover esse INSERT do `001-initial-schema.sql` (ou condicioná-lo a um env de dev, nunca em prod). Fecha o furo na origem, não só neste servidor.
+
 ### F11 — Trocar a senha do admin por uma definitiva antes da produção real 🟠 (QA→prod)
 A senha do admin (`admin@loja.com`) gerada na Etapa 5 **passou pelo chat** — serve pra fase de **QA/testes**. Antes de a doceria ir pra **produção real** (a mãe operando, clientes reais), trocar por uma senha definitiva que **nunca** passou por canal registrado (o dono define e aplica via `SEED_ADMIN_PASSWORD` ou troca de senha no app). Não-urgente; é higiene de QA→prod.
 

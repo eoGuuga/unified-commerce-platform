@@ -68,6 +68,12 @@ Estende a prova já feita (migrations) pra incluir **grants + seed com o UUID re
 - [ ] **T2.3 — Migrar** (T1.3 apontando pro `ucm`).
 - [ ] **T2.4 — Grants** (`provision-db-user.sh` com `DB_APP_USER`/`DB_APP_PASSWORD` do `.env`, contra `ucm`).
 - [ ] **T2.5 — Seed** (comando final do T1.5, `SEED_TENANT_ID=UUID_DOCERIA`, contra `ucm`): produtos-seed → usuario-seed.
+- [ ] **T2.5b — 🔒 Remover o admin/tenant default (BACKDOOR):** as migrations (`001-initial-schema.sql:374-382`) criam `admin@exemplo.com` / **`admin123`** + tenant "Loja de Exemplo" (`000…000`) — credencial conhecida, inaceitável num servidor público. **Provado na T1** (apareceram no banco fresco). Após o seed, remover como `postgres`:
+  ```sql
+  DELETE FROM usuarios WHERE email = 'admin@exemplo.com';
+  DELETE FROM tenants  WHERE id = '00000000-0000-0000-0000-000000000000';
+  ```
+  **Verificar (obrigatório):** `SELECT id,name FROM tenants;` → **só** a doceria (`2675a300-…`); `SELECT email FROM usuarios;` → **só** `admin@loja.com`. Fecha o backdoor E remove o sentinel `000…000`.
 - [ ] **T2.6 — Validar no banco:** `migration:show` todas [X]; `store_availability_exceptions` existe; `SELECT id,name FROM tenants` = só a doceria com `2675a300-…`; admin existe; catálogo presente; `ucm_app` lê sob RLS.
 - [ ] **T2.7 — Validar a app no ar:** backend health 200; `/admin/configuracoes` 200; **"Próximas exceções" não dá mais 500** (era o sintoma). *(Login ainda exige o 5b.)*
 

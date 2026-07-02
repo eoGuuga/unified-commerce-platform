@@ -42,6 +42,8 @@ Estado atual dos seeds (bagunçado — o plano corrige):
 - **RLS:** rodar os seeds como **superuser** (`postgres@127.0.0.1`, bypassa RLS) — mesma mecânica das migrations. Sem isso, os INSERTs quebram no schema com RLS forced.
 - **Rodar contra o source:** o container de seed precisa do `backend/src` + `node_modules` + `scripts/seeds`. Mecânica exata **definida e provada** no test DB (task de prova), antes do `ucm`.
 
+**🔒 Backdoor default (removido no T2):** as migrations (`001-initial-schema.sql:374-382`) semeiam um tenant "Loja de Exemplo" (`000…000`) + admin `admin@exemplo.com` com `crypt('admin123', gen_salt('bf'))` — **provado na T1**. Num servidor público é credencial conhecida (backdoor). O **T2.5b** remove ambos após o seed (DELETE como `postgres`), deixando o banco só com a doceria (`2675a300-…`) + `admin@loja.com`. A remoção dessa criação no **código** da migration é o follow-up F12.
+
 ## 6. Login (Causa 2) — Etapa 5b (logo após o seed, mesma sessão)
 Com o UUID real definido, o fix do login é config de frontend:
 - **`NEXT_PUBLIC_TENANT_ID = 2675a300-…`** no build do frontend (via `deploy/.env` / build arg do compose).
