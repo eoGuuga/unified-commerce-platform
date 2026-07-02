@@ -66,6 +66,19 @@ function ModalAjuste({
   const contadoNum = parseInt(quantidade, 10);
   const deltaCorrecao = isCorrecao && !isNaN(contadoNum) ? contadoNum - currentStock : null;
 
+  // C4: valida ANTES de submeter — antes o "0" (ou vazio) só era barrado DEPOIS de
+  // clicar em Confirmar. Agora o botão fica desabilitado e há aviso inline.
+  const quantidadePreenchida =
+    quantidade.trim() !== '' && !isNaN(contadoNum) && contadoNum >= 0;
+  const deltaResultante = !quantidadePreenchida
+    ? null
+    : isCorrecao
+      ? contadoNum - currentStock
+      : tipo === 'PERDA'
+        ? -contadoNum
+        : contadoNum;
+  const submitBloqueado = !quantidadePreenchida || deltaResultante === 0;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErro(null);
@@ -198,6 +211,13 @@ function ModalAjuste({
                   : `ajuste: ${formatDelta(deltaCorrecao!)}`}
               </p>
             )}
+
+            {/* C4: aviso inline quando a quantidade não registra nada (0/vazio) */}
+            {!isCorrecao && quantidade.trim() !== '' && quantidadePreenchida && contadoNum === 0 && (
+              <p className="mt-1 text-[12px] text-amber-600" data-testid="aviso-quantidade">
+                Informe uma quantidade maior que zero.
+              </p>
+            )}
           </div>
 
           {/* Motivo (opcional) */}
@@ -236,7 +256,7 @@ function ModalAjuste({
             </button>
             <button
               type="submit"
-              disabled={salvando}
+              disabled={salvando || submitBloqueado}
               className="flex-1 rounded-[4px] bg-[#1a1814] py-2 text-[13px] font-medium text-[#f6f3ee] transition hover:bg-[#1a1814]/85 disabled:opacity-50"
             >
               {salvando ? 'Salvando…' : 'Confirmar'}
@@ -447,10 +467,11 @@ export function StockManager() {
           </button>
           <button
             onClick={() => void refetch()}
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-[#1a1814]/15 px-4 text-[13px] font-medium text-[#1a1814] transition hover:bg-[#1a1814]/5"
+            disabled={loading}
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-[#1a1814]/15 px-4 text-[13px] font-medium text-[#1a1814] transition hover:bg-[#1a1814]/5 disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Atualizar
+            {loading ? 'Atualizando…' : 'Atualizar'}
           </button>
         </div>
       </div>
@@ -517,11 +538,19 @@ function EditarMinimo({
   const [editando, setEditando] = useState(false);
   const [valor, setValor] = useState(String(produto.min_stock ?? 0));
   const [salvando, setSalvando] = useState(false);
+  const [feedback, setFeedback] = useState<'ok' | 'erro' | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (editando) inputRef.current?.focus();
   }, [editando]);
+
+  // C3: o feedback discreto some sozinho após alguns segundos.
+  useEffect(() => {
+    if (!feedback) return;
+    const id = setTimeout(() => setFeedback(null), 2500);
+    return () => clearTimeout(id);
+  }, [feedback]);
 
   async function salvar() {
     const num = parseInt(valor, 10);
@@ -531,21 +560,36 @@ function EditarMinimo({
       return;
     }
     setSalvando(true);
-    await setMin(produto.id, num);
+    const result = await setMin(produto.id, num);
     setSalvando(false);
     setEditando(false);
+    // C3: antes o resultado do setMin era ignorado — nenhum sinal de sucesso/erro
+    // ao salvar o mínimo. Agora dá feedback explícito à lojista.
+    setFeedback(result.ok ? 'ok' : 'erro');
   }
 
   if (!editando) {
     return (
-      <button
-        onClick={() => { setEditando(true); setValor(String(produto.min_stock ?? 0)); }}
-        title="Editar mínimo"
-        className="text-[12px] text-[#1a1814]/55 hover:text-[#b8654a] underline decoration-dotted"
-        data-testid={`editar-min-${produto.id}`}
-      >
-        Mínimo: <strong>{produto.min_stock ?? 0}</strong>
-      </button>
+      <span className="inline-flex items-center gap-1.5">
+        <button
+          onClick={() => { setEditando(true); setValor(String(produto.min_stock ?? 0)); }}
+          title="Editar mínimo"
+          className="text-[12px] text-[#1a1814]/55 hover:text-[#b8654a] underline decoration-dotted"
+          data-testid={`editar-min-${produto.id}`}
+        >
+          Mínimo: <strong>{produto.min_stock ?? 0}</strong>
+        </button>
+        {feedback === 'ok' && (
+          <span className="text-[11px] font-medium text-emerald-600" role="status">
+            salvo ✓
+          </span>
+        )}
+        {feedback === 'erro' && (
+          <span className="text-[11px] font-medium text-red-600" role="alert">
+            falhou ao salvar
+          </span>
+        )}
+      </span>
     );
   }
 

@@ -3,6 +3,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Check, CreditCard, Building2, Smartphone, Shield, Lock, Sparkles, Loader2 } from 'lucide-react';
+import {
+  validateCheckoutContact,
+  type CheckoutContactErrors,
+} from '@/lib/checkout-validation';
 
 type PlanoKey = 'comecar' | 'crescer' | 'escalar';
 
@@ -24,6 +28,7 @@ export default function CheckoutPage() {
   const [pagamento, setPagamento] = useState<Pagamento>('cartao');
   const [step, setStep] = useState<'plano' | 'dados' | 'pagamento' | 'sucesso'>('plano');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<CheckoutContactErrors>({});
 
   // Form data
   const [form, setForm] = useState({
@@ -200,18 +205,24 @@ export default function CheckoutPage() {
 
                 <div className="mt-8 space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Nome completo" value={form.nome} onChange={(v) => setForm({ ...form, nome: v })} placeholder="Seu nome" required />
-                    <Field label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} placeholder="voce@empresa.com" required />
+                    <Field label="Nome completo" value={form.nome} onChange={(v) => setForm({ ...form, nome: v })} placeholder="Seu nome" required error={errors.nome} />
+                    <Field label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} placeholder="voce@empresa.com" required error={errors.email} />
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="CPF ou CNPJ" value={form.cpfCnpj} onChange={(v) => setForm({ ...form, cpfCnpj: v })} placeholder="000.000.000-00" required />
-                    <Field label="WhatsApp" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} placeholder="(11) 99999-9999" required />
+                    <Field label="CPF ou CNPJ" value={form.cpfCnpj} onChange={(v) => setForm({ ...form, cpfCnpj: v })} placeholder="000.000.000-00" required error={errors.cpfCnpj} />
+                    <Field label="WhatsApp" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} placeholder="(11) 99999-9999" required error={errors.telefone} />
                   </div>
                   <Field label="Nome da empresa" value={form.empresa} onChange={(v) => setForm({ ...form, empresa: v })} placeholder="Sua loja" />
                 </div>
 
                 <button
-                  onClick={() => setStep('pagamento')}
+                  onClick={() => {
+                    // C1: valida o formato ANTES de avançar — pedido com dados inválidos
+                    // (e-mail sem @, CPF/CNPJ ou telefone errados) trava a operação depois.
+                    const errs = validateCheckoutContact(form);
+                    setErrors(errs);
+                    if (Object.keys(errs).length === 0) setStep('pagamento');
+                  }}
                   className="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#1a1814] text-[14px] font-medium text-[#f6f3ee] transition-all duration-300 hover:bg-[#1a1814]/90 active:scale-[0.98]"
                 >
                   Continuar para pagamento
@@ -428,6 +439,7 @@ function Field({
   placeholder,
   type = 'text',
   required,
+  error,
 }: {
   label: string;
   value: string;
@@ -435,6 +447,7 @@ function Field({
   placeholder?: string;
   type?: string;
   required?: boolean;
+  error?: string;
 }) {
   return (
     <div>
@@ -448,8 +461,14 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}
-        className="w-full rounded-[3px] border border-[#1a1814]/15 bg-white/80 px-4 py-3 text-[15px] text-[#1a1814] placeholder:text-[#1a1814]/35 transition focus:border-[#1a1814]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#b8654a]/25"
+        aria-invalid={error ? true : undefined}
+        className={`w-full rounded-[3px] border bg-white/80 px-4 py-3 text-[15px] text-[#1a1814] placeholder:text-[#1a1814]/35 transition focus:bg-white focus:outline-none focus:ring-2 ${
+          error
+            ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+            : 'border-[#1a1814]/15 focus:border-[#1a1814]/40 focus:ring-[#b8654a]/25'
+        }`}
       />
+      {error && <p className="mt-1 text-[12px] text-red-600">{error}</p>}
     </div>
   );
 }

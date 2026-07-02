@@ -126,10 +126,11 @@ export function ProductsManager() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => refetch()}
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-[#1a1814]/15 px-4 text-[13px] font-medium text-[#1a1814] transition hover:bg-[#1a1814]/5"
+            disabled={loading}
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-[#1a1814]/15 px-4 text-[13px] font-medium text-[#1a1814] transition hover:bg-[#1a1814]/5 disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Atualizar
+            {loading ? 'Atualizando…' : 'Atualizar'}
           </button>
           <button
             onClick={() => setFormAberto({ mode: 'create' })}
@@ -299,7 +300,7 @@ function ProductRow({
                 : 'bg-[#1a1814] text-[#f6f3ee] hover:bg-[#1a1814]/90'
             }`}
           >
-            {mutating ? '…' : product.is_active ? 'Desativar' : 'Ativar'}
+            {mutating ? 'Salvando…' : product.is_active ? 'Desativar' : 'Ativar'}
           </button>
         </div>
       </div>

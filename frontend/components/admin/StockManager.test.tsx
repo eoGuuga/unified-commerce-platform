@@ -465,3 +465,88 @@ describe('StockManager — A3: fechar/reabrir o extrato não trava em loading', 
     expect(historyFn).toHaveBeenCalledTimes(2);
   });
 });
+
+// ---- Bloco 4 (polimento) — C3: feedback ao salvar o estoque mínimo ----
+
+describe('StockManager — C3: feedback ao salvar o mínimo', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('salvar o mínimo com sucesso mostra confirmação', async () => {
+    const setMinFn = vi.fn().mockResolvedValue({ ok: true });
+    mockUseAdminData.mockReturnValue(makeAdminData({ setMin: setMinFn }));
+    render(<StockManager />);
+
+    fireEvent.click(screen.getByTestId('editar-min-p1'));
+    const input = screen.getByTestId('input-min-p1');
+    fireEvent.change(input, { target: { value: '8' } });
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(screen.getByText(/salvo/i)).toBeInTheDocument());
+    expect(setMinFn).toHaveBeenCalledWith('p1', 8);
+  });
+
+  it('falha ao salvar o mínimo mostra erro (antes o resultado era ignorado)', async () => {
+    const setMinFn = vi.fn().mockResolvedValue({ ok: false, error: 'boom' });
+    mockUseAdminData.mockReturnValue(makeAdminData({ setMin: setMinFn }));
+    render(<StockManager />);
+
+    fireEvent.click(screen.getByTestId('editar-min-p1'));
+    const input = screen.getByTestId('input-min-p1');
+    fireEvent.change(input, { target: { value: '8' } });
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(screen.getByText(/falhou/i)).toBeInTheDocument());
+  });
+});
+
+// ---- Bloco 4 (polimento) — C4: ajuste valida antes de submeter ----
+
+describe('StockManager — C4: ajuste valida a quantidade antes de submeter', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAdminData.mockReturnValue(makeAdminData());
+  });
+
+  it('Confirmar desabilitado com quantidade vazia/0; habilita com valor válido', () => {
+    render(<StockManager />);
+    fireEvent.click(screen.getAllByText('Ajustar')[0]); // p1
+
+    const confirmar = screen.getByRole('button', { name: /Confirmar/i });
+    expect(confirmar).toBeDisabled(); // vazio
+
+    const inputQtd = screen.getByPlaceholderText('0');
+    fireEvent.change(inputQtd, { target: { value: '0' } });
+    expect(confirmar).toBeDisabled();
+    expect(screen.getByTestId('aviso-quantidade')).toBeInTheDocument();
+
+    fireEvent.change(inputQtd, { target: { value: '5' } });
+    expect(confirmar).not.toBeDisabled();
+  });
+
+  it('Correção com contado = estoque atual (delta 0) mantém Confirmar desabilitado', () => {
+    render(<StockManager />);
+    fireEvent.click(screen.getAllByText('Ajustar')[0]); // p1 (current 50)
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'AJUSTE' } });
+    const inputQtd = screen.getByPlaceholderText(/quantas unidades há na prateleira/i);
+    fireEvent.change(inputQtd, { target: { value: '50' } }); // = current → delta 0
+
+    expect(screen.getByRole('button', { name: /Confirmar/i })).toBeDisabled();
+    expect(screen.getByTestId('delta-preview')).toHaveTextContent('Nenhuma alteração');
+  });
+});
+
+// ---- Bloco 4 (polimento) — D1: botão Atualizar com estado de carregando ----
+
+describe('StockManager — D1: botão Atualizar mostra carregando', () => {
+  it('quando carregando, o botão vira "Atualizando…" e fica desabilitado', () => {
+    // summary presente + stockLoading true → lista renderiza + botão em loading.
+    mockUseAdminData.mockReturnValue(makeAdminData({ stockLoading: true }));
+    render(<StockManager />);
+
+    const btn = screen.getByRole('button', { name: /Atualizando/i });
+    expect(btn).toBeDisabled();
+  });
+});

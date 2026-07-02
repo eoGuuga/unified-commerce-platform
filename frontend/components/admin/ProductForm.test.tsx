@@ -180,4 +180,45 @@ describe('ProductForm', () => {
       expect(img.src).toContain('placehold.co');
     });
   });
+
+  describe('C2 — aviso de margem negativa (custo > preço)', () => {
+    function renderCreate() {
+      render(
+        <ProductForm
+          mode="create"
+          categories={categorias}
+          onSubmit={onSubmit}
+          onCancel={onCancel}
+          submitting={false}
+        />,
+      );
+    }
+
+    it('avisa quando o custo é maior que o preço de venda', () => {
+      renderCreate();
+      fireEvent.change(screen.getByLabelText('Preço do produto'), { target: { value: '10' } });
+      fireEvent.change(screen.getByLabelText('Preço de custo'), { target: { value: '15' } });
+      expect(screen.getByText(/margem ficará negativa/i)).toBeInTheDocument();
+    });
+
+    it('não avisa quando o custo é menor que o preço', () => {
+      renderCreate();
+      fireEvent.change(screen.getByLabelText('Preço do produto'), { target: { value: '10' } });
+      fireEvent.change(screen.getByLabelText('Preço de custo'), { target: { value: '6' } });
+      expect(screen.queryByText(/margem ficará negativa/i)).not.toBeInTheDocument();
+    });
+
+    it('não avisa enquanto um dos campos está vazio', () => {
+      renderCreate();
+      fireEvent.change(screen.getByLabelText('Preço de custo'), { target: { value: '15' } });
+      expect(screen.queryByText(/margem ficará negativa/i)).not.toBeInTheDocument();
+    });
+
+    it('não bloqueia o cadastro — é só um alerta (pode ser intencional)', () => {
+      renderCreate();
+      fireEvent.change(screen.getByLabelText('Preço do produto'), { target: { value: '10' } });
+      fireEvent.change(screen.getByLabelText('Preço de custo'), { target: { value: '15' } });
+      expect(screen.getByRole('button', { name: /Criar produto/i })).not.toBeDisabled();
+    });
+  });
 });

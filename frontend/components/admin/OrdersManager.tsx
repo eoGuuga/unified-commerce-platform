@@ -87,10 +87,11 @@ export function OrdersManager() {
         </div>
         <button
           onClick={() => refetch()}
-          className="inline-flex h-10 items-center gap-2 self-start rounded-full border border-[#1a1814]/15 px-4 text-[13px] font-medium text-[#1a1814] transition hover:bg-[#1a1814]/5"
+          disabled={loading}
+          className="inline-flex h-10 items-center gap-2 self-start rounded-full border border-[#1a1814]/15 px-4 text-[13px] font-medium text-[#1a1814] transition hover:bg-[#1a1814]/5 disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Atualizar
+          {loading ? 'Atualizando…' : 'Atualizar'}
         </button>
       </div>
 

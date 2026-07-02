@@ -42,6 +42,17 @@ export function ProductForm({ mode, initial, categories, onSubmit, onCancel, sub
     c.toLowerCase().includes(categoriaInput.toLowerCase()),
   );
 
+  // C2: alerta (não bloqueia — pode ser intencional) quando o custo supera o
+  // preço de venda, ou seja, a margem ficaria negativa.
+  const precoVenda = Number(preco);
+  const precoCusto = Number(custo);
+  const margemNegativa =
+    preco.trim() !== '' &&
+    custo.trim() !== '' &&
+    !isNaN(precoVenda) &&
+    !isNaN(precoCusto) &&
+    precoCusto > precoVenda;
+
   function selecionarCategoria(cat: string) {
     setCategoria(cat);
     setCategoriaInput(cat);
@@ -234,6 +245,11 @@ export function ProductForm({ mode, initial, categories, onSubmit, onCancel, sub
           placeholder="0,00"
           aria-label="Preço de custo"
         />
+        {margemNegativa && (
+          <p className="mt-1 text-[12px] text-amber-600" role="alert">
+            O custo está maior que o preço de venda — a margem ficará negativa.
+          </p>
+        )}
       </div>
 
       {/* Estoque inicial — só no create */}
