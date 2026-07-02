@@ -59,6 +59,9 @@ O `pg_hba` tem `host all all all scram-sha-256`, mas a senha guardada do role `p
 `WebhookEvent.entity.ts` (`webhook_events`) e `UsageLog.entity.ts` (`usage_logs`) existem no código, mas **nenhuma migration cria essas tabelas** — provado: após um `migration:run` do zero, ambas ficam **MISSING**. Mesma classe de bug do 500 da Camada 2 (entidade × tabela ausente), mas **pré-existente** (o prod legado também não as tem; a Etapa 5 não piora — só não resolve estas duas).
 **A fazer:** (1) verificar se o código **consulta** essas entidades em caminho ativo (se sim, esses endpoints hoje dão 500); (2) gerar as migrations que faltam (`migration:generate`) e aplicá-las. Não bloqueia a Etapa 5, mas fecha o mesmo tipo de furo.
 
+### F11 — Trocar a senha do admin por uma definitiva antes da produção real 🟠 (QA→prod)
+A senha do admin (`admin@loja.com`) gerada na Etapa 5 **passou pelo chat** — serve pra fase de **QA/testes**. Antes de a doceria ir pra **produção real** (a mãe operando, clientes reais), trocar por uma senha definitiva que **nunca** passou por canal registrado (o dono define e aplica via `SEED_ADMIN_PASSWORD` ou troca de senha no app). Não-urgente; é higiene de QA→prod.
+
 ---
 
 ## ✅ Receita da Etapa 5 PROVADA (2026-07-02, em banco de teste descartável)
