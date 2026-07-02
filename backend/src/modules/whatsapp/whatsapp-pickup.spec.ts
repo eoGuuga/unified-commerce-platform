@@ -91,7 +91,13 @@ describe('Retirada + agendamento + horario de funcionamento (S2b)', () => {
 
     const whatsappSender = { sendImage: jest.fn().mockResolvedValue(undefined) };
 
-    const deps: any[] = new Array(30).fill(undefined);
+    // Camada 2: por padrao SEM exceçoes (retorna []), preservando o comportamento
+    // recorrente (Camada 1). Testes especificos passam a Map direto pra funcao pura.
+    const availabilityService = {
+      findByDateRange: jest.fn().mockResolvedValue([]),
+    };
+
+    const deps: any[] = new Array(31).fill(undefined);
     service = new (WhatsAppService as any)(...deps);
     service.cartService = cartService;
     service.ordersService = ordersService;
@@ -99,6 +105,7 @@ describe('Retirada + agendamento + horario de funcionamento (S2b)', () => {
     service.conversationService = conversationService;
     service.tenantsService = tenantsService;
     service.whatsappSender = whatsappSender;
+    service.availabilityService = availabilityService;
     service.catalogManager = { isCatalogCommand: () => false };
     service.logger = { warn: jest.fn(), error: jest.fn(), log: jest.fn(), debug: jest.fn() };
   });
@@ -422,6 +429,331 @@ describe('Retirada + agendamento + horario de funcionamento (S2b)', () => {
       for (let d = 0; d <= 6; d++) days[String(d)] = { open: '08:00', close: '20:00' };
       const desc = service.describeBusinessHours({ tz: 'America/Sao_Paulo', days });
       expect(desc).toContain('dom-sáb 08:00-20:00');
+    });
+  });
+
+  // ============== TASK 3: GATE POR-DATA (exceçoes) — funcao PURA (Map por parametro) ==============
+  describe('generatePickupSlots — gate por-data (exceptions Map, sem I/O)', () => {
+    // Data civil (YYYY-MM-DD) no fuso da loja de um instante — a MESMA chave do
+    // AvailabilityService, pra provar que a chave da Map bate.
+    const civilDateSP = (d: Date): string =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d);
+
+    const datesOf = (slots: Array<{ scheduledAt: Date }>): string[] =>
+      slots.map((s) => civilDateSP(s.scheduledAt));
+
+    const hoursOnDate = (
+      slots: Array<{ scheduledAt: Date }>,
+      date: string,
+    ): number[] =>
+      slots
+        .filter((s) => civilDateSP(s.scheduledAt) === date)
+        .map((s) => {
+          const h = Number(
+            new Intl.DateTimeFormat('en-US', {
+              timeZone: 'America/Sao_Paulo',
+              hour: '2-digit',
+              hour12: false,
+            })
+              .formatToParts(s.scheduledAt)
+              .find((p) => p.type === 'hour')?.value,
+          );
+          return h === 24 ? 0 : h;
+        });
+
+    // now = sexta 2026-06-26 06:00 local (-03) = 09:00 UTC. Varre a semana:
+    // sex 26, sab 27, seg 29, ter 30... (dom 28 ausente em days).
+    // maxSlots alto pra que multiplos dias apareçam (senao sexta 09-18 ja enche o cap).
+    const NOW = new Date('2026-06-26T09:00:00.000Z');
+    const OPTS = { maxSlots: 60, lookaheadDays: 7 };
+
+    it('(a) exceçao "closed" numa data D -> NENHUM slot em D; os outros dias seguem normais', () => {
+      const D = '2026-06-27'; // sabado, recorrente 09-18
+      // Baseline sem exceçao: sabado 27 TEM slots.
+      const baseline = service.generatePickupSlots(BUSINESS_HOURS, NOW, OPTS);
+      expect(datesOf(baseline)).toContain(D);
+
+      const exceptions = new Map<
+        string,
+        { kind: 'closed' | 'custom_hours'; open?: string | null; close?: string | null }
+      >([[D, { kind: 'closed' }]]);
+
+      const slots = service.generatePickupSlots(BUSINESS_HOURS, NOW, OPTS, exceptions);
+
+      // Nenhum slot na data fechada.
+      expect(datesOf(slots)).not.toContain(D);
+      // Os outros dias que apareciam no baseline continuam aparecendo.
+      const otherBaselineDates = new Set(datesOf(baseline).filter((x) => x !== D));
+      for (const other of otherBaselineDates) {
+        expect(datesOf(slots)).toContain(other);
+      }
+    });
+
+    it('(b) exceçao "custom_hours" 09:00-13:00 numa data cujo recorrente e 09:00-18:00 -> slots so ate 13h', () => {
+      const D = '2026-06-27'; // sabado, recorrente 09-18
+      // Baseline: sem exceçao, sabado vai ate 18h.
+      const baseline = service.generatePickupSlots(BUSINESS_HOURS, NOW, OPTS);
+      const baselineHours = hoursOnDate(baseline, D);
+      expect(Math.max(...baselineHours)).toBe(18);
+
+      const exceptions = new Map<
+        string,
+        { kind: 'closed' | 'custom_hours'; open?: string | null; close?: string | null }
+      >([[D, { kind: 'custom_hours', open: '09:00', close: '13:00' }]]);
+
+      const slots = service.generatePickupSlots(BUSINESS_HOURS, NOW, OPTS, exceptions);
+      const hours = hoursOnDate(slots, D);
+
+      expect(hours.length).toBeGreaterThan(0);
+      // So ate 13h (nao 18h).
+      expect(Math.max(...hours)).toBe(13);
+      expect(hours).not.toContain(14);
+      expect(hours).not.toContain(18);
+      // Comeca as 09h (recorrente da exceçao) e passos de 1h.
+      expect(hours).toEqual([9, 10, 11, 12, 13]);
+    });
+
+    it('(c) Camada 1 intacta: exceçao numa data NAO afeta as outras datas (recorrente mantido)', () => {
+      const D = '2026-06-27'; // sabado com exceçao
+      const OTHER = '2026-06-29'; // segunda SEM exceçao, recorrente 09-18
+
+      // Antes: horas da segunda sem nenhuma exceçao.
+      const before = service.generatePickupSlots(BUSINESS_HOURS, NOW, OPTS);
+      const beforeMon = hoursOnDate(before, OTHER);
+      expect(beforeMon.length).toBeGreaterThan(0);
+
+      // Depois: aplica exceçao SO no sabado.
+      const exceptions = new Map<
+        string,
+        { kind: 'closed' | 'custom_hours'; open?: string | null; close?: string | null }
+      >([[D, { kind: 'custom_hours', open: '09:00', close: '13:00' }]]);
+      const after = service.generatePickupSlots(BUSINESS_HOURS, NOW, OPTS, exceptions);
+      const afterMon = hoursOnDate(after, OTHER);
+
+      // A segunda (sem exceçao) mantem EXATAMENTE o horario recorrente — nao muda.
+      expect(afterMon).toEqual(beforeMon);
+      expect(Math.max(...afterMon)).toBe(18); // recorrente 09-18 intacto
+    });
+  });
+
+  // ============== TASK 4: MENSAGEM "fechado hoje" — distincao RIGOROSA das 3 causas ==============
+  // A mensagem NAO pode mentir: "Hoje a loja esta fechada" SO aparece quando a causa
+  // REAL da lista-vazia e a exceçao `closed` de HOJE (fuso da loja). Nunca quando a
+  // lista veio vazia por "sem business_hours" (b) ou por "fora do horario agora" (c).
+  // `custom_hours` (horario reduzido, COM slots) nao dispara nenhuma mensagem especial (d).
+  describe('mensagem "fechado hoje" — a mensagem nao pode mentir (3 causas + custom_hours)', () => {
+    // "hoje" = data civil ATUAL no fuso da loja (a MESMA chave do gate/AvailabilityService).
+    const hojeSP = (): string =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date());
+
+    // Avanca a FSM pela PORTA DA FRENTE ate o ponto de lista-vazia da retirada
+    // (estagio collecting_phone com delivery_type='pickup'): retirada -> nome -> telefone.
+    async function reachPickupSlotStage(): Promise<string> {
+      await start();
+      await step('retirada');
+      await step('Maria Souza');
+      return step('11988887777');
+    }
+
+    it('(a) HOJE com exceçao "closed" + lista vazia -> "Hoje a loja está fechada" (mensagem nova)', async () => {
+      // A causa REAL da lista-vazia e a exceçao closed de HOJE. Isolamos a decisao da
+      // mensagem forçando slots=[] (o gate ja e coberto pelos testes da Task 3) e
+      // fazendo o findByDateRange devolver o `closed` de hoje.
+      service.generatePickupSlots = jest.fn().mockReturnValue([]);
+      service.availabilityService.findByDateRange = jest.fn().mockResolvedValue([
+        { date: hojeSP(), kind: 'closed', open: null, close: null },
+      ]);
+
+      const r = await reachPickupSlotStage();
+
+      expect(String(r)).toContain('Hoje a loja está fechada');
+      // Encerra honesto, sem criar pedido.
+      expect(createSpy).not.toHaveBeenCalled();
+      expect(conversation.context.checkout).toBeFalsy();
+      expect(conversation.context.state).toBe('idle');
+    });
+
+    it('(b) loja SEM business_hours -> mensagem "só entregas" existente, NAO "fechada"', async () => {
+      tenant = { id: tenantId, settings: {} }; // sem business_hours
+
+      // Sem business_hours, a retirada nao e oferecida: a mensagem "so entregas" ja
+      // dispara ao escolher "retirada" (estagio ask_fulfillment, ~L946) — causa distinta
+      // de "fechado por exceçao hoje".
+      await start();
+      const r = await step('retirada');
+
+      expect(String(r).toLowerCase()).toContain('entrega');
+      expect(String(r).toLowerCase()).not.toContain('fechad'); // nem "fechada" nem "fechado"
+      expect(createSpy).not.toHaveBeenCalled();
+      // FSM encerrada honesta (idle, checkout limpo).
+      expect(conversation.context.checkout).toBeFalsy();
+      expect(conversation.context.state).toBe('idle');
+    });
+
+    it('(c) COM horario hoje mas fora do horario agora (lista vazia, SEM exceçao) -> "sem horários em breve", NAO "fechada"', async () => {
+      // Sem exceçao nenhuma (findByDateRange = []) e slots vazios por horario.
+      service.generatePickupSlots = jest.fn().mockReturnValue([]);
+      service.availabilityService.findByDateRange = jest.fn().mockResolvedValue([]);
+
+      const r = await reachPickupSlotStage();
+
+      expect(String(r).toLowerCase()).toMatch(/hor[aá]rios dispon[ií]veis|mais tarde/);
+      expect(String(r).toLowerCase()).not.toContain('fechad');
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+
+    it('(d) custom_hours HOJE (reduzido, COM slots) -> oferece os slots, SEM mensagem de fechamento', async () => {
+      // A exceçao de hoje e custom_hours (nao closed). O gate produz slots (nao vazio),
+      // entao a FSM oferece a lista normalmente — nenhuma mensagem especial.
+      service.availabilityService.findByDateRange = jest.fn().mockResolvedValue([
+        { date: hojeSP(), kind: 'custom_hours', open: '09:00', close: '13:00' },
+      ]);
+      // Slots nao-vazios: o gate real produziria; garantimos o ramo "tem slots".
+      service.generatePickupSlots = jest.fn().mockReturnValue([
+        { label: 'Hoje 9h', scheduledAt: new Date(Date.now() + 3600_000) },
+        { label: 'Hoje 10h', scheduledAt: new Date(Date.now() + 7200_000) },
+      ]);
+
+      const r = await reachPickupSlotStage();
+
+      expect(String(r).toLowerCase()).toMatch(/quando quer retirar|n[uú]mero/);
+      expect(String(r).toLowerCase()).not.toContain('fechad');
+      expect(conversation.context.checkout?.stage).toBe('selecting_pickup_slot');
+    });
+  });
+
+  // ============== TASK 5: BACKSTOP consulta exceçoes (cinto-e-suspensorio) ==============
+  // isWithinBusinessHours e o backstop que valida o slot ESCOLHIDO na confirmacao
+  // (~L1082, estagio selecting_pickup_slot). O gate (Task 3) ja filtra na oferta, mas
+  // no cenario raro (slot fechado por exceçao que escapou) o backstop TAMBEM consulta
+  // exceçoes para NUNCA confirmar pedido em data fechada.
+  //
+  // A funcao continua PURA: recebe a Map de exceçoes por PARAMETRO (chave "YYYY-MM-DD"
+  // no fuso da loja, a MESMA do gate). Testamos passando a Map direto — sem I/O.
+  describe('isWithinBusinessHours — backstop consulta exceçoes (Map por parametro, puro)', () => {
+    type ExcLite = {
+      kind: 'closed' | 'custom_hours';
+      open?: string | null;
+      close?: string | null;
+    };
+    const mapOf = (entries: Array<[string, ExcLite]>): Map<string, ExcLite> =>
+      new Map<string, ExcLite>(entries);
+
+    it('(a) exceçao "closed" na data do slot -> false (mesmo que o recorrente do dia estivesse ABERTO)', () => {
+      // 2026-06-29 e SEGUNDA, recorrente 09-18 (aberto). 16:00 local = 19:00 UTC:
+      // sem exceçao passaria (coberto no baseline abaixo). Com a exceçao closed de
+      // 2026-06-29, o backstop RECUSA.
+      const scheduled = new Date('2026-06-29T19:00:00.000Z'); // 16:00 BRT, segunda
+      // Baseline (sem exceçao): recorrente aberto -> true.
+      expect(service.isWithinBusinessHours(scheduled, BUSINESS_HOURS)).toBe(true);
+
+      const exceptions = mapOf([['2026-06-29', { kind: 'closed' }]]);
+      expect(service.isWithinBusinessHours(scheduled, BUSINESS_HOURS, exceptions)).toBe(false);
+    });
+
+    it('(b) exceçao "custom_hours" 09:00-13:00 -> aceita 10:00 e RECUSA 15:00 (valida contra a EXCEÇAO, nao o recorrente 09-18)', () => {
+      // 2026-06-29 (segunda), recorrente 09-18. A exceçao reduz para 09-13.
+      const exceptions = mapOf([
+        ['2026-06-29', { kind: 'custom_hours', open: '09:00', close: '13:00' }],
+      ]);
+
+      // 10:00 local (= 13:00 UTC): dentro de 09-13 (exceçao) -> ACEITO.
+      const dentro = new Date('2026-06-29T13:00:00.000Z');
+      expect(service.isWithinBusinessHours(dentro, BUSINESS_HOURS, exceptions)).toBe(true);
+
+      // 15:00 local (= 18:00 UTC): fora de 09-13 (exceçao), MAS dentro de 09-18
+      // (recorrente). Se validasse contra o recorrente aceitaria — o teste exige RECUSA.
+      const fora = new Date('2026-06-29T18:00:00.000Z');
+      expect(service.isWithinBusinessHours(fora, BUSINESS_HOURS, exceptions)).toBe(false);
+      // Prova de que o recorrente sozinho aceitaria as 15:00 (garante que a recusa acima
+      // vem da exceçao, nao de "15:00 estar fora do recorrente").
+      expect(service.isWithinBusinessHours(fora, BUSINESS_HOURS)).toBe(true);
+    });
+
+    it('(c) sem exceçao para a data do slot -> comportamento atual (recorrente) inalterado', () => {
+      // Segunda 16:00 local, sem exceçao nenhuma na Map -> recorrente 09-18 -> true.
+      const scheduled = new Date('2026-06-29T19:00:00.000Z');
+      const exceptions = mapOf([
+        // exceçao em OUTRA data (sabado 27) — nao afeta a segunda 29.
+        ['2026-06-27', { kind: 'closed' }],
+      ]);
+      expect(service.isWithinBusinessHours(scheduled, BUSINESS_HOURS, exceptions)).toBe(true);
+
+      // Fora do recorrente (20:00 local) continua RECUSADO, com ou sem Map.
+      const foraRecorrente = new Date('2026-06-29T23:00:00.000Z'); // 20:00 BRT
+      expect(service.isWithinBusinessHours(foraRecorrente, BUSINESS_HOURS, exceptions)).toBe(false);
+      // Map vazia == sem exceçoes: identico ao comportamento historico.
+      expect(service.isWithinBusinessHours(scheduled, BUSINESS_HOURS, new Map())).toBe(true);
+    });
+  });
+
+  // ============== TASK 5: BACKSTOP no fluxo (selecting_pickup_slot) recusa/ajusta ==============
+  // O backstop L1082 chama isWithinBusinessHours com a Map carregada no caller
+  // (mesmo padrao do gate: availabilityService.findByDateRange). Um slot que caia
+  // numa data com exceçao `closed` NAO cria pedido — re-mostra a lista.
+  describe('backstop no fluxo — slot em data "closed" nao cria pedido', () => {
+    // Data civil (YYYY-MM-DD) no fuso da loja de um instante.
+    const civilDateSP = (d: Date): string =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d);
+
+    async function reachSlotStage(): Promise<void> {
+      await start();
+      await step('retirada');
+      await step('Maria Souza');
+      await step('11988887777');
+    }
+
+    it('escolher um slot cuja data virou "closed" (backstop) -> NAO cria pedido, re-mostra a lista', async () => {
+      // Gate real ofertou os slots normalmente (sem exceçao na oferta).
+      await reachSlotStage();
+      expect(conversation.context.checkout?.stage).toBe('selecting_pickup_slot');
+      const slots = conversation.context.checkout.pickup_slots as Array<{
+        label: string;
+        scheduled_at: string;
+      }>;
+      expect(slots.length).toBeGreaterThanOrEqual(1);
+
+      // Cenario raro: entre a oferta e a confirmacao, o lojista fechou a data do slot 1.
+      // O findByDateRange (consultado no backstop) agora devolve `closed` para essa data.
+      const dataDoSlot1 = civilDateSP(new Date(slots[0].scheduled_at));
+      service.availabilityService.findByDateRange = jest
+        .fn()
+        .mockResolvedValue([{ date: dataDoSlot1, kind: 'closed', open: null, close: null }]);
+
+      const r = await step('1');
+
+      // Backstop recusa: NAO cria pedido, re-mostra a lista.
+      expect(createSpy).not.toHaveBeenCalled();
+      expect(String(r).toLowerCase()).toMatch(/fora do nosso funcionamento|n[uú]mero/);
+      expect(conversation.context.checkout?.stage).toBe('selecting_pickup_slot');
+    });
+
+    it('sem exceçao na confirmaçao -> backstop passa e cria o pedido (regressao)', async () => {
+      await reachSlotStage();
+      const slots = conversation.context.checkout.pickup_slots as Array<{
+        label: string;
+        scheduled_at: string;
+      }>;
+      const slot1Iso = slots[0].scheduled_at;
+      // findByDateRange volta vazio (padrao) -> backstop passa.
+      await step('1');
+      expect(createSpy).toHaveBeenCalledTimes(1);
+      expect(createSpy.mock.calls[0][0].scheduled_at).toEqual(new Date(slot1Iso));
     });
   });
 });

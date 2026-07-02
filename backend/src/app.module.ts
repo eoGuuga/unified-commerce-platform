@@ -16,6 +16,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { HealthModule } from './modules/health/health.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
+import { AvailabilityModule } from './modules/availability/availability.module';
 import { LgpdModule } from './modules/lgpd/lgpd.module';
 import { StockSchedulerModule } from './modules/products/stock-scheduler.module';
 import { TenantDbContextInterceptor } from './common/interceptors/tenant-db-context.interceptor';
@@ -58,6 +59,7 @@ import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
     HealthModule,
     CouponsModule,
     TenantsModule,
+    AvailabilityModule,
     LgpdModule,
   ],
   controllers: [AppController],

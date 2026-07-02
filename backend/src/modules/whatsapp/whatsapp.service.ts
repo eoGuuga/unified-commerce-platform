@@ -6,6 +6,7 @@ import { OrdersService } from '../orders/orders.service';
 import { PaymentsService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CouponsService } from '../coupons/coupons.service';
+import { AvailabilityService } from '../availability/availability.service';
 import { DbContextService } from '../common/services/db-context.service';
 import { CanalVenda, Pedido } from '../../database/entities/Pedido.entity';
 
@@ -158,6 +159,10 @@ export class WhatsAppService {
 
     // Envio tenant-aware (R2): resolve provider/credencial por tenant
     private readonly whatsappSender: WhatsappSender,
+
+    // Camada 2: exceçoes por-data (gate da retirada). Importado do AvailabilityModule
+    // (unidirecional — availability NAO importa whatsapp, sem ciclo).
+    private readonly availabilityService: AvailabilityService,
   ) {}
 
   /**
@@ -976,7 +981,32 @@ export class WhatsAppService {
             conversation.context = { ...conversation.context, state: 'idle', checkout: undefined };
             return 'No momento estamos fazendo só entregas por aqui. 🙏';
           }
-          const slots = this.generatePickupSlots(businessHours, new Date());
+          // CAMADA 2: carrega as exceçoes por-data da janela de lookahead e monta a
+          // Map (chave = data civil "YYYY-MM-DD" da exceçao). O I/O mora AQUI, no
+          // caller; generatePickupSlots continua PURO (recebe a Map por parametro).
+          const now = new Date();
+          const lookaheadDays = 7;
+          const to = new Date(now.getTime() + lookaheadDays * 24 * 60 * 60 * 1000);
+          const exceptionRows = await this.availabilityService.findByDateRange(
+            tenantId,
+            now,
+            to,
+          );
+          const exceptions = new Map<
+            string,
+            { kind: 'closed' | 'custom_hours'; open?: string | null; close?: string | null }
+          >(
+            exceptionRows.map((e) => [
+              e.date,
+              { kind: e.kind, open: e.open, close: e.close },
+            ]),
+          );
+          const slots = this.generatePickupSlots(
+            businessHours,
+            now,
+            { lookaheadDays },
+            exceptions,
+          );
           if (slots.length === 0) {
             // Sem nenhum horario disponivel em breve: encerra honesto, sem criar pedido.
             await this.conversationService.updateContext(conversation.id, {
@@ -984,6 +1014,18 @@ export class WhatsAppService {
               checkout: null,
             });
             conversation.context = { ...conversation.context, state: 'idle', checkout: undefined };
+            // CAMADA 2 — A MENSAGEM NAO PODE MENTIR: a lista-vazia tem causas distintas.
+            // Se a causa REAL e a exceçao `closed` de HOJE (dayOffset===0, data civil
+            // atual no fuso da loja — a MESMA chave zero-padded que o gate usa), damos
+            // a mensagem especifica de fechamento. `custom_hours` (que gera slots) e as
+            // outras causas ("sem business_hours" / "fora do horario agora") NAO caem
+            // aqui: `custom_hours` nao esvazia a lista, e "sem business_hours" ja
+            // encerrou antes (~L947/L975).
+            const t = this.localDateParts(now, businessHours.tz);
+            const hojeKey = `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
+            if (exceptions.get(hojeKey)?.kind === 'closed') {
+              return 'Hoje a loja está fechada 🙏 Volte em breve!';
+            }
             return 'Não há horários disponíveis para retirada em breve. 🙏 Tente novamente mais tarde.';
           }
           const pickupSlots: PickupSlot[] = slots.map((s) => ({
@@ -1035,9 +1077,29 @@ export class WhatsAppService {
 
         const slot = slots[choice - 1];
         const scheduledAt = new Date(slot.scheduled_at);
+        // CAMADA 2: carrega as exceçoes por-data (mesmo padrao do gate) para o backstop
+        // TAMBEM consultar exceçoes antes de confirmar. O I/O mora AQUI, no caller;
+        // isWithinBusinessHours continua PURO (recebe a Map por parametro). Cobrimos do
+        // AGORA ate a data do slot (a mais distante que precisamos), com folga de 1 dia.
+        const nowConfirm = new Date();
+        const toConfirm = new Date(
+          Math.max(scheduledAt.getTime(), nowConfirm.getTime()) + 24 * 60 * 60 * 1000,
+        );
+        const excRows = await this.availabilityService.findByDateRange(
+          tenantId,
+          nowConfirm,
+          toConfirm,
+        );
+        const excMap = new Map<
+          string,
+          { kind: 'closed' | 'custom_hours'; open?: string | null; close?: string | null }
+        >(
+          excRows.map((e) => [e.date, { kind: e.kind, open: e.open, close: e.close }]),
+        );
         // BACKSTOP (defesa-em-profundidade): por construcao o slot ja esta dentro do
-        // funcionamento, mas revalidamos antes de criar o pedido (cinto-e-suspensorio).
-        if (!this.isWithinBusinessHours(scheduledAt, businessHours)) {
+        // funcionamento (o gate ja filtra exceçoes na oferta), mas revalidamos antes de
+        // criar o pedido — inclusive contra exceçoes — (cinto-e-suspensorio).
+        if (!this.isWithinBusinessHours(scheduledAt, businessHours, excMap)) {
           return [
             `😕 Esse horário está fora do nosso funcionamento (${this.describeBusinessHours(businessHours)}).`,
             '',
@@ -1373,6 +1435,10 @@ export class WhatsAppService {
     businessHours: BusinessHours,
     now: Date,
     opts?: { maxSlots?: number; lookaheadDays?: number },
+    exceptions?: Map<
+      string,
+      { kind: 'closed' | 'custom_hours'; open?: string | null; close?: string | null }
+    >,
   ): Array<{ label: string; scheduledAt: Date }> {
     const maxSlots = opts?.maxSlots ?? 8;
     const lookaheadDays = opts?.lookaheadDays ?? 7;
@@ -1400,8 +1466,21 @@ export class WhatsAppService {
       const d = civil.getUTCDate();
       // Dia da semana (0=dom..6=sab) desta data civil.
       const dow = civil.getUTCDay();
+      // Chave da data civil "YYYY-MM-DD" (zero-padded), a MESMA do AvailabilityService.
+      const dateKey = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      // CAMADA 2 (gate por-data, PURO): a exceçao vem por parametro (sem I/O aqui).
+      //  - `closed` -> zero slots nesse dia (pula).
+      //  - `custom_hours` -> usa a janela da exceçao no lugar do recorrente.
+      //  - sem exceçao -> faixa recorrente (Camada 1, intacta).
+      const exc = exceptions?.get(dateKey);
+      if (exc?.kind === 'closed') {
+        continue;
+      }
       // Faixa PROPRIA do dia (shape por-dia); dia AUSENTE = fechado -> pula.
-      const dh = businessHours.days[String(dow)];
+      const dh =
+        exc?.kind === 'custom_hours'
+          ? { open: exc.open!, close: exc.close! }
+          : businessHours.days[String(dow)];
       if (!dh) {
         continue;
       }
@@ -1505,7 +1584,14 @@ export class WhatsAppService {
    * Ex.: 16:00 em America/Sao_Paulo (= 19:00 UTC) deve ser ACEITO contra 09-18 local —
    * comparar a hora UTC (19h) contra "fecha 18h" rejeitaria errado.
    */
-  private isWithinBusinessHours(scheduledAt: Date, businessHours: BusinessHours): boolean {
+  private isWithinBusinessHours(
+    scheduledAt: Date,
+    businessHours: BusinessHours,
+    exceptions?: Map<
+      string,
+      { kind: 'closed' | 'custom_hours'; open?: string | null; close?: string | null }
+    >,
+  ): boolean {
     if (!scheduledAt || Number.isNaN(scheduledAt.getTime())) {
       return false;
     }
@@ -1529,8 +1615,23 @@ export class WhatsAppService {
     if (dow === undefined) {
       return false;
     }
-    // Faixa PROPRIA do dia (shape por-dia); dia AUSENTE = fechado -> recusa.
-    const dh = businessHours.days[String(dow)];
+    // CAMADA 2 (backstop por-data, PURO): a exceçao vem por parametro (sem I/O aqui).
+    // Chave = data civil "YYYY-MM-DD" do slot NO FUSO da loja — a MESMA do gate.
+    //  - `closed` -> recusa confirmar (nunca cria pedido em data fechada).
+    //  - `custom_hours` -> valida contra a janela da EXCEÇAO (nao o recorrente).
+    //  - sem exceçao -> faixa recorrente (Camada 1, intacta) abaixo.
+    const civil = this.localDateParts(scheduledAt, businessHours.tz);
+    const dateKey = `${civil.year}-${String(civil.month).padStart(2, '0')}-${String(civil.day).padStart(2, '0')}`;
+    const exc = exceptions?.get(dateKey);
+    if (exc?.kind === 'closed') {
+      return false;
+    }
+    // Faixa PROPRIA do dia: exceçao `custom_hours` sobrepoe; senao o recorrente
+    // (shape por-dia; dia AUSENTE = fechado -> recusa).
+    const dh =
+      exc?.kind === 'custom_hours'
+        ? { open: exc.open!, close: exc.close! }
+        : businessHours.days[String(dow)];
     if (!dh) {
       return false;
     }

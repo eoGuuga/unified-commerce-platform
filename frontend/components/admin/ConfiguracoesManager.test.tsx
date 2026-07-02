@@ -14,17 +14,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 
-// ---- Mock do hook de dados (T6) ----
+// ---- Mock dos hooks de dados (T6) ----
 
 vi.mock('@/hooks/useTenantSettings', () => ({
   useTenantSettings: vi.fn(),
 }));
 
+vi.mock('@/hooks/useAvailabilityExceptions', () => ({
+  useAvailabilityExceptions: vi.fn(),
+}));
+
 import { useTenantSettings } from '@/hooks/useTenantSettings';
+import { useAvailabilityExceptions } from '@/hooks/useAvailabilityExceptions';
 import { ConfiguracoesManager } from './ConfiguracoesManager';
 import type { TenantSettingsProjection } from '@/lib/types/tenant-settings';
+import type { StoreException } from '@/lib/types/store-exception';
 
 const mockUseTenantSettings = useTenantSettings as ReturnType<typeof vi.fn>;
+const mockUseAvailabilityExceptions =
+  useAvailabilityExceptions as ReturnType<typeof vi.fn>;
 
 function makeProjection(
   overrides: Partial<TenantSettingsProjection> = {},
@@ -72,9 +80,36 @@ function makeHook(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function makeExc(overrides: Partial<StoreException> = {}): StoreException {
+  return {
+    id: 'exc-1',
+    date: '2026-12-25',
+    kind: 'closed',
+    open: null,
+    close: null,
+    ...overrides,
+  };
+}
+
+function makeExcHook(overrides: Record<string, unknown> = {}) {
+  return {
+    exceptions: [] as StoreException[],
+    loading: false,
+    error: null,
+    add: vi.fn().mockResolvedValue({ ok: true }),
+    remove: vi.fn().mockResolvedValue({ ok: true }),
+    closeToday: vi.fn().mockResolvedValue({ ok: true }),
+    refetch: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  };
+}
+
 describe('ConfiguracoesManager', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: hook das exceções sempre com um valor válido (as sub-suítes que
+    // precisam de dados específicos sobrescrevem via mockReturnValue).
+    mockUseAvailabilityExceptions.mockReturnValue(makeExcHook());
   });
 
   // ---- Estados de base (loading / error / empty) ----
@@ -330,5 +365,148 @@ describe('ConfiguracoesManager', () => {
     expect(screen.getByText(/Chave PIX não configurada/i)).toBeInTheDocument();
     // Sem aviso de horario quando hasBusinessHours=true.
     expect(screen.queryByText(/ainda não tem horário definido/i)).not.toBeInTheDocument();
+  });
+
+  // ---- (T7) Secao "Exceções / Feriados" ----
+
+  describe('seção Exceções / Feriados', () => {
+    // (a) renderiza a seção com a lista das exceções futuras (mockadas).
+    it('renderiza a seção com a lista das exceções futuras', () => {
+      mockUseTenantSettings.mockReturnValue(makeHook());
+      mockUseAvailabilityExceptions.mockReturnValue(
+        makeExcHook({
+          exceptions: [
+            makeExc({ id: 'a', date: '2026-12-25', kind: 'closed' }),
+            makeExc({
+              id: 'b',
+              date: '2026-12-31',
+              kind: 'custom_hours',
+              open: '09:00',
+              close: '13:00',
+            }),
+          ],
+        }),
+      );
+      render(<ConfiguracoesManager />);
+
+      // Titulo da 4a secao (h2).
+      expect(
+        screen.getByRole('heading', { level: 2, name: /Exceções/i }),
+      ).toBeInTheDocument();
+
+      // Linhas da lista (escopo p/ nao colidir com o radio "Fechado" do form).
+      const lista = screen.getByTestId('excecoes-lista');
+      expect(within(lista).getByText(/Fechado/i)).toBeInTheDocument();
+      expect(within(lista).getByText(/09:00/)).toBeInTheDocument();
+      expect(within(lista).getByText(/13:00/)).toBeInTheDocument();
+    });
+
+    // (b) adicionar exceção Fechado numa data -> add({ date, kind:'closed' }) (sem open/close).
+    it('adicionar exceção Fechado chama add({ date, kind: "closed" })', async () => {
+      const add = vi.fn().mockResolvedValue({ ok: true });
+      mockUseTenantSettings.mockReturnValue(makeHook());
+      mockUseAvailabilityExceptions.mockReturnValue(makeExcHook({ add }));
+      render(<ConfiguracoesManager />);
+
+      const secao = screen.getByTestId('secao-excecoes');
+      // Data.
+      fireEvent.change(within(secao).getByLabelText(/Data da exceção/i), {
+        target: { value: '2026-12-25' },
+      });
+      // Tipo "Fechado" (default), garante selecionado.
+      fireEvent.click(within(secao).getByLabelText(/^Fechado$/i));
+      // Adicionar.
+      fireEvent.click(within(secao).getByRole('button', { name: /Adicionar/i }));
+
+      await waitFor(() => {
+        expect(add).toHaveBeenCalledTimes(1);
+      });
+      const arg = add.mock.calls[0][0];
+      expect(arg).toEqual({ date: '2026-12-25', kind: 'closed' });
+      // Sem open/close num closed.
+      expect(Object.prototype.hasOwnProperty.call(arg, 'open')).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(arg, 'close')).toBe(false);
+    });
+
+    // (c) adicionar Horario especial 09:00-13:00 -> add({ date, kind:'custom_hours', open, close }).
+    it('adicionar Horário especial chama add com kind custom_hours + open/close', async () => {
+      const add = vi.fn().mockResolvedValue({ ok: true });
+      mockUseTenantSettings.mockReturnValue(makeHook());
+      mockUseAvailabilityExceptions.mockReturnValue(makeExcHook({ add }));
+      render(<ConfiguracoesManager />);
+
+      const secao = screen.getByTestId('secao-excecoes');
+      fireEvent.change(within(secao).getByLabelText(/Data da exceção/i), {
+        target: { value: '2026-12-31' },
+      });
+      // Seleciona "Horário especial".
+      fireEvent.click(within(secao).getByLabelText(/Horário especial/i));
+      // Abre/fecha só aparecem no modo especial.
+      fireEvent.change(within(secao).getByLabelText(/^Abre$/i), {
+        target: { value: '09:00' },
+      });
+      fireEvent.change(within(secao).getByLabelText(/^Fecha$/i), {
+        target: { value: '13:00' },
+      });
+      fireEvent.click(within(secao).getByRole('button', { name: /Adicionar/i }));
+
+      await waitFor(() => {
+        expect(add).toHaveBeenCalledTimes(1);
+      });
+      expect(add.mock.calls[0][0]).toEqual({
+        date: '2026-12-31',
+        kind: 'custom_hours',
+        open: '09:00',
+        close: '13:00',
+      });
+    });
+
+    // (d) clicar "Remover" numa linha -> remove(id).
+    it('clicar Remover numa linha chama remove(id)', async () => {
+      const remove = vi.fn().mockResolvedValue({ ok: true });
+      mockUseTenantSettings.mockReturnValue(makeHook());
+      mockUseAvailabilityExceptions.mockReturnValue(
+        makeExcHook({
+          remove,
+          exceptions: [makeExc({ id: 'exc-42', date: '2026-12-25', kind: 'closed' })],
+        }),
+      );
+      render(<ConfiguracoesManager />);
+
+      const secao = screen.getByTestId('secao-excecoes');
+      fireEvent.click(within(secao).getByRole('button', { name: /Remover/i }));
+
+      await waitFor(() => {
+        expect(remove).toHaveBeenCalledTimes(1);
+      });
+      expect(remove).toHaveBeenCalledWith('exc-42');
+    });
+
+    // (e) "Fechar hoje" -> closeToday().
+    it('clicar Fechar hoje chama closeToday()', async () => {
+      const closeToday = vi.fn().mockResolvedValue({ ok: true });
+      mockUseTenantSettings.mockReturnValue(makeHook());
+      mockUseAvailabilityExceptions.mockReturnValue(makeExcHook({ closeToday }));
+      render(<ConfiguracoesManager />);
+
+      const secao = screen.getByTestId('secao-excecoes');
+      fireEvent.click(within(secao).getByRole('button', { name: /Fechar hoje/i }));
+
+      await waitFor(() => {
+        expect(closeToday).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    // Estado vazio: sem exceções, mostra mensagem.
+    it('sem exceções mostra estado vazio', () => {
+      mockUseTenantSettings.mockReturnValue(makeHook());
+      mockUseAvailabilityExceptions.mockReturnValue(makeExcHook({ exceptions: [] }));
+      render(<ConfiguracoesManager />);
+
+      const secao = screen.getByTestId('secao-excecoes');
+      expect(
+        within(secao).getByText(/Nenhuma exceção/i),
+      ).toBeInTheDocument();
+    });
   });
 });
