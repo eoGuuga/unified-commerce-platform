@@ -88,6 +88,11 @@ function CaixaScreen() {
   const openPayment = useCallback(() => {
     if (sale.items.length === 0) return;
     sale.beginPayment();
+    // Zera o "valor recebido" a cada abertura: o modal desmonta ao fechar, mas este
+    // estado vive no pai — sem o reset, o valor da venda anterior persiste e o troco
+    // da proxima venda sai errado (A4).
+    setCashReceivedInput('');
+    sale.setCashReceived(0);
     // Fecha o overlay (se aberto) e abre o pagamento — sem dois overlays empilhados.
     setCartExpanded(false);
     setPaymentOpen(true);

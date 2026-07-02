@@ -509,4 +509,64 @@ describe('ConfiguracoesManager', () => {
       ).toBeInTheDocument();
     });
   });
+
+  // ---- Bloco 1 (polimento) — K3: validação open < close ----
+
+  describe('K3: validação open < close (janela degenerada/invertida)', () => {
+    it('dias: abertura >= fechamento (18:00 até 09:00) mostra aviso e desabilita "Salvar horário"', () => {
+      mockUseTenantSettings.mockReturnValue(makeHook());
+      render(<ConfiguracoesManager />);
+
+      const linha = screen.getByTestId('dia-6');
+      fireEvent.click(within(linha).getByRole('checkbox', { name: /aberto/i }));
+      fireEvent.change(within(linha).getByLabelText(/abre/i), { target: { value: '18:00' } });
+      fireEvent.change(within(linha).getByLabelText(/fecha/i), { target: { value: '09:00' } });
+
+      expect(within(linha).getByText(/antes do fechamento/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Salvar horário/i })).toBeDisabled();
+    });
+
+    it('dias: janela degenerada (02:11 até 02:11) também bloqueia', () => {
+      mockUseTenantSettings.mockReturnValue(makeHook());
+      render(<ConfiguracoesManager />);
+
+      const linha = screen.getByTestId('dia-6');
+      fireEvent.click(within(linha).getByRole('checkbox', { name: /aberto/i }));
+      fireEvent.change(within(linha).getByLabelText(/abre/i), { target: { value: '02:11' } });
+      fireEvent.change(within(linha).getByLabelText(/fecha/i), { target: { value: '02:11' } });
+
+      expect(within(linha).getByText(/antes do fechamento/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Salvar horário/i })).toBeDisabled();
+    });
+
+    it('dias: horário válido (09:00 até 13:00) mantém "Salvar horário" habilitado', () => {
+      mockUseTenantSettings.mockReturnValue(makeHook());
+      render(<ConfiguracoesManager />);
+
+      const linha = screen.getByTestId('dia-6');
+      fireEvent.click(within(linha).getByRole('checkbox', { name: /aberto/i }));
+      fireEvent.change(within(linha).getByLabelText(/abre/i), { target: { value: '09:00' } });
+      fireEvent.change(within(linha).getByLabelText(/fecha/i), { target: { value: '13:00' } });
+
+      expect(within(linha).queryByText(/antes do fechamento/i)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Salvar horário/i })).not.toBeDisabled();
+    });
+
+    it('exceção: horário especial com abertura >= fechamento mostra aviso e desabilita "Adicionar"', () => {
+      mockUseTenantSettings.mockReturnValue(makeHook());
+      mockUseAvailabilityExceptions.mockReturnValue(makeExcHook());
+      render(<ConfiguracoesManager />);
+
+      const secao = screen.getByTestId('secao-excecoes');
+      fireEvent.change(within(secao).getByLabelText(/Data da exceção/i), {
+        target: { value: '2026-12-31' },
+      });
+      fireEvent.click(within(secao).getByLabelText(/Horário especial/i));
+      fireEvent.change(within(secao).getByLabelText(/^Abre$/i), { target: { value: '18:00' } });
+      fireEvent.change(within(secao).getByLabelText(/^Fecha$/i), { target: { value: '09:00' } });
+
+      expect(within(secao).getByText(/antes do fechamento/i)).toBeInTheDocument();
+      expect(within(secao).getByRole('button', { name: /Adicionar/i })).toBeDisabled();
+    });
+  });
 });

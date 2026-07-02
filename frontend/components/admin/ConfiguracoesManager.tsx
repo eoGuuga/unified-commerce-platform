@@ -67,6 +67,11 @@ const DEFAULT_TZ = 'America/Sao_Paulo';
 const DEFAULT_ABRE = '09:00';
 const DEFAULT_FECHA = '18:00';
 
+/** Janela de horario invalida: abertura >= fechamento (ambos "HH:MM", comparaveis lexicalmente). */
+function horaInvalida(open: string, close: string): boolean {
+  return !!open && !!close && open >= close;
+}
+
 const METODOS: { value: PaymentMethod; label: string }[] = [
   { value: 'pix', label: 'PIX' },
   { value: 'dinheiro', label: 'Dinheiro' },
@@ -186,7 +191,23 @@ function ConfiguracoesForm({
     });
   }
 
+  // Algum dia aberto com janela invalida (abertura >= fechamento)?
+  const horarioInvalido = DIAS.some(({ dow }) => {
+    const d = dias[dow];
+    return !!d?.aberto && horaInvalida(d.open, d.close);
+  });
+
   function salvarHorario() {
+    if (horarioInvalido) {
+      setFeedback((prev) => ({
+        ...prev,
+        horario: {
+          kind: 'err',
+          text: 'Corrija os horários: a abertura deve ser antes do fechamento.',
+        },
+      }));
+      return;
+    }
     // Nenhum dia aberto -> limpar horário (business_hours: null). Um mapa vazio
     // ({tz, days:{}}) seria rejeitado pelo DTO (fail-closed exige >=1 dia).
     void salvar('horario', { horario: { business_hours: montarBusinessHours(tz, dias) } });
@@ -348,6 +369,7 @@ function ConfiguracoesForm({
         titulo="Horário de funcionamento"
         onSalvar={salvarHorario}
         saving={saving === 'horario'}
+        saveDisabled={horarioInvalido}
         feedback={feedback.horario}
       >
         <div>
@@ -408,6 +430,11 @@ function ConfiguracoesForm({
                       className={`${inputClass} h-9 w-32`}
                     />
                   </div>
+                )}
+                {d.aberto && horaInvalida(d.open, d.close) && (
+                  <p className="text-[12px] text-red-700 sm:w-full">
+                    A abertura deve ser antes do fechamento.
+                  </p>
                 )}
               </div>
             );
@@ -503,6 +530,9 @@ function ExcecoesSection() {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Horário especial com janela inválida (abertura >= fechamento)?
+  const excInvalida = kind === 'custom_hours' && horaInvalida(open, close);
+
   useEffect(() => {
     if (feedback?.kind !== 'ok') return;
     const id = setTimeout(() => setFeedback(null), 6000);
@@ -520,6 +550,10 @@ function ExcecoesSection() {
   async function adicionar() {
     if (!date) {
       setFeedback({ kind: 'err', text: 'Escolha uma data para a exceção.' });
+      return;
+    }
+    if (kind === 'custom_hours' && horaInvalida(open, close)) {
+      setFeedback({ kind: 'err', text: 'A abertura deve ser antes do fechamento.' });
       return;
     }
     // Monta o input: `closed` NAO leva open/close; `custom_hours` leva ambos.
@@ -641,11 +675,17 @@ function ExcecoesSection() {
           </div>
         )}
 
+        {excInvalida && (
+          <p className="text-[12px] text-red-700">
+            A abertura deve ser antes do fechamento.
+          </p>
+        )}
+
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={() => void adicionar()}
-            disabled={busy}
+            disabled={busy || excInvalida}
             className="inline-flex h-11 items-center justify-center rounded-full bg-[#1a1814] px-6 text-[14px] font-medium text-[#f6f3ee] transition hover:bg-[#1a1814]/90 disabled:opacity-50"
           >
             {busy ? 'Salvando…' : 'Adicionar'}
@@ -724,12 +764,14 @@ function Secao({
   children,
   onSalvar,
   saving,
+  saveDisabled,
   feedback,
 }: {
   titulo: string;
   children: React.ReactNode;
   onSalvar: () => void;
   saving: boolean;
+  saveDisabled?: boolean;
   feedback: Feedback | null | undefined;
 }) {
   return (
@@ -753,7 +795,7 @@ function Secao({
         <button
           type="button"
           onClick={onSalvar}
-          disabled={saving}
+          disabled={saving || saveDisabled}
           className="inline-flex h-11 items-center justify-center rounded-full bg-[#1a1814] px-6 text-[14px] font-medium text-[#f6f3ee] transition hover:bg-[#1a1814]/90 disabled:opacity-50"
         >
           {saving ? 'Salvando…' : `Salvar ${titulo.split(' ')[0].toLowerCase()}`}
