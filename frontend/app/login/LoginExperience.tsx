@@ -19,10 +19,13 @@ export default function LoginExperience({ redirectTarget }: { redirectTarget: st
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [tenantId, setTenantId] = useState(DEFAULT_WORKSPACE);
-  // Single-tenant: com um tenant configurado (NEXT_PUBLIC_TENANT_ID != sentinel),
-  // o workspace fica escondido e o x-tenant-id vai automatico (tenantId ja pre-preenchido).
-  // So mostra o campo quando NAO ha tenant configurado (sentinel) — caso dev/multi-tenant.
-  const [showWorkspaceField, setShowWorkspaceField] = useState(TENANT_ID === SENTINEL_TENANT);
+  // Single-tenant: com um tenant configurado (NEXT_PUBLIC_TENANT_ID != sentinel), o
+  // workspace fica escondido e o x-tenant-id vai automatico (tenantId ja pre-preenchido).
+  // A capacidade multi-loja e PRESERVADA (nao deletada): se um dia o tenant for o
+  // sentinel (dev/multi-tenant), o seletor de workspace volta a aparecer sozinho —
+  // aqui so recolhemos a UI, mantendo toda a logica por tras.
+  const workspaceSelectable = TENANT_ID === SENTINEL_TENANT;
+  const [showWorkspaceField, setShowWorkspaceField] = useState(workspaceSelectable);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,12 +91,12 @@ export default function LoginExperience({ redirectTarget }: { redirectTarget: st
             A operação que <em className="text-[#b8654a]" style={{ fontStyle: 'italic' }}>respira</em> em uníssono.
           </h1>
           <p className="mt-6 max-w-md text-[16px] leading-[1.55] text-[#1a1814]/70">
-            Estoque, PDV, bot de WhatsApp e atendimento compartilhando a mesma fonte de verdade. A plataforma que devolve ritmo e serenidade.
+            Estoque, PDV e atendimento automático no WhatsApp compartilhando a mesma fonte de verdade. A plataforma que devolve ritmo e serenidade.
           </p>
 
           <div className="mt-12 space-y-3">
             {[
-              { t: 'Sessao criptografada end-to-end' },
+              { t: 'Seus dados protegidos com segurança' },
               { t: 'Acesso direto a operacao' },
               { t: 'UX premium em todos os modulos' },
             ].map((s) => (
@@ -130,7 +133,7 @@ export default function LoginExperience({ redirectTarget }: { redirectTarget: st
               Entrar
             </h2>
             <p className="mt-2 text-[14px] leading-[1.55] text-[#1a1814]/60">
-              Use suas credenciais para abrir o ambiente certo.
+              Entre com seu e-mail e senha.
             </p>
 
             {error && (
@@ -161,13 +164,17 @@ export default function LoginExperience({ redirectTarget }: { redirectTarget: st
                   <label htmlFor="password" className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#1a1814]/55">
                     Senha
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowWorkspaceField((c) => !c)}
-                    className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#1a1814]/40 transition hover:text-[#1a1814]"
-                  >
-                    {showWorkspaceField ? 'Ocultar workspace' : 'Informar workspace'}
-                  </button>
+                  {/* Seletor de workspace: só no modo multi-tenant (sentinel). No
+                      single-tenant atual fica recolhido — a lógica permanece intacta. */}
+                  {workspaceSelectable && (
+                    <button
+                      type="button"
+                      onClick={() => setShowWorkspaceField((c) => !c)}
+                      className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#1a1814]/40 transition hover:text-[#1a1814]"
+                    >
+                      {showWorkspaceField ? 'Ocultar workspace' : 'Informar workspace'}
+                    </button>
+                  )}
                 </div>
                 <div className="relative">
                   <input

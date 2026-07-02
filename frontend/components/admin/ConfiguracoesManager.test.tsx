@@ -297,8 +297,10 @@ describe('ConfiguracoesManager', () => {
       }),
     );
     render(<ConfiguracoesManager />);
-    // Aviso coerente com o bot: sem horario -> retirada nao oferecida.
-    expect(screen.getByText(/retirada não será oferecida/i)).toBeInTheDocument();
+    // Aviso (voz do lojista): sem horario -> clientes nao podem agendar retirada.
+    expect(
+      screen.getByText(/seus clientes não poderão agendar retirada/i),
+    ).toBeInTheDocument();
   });
 
   // ---- (c) HORARIO POR-DIA: sabado presente, domingo ausente ----
