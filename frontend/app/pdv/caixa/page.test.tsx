@@ -276,4 +276,35 @@ describe('CaixaPage — /pdv/caixa', () => {
     // Nao vaza o conteudo do caixa enquanto desautenticado.
     expect(screen.queryByLabelText('Buscar produto')).not.toBeInTheDocument();
   });
+
+  // ---- Bloco 1 (polimento) — A4: valor recebido reseta entre vendas ----
+
+  it('A4: fechar o pagamento sem concluir e reabrir -> "valor recebido" zerado (troco correto)', () => {
+    authOk();
+    productsOk();
+
+    render(<CaixaPage />);
+
+    // Adiciona um item e abre o pagamento em Dinheiro.
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar Brigadeiro' }));
+    fireEvent.click(screen.getByRole('button', { name: /PAGAR/i }));
+    fireEvent.click(screen.getByText('Dinheiro'));
+
+    // Digita um valor recebido (mascara BR: "500" = R$ 5,00).
+    const cashInput = screen.getByPlaceholderText('0,00') as HTMLInputElement;
+    fireEvent.change(cashInput, { target: { value: '500' } });
+    expect(cashInput.value).not.toBe('');
+
+    // Fecha SEM concluir a venda (Esc) — carrinho intacto.
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByText('Pagamento')).not.toBeInTheDocument();
+
+    // Reabre o pagamento (mesmo carrinho) e garante o metodo Dinheiro.
+    fireEvent.click(screen.getByRole('button', { name: /PAGAR/i }));
+    fireEvent.click(screen.getByText('Dinheiro'));
+    const cashInputReabre = screen.getByPlaceholderText('0,00') as HTMLInputElement;
+
+    // O valor recebido NAO pode persistir o da venda anterior — deve estar zerado.
+    expect(cashInputReabre.value).toBe('');
+  });
 });

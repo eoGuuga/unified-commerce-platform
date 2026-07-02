@@ -385,3 +385,35 @@ describe('StockManager — mutações (T5b)', () => {
     });
   });
 });
+
+// ---- Bloco 1 (polimento) — A1: reset do tipo entre produtos ----
+
+describe('StockManager — A1: reset de tipo do ModalAjuste entre produtos', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAdminData.mockReturnValue(makeAdminData());
+  });
+
+  it('abrir p/ produto A com "Perda", fechar, abrir p/ produto B → tipo volta ao default "Compra" (não persiste)', async () => {
+    render(<StockManager />);
+
+    // Abre o modal para o Produto A (primeiro "Ajustar") e muda o tipo para PERDA
+    fireEvent.click(screen.getAllByText('Ajustar')[0]);
+    const selectA = screen.getByRole('combobox') as HTMLSelectElement;
+    fireEvent.change(selectA, { target: { value: 'PERDA' } });
+    expect(selectA.value).toBe('PERDA');
+
+    // Fecha o modal
+    fireEvent.click(screen.getByText('Cancelar'));
+    await waitFor(() =>
+      expect(screen.queryByText('Ajustar Estoque')).not.toBeInTheDocument(),
+    );
+
+    // Abre o modal para o Produto B (segundo "Ajustar")
+    fireEvent.click(screen.getAllByText('Ajustar')[1]);
+    const selectB = screen.getByRole('combobox') as HTMLSelectElement;
+
+    // O tipo NÃO pode persistir "PERDA" — deve voltar ao default "COMPRA"
+    expect(selectB.value).toBe('COMPRA');
+  });
+});
