@@ -1,9 +1,10 @@
 /**
- * Testa que o ModalAjuste bloqueia chamadas à API quando delta === 0,
- * exibindo mensagem amigável "Nenhuma mudança a registrar."
+ * Testa que o ModalAjuste bloqueia chamadas à API quando delta === 0.
+ * Após o C4 (Bloco 4), a validação é ANTES de submeter: o botão Confirmar
+ * fica desabilitado quando não há mudança a registrar.
  */
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // Mocked antes do import do componente para sobrescrever o provider
@@ -59,7 +60,7 @@ describe('ModalAjuste — delta=0 guard', () => {
     mockAdjustStock.mockReset();
   });
 
-  it('exibe "Nenhuma mudança a registrar." quando Correção com contado == estoque atual e NÃO chama adjustStock', async () => {
+  it('C4: Confirmar fica desabilitado quando Correção com contado == estoque atual (delta 0) e NÃO chama adjustStock', () => {
     render(<StockManager />);
 
     // Abrir modal de ajuste
@@ -74,16 +75,14 @@ describe('ModalAjuste — delta=0 guard', () => {
     const inputQtd = screen.getByRole('spinbutton');
     fireEvent.change(inputQtd, { target: { value: '10' } });
 
-    // Submeter
+    // C4: valida ANTES de submeter — o botão fica desabilitado (nada a registrar),
+    // em vez de só mostrar o erro depois de clicar em Confirmar.
     const btnConfirmar = screen.getByRole('button', { name: /confirmar/i });
+    expect(btnConfirmar).toBeDisabled();
+    expect(screen.getByTestId('delta-preview')).toHaveTextContent('Nenhuma alteração');
+
+    // Clicar num botão desabilitado não dispara a API.
     fireEvent.click(btnConfirmar);
-
-    // Deve exibir mensagem amigável
-    await waitFor(() => {
-      expect(screen.getByTestId('erro-ajuste')).toHaveTextContent('Nenhuma mudança a registrar.');
-    });
-
-    // NÃO deve ter chamado a API
     expect(mockAdjustStock).not.toHaveBeenCalled();
   });
 });

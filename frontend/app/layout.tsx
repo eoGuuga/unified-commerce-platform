@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     url: siteUrl,
     siteName: 'GTSoftHub',
     title: 'GTSoftHub | Vender em qualquer canal, como se fosse tudo um só',
-    description: 'Bot de WhatsApp, PDV e controle de estoque num só ecossistema. 14 dias grátis.',
+    description: 'Bot de WhatsApp, PDV e controle de estoque numa só plataforma. 14 dias grátis.',
     images: [
       {
         url: '/og-image.png',
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'GTSoftHub | Vender em qualquer canal, como se fosse tudo um só',
-    description: 'Bot de WhatsApp, PDV e controle de estoque num só ecossistema.',
+    description: 'Bot de WhatsApp, PDV e controle de estoque numa só plataforma.',
     images: ['/og-image.png'],
     creator: '@gtsofthub',
   },

@@ -68,7 +68,7 @@ export function OnboardingPanel({
                 bem-vindo de volta, {welcomeName}
               </p>
               <h2 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-                Vamos transformar este workspace em uma operacao que arranca confianca no primeiro minuto.
+                Vamos transformar sua loja em uma operação que arranca confiança no primeiro minuto.
               </h2>
               <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground">
                 O command center ja esta bonito. Agora a trilha abaixo organiza os
@@ -89,13 +89,13 @@ export function OnboardingPanel({
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                workspace ativo
+                loja ativa
               </p>
               <p className="mt-2 text-xl font-semibold tracking-tight text-foreground">
                 {workspaceLabel}
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {userEmail || 'Operador principal conectado ao ecossistema.'}
+                {userEmail || 'Operador principal conectado à plataforma.'}
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">

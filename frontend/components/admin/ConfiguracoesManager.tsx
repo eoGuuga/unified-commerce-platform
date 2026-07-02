@@ -445,11 +445,11 @@ function ConfiguracoesForm({
             role="status"
             className="rounded-[4px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800"
           >
-            Loja sem horário definido — retirada não será oferecida.
+            Loja sem horário definido — seus clientes não poderão agendar retirada.
           </div>
         )}
         <p className="text-[12px] text-[#1a1814]/50">
-          Dias marcados como Fechado ficam de fora do horário — o bot não afirma horário nesses dias.
+          Dias marcados como Fechado ficam de fora do horário — o atendimento automático não informará o horário de funcionamento nesses dias.
         </p>
       </Secao>
 
@@ -879,7 +879,7 @@ function buildAvisos(status: TenantSettingsProjection['status']): { key: string;
   if (!status.hasBusinessHours) {
     avisos.push({
       key: 'horario',
-      text: 'Sua loja ainda não tem horário definido. Configure abaixo para o bot informar quando você atende.',
+      text: 'Sua loja ainda não tem horário definido. Configure abaixo para o atendimento automático informar quando você atende.',
     });
   }
   if (!status.hasPixKey) {

@@ -56,3 +56,40 @@ describe('ProductsManager — B3 (categorias não podem falhar em silêncio)', (
     ).not.toBeInTheDocument();
   });
 });
+
+describe('ProductsManager — D1: estados de carregando nos botões', () => {
+  beforeEach(() => {
+    vi.spyOn(api, 'getCategories').mockResolvedValue([]);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('botão Atualizar vira "Atualizando…" e desabilita quando loading', () => {
+    mockUseProducts.mockReturnValue(makeProductsState({ loading: true }));
+    render(<ProductsManager />);
+
+    expect(screen.getByRole('button', { name: /Atualizando/i })).toBeDisabled();
+  });
+
+  it('toggle Ativar/Desativar mostra "Salvando…" e desabilita durante a mutação', () => {
+    mockUseProducts.mockReturnValue(
+      makeProductsState({
+        products: [
+          {
+            id: '1',
+            tenant_id: 't1',
+            name: 'Brigadeiro',
+            price: 5,
+            unit: 'unidade',
+            is_active: true,
+          },
+        ],
+        mutatingId: '1',
+      }),
+    );
+    render(<ProductsManager />);
+
+    expect(screen.getByRole('button', { name: /Salvando/i })).toBeDisabled();
+  });
+});
