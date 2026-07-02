@@ -19,7 +19,10 @@ export default function LoginExperience({ redirectTarget }: { redirectTarget: st
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [tenantId, setTenantId] = useState(DEFAULT_WORKSPACE);
-  const [showWorkspaceField, setShowWorkspaceField] = useState(Boolean(DEFAULT_WORKSPACE));
+  // Single-tenant: com um tenant configurado (NEXT_PUBLIC_TENANT_ID != sentinel),
+  // o workspace fica escondido e o x-tenant-id vai automatico (tenantId ja pre-preenchido).
+  // So mostra o campo quando NAO ha tenant configurado (sentinel) — caso dev/multi-tenant.
+  const [showWorkspaceField, setShowWorkspaceField] = useState(TENANT_ID === SENTINEL_TENANT);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

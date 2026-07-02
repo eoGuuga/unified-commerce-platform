@@ -101,6 +101,8 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_TENANT_ID: ${NEXT_PUBLIC_TENANT_ID}
     container_name: ucm-frontend
     restart: unless-stopped
     init: true
