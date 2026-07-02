@@ -27,6 +27,7 @@ vi.mock('@/components/admin/shell/AdminDataProvider', () => ({
 
 import { useAdminData } from '@/components/admin/shell/AdminDataProvider';
 import { StockManager } from './StockManager';
+import { API_ERROR_MESSAGES } from '@/lib/api-client';
 
 const mockUseAdminData = useAdminData as ReturnType<typeof vi.fn>;
 
@@ -211,6 +212,24 @@ describe('StockManager — leitura (T5a)', () => {
     await waitFor(() => {
       expect(screen.getByText(/nenhuma movimentação/i)).toBeInTheDocument();
     });
+  });
+
+  // B2 — erro do backend no extrato não pode vazar texto técnico cru na tela.
+  it('B2: erro 500 no extrato mostra mensagem amigável, não o texto técnico cru', async () => {
+    const historyFn = vi
+      .fn()
+      .mockRejectedValue(
+        Object.assign(new Error('Internal server error'), { status: 500 }),
+      );
+    mockUseAdminData.mockReturnValue(makeAdminData({ history: historyFn }));
+
+    render(<StockManager />);
+    fireEvent.click(screen.getAllByText('Extrato')[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText(API_ERROR_MESSAGES.server)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/internal server error/i)).not.toBeInTheDocument();
   });
 });
 

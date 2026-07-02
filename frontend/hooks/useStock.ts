@@ -15,7 +15,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import api from '@/lib/api-client';
+import api, { normalizeApiError } from '@/lib/api-client';
 import { stockStatus, isAttention } from '@/lib/stock-status';
 import type { StockSummary, StockSummaryEntry } from '@/lib/types/product';
 
@@ -148,7 +148,9 @@ export function useStock(): UseStockResult {
     } catch (err) {
       // Erro NÃO-FATAL: registra o erro mas não lança — provider permanece vivo.
       setStockError(
-        err instanceof Error ? err.message : 'Não foi possível carregar o estoque.',
+        normalizeApiError(err, {
+          fallback: 'Não foi possível carregar o estoque.',
+        }),
       );
       setSummary(null);
     } finally {
@@ -213,8 +215,9 @@ export function useStock(): UseStockResult {
         }
 
         const code = (err as Error & { code?: string }).code;
-        const message =
-          err instanceof Error ? err.message : 'Falha no ajuste de estoque.';
+        const message = normalizeApiError(err, {
+          fallback: 'Falha no ajuste de estoque.',
+        });
         return { ok: false, error: message, code };
       }
     },
@@ -247,8 +250,9 @@ export function useStock(): UseStockResult {
         }
 
         const code = (err as Error & { code?: string }).code;
-        const message =
-          err instanceof Error ? err.message : 'Falha ao definir estoque mínimo.';
+        const message = normalizeApiError(err, {
+          fallback: 'Falha ao definir estoque mínimo.',
+        });
         return { ok: false, error: message, code };
       }
     },

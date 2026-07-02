@@ -16,12 +16,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
-// Mock do api-client (default export) antes de importar o hook.
-vi.mock('@/lib/api-client', () => ({
-  default: {
-    createOrder: vi.fn(),
-  },
-}));
+// Mocka só o default (createOrder), mantendo normalizeApiError real via importActual.
+vi.mock('@/lib/api-client', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
+  return {
+    ...actual,
+    default: {
+      createOrder: vi.fn(),
+    },
+  };
+});
 
 import api from '@/lib/api-client';
 import { usePdvSale } from './usePdvSale';
@@ -216,6 +221,26 @@ describe('usePdvSale — preco divergente', () => {
     // Mensagem especifica (re-sync de preco), diferente da de estoque.
     expect(result.current.paymentError).toMatch(/pre[çc]o/i);
     expect(result.current.paymentError).not.toMatch(/estoque/i);
+  });
+
+  // B4 — o caso genérico não pode vazar o texto técnico cru do backend.
+  it('B4: erro técnico 500 vira mensagem amigável, não vaza o texto cru', async () => {
+    const err = Object.assign(
+      new Error('QueryFailedError: duplicate key value violates unique constraint'),
+      { status: 500 },
+    );
+    mockApi.createOrder.mockRejectedValueOnce(err);
+
+    const { result } = renderHook(() => usePdvSale());
+    seedSale(result);
+
+    await act(async () => {
+      await result.current.submitSale();
+    });
+
+    expect(result.current.items).toHaveLength(2); // carrinho preservado
+    expect(result.current.paymentError).toBeTruthy();
+    expect(result.current.paymentError).not.toMatch(/QueryFailedError|constraint|duplicate/i);
   });
 });
 

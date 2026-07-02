@@ -12,6 +12,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { RefreshCw, Package, AlertTriangle, X, Clock, SlidersHorizontal } from 'lucide-react';
 import { useAdminData } from '@/components/admin/shell/AdminDataProvider';
+import { normalizeApiError } from '@/lib/api-client';
 import { stockStatus, isAttention, STATUS_META } from '@/lib/stock-status';
 import type { StockSummaryEntry } from '@/lib/types/product';
 import type { StockHistoryItem } from '@/hooks/useStock';
@@ -272,7 +273,9 @@ function ExtratoDrawer({
       })
       .catch((err: unknown) => {
         if (!cancelled)
-          setError(err instanceof Error ? err.message : 'Falha ao carregar extrato.');
+          setError(
+            normalizeApiError(err, { fallback: 'Falha ao carregar o extrato.' }),
+          );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

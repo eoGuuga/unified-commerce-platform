@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { RefreshCw, Package, Search, Plus, Pencil } from 'lucide-react';
 import { useProducts } from '@/hooks/useProducts';
 import { ProductForm } from './ProductForm';
-import api from '@/lib/api-client';
+import api, { normalizeApiError } from '@/lib/api-client';
 import type { Product, CreateProductInput, UpdateProductInput } from '@/lib/types/product';
 
 function formatMoney(value: unknown): string {
@@ -27,10 +27,25 @@ export function ProductsManager() {
   const [formAberto, setFormAberto] = useState<{ mode: 'create' | 'edit'; product?: Product } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  const [categoriasErro, setCategoriasErro] = useState<string | null>(null);
 
-  // Carrega categorias para o formulário
+  // Carrega categorias para o formulário. Falha NÃO é silenciada (B3): sem aviso,
+  // o dropdown fica misteriosamente vazio e a lojista não sabe que algo quebrou.
   useEffect(() => {
-    api.getCategories().then(setCategories).catch(() => setCategories([]));
+    api
+      .getCategories()
+      .then((cats) => {
+        setCategories(cats);
+        setCategoriasErro(null);
+      })
+      .catch((err) => {
+        setCategories([]);
+        setCategoriasErro(
+          normalizeApiError(err, {
+            fallback: 'Não foi possível carregar as categorias.',
+          }),
+        );
+      });
   }, []);
 
   // Feedback de sucesso some sozinho após 6s; erro fica até próximo clique
@@ -158,6 +173,16 @@ export function ProductsManager() {
           }`}
         >
           {feedback.text}
+        </div>
+      )}
+
+      {/* Aviso de categorias (B3): não silencia a falha de carregamento */}
+      {categoriasErro && (
+        <div
+          role="status"
+          className="mt-5 rounded-[4px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800"
+        >
+          {categoriasErro} As sugestões de categoria podem estar incompletas.
         </div>
       )}
 

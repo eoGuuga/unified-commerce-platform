@@ -16,7 +16,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import api from '@/lib/api-client';
+import api, { normalizeApiError } from '@/lib/api-client';
 import type {
   TenantSettingsProjection,
   UpdateTenantSettingsDto,
@@ -76,9 +76,9 @@ export function useTenantSettings(): UseTenantSettingsResult {
       setSettings(data);
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : 'Não foi possível carregar as configurações.',
+        normalizeApiError(err, {
+          fallback: 'Não foi possível carregar as configurações.',
+        }),
       );
       setSettings(null);
     } finally {
@@ -108,10 +108,9 @@ export function useTenantSettings(): UseTenantSettingsResult {
         setSettings(snapshot);
         return {
           ok: false,
-          error:
-            err instanceof Error
-              ? err.message
-              : 'Falha ao salvar as configurações.',
+          error: normalizeApiError(err, {
+            fallback: 'Falha ao salvar as configurações.',
+          }),
         };
       }
     },

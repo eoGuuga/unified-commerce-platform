@@ -19,7 +19,7 @@
  */
 
 import { useCallback, useMemo, useReducer, useRef, useState } from 'react';
-import api from '@/lib/api-client';
+import api, { normalizeApiError } from '@/lib/api-client';
 import type { PdvPaymentMethod } from '@/lib/types/order';
 import {
   cartReducer,
@@ -90,11 +90,13 @@ function describeSaleError(error: unknown): string {
   if (/diverg/i.test(message)) {
     return 'O preço de um item mudou. Atualize o produto e confira o total antes de cobrar.';
   }
-  // Generico (rede/servidor): incentiva o retry seguro — a Idempotency-Key
-  // estavel por venda evita cobranca dupla mesmo reenviando a mesma tentativa.
-  return message
-    ? `Não foi possível registrar a venda: ${message}`
-    : 'Não foi possível registrar a venda. Pode tentar de novo — a idempotência evita cobrança dupla.';
+  // Generico: NUNCA vaza o texto cru do backend (antes fazia `...: ${message}`).
+  // normalizeApiError decide por status; o fallback reforca o retry seguro — a
+  // Idempotency-Key estavel por venda evita cobranca dupla mesmo reenviando.
+  return normalizeApiError(error, {
+    fallback:
+      'Não foi possível registrar a venda. Pode tentar de novo — a idempotência evita cobrança dupla.',
+  });
 }
 
 function newIdempotencyKey(): string {

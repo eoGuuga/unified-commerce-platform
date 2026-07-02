@@ -2,12 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 // Mock do api-client antes de importar o hook (mesmo padrao de useProducts.test.ts).
-vi.mock('@/lib/api-client', () => ({
-  default: {
-    getSettings: vi.fn(),
-    updateSettings: vi.fn(),
-  },
-}));
+// Mocka só o default (métodos HTTP), mantendo normalizeApiError real via importActual.
+vi.mock('@/lib/api-client', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
+  return {
+    ...actual,
+    default: {
+      getSettings: vi.fn(),
+      updateSettings: vi.fn(),
+    },
+  };
+});
 
 import { useTenantSettings } from './useTenantSettings';
 import api from '@/lib/api-client';
@@ -76,7 +82,8 @@ describe('useTenantSettings', () => {
 
       expect(result.current.loading).toBe(false);
       expect(result.current.settings).toBeNull();
-      expect(result.current.error).toBe('rede caiu');
+      // B5: erro sem status vira o fallback amigável (não vaza o texto cru).
+      expect(result.current.error).toBe('Não foi possível carregar as configurações.');
     });
   });
 
@@ -157,7 +164,8 @@ describe('useTenantSettings', () => {
       // Reverteu ao snapshot anterior.
       expect(result.current.settings?.loja.store_name).toBe('Doceria da Ana');
       expect(res!.ok).toBe(false);
-      expect(res!.error).toBe('timeout');
+      // B5: erro sem status vira o fallback amigável.
+      expect(res!.error).toBe('Falha ao salvar as configurações.');
     });
 
     it('merge por secao: update de horario nao apaga campos de loja/pagamento', async () => {

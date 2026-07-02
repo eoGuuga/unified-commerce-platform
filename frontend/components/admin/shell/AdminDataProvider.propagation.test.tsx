@@ -53,14 +53,20 @@ vi.mock('@/hooks/useOrders', () => ({
 }));
 
 // api-client: controlado — getStockSummary retorna 2 produtos específicos
-vi.mock('@/lib/api-client', () => ({
-  default: {
-    getStockSummary: vi.fn(),
-    adjustStock: vi.fn(),
-    setMinStock: vi.fn(),
-    getStockHistory: vi.fn().mockResolvedValue({ items: [], total: 0 }),
-  },
-}));
+// Mocka só o default (métodos HTTP), mantendo normalizeApiError real via importActual.
+vi.mock('@/lib/api-client', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
+  return {
+    ...actual,
+    default: {
+      getStockSummary: vi.fn(),
+      adjustStock: vi.fn(),
+      setMinStock: vi.fn(),
+      getStockHistory: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+    },
+  };
+});
 
 // next/navigation: AdminNav usa usePathname()
 vi.mock('next/navigation', () => ({
@@ -95,7 +101,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePathname } from 'next/navigation';
 import { AdminNav } from './AdminNav';
 
-const mockApi = api as {
+const mockApi = api as unknown as {
   getStockSummary: ReturnType<typeof vi.fn>;
   adjustStock: ReturnType<typeof vi.fn>;
 };

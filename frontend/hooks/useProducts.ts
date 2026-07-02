@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import api from '@/lib/api-client';
+import api, { normalizeApiError } from '@/lib/api-client';
 import type { Product, CreateProductInput, UpdateProductInput } from '@/lib/types/product';
 
 interface UseProductsResult {
@@ -41,7 +41,11 @@ export function useProducts(): UseProductsResult {
       const list = Array.isArray(raw) ? raw : ((raw as { data?: Product[] })?.data ?? []);
       setProducts(list);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível carregar os produtos.');
+      setError(
+        normalizeApiError(err, {
+          fallback: 'Não foi possível carregar os produtos.',
+        }),
+      );
       setProducts([]);
     } finally {
       setLoading(false);
@@ -61,7 +65,7 @@ export function useProducts(): UseProductsResult {
       } catch (err) {
         return {
           ok: false,
-          error: err instanceof Error ? err.message : 'Falha ao criar produto.',
+          error: normalizeApiError(err, { fallback: 'Falha ao criar produto.' }),
         };
       }
     },
@@ -80,7 +84,7 @@ export function useProducts(): UseProductsResult {
       } catch (err) {
         return {
           ok: false,
-          error: err instanceof Error ? err.message : 'Falha ao atualizar produto.',
+          error: normalizeApiError(err, { fallback: 'Falha ao atualizar produto.' }),
         };
       } finally {
         setMutatingId(null);
@@ -103,7 +107,9 @@ export function useProducts(): UseProductsResult {
         setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, is_active: !next } : p)));
         return {
           ok: false,
-          error: err instanceof Error ? err.message : 'Falha ao alterar status do produto.',
+          error: normalizeApiError(err, {
+            fallback: 'Falha ao alterar status do produto.',
+          }),
         };
       } finally {
         setMutatingId(null);

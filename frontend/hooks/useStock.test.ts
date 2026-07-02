@@ -20,18 +20,24 @@ import { useStock } from './useStock';
 
 // ---- Mock do api-client ----
 
-vi.mock('@/lib/api-client', () => ({
-  default: {
-    getStockSummary: vi.fn(),
-    getStockHistory: vi.fn(),
-    adjustStock: vi.fn(),
-    setMinStock: vi.fn(),
-  },
-}));
+// Mocka só o default (métodos HTTP), mantendo normalizeApiError real via importActual.
+vi.mock('@/lib/api-client', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
+  return {
+    ...actual,
+    default: {
+      getStockSummary: vi.fn(),
+      getStockHistory: vi.fn(),
+      adjustStock: vi.fn(),
+      setMinStock: vi.fn(),
+    },
+  };
+});
 
 import api from '@/lib/api-client';
 
-const mockApi = api as {
+const mockApi = api as unknown as {
   getStockSummary: ReturnType<typeof vi.fn>;
   getStockHistory: ReturnType<typeof vi.fn>;
   adjustStock: ReturnType<typeof vi.fn>;
@@ -232,7 +238,8 @@ describe('useStock — mutações T5b', () => {
 
     expect(resultado!.ok).toBe(false);
     expect(resultado!.code).toBe('INSUFFICIENT_STOCK');
-    expect(resultado!.error).toBe('Estoque insuficiente');
+    // B5: o code estruturado mapeia para a mensagem amigável específica.
+    expect(resultado!.error).toBe('Estoque insuficiente para essa quantidade.');
   });
 
   /**

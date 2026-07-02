@@ -90,4 +90,20 @@ describe('api-client', () => {
     );
     await expect(api.getCurrentUser()).rejects.toThrow('Request failed');
   });
+
+  it('anexa .status e .code ao Error para o consumidor classificar (normalizeApiError)', async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      jsonResponse(
+        { message: 'Estoque insuficiente', code: 'INSUFFICIENT_STOCK' },
+        { status: 422 },
+      ),
+    );
+    const err = await api.getCurrentUser().then(
+      () => null,
+      (e: unknown) => e as Error & { status?: number; code?: string },
+    );
+    expect(err).toBeInstanceOf(Error);
+    expect(err?.status).toBe(422);
+    expect(err?.code).toBe('INSUFFICIENT_STOCK');
+  });
 });
