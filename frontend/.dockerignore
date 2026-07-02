@@ -1,0 +1,21 @@
+# Nunca copiar artefatos de build locais para o contexto Docker.
+# Sem isto, um .next/ antigo do host era copiado e o build reusava
+# codigo desatualizado (mesmo bug que o backend/.dockerignore ja resolve).
+node_modules
+.next
+out
+*.tsbuildinfo
+.tsbuildinfo
+
+# Lixo de dev / nao necessario no build
+.git
+.env
+.env.*
+*.log
+coverage
+test-results
+playwright-report
+.vscode
+.idea
+**/*.test.ts
+**/*.test.tsx
