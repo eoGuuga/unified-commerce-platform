@@ -13,9 +13,19 @@ Migration `1751900000000-EnableRlsOnRemainingTables.ts` liga `ENABLE+FORCE+<tabe
 
 ---
 
-## Fase B — `whatsapp_carts` + o sweeper — ⏳ NÃO FEITO (frente própria)
+## Fase B — `whatsapp_carts` + o sweeper — ✅ FEITO (commit `32f84d0`)
 
-**Por que não é "liga direto":** só quebra em PROD (dev/testes conectam como superuser e furam o RLS → dariam falso-verde). Dois problemas:
+**Abordagem (a) loop-por-tenant, app 100% restrito (sem BYPASSRLS).** Migration `1752000000000`: RLS+FORCE+policy em `whatsapp_carts` + a primitiva **`app_list_tenant_ids()` (SECURITY DEFINER)** que resolve a enumeração — o job lista os tenants sem o papel do app ter BYPASSRLS (retorna só UUIDs; app segue NOSUPERUSER). `CartService` roteado pelo contexto por-tenant (`withCart`; `releaseExpiredCart(cartId, tenantId)`). `StockSweeper` itera por-tenant (enumera → set_config → varre). `releaseExpiredPendingOrder(orderId, tenantId)` seta contexto antes do UPDATE — **conserta de brinde o no-op silencioso do sweep de pedidos**. Único `@Cron` do backend (confirmado); nenhum outro job cross-tenant.
+
+**Provas (`rls-fase-b.integration.spec`, 4/4, sob o papel restrito):** (1a) `whatsapp_carts` tem ENABLE+FORCE+policy; (1b) sem contexto → 0, com tenant → só o dele; enumeração via `app_list_tenant_ids()` lista os tenants; (2) o **sweeper REAL** limpou os expirados de 2 tenants enquanto a varredura ingênua (sem contexto) via 0, e o carrinho futuro ficou intacto.
+
+**Deploy:** a migration precisa rodar em prod com `DATABASE_ADMIN_URL` + deploy do código junto (senão o fluxo de carrinho quebra) — deploy-em-bloco, com aprovação.
+
+---
+
+### Registro do desenho original da Fase B (por que não era "liga direto")
+
+Só quebrava em PROD (dev/testes conectam como superuser e furam o RLS → dariam falso-verde). Dois problemas:
 1. O `CartService` lê/grava `whatsapp_carts` via **DataSource cru** (sem contexto de tenant) — `cart.service.ts:56-58`. Com RLS: SELECT/UPDATE → 0, INSERT rejeitado pelo `WITH CHECK` → **o fluxo de carrinho do bot lança erro**.
 2. O `@Cron` **`StockSweeperService`** (`stock-sweeper.service.ts:28`) faz `SELECT id FROM whatsapp_carts` **cross-tenant, sem contexto** (`:50-56`). Com RLS → 0 linhas → **carrinhos expirados nunca liberados → vazamento de reserva de estoque**.
 
