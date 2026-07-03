@@ -1,7 +1,7 @@
-# Envelope Encryption — Fase 1 (per-tenant DEKs) — ENTREGUE (não mergeado/deployado)
+# Envelope Encryption — Fase 1 (per-tenant DEKs) — ✅ APROVADA (fundação pronta, não deployada)
 
-**Branch:** `security/envelope-encryption-phase1` (a partir da `main`). **NÃO mergeado, NÃO deployado — aguarda revisão.**
-**Data:** 2026-07-03.
+**Branch:** `security/envelope-encryption-phase1` (a partir da `main`=`d3b4b9b`, 3 commits: `384746c`+`f9b3912`+`047135b`). **Guardada localmente, NÃO pushada, NÃO mergeada, NÃO deployada.**
+**Data:** 2026-07-03. **Status:** revisada e **aprovada pelo dono**; a fundação de envelope está pronta e provada na branch. Aguarda a **etapa dedicada de deploy** (plano escrito em `2026-07-03-envelope-deploy-plan.md` — tem a pegadinha do boot fail-closed na master key). **Fase 2 = KMS junto da frente de pagamentos.**
 
 ## O quê e por quê
 
