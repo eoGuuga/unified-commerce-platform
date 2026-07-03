@@ -27,11 +27,15 @@ try {
   // dotenv ausente - usa env vars do processo direto.
 }
 
-const databaseUrl = process.env.DATABASE_URL;
+// Migrations fazem DDL -> precisam de um usuario privilegiado. Em producao o
+// app roda como usuario RESTRITO (ucm_app, sem DDL, para o RLS valer); por isso
+// as migrations usam um DATABASE_ADMIN_URL separado (superuser/dono). Cai pro
+// DATABASE_URL quando nao definido (dev/test, onde o proprio usuario ja faz DDL).
+const databaseUrl = process.env.DATABASE_ADMIN_URL || process.env.DATABASE_URL;
 if (!databaseUrl) {
   throw new Error(
-    'DATABASE_URL nao definido. Copie deploy/env.dev.example para backend/.env ' +
-      'antes de rodar migrations.',
+    'DATABASE_ADMIN_URL/DATABASE_URL nao definido. Copie deploy/env.dev.example ' +
+      'para backend/.env antes de rodar migrations.',
   );
 }
 

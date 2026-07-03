@@ -7,6 +7,8 @@ import cookieParser from 'cookie-parser';
 import { DataSource } from 'typeorm';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { CsrfGuard } from './common/guards/csrf.guard';
+import { applyExpressHardening, buildHelmetOptions } from './common/security/http-hardening';
+import { assertDatabaseLeastPrivilege } from './common/security/db-least-privilege';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 import { StructuredLogger } from './common/services/structured-logger.service';
 import { AppModule } from './app.module';
@@ -34,30 +36,13 @@ async function bootstrap() {
   const isProd = process.env.NODE_ENV === 'production';
   const enableSwagger = !isProd || process.env.ENABLE_SWAGGER === 'true';
 
-  // Hardening basico do Express/Nest.
-  try {
-    const instance = app.getHttpAdapter().getInstance() as any;
-    instance?.disable?.('x-powered-by');
-    // Evita respostas 304/ETag em APIs (especialmente em dev/test).
-    instance?.disable?.('etag');
-  } catch {
-    // ignore
-  }
+  // Hardening do Express/Nest: trust proxy (rate limit por cliente real atras do
+  // nginx) + remocao de headers que vazam a stack.
+  applyExpressHardening(app);
   app.enableShutdownHooks();
   app.use(cookieParser());
-  app.use(
-    helmet(
-      enableSwagger
-        ? {
-            contentSecurityPolicy: false,
-            crossOriginEmbedderPolicy: false,
-          }
-        : {
-            contentSecurityPolicy: true,
-            crossOriginEmbedderPolicy: { policy: 'require-corp' },
-          },
-    ),
-  );
+  // Headers de seguranca HTTP (HSTS forte, CSP, X-Frame-Options, nosniff...).
+  app.use(helmet(buildHelmetOptions(enableSwagger)));
 
   // CORS.
   const frontendUrl = process.env.FRONTEND_URL?.trim();
@@ -269,6 +254,13 @@ async function bootstrap() {
     } finally {
       await runner.release();
     }
+  }
+
+  // Fail-closed: em producao o app tem que rodar como papel de banco restrito
+  // (NOSUPERUSER, sem BYPASSRLS). Papel privilegiado ignora o RLS e mata o
+  // isolamento multi-tenant — melhor abortar o boot do que rodar sem protecao.
+  if (isProd) {
+    await assertDatabaseLeastPrivilege(app.get(DataSource));
   }
 
   const port = process.env.PORT || 3001;

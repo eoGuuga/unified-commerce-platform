@@ -1080,7 +1080,10 @@ export class PaymentsService {
           const rawStatus = (details.status ?? '').toLowerCase();
           if (['expired', 'cancelled'].includes(rawStatus)) {
             try {
-              await this.ordersService.releaseExpiredPendingOrder(pagamento.pedido_id);
+              await this.ordersService.releaseExpiredPendingOrder(
+                pagamento.pedido_id,
+                pagamento.tenant_id,
+              );
               this.logger.log(
                 `Webhook MP: reserva liberada para pedido ${pagamento.pedido_id} (status MP: ${details.status})`,
               );

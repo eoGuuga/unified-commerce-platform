@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, In, LessThan, MoreThan } from 'typeorm';
+import { DataSource, In, LessThan, MoreThan, Repository } from 'typeorm';
 import { WhatsAppCart, CartItem } from '../../../database/entities/WhatsappCart.entity';
 import { StockEngineService } from '../../products/stock-engine.service';
+import { DbContextService } from '../../common/services/db-context.service';
 
 export interface AddToCartInput {
   tenantId: string;
@@ -38,6 +39,7 @@ export class CartService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly config: ConfigService,
     private readonly stockEngine: StockEngineService,
+    private readonly dbContext: DbContextService,
   ) {}
 
   private getCartTtlMinutes(): number {
@@ -53,8 +55,34 @@ export class CartService {
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : 10;
   }
 
-  private getRepository() {
-    return this.dataSource.getRepository(WhatsAppCart);
+  /**
+   * Repositorio de carrinho no contexto RLS ATUAL (via interceptor/ALS).
+   * Usado por leituras que so tem o cartId e rodam dentro de um request
+   * (o contexto de tenant ja esta setado). Fora de request retorna vazio — por
+   * isso escritas e leituras com tenantId conhecido usam withCart().
+   */
+  private getCartRepo(): Repository<WhatsAppCart> {
+    return this.dbContext.getManager().getRepository(WhatsAppCart);
+  }
+
+  /**
+   * Roda fn numa transacao propria (commit imediato) com o contexto RLS do
+   * tenant setado — necessario porque whatsapp_carts tem FORCE RLS. Funciona
+   * tanto em request quanto em job de fundo (o chamador informa o tenantId).
+   */
+  private async withCart<T>(
+    tenantId: string,
+    fn: (repo: Repository<WhatsAppCart>) => Promise<T>,
+  ): Promise<T> {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [tenantId]);
+      return fn(manager.getRepository(WhatsAppCart));
+    });
+  }
+
+  /** Salva o carrinho no contexto RLS do proprio tenant. */
+  private saveCart(cart: WhatsAppCart): Promise<WhatsAppCart> {
+    return this.withCart(cart.tenant_id, (repo) => repo.save(cart));
   }
 
   /**
@@ -62,30 +90,26 @@ export class CartService {
    * Retorna null se não encontrar carrinho
    */
   async getCartByTenantAndPhone(tenantId: string, customerPhone: string): Promise<WhatsAppCart | null> {
-    const repo = this.getRepository();
-
     // Primeiro, expirar carrinhos antigos
     await this.expireOldCarts(tenantId, customerPhone);
 
-    // Buscar carrinho ativo
-    const cart = await repo.findOne({
-      where: {
-        tenant_id: tenantId,
-        customer_phone: customerPhone,
-        status: 'active',
-      },
-      order: { updated_at: 'DESC' },
-    });
-
-    return cart;
+    // Buscar carrinho ativo (no contexto RLS do tenant)
+    return this.withCart(tenantId, (repo) =>
+      repo.findOne({
+        where: {
+          tenant_id: tenantId,
+          customer_phone: customerPhone,
+          status: 'active',
+        },
+        order: { updated_at: 'DESC' },
+      }),
+    );
   }
 
   /**
    * Busca ou cria carrinho ativo para o cliente
    */
   async getOrCreateCart(tenantId: string, customerPhone: string): Promise<WhatsAppCart> {
-    const repo = this.getRepository();
-
     // Primeiro, expirar carrinhos antigos
     await this.expireOldCarts(tenantId, customerPhone);
 
@@ -108,7 +132,7 @@ export class CartService {
       newCart.expires_at = expiresAt;
       newCart.status = 'active';
 
-      cart = await repo.save(newCart);
+      cart = await this.saveCart(newCart);
       this.logger.log(`Carrinho ${cart.id} criado para ${customerPhone}`);
     }
 
@@ -152,7 +176,7 @@ export class CartService {
 
     // Recalcular totais e salvar
     this.recalculateTotals(cart);
-    await this.getRepository().save(cart);
+    await this.saveCart(cart);
 
     this.logger.log(`Item ${input.produtoName} adicionado ao carrinho ${cart.id}`, {
       quantity: input.quantity,
@@ -210,7 +234,7 @@ export class CartService {
     }
 
     this.recalculateTotals(cart);
-    await this.getRepository().save(cart);
+    await this.saveCart(cart);
 
     return cart;
   }
@@ -241,12 +265,12 @@ export class CartService {
     if (cart.items.length === 0) {
       cart.status = 'abandoned';
       cart.stock_released_at = new Date();
-      await this.getRepository().save(cart);
+      await this.saveCart(cart);
       return cart;
     }
 
     this.recalculateTotals(cart);
-    await this.getRepository().save(cart);
+    await this.saveCart(cart);
 
     return cart;
   }
@@ -278,7 +302,7 @@ export class CartService {
     cart.status = 'abandoned';
     cart.stock_released_at = cart.stock_released_at ?? new Date();
 
-    await this.getRepository().save(cart);
+    await this.saveCart(cart);
 
     return cart;
   }
@@ -289,17 +313,11 @@ export class CartService {
    * com stock_released_at=now() de fato libera as reservas.
    * Usado tanto pelo fast-path de expireOldCarts quanto pelo sweeper (Task 7).
    */
-  async releaseExpiredCart(cartId: string): Promise<void> {
-    // Buscar tenant_id antes para poder configurar RLS no UPDATE atômico
-    const cartRow = await this.dataSource.query(
-      `SELECT tenant_id FROM whatsapp_carts WHERE id = $1`,
-      [cartId],
-    );
-    if (!cartRow || cartRow.length === 0) return;
-    const tenantId: string = cartRow[0].tenant_id;
-
+  async releaseExpiredCart(cartId: string, tenantId: string): Promise<void> {
     // Atomic compare-and-set dentro de transação com RLS configurado:
-    // só afeta carrinhos active sem stock_released_at
+    // só afeta carrinhos active sem stock_released_at. O tenantId vem do
+    // chamador (sweeper loop-por-tenant ou expireOldCarts) — sob FORCE RLS não
+    // dá para descobri-lo com uma leitura sem contexto.
     let items: CartItem[] | null = null;
     await this.dataSource.transaction(async (manager) => {
       // RLS: necessário para acessar whatsapp_carts (e também movimentacoes_estoque)
@@ -349,7 +367,7 @@ export class CartService {
     // Por enquanto, apenas armazena o código
     cart.coupon_code = input.couponCode;
 
-    await this.getRepository().save(cart);
+    await this.saveCart(cart);
 
     return cart;
   }
@@ -368,7 +386,7 @@ export class CartService {
     cart.discount_amount = 0;
 
     this.recalculateTotals(cart);
-    await this.getRepository().save(cart);
+    await this.saveCart(cart);
 
     return cart;
   }
@@ -381,7 +399,7 @@ export class CartService {
 
     if (cart) {
       cart.status = 'converted';
-      await this.getRepository().save(cart);
+      await this.saveCart(cart);
       this.logger.log(`Carrinho ${cartId} convertido em pedido`);
     }
   }
@@ -390,7 +408,21 @@ export class CartService {
    * Busca carrinho por ID
    */
   async getCartById(cartId: string): Promise<WhatsAppCart | null> {
-    return await this.getRepository().findOne({ where: { id: cartId } });
+    // cartId-only: roda no contexto RLS atual (request). Fora de request, vazio.
+    return this.getCartRepo().findOne({ where: { id: cartId } });
+  }
+
+  /** Contagens de carrinho de um tenant (para métricas), no contexto RLS dele. */
+  async countCartsByTenant(
+    tenantId: string,
+  ): Promise<{ total: number; converted: number }> {
+    return this.withCart(tenantId, async (repo) => {
+      const total = await repo.count({ where: { tenant_id: tenantId } });
+      const converted = await repo.count({
+        where: { tenant_id: tenantId, status: 'converted' },
+      });
+      return { total, converted };
+    });
   }
 
   /**
@@ -402,7 +434,7 @@ export class CartService {
     if (cart) {
       const ttl = minutes || this.getCartTtlMinutes();
       cart.expires_at = new Date(Date.now() + ttl * 60 * 1000);
-      await this.getRepository().save(cart);
+      await this.saveCart(cart);
     }
   }
 
@@ -448,15 +480,17 @@ export class CartService {
   private async findActiveCart(tenantId: string, customerPhone: string): Promise<WhatsAppCart | null> {
     const now = new Date();
 
-    return await this.getRepository().findOne({
-      where: {
-        tenant_id: tenantId,
-        customer_phone: customerPhone,
-        status: 'active' as any,
-        expires_at: MoreThan(now) as any,
-      },
-      order: { created_at: 'DESC' },
-    });
+    return this.withCart(tenantId, (repo) =>
+      repo.findOne({
+        where: {
+          tenant_id: tenantId,
+          customer_phone: customerPhone,
+          status: 'active' as any,
+          expires_at: MoreThan(now) as any,
+        },
+        order: { created_at: 'DESC' },
+      }),
+    );
   }
 
   /**
@@ -465,20 +499,22 @@ export class CartService {
   private async expireOldCarts(tenantId: string, customerPhone: string): Promise<void> {
     const now = new Date();
 
-    // Buscar carrinhos expirados ainda marcados como 'active'
-    const carrinhos = await this.getRepository().find({
-      where: {
-        tenant_id: tenantId,
-        customer_phone: customerPhone,
-        status: 'active' as any,
-        expires_at: LessThan(now) as any,
-      },
-      select: ['id'],
-    });
+    // Buscar carrinhos expirados ainda marcados como 'active' (contexto do tenant)
+    const carrinhos = await this.withCart(tenantId, (repo) =>
+      repo.find({
+        where: {
+          tenant_id: tenantId,
+          customer_phone: customerPhone,
+          status: 'active' as any,
+          expires_at: LessThan(now) as any,
+        },
+        select: ['id'],
+      }),
+    );
 
     // Liberar estoque de cada carrinho expirado via compare-and-set idempotente
     for (const c of carrinhos) {
-      await this.releaseExpiredCart(c.id);
+      await this.releaseExpiredCart(c.id, tenantId);
     }
   }
 
