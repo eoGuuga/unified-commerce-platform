@@ -8,6 +8,7 @@ import { DataSource } from 'typeorm';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { CsrfGuard } from './common/guards/csrf.guard';
 import { applyExpressHardening, buildHelmetOptions } from './common/security/http-hardening';
+import { assertDatabaseLeastPrivilege } from './common/security/db-least-privilege';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 import { StructuredLogger } from './common/services/structured-logger.service';
 import { AppModule } from './app.module';
@@ -253,6 +254,13 @@ async function bootstrap() {
     } finally {
       await runner.release();
     }
+  }
+
+  // Fail-closed: em producao o app tem que rodar como papel de banco restrito
+  // (NOSUPERUSER, sem BYPASSRLS). Papel privilegiado ignora o RLS e mata o
+  // isolamento multi-tenant — melhor abortar o boot do que rodar sem protecao.
+  if (isProd) {
+    await assertDatabaseLeastPrivilege(app.get(DataSource));
   }
 
   const port = process.env.PORT || 3001;
