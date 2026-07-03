@@ -7,7 +7,7 @@ import cookieParser from 'cookie-parser';
 import { DataSource } from 'typeorm';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { CsrfGuard } from './common/guards/csrf.guard';
-import { applyExpressHardening } from './common/security/http-hardening';
+import { applyExpressHardening, buildHelmetOptions } from './common/security/http-hardening';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 import { StructuredLogger } from './common/services/structured-logger.service';
 import { AppModule } from './app.module';
@@ -40,19 +40,8 @@ async function bootstrap() {
   applyExpressHardening(app);
   app.enableShutdownHooks();
   app.use(cookieParser());
-  app.use(
-    helmet(
-      enableSwagger
-        ? {
-            contentSecurityPolicy: false,
-            crossOriginEmbedderPolicy: false,
-          }
-        : {
-            contentSecurityPolicy: true,
-            crossOriginEmbedderPolicy: { policy: 'require-corp' },
-          },
-    ),
-  );
+  // Headers de seguranca HTTP (HSTS forte, CSP, X-Frame-Options, nosniff...).
+  app.use(helmet(buildHelmetOptions(enableSwagger)));
 
   // CORS.
   const frontendUrl = process.env.FRONTEND_URL?.trim();
