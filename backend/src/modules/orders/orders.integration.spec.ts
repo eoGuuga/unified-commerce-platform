@@ -817,7 +817,7 @@ describe('Orders Integration Tests (e2e)', () => {
       const antes = await queryEstoque(produtoId);
 
       // release nao deve alterar nada — pedido esta ENTREGUE, nao pendente_pagamento
-      await ordersService.releaseExpiredPendingOrder(res.body.id);
+      await ordersService.releaseExpiredPendingOrder(res.body.id, tenantId);
 
       // Saldo deve permanecer inalterado
       const depois = await queryEstoque(produtoId);

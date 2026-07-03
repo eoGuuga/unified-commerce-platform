@@ -609,7 +609,7 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
       const payload = buildWebhookPayload(mpPaymentIdExp);
       await Promise.all([
         paymentsService.handleMercadoPagoWebhook(payload, { token: '' }),
-        ordersService.releaseExpiredPendingOrder(pedidoIdExp),
+        ordersService.releaseExpiredPendingOrder(pedidoIdExp, tenantId),
       ]);
 
       const qr = dataSource.createQueryRunner();
@@ -1348,7 +1348,7 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
 
       // Cancela o pedido pelo CAMINHO REAL da expiracao: status -> CANCELADO,
       // reserva liberada, stock_released_at preenchido.
-      await ordersService.releaseExpiredPendingOrder(pedidoId);
+      await ordersService.releaseExpiredPendingOrder(pedidoId, tenantId);
 
       // Confirma pre-condicoes: pedido CANCELADO e reserva ja liberada.
       expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CANCELADO);

@@ -870,8 +870,16 @@ export class OrdersService {
    * status→'cancelado' + stock_released_at=now() de fato libera o estoque.
    * Chamadas subsequentes encontram stock_released_at preenchido e retornam sem-op.
    */
-  async releaseExpiredPendingOrder(orderId: string): Promise<void> {
+  async releaseExpiredPendingOrder(orderId: string, tenantId: string): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
+      // Contexto RLS do tenant ANTES de tocar pedidos (FORCE RLS). O tenantId vem
+      // do chamador (sweeper loop-por-tenant) — sob RLS o UPDATE sem contexto
+      // afetaria 0 linhas silenciosamente (no-op invisível).
+      await manager.query(
+        `SELECT set_config('app.current_tenant_id', $1, true)`,
+        [tenantId],
+      );
+
       // Flip atômico: só afeta linha com status='pendente_pagamento' e sem liberação anterior
       const rawUpdate = await manager.query(
         `UPDATE pedidos
@@ -892,14 +900,6 @@ export class OrdersService {
         // Outro ator já tratou — no-op
         return;
       }
-
-      const tenantId = rows[0].tenant_id;
-
-      // Configura RLS tenant-local para acessar movimentacoes_estoque
-      await manager.query(
-        `SELECT set_config('app.current_tenant_id', $1, true)`,
-        [tenantId],
-      );
 
       // Carregar itens do pedido e liberar cada reserva
       const itens = await manager.find(ItemPedido, { where: { pedido_id: orderId } });

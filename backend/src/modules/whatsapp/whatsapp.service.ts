@@ -2298,20 +2298,10 @@ export class WhatsAppService {
         },
       }) || 0;
 
-      // Buscar carrinhos
-      const cartRepo = this.cartService['dataSource'].getRepository('WhatsAppCart');
-      const totalCarts = await cartRepo?.count({
-        where: {
-          tenant_id: tenantId,
-        },
-      }) || 0;
-
-      const convertedCarts = await cartRepo?.count({
-        where: {
-          tenant_id: tenantId,
-          status: 'converted',
-        },
-      }) || 0;
+      // Buscar carrinhos (no contexto RLS do tenant, via CartService)
+      const cartCounts = await this.cartService.countCartsByTenant(tenantId);
+      const totalCarts = cartCounts.total;
+      const convertedCarts = cartCounts.converted;
 
       return {
         period: {
