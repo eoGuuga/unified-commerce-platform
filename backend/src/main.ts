@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import { DataSource } from 'typeorm';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { CsrfGuard } from './common/guards/csrf.guard';
+import { applyExpressHardening } from './common/security/http-hardening';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 import { StructuredLogger } from './common/services/structured-logger.service';
 import { AppModule } from './app.module';
@@ -34,15 +35,9 @@ async function bootstrap() {
   const isProd = process.env.NODE_ENV === 'production';
   const enableSwagger = !isProd || process.env.ENABLE_SWAGGER === 'true';
 
-  // Hardening basico do Express/Nest.
-  try {
-    const instance = app.getHttpAdapter().getInstance() as any;
-    instance?.disable?.('x-powered-by');
-    // Evita respostas 304/ETag em APIs (especialmente em dev/test).
-    instance?.disable?.('etag');
-  } catch {
-    // ignore
-  }
+  // Hardening do Express/Nest: trust proxy (rate limit por cliente real atras do
+  // nginx) + remocao de headers que vazam a stack.
+  applyExpressHardening(app);
   app.enableShutdownHooks();
   app.use(cookieParser());
   app.use(
