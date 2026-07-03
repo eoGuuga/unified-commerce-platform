@@ -5,6 +5,55 @@
 
 ---
 
+## ✅ CONCLUSÃO E RECOMENDAÇÃO TÉCNICA (2026-07-02)
+
+**Recomendação TÉCNICA: ASAAS como forte candidato.** Por quê, nas dimensões que importam pro modelo do dono:
+- **Subconta** pro modelo dele (dinheiro direto na conta do lojista, plataforma não intermedeia).
+- **Credencial de escopo limitado** ("cria cobrança, NÃO saca" — `PAYMENT:READ_WRITE` + `TRANSFER:READ`) → a blindagem mais forte pro **Risco A** (hacker não saca). É o eixo que o dono mais prioriza.
+- **PIX automático** (webhook) → serve **bot + PDV-PIX** de uma vez.
+- **Caminho de maquininha pro futuro** (Asaas Tap / evolução) pro PDV-cartão — frente separada.
+- **Taxa baixa** + **sandbox** pra provar sem dinheiro real.
+
+> **É a recomendação TÉCNICA. A decisão DEFINITIVA depende de 3 coisas que SÓ O DONO faz:**
+> 1. **Ler o contrato e as taxas reais** ao cadastrar (o que não é público).
+> 2. **Verificar as implicações de compliance/KYC** (possivelmente com um contador) — incl. a **responsabilidade solidária** do modelo white-label (a doc do Asaas diz que a plataforma responde solidariamente por chargebacks/estornos das subcontas white-label; preferir o **subconta PADRÃO**, onde o lojista tem o painel dele e o saque é a auth dele, reduz esse peso).
+> 3. **Confirmar como os clientes reais recebem** (a doceria + 2-3 prospects: já têm MercadoPago? conta em qual banco?).
+
+**Alternativa honesta (o que faria reconsiderar):** o **Mercado Pago (OAuth)** empata/supera o Asaas em **completude** (é o único que integra **cartão presencial em software**, via Point cloud API, sem app nativo), **menor responsabilidade jurídica** (o lojista tem conta MP própria/independente — sem responsabilidade solidária) e **custo de PIX pra ticket pequeno** (0,99% online vs R$1,99 fixo do Asaas). O **Asaas ganha só no escopo FINO da credencial** (Risco A). Como o dono **prioriza os 2 riscos de segurança** e **adiou a maquininha**, o Asaas é coerente com a estratégia dele — mas se, no crivo de contrato/compliance, o escopo grosso do MP for aceitável e a completude+custo pesarem, **o MP volta à mesa**. Ambos são defensáveis; a decisão é do dono.
+
+### Cenários de pagamento mapeados (guia a frente)
+| Canal | Meio | Precisa de gateway? |
+|---|---|---|
+| **Bot WhatsApp** | **PIX remoto automático** | **SIM** (webhook de confirmação) |
+| **PDV presencial** | **Dinheiro** | não (registra no PDV) |
+| **PDV presencial** | **PIX** | SIM (o **mesmo** gateway) |
+| **PDV presencial** | **Cartão (maquininha)** | integração de maquininha = **frente futura** |
+
+**A decisão do gateway é PRINCIPALMENTE sobre PIX** (que serve bot + PDV-PIX). **Maquininha é frente separada e futura.**
+
+### Estratégia acordada
+- **Construir só o PIX primeiro** — é o essencial; **desbloqueia bot + PDV** de uma vez.
+- **Maquininha depois** (frente separada; via SDK nativo = app Android, ou MP Point cloud se for MP).
+- **Escolher o gateway pensando em AMBOS** (PIX agora, cartão futuro) — o Asaas cobre os dois caminhos.
+
+### A abstração de provider — o gateway é um "plugue" trocável
+- A **arquitetura de recebimento** (subconta, credencial **cifrada de escopo limitado**, **separação de papéis**, **roteamento seguro credencial↔tenant**) é **a MESMA independente do gateway final**. O gateway é o **"plugue" trocável** por trás de uma interface.
+- ⚠️ Hoje **NÃO existe** essa abstração (grep = zero `PaymentProviderFactory`; só um `if/else` global — ver §6). **Construir uma interface `PaymentProvider` de verdade é parte da frente.**
+- **Consequência prática:** a frente **pode ser construída com o Asaas como alvo provável SEM travar na decisão de negócio** — se a decisão final mudar pra MP, troca-se o "plugue", não o núcleo.
+
+### Checklist do "verificar ANTES de fechar o gateway" (o dono leva ao cadastro)
+- [ ] **Taxas reais negociadas:** PIX (% ou fixo), cartão (débito/crédito/parcelado), taxa de criação de subconta.
+- [ ] **Prazos de repasse:** PIX (instantâneo?), cartão (D+1/D+30; antecipação e custo).
+- [ ] **RESPONSABILIDADE (o mais crítico):** o contrato te torna **solidariamente responsável** por chargebacks/estornos dos lojistas? (Asaas white-label = **sim**, pela doc — preferir subconta padrão).
+- [ ] **Reserva/rolling reserve:** retém % por N dias contra chargeback?
+- [ ] **Compliance/KYC:** quem responde pelo KYC do lojista? AML/PLD? O que recai sobre a **plataforma**?
+- [ ] **Limites:** de transação, volume mensal, saque; políticas de hold.
+- [ ] **Marca/regulatório (white-label):** obrigação de exibir marca/links/textos de responsabilidade do Asaas.
+- [ ] **Rescisão:** o que acontece com o dinheiro dos lojistas se o contrato acabar.
+- [ ] **Pilar do Risco A:** provar **no sandbox** que a key "só cobrança" **recusa** um `POST /transfers` (com teste automatizado que falha se ganhar poder de saque).
+
+---
+
 ## 1. O objetivo (o modelo de negócio decidido)
 
 - **Bot 100% automático:** o cliente paga e o sistema é avisado **sozinho** (webhook do gateway) — sem humano confirmando. Isso **exige um gateway** (PIX-direto-por-chave não tem confirmação automática — ver §7).
