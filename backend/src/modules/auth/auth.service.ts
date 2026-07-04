@@ -2,13 +2,16 @@ import { Injectable, UnauthorizedException, BadRequestException, Logger } from '
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
+import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { Usuario, UserRole } from '../../database/entities/Usuario.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { DbContextService } from '../common/services/db-context.service';
+import { CacheService } from '../common/services/cache.service';
 import { PRIVACY_POLICY_VERSION } from '../common/constants/lgpd.constants';
+import { BCRYPT_COST, REVOKED_TOKEN_PREFIX } from './auth.constants';
 
 export interface SendConfirmationResponse {
   success: boolean;
@@ -25,6 +28,8 @@ export interface JwtPayload {
   email: string;
   role: UserRole;
   tenant_id: string;
+  jti?: string; // id unico do token (para revogacao no logout); ausente em tokens legados
+  exp?: number; // preenchido pelo jsonwebtoken; usado no logout p/ calcular o TTL da denylist
 }
 
 export interface LoginResponse {
@@ -47,6 +52,7 @@ export class AuthService {
     private jwtService: JwtService,
     private auditLogService: AuditLogService,
     private readonly db: DbContextService,
+    private readonly cacheService: CacheService,
   ) {}
 
   private async runWithTenantContext<T>(
@@ -112,6 +118,7 @@ export class AuthService {
       email: usuario.email,
       role: usuario.role,
       tenant_id: usuario.tenant_id,
+      jti: randomUUID(), // id unico -> permite revogar ESTE token no logout
     };
 
     // ✅ AUDIT LOG: Registrar login
@@ -155,16 +162,18 @@ export class AuthService {
       throw new BadRequestException('Email ja cadastrado');
     }
 
-    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+    const hashedPassword = await bcrypt.hash(registerDto.password, BCRYPT_COST);
 
     // Registra o consentimento LGPD no momento do aceite (Art. 7/8) — prova com data + versao.
+    // SEGURANCA: o role NUNCA vem do cliente (evita auto-registro como admin). Todo
+    // auto-registro nasce SELLER; elevacao de privilegio so por fluxo administrativo.
     const usuario = this.db.getRepository(Usuario).create({
       email: registerDto.email,
       full_name: registerDto.full_name,
       phone: registerDto.phone,
       encrypted_password: hashedPassword,
       tenant_id: tenantId,
-      role: registerDto.role || UserRole.SELLER,
+      role: UserRole.SELLER,
       consent_at: new Date(),
       consent_policy_version: PRIVACY_POLICY_VERSION,
     });
@@ -198,6 +207,12 @@ export class AuthService {
       throw new UnauthorizedException('Tenant invalido');
     }
 
+    // Revogacao: um token cujo jti esta na denylist (logout) e rejeitado, mesmo
+    // valido em assinatura/expiracao. Tokens legados (sem jti) seguem o caminho normal.
+    if (payload.jti && (await this.isTokenRevoked(payload.jti))) {
+      throw new UnauthorizedException('Sessao encerrada');
+    }
+
     const usuario = await this.db.runInTransaction(async (manager) => {
       // Garantir RLS antes de validar o usuario no guard (mesmo sem interceptor).
       await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [tenantId]);
@@ -211,6 +226,47 @@ export class AuthService {
     }
 
     return usuario;
+  }
+
+  /**
+   * Logout real: revoga o token atual pondo o jti dele numa denylist com TTL =
+   * vida restante do token. A partir daqui, o validateUser rejeita este token,
+   * mesmo que a assinatura/expiracao ainda sejam validas. E por-token: nao afeta
+   * outras sessoes ativas do mesmo usuario.
+   */
+  async logout(token: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const decoded = this.jwtService.decode(token) as JwtPayload | null;
+      const jti = decoded?.jti;
+      const exp = decoded?.exp;
+      if (jti && exp) {
+        const ttl = exp - Math.floor(Date.now() / 1000);
+        if (ttl > 0) {
+          await this.cacheService.set(`${REVOKED_TOKEN_PREFIX}${jti}`, true, ttl);
+        }
+      }
+    } catch (error) {
+      // Nao falhar o logout se o Redis estiver indisponivel: o token expira em <=15min.
+      this.logger.error('Falha ao revogar token no logout', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return { success: true, message: 'Logout realizado' };
+  }
+
+  /** Consulta a denylist. Fail-open na disponibilidade: um Redis fora do ar NAO
+   * pode derrubar toda a autenticacao (o token ainda expira em <=15min). */
+  private async isTokenRevoked(jti: string): Promise<boolean> {
+    try {
+      return (
+        (await this.cacheService.get<boolean>(`${REVOKED_TOKEN_PREFIX}${jti}`)) === true
+      );
+    } catch (error) {
+      this.logger.error('Falha ao consultar denylist de tokens', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
   }
 
   async sendConfirmationEmail(email: string): Promise<SendConfirmationResponse> {
