@@ -11,6 +11,7 @@ vi.mock('@/lib/api-client', async () => {
     default: {
       login: vi.fn(),
       getCurrentUser: vi.fn(),
+      logout: vi.fn(),
     },
   };
 });
@@ -31,6 +32,7 @@ function apiError(message: string, extra: { status?: number; code?: string } = {
 const mockedApi = api as unknown as {
   login: ReturnType<typeof vi.fn>;
   getCurrentUser: ReturnType<typeof vi.fn>;
+  logout: ReturnType<typeof vi.fn>;
 };
 const mockedJwtDecode = jwtDecode as unknown as ReturnType<typeof vi.fn>;
 
@@ -42,6 +44,8 @@ describe('useAuth', () => {
     window.localStorage.clear();
     mockedApi.login.mockReset();
     mockedApi.getCurrentUser.mockReset();
+    mockedApi.logout.mockReset();
+    mockedApi.logout.mockResolvedValue(undefined);
     mockedJwtDecode.mockReset();
     replaceMock = vi.fn();
     vi.stubGlobal('location', {
@@ -197,11 +201,15 @@ describe('useAuth', () => {
     const { result } = renderHook(() => useAuth());
     await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
 
-    act(() => result.current.logout());
+    await act(async () => {
+      await result.current.logout();
+    });
 
     expect(result.current.isAuthenticated).toBe(false);
     expect(result.current.user).toBeNull();
     expect(window.localStorage.getItem('token')).toBeNull();
+    // revoga a sessao no servidor (denylist por jti), nao so limpa o cliente
+    expect(mockedApi.logout).toHaveBeenCalled();
   });
 
   it('logout redireciona para /login (evita o estado "zumbi" com useAuth por-instancia)', async () => {
@@ -221,7 +229,9 @@ describe('useAuth', () => {
     const { result } = renderHook(() => useAuth());
     await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
 
-    act(() => result.current.logout());
+    await act(async () => {
+      await result.current.logout();
+    });
 
     expect(replaceMock).toHaveBeenCalledWith('/login');
   });

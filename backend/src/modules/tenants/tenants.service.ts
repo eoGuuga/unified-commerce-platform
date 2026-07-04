@@ -7,6 +7,7 @@ import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateBrandingDto } from './dto/update-branding.dto';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { BusinessHours } from '../whatsapp/utils/business-hours';
+import { BCRYPT_COST } from '../auth/auth.constants';
 
 /**
  * Projecao ALLOW-LIST das configuracoes do tenant (§2.1 do spec).
@@ -352,7 +353,7 @@ export class TenantsService {
         throw new ConflictException(`Email "${dto.admin_email}" ja cadastrado neste tenant.`);
       }
 
-      const hashedPassword = await bcrypt.hash(dto.admin_password, 10);
+      const hashedPassword = await bcrypt.hash(dto.admin_password, BCRYPT_COST);
 
       const admin = userRepo.create({
         tenant_id: savedTenant.id,

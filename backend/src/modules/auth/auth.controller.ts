@@ -87,6 +87,23 @@ export class AuthController {
     return this.authService.confirmEmailCode(dto.email, dto.code);
   }
 
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Logout (revoga o token atual)',
+    description:
+      'Poe o token atual numa denylist ate a expiracao original — a sessao morre de verdade, mesmo se o token foi roubado.',
+  })
+  @ApiResponse({ status: 200, description: 'Logout realizado' })
+  @ApiResponse({ status: 401, description: 'Nao autorizado' })
+  async logout(@Request() req: TypedRequest): Promise<{ success: boolean; message: string }> {
+    const rawAuth = req.headers['authorization'];
+    const authHeader = Array.isArray(rawAuth) ? rawAuth[0] : rawAuth || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    return this.authService.logout(token);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
