@@ -1,6 +1,6 @@
-# Segurança — Bloco A (HIGH limpos de auth) — ENTREGUE (não mergeado/deployado)
+# Segurança — Bloco A (HIGH limpos de auth) — ✅ APROVADA (aguarda janela de deploy)
 
-**Branch:** `security/bloco-a-token-revocation` (a partir da `main`=`662835f`, 3 commits: `0fc0502` auth, `cae1f4f` tenants, `427165f` web). **NÃO pushado, NÃO mergeado, NÃO deployado — aguarda revisão.**
+**Branch:** `security/bloco-a-token-revocation` (a partir da `main`=`662835f`, 4 commits: `0fc0502` auth, `cae1f4f` tenants, `427165f` web, `8114e2a` docs). **Guardada local, NÃO pushada/mergeada/deployada.** Revisada e **aprovada pelo dono** (2026-07-04); pré-voo do deploy escrito em `2026-07-04-security-bloco-a-deploy-plan.md`. Aguarda decisão da janela de deploy.
 **Data:** 2026-07-04. Fecha os HIGH/MEDIUM **limpos** do levantamento (alto valor, baixo risco de quebrar fluxo). O `localStorage→httpOnly cookie` (o delicado) foi **deixado como sub-frente própria** — ver `2026-07-04-security-cookie-subfront.md`.
 
 ## O que foi feito (cada um com teste-que-prova)
