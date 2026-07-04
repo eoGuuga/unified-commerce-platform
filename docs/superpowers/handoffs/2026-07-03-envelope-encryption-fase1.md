@@ -1,7 +1,7 @@
-# Envelope Encryption — Fase 1 (per-tenant DEKs) — ✅ APROVADA (fundação pronta, não deployada)
+# Envelope Encryption — Fase 1 (per-tenant DEKs) — ✅✅ DEPLOYADA E VALIDADA EM PROD
 
-**Branch:** `security/envelope-encryption-phase1` (a partir da `main`=`d3b4b9b`, 3 commits: `384746c`+`f9b3912`+`047135b`). **Guardada localmente, NÃO pushada, NÃO mergeada, NÃO deployada.**
-**Data:** 2026-07-03. **Status:** revisada e **aprovada pelo dono**; a fundação de envelope está pronta e provada na branch. Aguarda a **etapa dedicada de deploy** (plano escrito em `2026-07-03-envelope-deploy-plan.md` — tem a pegadinha do boot fail-closed na master key). **Fase 2 = KMS junto da frente de pagamentos.**
+**Branch:** `security/envelope-encryption-phase1` → mergeada `--no-ff` na `main` = prod HEAD = `83b0157`.
+**Deploy: 2026-07-04** (em blocos, plano em `2026-07-03-envelope-deploy-plan.md`). **Fundação de cripto por-tenant LIVE.** Validado no ar: boot limpo com a master (health 200, sem erro de master), `tenant_data_keys` FORCE_RLS=t + `ucm_app` sem contexto→0 + grants ok, dual-format (0 tokens cifrados = nada em risco), doceria intacta. Master gerada no servidor, guardada no cofre pelo dono. **Fase 2 = KMS junto da frente de pagamentos.**
 
 ## O quê e por quê
 
