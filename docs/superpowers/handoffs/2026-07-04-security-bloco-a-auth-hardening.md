@@ -1,6 +1,8 @@
-# Segurança — Bloco A (HIGH limpos de auth) — ✅ APROVADA (aguarda janela de deploy)
+# Segurança — Bloco A (HIGH limpos de auth) — ✅✅ DEPLOYADA E VALIDADA EM PROD
 
-**Branch:** `security/bloco-a-token-revocation` (a partir da `main`=`662835f`, 4 commits: `0fc0502` auth, `cae1f4f` tenants, `427165f` web, `8114e2a` docs). **Guardada local, NÃO pushada/mergeada/deployada.** Revisada e **aprovada pelo dono** (2026-07-04); pré-voo do deploy escrito em `2026-07-04-security-bloco-a-deploy-plan.md`. Aguarda decisão da janela de deploy.
+**Branch:** `security/bloco-a-token-revocation` → mergeada `--no-ff` na `main` = prod HEAD = `72b3019`.
+**Deploy: 2026-07-04** (leve, sem migration; plano em `2026-07-04-security-bloco-a-deploy-plan.md`). **Todos os 5 fixes LIVE.** Validado no ar: boot limpo (health 200, NEST_STARTED, Redis healthy); login funciona (401 em cred errada = data-path vivo); **🎯 revogação por-token PROVADA no ar** (dono rodou o round-trip: `me(A) após logout=401` revogado + `me(B)=200` 2ª sessão intacta); `/auth/logout` deployado (401 sem token); register com `role:admin`→400 (privesc fechado); headers HSTS/CSP ativos + `server:nginx` sem versão; doceria intacta (1/69/1); front serve `/`+`/login`+`/info/[slug]`=200 (Turbopack não pulou rotas). Backup de rede: `ucm-20260704-035549.sql.gz`.
+- **Follow-up cosmético anotado:** o `POST /auth/logout` retorna **201** (default do Nest pra POST) em vez de 200 — ambos são sucesso (a prova é o 401 seguinte). Alinhar com `@HttpCode(HttpStatus.OK)` no próximo deploy (não vale um ciclo só pra isso).
 **Data:** 2026-07-04. Fecha os HIGH/MEDIUM **limpos** do levantamento (alto valor, baixo risco de quebrar fluxo). O `localStorage→httpOnly cookie` (o delicado) foi **deixado como sub-frente própria** — ver `2026-07-04-security-cookie-subfront.md`.
 
 ## O que foi feito (cada um com teste-que-prova)

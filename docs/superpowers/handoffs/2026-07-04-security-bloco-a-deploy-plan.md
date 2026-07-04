@@ -1,6 +1,8 @@
 # Pré-voo / plano de deploy — Bloco A (auth hardening) — LEVE, sem migration
 
-**Branch:** `security/bloco-a-token-revocation` (4 commits). **NÃO deployado.** Escopo: backend (auth + tenants) + frontend (logout wiring) + docs. **Sem migration, sem mudança de compose/nginx/env, sem infra nova.**
+> ✅✅ **EXECUTADO E VALIDADO EM PROD (2026-07-04, `origin/main`=prod=`72b3019`).** Deploy em blocos seguindo este plano. Round-trip da revogação provado no ar (dono rodou `roundtrip.sh` via SSH — Windows/PowerShell não tem bash, então o script ficou no servidor e o dono só fez `ssh` + `bash /tmp/roundtrip.sh`, senha por prompt oculto). Resultado: `me(A) após logout=401`, `me(B)=200`. Único ajuste pendente: logout retorna 201 (cosmético → `@HttpCode(200)` no próximo deploy).
+
+**Branch:** `security/bloco-a-token-revocation` (5 commits) → mergeada na `main` (`72b3019`). **DEPLOYADA.** Escopo: backend (auth + tenants) + frontend (logout wiring) + docs. **Sem migration, sem mudança de compose/nginx/env, sem infra nova.**
 
 ## Estado (read-only, 2026-07-04) — tudo em sync ✅
 - **Local:** `main`=`662835f`; branch `8114e2a` = 4 commits à frente; **não pushada**; working tree limpo.
