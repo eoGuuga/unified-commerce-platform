@@ -5,7 +5,7 @@
 >
 > **Legenda:** status `⬜ a fazer` · `🔄 em andamento` · `✅ feito` · `🚫 bloqueado (mundo-real)` — gravidade `🔴 morde cedo` · `🟡 importante` · `🟢 pode esperar` — dono `👤 mundo-real (dono + profissional)` · `🔧 técnico (nós)`.
 >
-> _Última atualização: 2026-07-05._
+> _Última atualização: 2026-07-06 (auditoria empírica de segurança — 7 blocos)._
 
 ---
 
@@ -51,11 +51,20 @@ Os 3 pontos cegos 🔴 são **baratos de mitigar e caros de ignorar** — fazer 
 
 **Segurança**
 - 🟡 Bloco B: `JwtAuthGuard` global fail-open → **fail-closed**.
-- 🟡 `/whatsapp/test` + `/whatsapp/metrics` sem guard em prod (o `/test` é o pior).
+- 🟢 `/whatsapp/test` **agora fail-closed em prod (403)** — provado empíricamente 2026-07-06 · 🟡 `/whatsapp/metrics` ainda sem guard.
 - 🟡 Vazamento cross-tenant **além do RLS** (cache Redis / logs / prompts do LLM) — auditar.
 - 🟢 JWT em localStorage → httpOnly cookie (delicado; já mitigado por CSP+revogação+TTL).
 - 🟢 Dead code: `whatsapp.service.legacy.ts` (14.8k linhas) + `*.service.ts.disabled` + branch `chore/preserve-server-snapshot` (arquivo morto — descartar após revisar `email/`, `subscriptions/`, `whatsapp-cart.controller`).
 - ❓ Round-trip autenticado do envelope (verificação end-to-end pendente) · "rotação de senha fraca" (provável = F11).
+
+**Auditoria empírica adversarial (2026-07-06)** — dossiê completo em [`docs/security/2026-07-06-auditoria-empirica.md`](../security/2026-07-06-auditoria-empirica.md). 7 blocos, ataques REAIS contra o teste. **Zero 🔴 explorável.** Achados de hardening 🟡 registrados aqui:
+- 🟡 **H1** revogação **fail-open com Redis fora** (logout não revoga se o Redis cai; válido até expirar em 15min) — o mais "real"; mitigado por TTL curto.
+- 🟡 **H7** `POST /payments/:id/confirm` é **staff-wide** (sem `@Roles('admin')`) e não verifica o provedor — OK no modelo dono-único; revisar se surgir staff de menor confiança.
+- 🟡 **H2** timing-oracle ~70ms no login (enumeração de email; mitigável com dummy-hash) · **H3** enumeração via `send-confirmation` (campo `success`).
+- 🟡 **H8** latência degrada sob alta concorrência (amplificado pelo túnel de teste; em prod há throttle 100/min + nginx edge; sem 5xx/queda) · **H9** `JwtAuthGuard` não-global ("aberto por padrão"; footgun p/ endpoint futuro — mesmo item do "Bloco B" acima).
+- 🟡 **H4** body >100kb → 500 em vez de 413 (quick-win; o limite protege a memória) · **H5** `@Get(':id')` sem `ParseUUIDPipe` → 500 (quick-win) · **H6** `quantity` aceita fracionado (deveria ser `@IsInt`; quick-win).
+- ⚪ **A1 — a-provar:** prompt-injection no bot **não testado** (OpenAI unset no teste → bot cai em canned). Rodar a bateria no LLM ao vivo **quando a chave OpenAI estiver no ambiente de teste**.
+- ✅ **RESOLVIDO/ESCLARECIDO pela auditoria:** multi-tenant **provado sob ataque real** (não só RLS no código: cross-tenant read/write/IDOR/webhook-forge todos bloqueados) · Asaas webhook **fail-closed token provado** (403) + MP webhook usa metadata autoritativo (forja → ignored) · `/whatsapp/test` **fail-closed em prod** (403, acima) · segredos **ausentes do log** (JWT_SECRET/senha DB = 0 ocorrências) · injeção clássica limpa · fluxo de dinheiro à prova (preço/amount server-side, cupom clampado, race de estoque+idempotência seguras) · CSRF N/A hoje (Bearer puro). *(Nota: o webhook do **WhatsApp** teve forja rejeitada no teste, mas o fail-open em prod de `if (webhookSecret && signature)` — CLAUDE.md §9 — NÃO foi re-verificado; segue aberto.)*
 
 **Infra** (F-items registrados em [server-infra-debt])
 - 🟡 F12 remover admin-default do CÓDIGO das migrations · F18 compose não mapeia `DATABASE_ADMIN_URL`.
