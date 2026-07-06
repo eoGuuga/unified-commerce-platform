@@ -1,0 +1,12 @@
+# Backup diario do Postgres de prod — 03:00 BRT (06:00 UTC), rotacao 14 dias.
+#
+# Versionado no repo (config de servidor que so vive no host foi exatamente o
+# que se perdeu na faxina de path /opt/ucm -> /opt/gtsofthub).
+#
+# Instalar no servidor (requer root):
+#   sudo install -m 644 -o root -g root deploy/cron/gtsofthub-backup /etc/cron.d/gtsofthub-backup
+# (nome de arquivo SEM ponto, senao o run-parts do cron ignora)
+#
+# Roda como usuario 'ubuntu' (membro do grupo docker -> docker exec sem sudo).
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+0 6 * * * ubuntu cd /opt/gtsofthub && bash deploy/scripts/backup-postgres.sh >> /opt/gtsofthub/backups/backup.log 2>&1
