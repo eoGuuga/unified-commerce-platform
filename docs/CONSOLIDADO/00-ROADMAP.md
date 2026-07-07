@@ -25,7 +25,7 @@ Prod (`origin/main`, servidor `/opt/gtsofthub` = espelho limpo, site 200) roda: 
 
 ### Destravamentos (na ordem de impacto)
 1. **⬜ 👤 Enviar o chamado ao Asaas.** Texto pronto/guardado (runbook da Fase 2). **Destrava:** subconta escopada real fazendo PIX ao vivo (fecha a Rota 1 — hoje o PIX de subconta é gate do lado do Asaas). **Estado:** NÃO enviado. Barato e rápido; é o próximo passo lógico da frente de pagamentos.
-2. **🚫 👤 Criar a conta Meta (WhatsApp Cloud API).** **Destrava:** o bot **enviar/receber de verdade** (hoje o envio só loga) + o merge da branch `feat/whatsapp-cloud-api-webhook` (código pronto/verde). **Estado:** bloqueado — conta não criada. Precisa: app/conta Meta + número + teste real.
+2. **✅ 👤 Criar a conta Meta (WhatsApp Cloud API) — CONTA CRIADA (2026-07-07).** **Destrava:** o bot **enviar/receber de verdade** + o merge da branch `feat/whatsapp-cloud-api-webhook` (código pronto/verde). **Próximo passo:** ativar o bot em prod (ligar o envio real + número + teste real). **🔒 Pré-requisito ATENDIDO antes de ligar:** o fix de PII nos logs foi **deployado em prod** (ver "Em produção") — o vazamento que ligaria junto com o bot está **estancado**.
 3. **⬜ 👤 Abrir o CNPJ (com o contador).** **Destrava:** **produção de pagamentos** — a conta-plataforma Asaas EXIGE CNPJ (é a Fase 4). **Estado:** pendente. Sem CNPJ, pagamentos ficam presos ao sandbox. (Ver a pauta do contador abaixo antes de decidir MEI vs empresa.)
 
 ### 📋 Pauta pro CONTADOR (a conversa que o CNPJ exige)
@@ -131,6 +131,7 @@ Os 3 pontos cegos 🔴 são **baratos de mitigar e caros de ignorar** — fazer 
 - Bot WhatsApp (fluxo/orquestrador) — **mas o envio só loga** (não entrega; ver Meta).
 - Polimento 22 bugs (4 blocos).
 - Observabilidade (watchdog HTTPS + netdata→Telegram + app-alert Tier 1-lite + backup automático 03:00 BRT) + correção do audit-log de login (RLS, `0558d66`).
+- **Fix de PII nos logs (LGPD) — DEPLOYADO 2026-07-07 (`79ff822`):** parou de logar o **conteúdo da mensagem** do cliente (Camada 1) + **mascara telefone/email** em ~17 sites (`maskPhone`/`maskEmail`, Camada 2) + auditoria **estruturada + IP mascarado** no cart-controller (Camada 4 — **eventos de segurança agora chegam no app-alert**) + máscara do telefone na **exceção** de número não-autorizado (que reaparecia cru via o http-exception-filter). *(Camada 3 — payload MercadoPago — verificada limpa, sem fix.)* **Provado vivo no container** (leak velho `[DEBUG handleCart]` sumiu, máscaras compiladas presentes, exceção mascara). Fechado **ANTES** do bot ir pra prod — o vazamento que ligaria junto está estancado. Watchdog blindado no deploy (parado/religado). Reversível (`git revert 79ff822`).
 
 **Construído mas não integrado (branches abertas):**
 | Branch | Contém | Provado? | Espera |
@@ -138,10 +139,10 @@ Os 3 pontos cegos 🔴 são **baratos de mitigar e caros de ignorar** — fazer 
 | `feat/pdv-cupom-venda` (7c) | Cupom não-fiscal Fase 1 (builder + CupomVenda + portal + botão + store_name) | ✅ 107 testes | Teste na bobina real + preview PDF do dono |
 | `feat/asaas-phase1-subaccount` (19c) | **Frente Asaas inteira** (⊃ `payments-neutral`): fundação neutra + Fase 1 (subconta escopada + 🎯 Risco A) + Fase 2 (PIX + roteamento reverso + Option B provado ao vivo) | ✅ sandbox | Gate Fase 4 (CNPJ + KMS + revisão adversarial) + Asaas liberar PIX de subconta |
 | `feat/payments-neutral-foundation` (7c) | Fundação neutra sozinha (subconjunto da de cima) | ✅ | Entra junto com a `asaas-phase1` |
-| `feat/whatsapp-cloud-api-webhook` (1c) | Webhook WhatsApp Cloud API (Meta): verify + parser + HMAC | ✅ código | Conta Meta + teste real |
+| `feat/whatsapp-cloud-api-webhook` (1c) | Webhook WhatsApp Cloud API (Meta): verify + parser + HMAC | ✅ código | **Meta ✅ criada** — falta ativar em prod + teste real |
 | `chore/preserve-server-snapshot` (1c) | Arquivo histórico da faxina (código server-only) — **NÃO é pra merge** | — | Descartar após revisão item-a-item |
 
-**Bloqueado por mundo real:** Asaas (chamado não enviado), Meta (conta não criada), CNPJ (não aberto) — ver seção "Ações do mundo real".
+**Bloqueado por mundo real:** Asaas (chamado a enviar), **Meta ✅ conta criada (2026-07-07) — bot destravado, falta ativar em prod**, CNPJ (não aberto) — ver seção "Ações do mundo real".
 
 #### 🔀 Decisão de merge (2026-07-07) — o que entra agora vs. o que espera gate
 Diagnóstico das branches abertas (a régua "verifica antes de agir"): todas partem da mesma base `a10b58a`; a main andou 6 commits (audit-fix + observabilidade) **sem conflitar** com nenhuma.
