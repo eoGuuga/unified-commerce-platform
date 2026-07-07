@@ -26,6 +26,11 @@ NOTIFY="${SCRIPT_DIR}/notify-telegram.sh"
 LOG="/var/log/ucm-watchdog.log"
 STATE="/var/lib/ucm-watchdog.state"
 CONTAINERS="ucm-nginx ucm-backend ucm-frontend ucm-postgres ucm-redis"
+# Checks batem no HTTPS do dominio (igual ao deploy.sh) — NAO em http://localhost,
+# que o nginx redireciona 301->HTTPS: isso dava falso-positivo de 'down' (frontend)
+# e falso-negativo (api/re-check passavam no 301 sem tocar o backend).
+HEALTH_URL="https://gtsofthub.com.br/api/v1/health"
+SITE_URL="https://gtsofthub.com.br/"
 TEST="${WATCHDOG_TEST:-0}"
 
 ts() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
@@ -47,8 +52,8 @@ for c in $CONTAINERS; do
   st="$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo MISSING)"
   [ "$st" = "running" ] || problems="${problems} container:${c}=${st}"
 done
-curl -fsS --max-time 5 http://localhost/api/v1/health/ready >/dev/null 2>&1 || problems="${problems} api_ready=fail"
-code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost/ || true)"
+curl -fsS --max-time 8 "$HEALTH_URL" >/dev/null 2>&1 || problems="${problems} api_health=fail"
+code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 "$SITE_URL" || true)"
 [ "$code" = "200" ] || [ "$code" = "304" ] || problems="${problems} frontend=http_${code}"
 
 # Modo teste: simula um down (nao toca container, nao grava estado)
@@ -70,8 +75,8 @@ if [ -n "$problems" ]; then
     ( cd "$DEPLOY_DIR" && docker compose -p "$PROJECT" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d ) >>"$LOG" 2>&1 || true
     docker restart ucm-backend ucm-frontend ucm-nginx >>"$LOG" 2>&1 || true
     sleep 3
-    if curl -fsS --max-time 5 http://localhost/api/v1/health/ready >/dev/null 2>&1; then
-      recovered="recuperei (api ready)"; curr="ok"; log "OK recovery_api_ready"
+    if curl -fsS --max-time 8 "$HEALTH_URL" >/dev/null 2>&1; then
+      recovered="recuperei (api health 200)"; curr="ok"; log "OK recovery_api_ready"
     else
       recovered="AINDA DOWN apos recovery"; log "ERROR recovery_api_still_down"
     fi
