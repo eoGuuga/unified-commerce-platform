@@ -11,7 +11,7 @@
 
 ## 🧭 Estado atual (leia isto primeiro)
 
-Prod (`origin/main`, servidor `/opt/gtsofthub` = espelho limpo, site 200) roda: **multi-tenancy RLS + segurança HIGH fechada + PDV/venda de balcão + admin produtos&estoque + PIX no bot**. **1 tenant real** (a doceria "Loucas por Brigadeiro"). Quatro frentes prontas em branch, **esperando o mundo-real**: cupom de venda (teste na bobina da mãe), pagamentos Asaas (CNPJ + Asaas liberar PIX de subconta), bot WhatsApp (conta Meta). **O gargalo central não é código — é os 3 destravamentos de mundo-real (Asaas, Meta, CNPJ):** o código está adiante do que o mundo-real permite ligar.
+Prod (`origin/main`, servidor `/opt/gtsofthub` = espelho limpo, site 200) roda: **multi-tenancy RLS + segurança HIGH fechada + PDV/venda de balcão + admin produtos&estoque + PIX no bot**. **1 tenant real** (a doceria "Loucas por Brigadeiro"). Quatro frentes prontas em branch, **esperando o mundo-real**: cupom de venda (teste na bobina da mãe), pagamentos Asaas (**Rota 1 PIX provada AO VIVO ✅ 2026-07-07**; falta CNPJ+prod = Fase 4), bot WhatsApp (**Meta ✅ criada**, falta ativar). **O gargalo central não é código — é os 3 destravamentos de mundo-real (Asaas, Meta, CNPJ):** o código está adiante do que o mundo-real permite ligar.
 
 > ### 🔴 BLOQUEADORES ATIVOS — ler ANTES de mergear qualquer código
 > Dois achados de 2026-07-07 (a régua "verifica, não confia" pescou os dois contra suposições nossas). O #1 já foi **resolvido**; o #2 **segue ativo** — pré-requisito, não nota de rodapé:
@@ -24,7 +24,7 @@ Prod (`origin/main`, servidor `/opt/gtsofthub` = espelho limpo, site 200) roda: 
 ## 🌍 Ações do mundo real (só o dono resolve, fora do código)
 
 ### Destravamentos (na ordem de impacto)
-1. **⬜ 👤 Enviar o chamado ao Asaas.** Texto pronto/guardado (runbook da Fase 2). **Destrava:** subconta escopada real fazendo PIX ao vivo (fecha a Rota 1 — hoje o PIX de subconta é gate do lado do Asaas). **Estado:** NÃO enviado. Barato e rápido; é o próximo passo lógico da frente de pagamentos.
+1. **✅ 👤 Chamado ao Asaas — ENVIADO E RESOLVIDO (chamado 1356594, Isadora/Integrações, 2026-07-07).** O time liberou o PIX de subconta White Label no sandbox. **🎉 Rota 1 da Fase 2 PROVADA AO VIVO (2026-07-07)** — round-trip PIX completo com subconta **REAL** (`accountId 1e694b22`): cobrança **400→200** (gate destravado) + QR real gerado + pagamento recebido + **webhook roteou pra subconta certa (roteamento reverso ao vivo)** + pedido fechou sozinho (`confirmado`→`paid`) + **Risco A confirmado AO VIVO** (chave "só cobrança" → **403 no saque**: recebe mas não saca). O diferencial central do produto, provado de ponta a ponta. *(Sandbox; banco de teste limpo pós-prova; reversível.)*
 2. **✅ 👤 Criar a conta Meta (WhatsApp Cloud API) — CONTA CRIADA (2026-07-07).** **Destrava:** o bot **enviar/receber de verdade** + o merge da branch `feat/whatsapp-cloud-api-webhook` (código pronto/verde). **Próximo passo:** ativar o bot em prod (ligar o envio real + número + teste real). **🔒 Pré-requisito ATENDIDO antes de ligar:** o fix de PII nos logs foi **deployado em prod** (ver "Em produção") — o vazamento que ligaria junto com o bot está **estancado**.
 3. **⬜ 👤 Abrir o CNPJ (com o contador).** **Destrava:** **produção de pagamentos** — a conta-plataforma Asaas EXIGE CNPJ (é a Fase 4). **Estado:** pendente. Sem CNPJ, pagamentos ficam presos ao sandbox. (Ver a pauta do contador abaixo antes de decidir MEI vs empresa.)
 
@@ -137,20 +137,31 @@ Os 3 pontos cegos 🔴 são **baratos de mitigar e caros de ignorar** — fazer 
 | Branch | Contém | Provado? | Espera |
 |---|---|---|---|
 | `feat/pdv-cupom-venda` (7c) | Cupom não-fiscal Fase 1 (builder + CupomVenda + portal + botão + store_name) | ✅ 107 testes | Teste na bobina real + preview PDF do dono |
-| `feat/asaas-phase1-subaccount` (19c) | **Frente Asaas inteira** (⊃ `payments-neutral`): fundação neutra + Fase 1 (subconta escopada + 🎯 Risco A) + Fase 2 (PIX + roteamento reverso + Option B provado ao vivo) | ✅ sandbox | Gate Fase 4 (CNPJ + KMS + revisão adversarial) + Asaas liberar PIX de subconta |
+| `feat/asaas-phase1-subaccount` (19c) | **Frente Asaas inteira** (⊃ `payments-neutral`): fundação neutra + Fase 1 (subconta escopada + 🎯 Risco A) + Fase 2 (PIX + roteamento reverso + **🎉 Rota 1 PROVADA AO VIVO com subconta REAL 2026-07-07**: 400→200, QR, roteamento reverso, Risco A 403) | ✅ **sandbox ao vivo** | 🔴 Gate Fase 4 (CNPJ+prod + migration + credenciais por-tenant + KMS + revisão adversarial) — **NÃO mergear antes** |
 | `feat/payments-neutral-foundation` (7c) | Fundação neutra sozinha (subconjunto da de cima) | ✅ | Entra junto com a `asaas-phase1` |
 | `feat/whatsapp-cloud-api-webhook` (1c) | Webhook WhatsApp Cloud API (Meta): verify + parser + HMAC | ✅ código | **Meta ✅ criada** — falta ativar em prod + teste real |
 | `chore/preserve-server-snapshot` (1c) | Arquivo histórico da faxina (código server-only) — **NÃO é pra merge** | — | Descartar após revisão item-a-item |
 
-**Bloqueado por mundo real:** Asaas (chamado a enviar), **Meta ✅ conta criada (2026-07-07) — bot destravado, falta ativar em prod**, CNPJ (não aberto) — ver seção "Ações do mundo real".
+**Bloqueado por mundo real:** **Asaas ✅ chamado 1356594 resolvido — PIX de subconta destravado + Rota 1 provada ao vivo (falta CNPJ+prod=Fase 4)**, **Meta ✅ conta criada — bot destravado, falta ativar em prod**, CNPJ (não aberto) — ver seção "Ações do mundo real".
 
 #### 🔀 Decisão de merge (2026-07-07) — o que entra agora vs. o que espera gate
 Diagnóstico das branches abertas (a régua "verifica antes de agir"): todas partem da mesma base `a10b58a`; a main andou 6 commits (audit-fix + observabilidade) **sem conflitar** com nenhuma.
 - **✅ MERGEADA AGORA:** `docs/roadmap-vivo` — doc pura (0 código, 0 toque em prod, sem conflito, não espera nada). Trouxe roadmap + runbooks + dossiê da auditoria pro tronco.
 - **Pilha real:** `feat/asaas-phase1-subaccount` **contém** `feat/payments-neutral-foundation` (empilhadas — entram juntas). `feat/pdv-cupom-venda` e `feat/whatsapp-cloud-api-webhook` são **independentes** (não carregam pagamentos).
 - **🚨 Correção de leitura — os pagamentos NÃO são dormentes:** o `payments.service` na branch **re-roteia o MP** pelo `credentialResolver.resolveForCharge('mercadopago', tenant)` (tabela nova `tenant_payment_credentials`, **fail-closed sem credencial — nunca fallback pro env**). **Deployar isso sem a migration + a credencial por-tenant QUEBRA o PIX da doceria.** Por isso a fundação de pagamentos (Fase 0/1/2, **provada em sandbox**) é **🔴 pré-requisito da Fase 4 (não só "aguarda gate"): NÃO pode ir pra main antes** de a Fase 4 tratar migration + credenciais por-tenant + a transição do MP existente (CNPJ + KMS + revisão adversarial). Merge ≠ deploy (deploy é manual), mas deixá-la na main viraria bomba pro próximo deploy manual.
-- **🔴 Landmine a desarmar antes de qualquer merge que toque `backend/**` ou `frontend/**`:** `.github/workflows/deploy-prod.yml` (auto-deploy em push que, se rodar, sobe container com env incompleto → quebra o boot). Os merges de doc não disparam ele (0 backend), mas ele precisa ser tratado antes de cupom/pagamentos/bot.
-- **Gates dos que ficam:** cupom → teste na bobina real da mãe · pagamentos → Fase 4 (CNPJ + Asaas liberar PIX de subconta) · bot → conta Meta · `chore/preserve-server-snapshot` → descartar após revisão.
+- **✅ Landmine `deploy-prod.yml` DESARMADA (2026-07-07):** `on: push` removido → só `workflow_dispatch` manual. Merges de backend/frontend não disparam mais auto-deploy (provado: o merge do fix de PII em backend não disparou).
+- **Gates dos que ficam:** cupom → teste na bobina real da mãe · pagamentos → **Fase 4 (CNPJ+prod; PIX de subconta ✅ destravado + Rota 1 provada AO VIVO)** · bot → conta Meta (✅ criada) · `chore/preserve-server-snapshot` → descartar após revisão.
+
+#### 💳 Fase 4 — pagamentos em PRODUÇÃO (o caminho que resta, pós-Rota-1-provada)
+A Fase 2 (Rota 1) está **provada ao vivo em sandbox** (round-trip PIX real + roteamento reverso + Risco A). Pra ligar pagamentos com lojistas **reais** falta:
+1. **👤 CNPJ real** (contador) — a conta-plataforma Asaas de produção **EXIGE CNPJ** (MEI vs empresa: ver pauta do contador).
+2. **👤 Conta Asaas de PRODUÇÃO** — subcontas de lojista aprovadas por **KYC/documentos reais** (não o atalho `/sandbox/approve`; em prod é o lojista que envia docs via `onboardingUrl`).
+3. **🔧 Migration `1752200000000`** (`tenant_payment_credentials`) rodada em prod.
+4. **🔧 Migrar a doceria pras credenciais por-tenant** — hoje o MP é global (env); a Fase 4 move pra credencial por-tenant no cofre + a transição do MP existente **sem quebrar o PIX atual** (o `payments.service` já re-roteia fail-closed → por isso não pode ir pra main antes disto).
+5. **🔧 Merge da fundação de pagamentos** (`feat/asaas-phase1-subaccount` ⊃ `payments-neutral`) — 🔴 **segura na branch ATÉ aqui**; mergear antes quebra o PIX da doceria.
+6. **🔧 KMS** — a `ENCRYPTION_MASTER_KEY` sai do `.env` pro cofre gerenciado (rotação).
+7. **🔧 Revisão adversarial** do fluxo de pagamento em prod (dinheiro real de terceiros).
+- **🔎 Achado pra Fase 4 (2026-07-07):** checar se um lojista foi aprovado usa a **chave-plataforma** (`GET /accounts` lista subcontas + status), **NÃO** a chave escopada da subconta (que dá **403 `ACCOUNT_INFO:READ`** — o escopo "só cobrança" não lê dados de conta).
 
 **Servidor (só-leitura, 2026-07-05):** VPS `vps-0e3446f6` (up 23d). Containers: frontend/backend (26h) · nginx (40h) · postgres/redis (saudáveis) · **+ postgres-test/redis-test** (banco de teste `ucm_test_motor` na VPS de prod). Git `/opt/gtsofthub` == `origin/main` limpo (só o `.env.bak` untracked). **Sem divergência de código.**
 
