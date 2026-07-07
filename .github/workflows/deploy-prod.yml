@@ -1,13 +1,33 @@
+# ============================================================================
+#  DESARMADO em 2026-07-07 — AUTO-DEPLOY DESABILITADO (so disparo manual).
+#
+#  Motivo: este workflow disparava um AUTO-DEPLOY em TODO push de backend/frontend
+#  na main, com config DIVERGENTE do deploy manual real. Ele fazia `docker run` de um
+#  container standalone (imagem ghcr) com env INCOMPLETO — faltam ENCRYPTION_KEY,
+#  ENCRYPTION_MASTER_KEY, MERCADOPAGO_*, PIX_KEY, WHATSAPP_*, TELEGRAM_* etc., entao o
+#  container novo CRASHA no boot; pior, ele PARA o container bom ANTES de subir o novo,
+#  o que quebraria producao sem ninguem olhando. O deploy real e MANUAL: git pull +
+#  build + `docker compose up` via deploy/scripts/deploy.sh (projeto `deploy`, imagem
+#  LOCAL deploy-backend).
+#
+#  Por isso o gatilho automatico (`on: push`) foi REMOVIDO — resta so `workflow_dispatch`
+#  (execucao manual, nunca dispara sozinho). O arquivo fica como REFERENCIA.
+#
+#  Para REATIVAR como auto-deploy com seguranca (melhoria futura, OPCIONAL, nao urgente):
+#    1. Alinhar com o deploy manual atual: MESMO `docker compose` (-p deploy, imagem
+#       local deploy-backend) e MESMO env COMPLETO (todos os secrets, incl.
+#       ENCRYPTION_KEY / ENCRYPTION_MASTER_KEY / MERCADOPAGO_* / PIX_KEY / WHATSAPP_*).
+#    2. Health-check pos-deploy com ROLLBACK se falhar — nunca remover o container bom
+#       antes de o novo provar que subiu saudavel.
+#    3. Testar ponta a ponta em staging antes de religar o `on: push`.
+#  Ver docs/CONSOLIDADO/00-ROADMAP.md (item "LANDMINE auto-deploy" / melhoria futura).
+# ============================================================================
+
 name: Deploy to Production VPS
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'backend/**'
-      - 'frontend/**'
-      - '.github/workflows/deploy-prod.yml'
+  # `on: push` (auto-deploy) DESABILITADO em 2026-07-07 — ver cabecalho acima.
+  # Somente disparo MANUAL a partir daqui (nunca roda sozinho):
   workflow_dispatch:
     inputs:
       skip_frontend:
