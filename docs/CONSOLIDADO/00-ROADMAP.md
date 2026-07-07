@@ -58,6 +58,8 @@ Os 3 pontos cegos 🔴 são **baratos de mitigar e caros de ignorar** — fazer 
 
 **Segurança**
 - 🟡 Bloco B: `JwtAuthGuard` global fail-open → **fail-closed**.
+- 🟡 **Audit log de login FALHANDO ao gravar** (achado via diagnóstico da Ponta 3, 2026-07-07): `AuthService: "Erro ao registrar audit log de login"` — 5× em 7 dias. O login funciona, mas o **registro de auditoria (LGPD/segurança) não é gravado** às vezes → furo no rastro de auditoria. Investigar+corrigir (a observabilidade achou isso ANTES de existir alerta). *(O alerta de app da Ponta 3 vai disparar nele até corrigir — comportamento certo.)*
+- 🟢 **Debug ligado em prod** (achado via Ponta 3): 8.6k linhas `"level":"debug"`/7d → setar `LOG_LEVEL=info`; verboso (enche log) + risco de vazar detalhe em debug.
 - 🟢 `/whatsapp/test` **agora fail-closed em prod (403)** — provado empíricamente 2026-07-06 · 🟡 `/whatsapp/metrics` ainda sem guard.
 - 🟡 Vazamento cross-tenant **além do RLS** (cache Redis / logs / prompts do LLM) — auditar.
 - 🟢 JWT em localStorage → httpOnly cookie (delicado; já mitigado por CSP+revogação+TTL).
