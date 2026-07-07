@@ -14,6 +14,7 @@ Erro aqui = prejuizo financeiro, vazamento de dados de cliente, ou processo judi
 2. **Eficiencia de tokens = acertar de primeira.** O custo nao esta no tamanho deste arquivo; esta em explorar a toa, errar caminho e refazer. Use o Mapa (sec. 6). Leia so o trecho necessario (`offset`/`limit`, Grep com escopo). Varredura ampla -> subagente `Explore`, fique com a conclusao. Nao releia arquivo que acabou de editar. Nao narre o que nao vai fazer.
 3. **Profissionalismo.** Codigo que se parece com o vizinho. Sem giria, sem "provisorio" que vira divida. Achou erro na base? Diga — nao replique. **Commits sempre em ingles, Conventional Commits, profissionais (regra detalhada na sec. 5).**
 4. **Honestidade de resultado.** Teste falhou: diga com a saida. Pulou passo: diga. "Funciona" so apos verificar.
+5. **Verificar antes de construir.** Antes de propor CONSTRUIR/CONFIGURAR qualquer coisa, o passo 1 e verificar se **ja existe** (repo + servidor: `.env`, scripts, systemd/cron, docs de operacao em `deploy/*.md`; historico git com `-S`/`-G` pra segredos, sem expor valor). **"Ja existe?" vem ANTES de "como construir?".** Este projeto tem historico de coisas construidas-e-esquecidas (scripts de monitor perdidos, watchdog esquecido, off-site de backup nao ligado, bot de Telegram de teste ja criado).
 
 **Definition of Done (checklist canonico — rodar antes de declarar tarefa pronta E antes de PR/deploy):**
 - [ ] `cd backend && npm run build` passa (e `npm run lint` sem novo erro nos arquivos tocados).
