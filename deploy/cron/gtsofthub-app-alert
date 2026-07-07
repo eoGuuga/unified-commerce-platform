@@ -1,0 +1,10 @@
+# Alerta de erro de APP (level:error do backend) -> Telegram. A cada 5min,
+# janela 6m (1min de sobreposicao pra nunca perder). Versionado no repo.
+#
+# Instalar no servidor (requer root):
+#   sudo install -m 644 -o root -g root deploy/cron/gtsofthub-app-alert /etc/cron.d/gtsofthub-app-alert
+# (nome de arquivo SEM ponto, senao o cron ignora)
+#
+# Roda como 'ubuntu' (grupo docker -> docker logs sem sudo). Reversivel: rm do arquivo.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+*/5 * * * * ubuntu cd /opt/gtsofthub && bash deploy/scripts/app-alert.sh >> /opt/gtsofthub/backups/app-alert.log 2>&1
