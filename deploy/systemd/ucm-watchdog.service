@@ -1,0 +1,10 @@
+[Unit]
+Description=UCM Watchdog (healthcheck + auto recovery + alerta Telegram)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Roda o script VERSIONADO no repo (nao mais /usr/local/bin) — sobrevive a
+# mudanca de path via git pull + reinstall. /bin/bash: dispensa bit +x.
+ExecStart=/bin/bash /opt/gtsofthub/deploy/scripts/ucm-watchdog.sh
