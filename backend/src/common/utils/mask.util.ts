@@ -32,3 +32,46 @@ export function maskEmail(value?: unknown): string {
   if (at < 1 || at === email.length - 1) return '***';
   return `${email[0]}***@${email.slice(at + 1)}`;
 }
+
+/**
+ * IP -> mantem os dois primeiros octetos (rede), mascara host+sub-rede. LGPD:
+ * IP e dado pessoal e o guia (CLAUDE.md) proibe logar IP cru.
+ * Ex.: "203.0.113.42" -> "203.0.*.*". IPv6/desconhecido -> mascarado.
+ */
+export function maskIp(value?: unknown): string {
+  if (value == null) return '(sem ip)';
+  const ip = String(value).trim();
+  if (ip === '') return '(sem ip)';
+  const v4 = ip.match(/^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/);
+  if (v4) return `${v4[1]}.${v4[2]}.*.*`;
+  if (ip.includes(':')) return `${ip.split(':').slice(0, 2).join(':')}:***`;
+  return '***';
+}
+
+/** Mascaradores por nome de campo (case-insensitive) para details de auditoria. */
+const AUDIT_FIELD_MASKERS: Record<string, (v: unknown) => string> = {
+  ip: maskIp,
+  clientip: maskIp,
+  ipaddress: maskIp,
+  phone: maskPhone,
+  telefone: maskPhone,
+  customer_phone: maskPhone,
+  customerphone: maskPhone,
+  email: maskEmail,
+};
+
+/**
+ * Sanitiza um objeto de "details" de auditoria antes de logar: mascara os campos
+ * cujo NOME indica PII (ip / phone / email). Chaves nao-sensiveis passam intactas.
+ */
+export function sanitizeAuditDetails(
+  details?: Record<string, unknown> | null,
+): Record<string, unknown> {
+  if (details == null || typeof details !== 'object') return {};
+  const out: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(details)) {
+    const masker = AUDIT_FIELD_MASKERS[key.toLowerCase()];
+    out[key] = masker ? masker(val) : val;
+  }
+  return out;
+}

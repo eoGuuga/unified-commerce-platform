@@ -1,4 +1,4 @@
-import { maskPhone, maskEmail } from './mask.util';
+import { maskPhone, maskEmail, maskIp, sanitizeAuditDetails } from './mask.util';
 
 describe('mask.util — mascaramento de PII para logs (LGPD)', () => {
   describe('maskPhone', () => {
@@ -52,6 +52,46 @@ describe('mask.util — mascaramento de PII para logs (LGPD)', () => {
       expect(maskEmail('')).toBe('(sem email)');
       expect(maskEmail(null)).toBe('(sem email)');
       expect(maskEmail(undefined)).toBe('(sem email)');
+    });
+  });
+
+  describe('maskIp', () => {
+    it('mantem os 2 primeiros octetos, mascara host + sub-rede', () => {
+      expect(maskIp('203.0.113.42')).toBe('203.0.*.*');
+    });
+
+    it('NAO revela o IP completo', () => {
+      expect(maskIp('203.0.113.42')).not.toContain('113');
+      expect(maskIp('203.0.113.42')).not.toContain('42');
+    });
+
+    it('vazio / nulo -> placeholder', () => {
+      expect(maskIp('')).toBe('(sem ip)');
+      expect(maskIp(null)).toBe('(sem ip)');
+    });
+  });
+
+  describe('sanitizeAuditDetails', () => {
+    it('mascara o campo ip, deixa os nao-sensiveis intactos', () => {
+      expect(
+        sanitizeAuditDetails({ ip: '203.0.113.42', productId: 'abc-123', quantity: 2 }),
+      ).toEqual({ ip: '203.0.*.*', productId: 'abc-123', quantity: 2 });
+    });
+
+    it('mascara phone/email tambem (por nome de campo)', () => {
+      expect(
+        sanitizeAuditDetails({ phone: '5511998887766', email: 'joao@gmail.com' }),
+      ).toEqual({ phone: '55****66', email: 'j***@gmail.com' });
+    });
+
+    it('NAO deixa o IP completo passar', () => {
+      const out = JSON.stringify(sanitizeAuditDetails({ ip: '203.0.113.42' }));
+      expect(out).not.toContain('203.0.113.42');
+    });
+
+    it('nulo / nao-objeto -> objeto vazio', () => {
+      expect(sanitizeAuditDetails(null)).toEqual({});
+      expect(sanitizeAuditDetails(undefined)).toEqual({});
     });
   });
 });
