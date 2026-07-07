@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { maskPhone } from '../../../common/utils/mask.util';
 import {
   CloudApiCredentials,
   DEFAULT_CLOUD_API_VERSION,
@@ -110,7 +111,7 @@ export class CloudApiProvider {
       messages?: Array<{ id?: string }>;
     };
     const messageId = data.messages?.[0]?.id || `cloud_${version}`;
-    this.logger.log('Cloud API: mensagem enviada', { to: payload.to, messageId });
+    this.logger.log('Cloud API: mensagem enviada', { to: maskPhone(payload.to), messageId });
     return messageId;
   }
 

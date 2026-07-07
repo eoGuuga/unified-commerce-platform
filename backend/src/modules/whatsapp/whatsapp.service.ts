@@ -42,6 +42,7 @@ import { WhatsappSender } from './config/whatsapp-sender.service';
 import { TypedConversation, ConversationState, CustomerData, PendingOrder } from './types/whatsapp.types';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
 import { BusinessHours, describeBusinessHours } from './utils/business-hours';
+import { maskPhone } from '../../common/utils/mask.util';
 
 export type WhatsAppOutboundResponse =
   | string
@@ -188,17 +189,17 @@ export class WhatsAppService {
     try {
       // 1. Verificações básicas
       if (this.isGroupOrBroadcastMessage(message)) {
-        this.logger.warn('Ignoring WhatsApp group/broadcast message', { from: message.from });
+        this.logger.warn('Ignoring WhatsApp group/broadcast message', { from: maskPhone(message.from) });
         return '';
       }
 
       if (this.isIgnoredInboundPhone(message.from)) {
-        this.logger.warn('Ignoring WhatsApp message from blocked direct number', { from: message.from });
+        this.logger.warn('Ignoring WhatsApp message from blocked direct number', { from: maskPhone(message.from) });
         return '';
       }
 
       if (!message.tenantId) {
-        this.logger.error('Tenant ID missing from WhatsApp message', { from: message.from });
+        this.logger.error('Tenant ID missing from WhatsApp message', { from: maskPhone(message.from) });
         throw new BadRequestException('Tenant ID é obrigatório para processar mensagens WhatsApp');
       }
 
@@ -207,7 +208,7 @@ export class WhatsAppService {
 
       if (this.isIgnoredInboundPhone(message.from, tenant)) {
         this.logger.warn('Ignoring WhatsApp message from tenant-blocked direct number', {
-          from: message.from,
+          from: maskPhone(message.from),
           tenantId: message.tenantId,
         });
         return '';

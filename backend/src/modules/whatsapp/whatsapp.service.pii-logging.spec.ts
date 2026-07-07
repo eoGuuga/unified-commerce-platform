@@ -66,4 +66,24 @@ describe('WhatsAppService — nao vaza conteudo de mensagem do cliente no log (L
     // mas o conteudo do cliente NAO pode vazar em lugar nenhum do log
     expect(leaksSentinel(errorSpy)).toBe(false);
   });
+
+  // Camada 2: telefone mascarado nos sites reais (aqui pelo site :192 do
+  // processIncomingMessage, que loga { from } cedo, antes de qualquer DB).
+  it('NAO loga o telefone completo do cliente — grava a versao mascarada (site real)', async () => {
+    const { service } = makeService();
+    const warnSpy = jest
+      .spyOn((service as any).logger, 'warn')
+      .mockImplementation(() => undefined);
+    const FULL_PHONE = '5511999998888';
+
+    await (service as any).processIncomingMessage({
+      from: FULL_PHONE,
+      metadata: { isGroupMessage: true }, // -> branch de grupo -> logger.warn com { from }
+    });
+
+    expect(warnSpy).toHaveBeenCalled();
+    const logged = JSON.stringify(warnSpy.mock.calls);
+    expect(logged).not.toContain(FULL_PHONE); // telefone completo NAO vaza
+    expect(logged).toContain('55****88'); // a versao mascarada aparece
+  });
 });

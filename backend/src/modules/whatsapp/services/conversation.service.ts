@@ -4,6 +4,7 @@ import { In, LessThan } from 'typeorm';
 import { WhatsappConversation } from '../../../database/entities/WhatsappConversation.entity';
 import { WhatsappMessage } from '../../../database/entities/WhatsappMessage.entity';
 import { DbContextService } from '../../common/services/db-context.service';
+import { maskPhone } from '../../../common/utils/mask.util';
 
 @Injectable()
 export class ConversationService {
@@ -126,7 +127,7 @@ export class ConversationService {
         last_message_at: new Date(),
       });
       conversation = await conversationRepository.save(conversation);
-      this.logger.log(`Created new conversation ${conversation.id} for ${customerPhone}`);
+      this.logger.log(`Created new conversation ${conversation.id} for ${maskPhone(customerPhone)}`);
     } else {
       // Atualizar timestamp
       conversation.last_message_at = new Date();

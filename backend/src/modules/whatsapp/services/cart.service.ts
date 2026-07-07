@@ -5,6 +5,7 @@ import { DataSource, In, LessThan, MoreThan, Repository } from 'typeorm';
 import { WhatsAppCart, CartItem } from '../../../database/entities/WhatsappCart.entity';
 import { StockEngineService } from '../../products/stock-engine.service';
 import { DbContextService } from '../../common/services/db-context.service';
+import { maskPhone } from '../../../common/utils/mask.util';
 
 export interface AddToCartInput {
   tenantId: string;
@@ -133,7 +134,7 @@ export class CartService {
       newCart.status = 'active';
 
       cart = await this.saveCart(newCart);
-      this.logger.log(`Carrinho ${cart.id} criado para ${customerPhone}`);
+      this.logger.log(`Carrinho ${cart.id} criado para ${maskPhone(customerPhone)}`);
     }
 
     return cart;

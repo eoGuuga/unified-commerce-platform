@@ -8,6 +8,7 @@ import { Tenant } from '../../database/entities/Tenant.entity';
 import { Usuario } from '../../database/entities/Usuario.entity';
 import { DbContextService } from '../common/services/db-context.service';
 import { WhatsappSender } from '../whatsapp/config/whatsapp-sender.service';
+import { maskPhone, maskEmail } from '../../common/utils/mask.util';
 
 export interface NotificationMessage {
   to: string; // numero do WhatsApp
@@ -576,7 +577,7 @@ export class NotificationsService {
         );
       }
 
-      this.logger.log(`WhatsApp notification sent to ${conversation.customer_phone}`);
+      this.logger.log(`WhatsApp notification sent to ${maskPhone(conversation.customer_phone)}`);
       return true;
     } catch (error) {
       this.logger.error('Error sending WhatsApp notification', {
@@ -604,7 +605,7 @@ export class NotificationsService {
 
     try {
       await this.sendEmail(email, subject, html);
-      this.logger.log(`Email notification sent to ${email} (${context})`);
+      this.logger.log(`Email notification sent to ${maskEmail(email)} (${context})`);
       return true;
     } catch (error) {
       this.logger.error('Error sending email notification', {
