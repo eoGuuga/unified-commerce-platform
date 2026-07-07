@@ -670,7 +670,7 @@ export class WhatsAppService {
           }
           return `😕 Não encontrei "${productName}" no seu carrinho.`;
         } catch (error) {
-          this.logger.error('Error removing from cart', { error, message });
+          this.logger.error('Error removing from cart', { error });
           return '😕 Erro ao remover item. Tente novamente.';
         }
       }
@@ -687,7 +687,7 @@ export class WhatsAppService {
         await this.cartService.clearCart(cart.id);
         return '🧹 Carrinho esvaziado! Quer adicionar algo novo?';
       } catch (error) {
-        this.logger.error('Error clearing cart', { error, message });
+        this.logger.error('Error clearing cart', { error });
         return '😕 Erro ao limpar carrinho. Tente novamente.';
       }
     }
@@ -774,8 +774,6 @@ export class WhatsAppService {
             .trim();
         }
 
-        console.log('[DEBUG handleCart] productName extraído:', productName, 'original:', lower);
-
         if (productName && productName.length > 1) {
           const products = await this.productsService.search(tenantId, productName);
           if (products.length > 0) {
@@ -795,7 +793,7 @@ export class WhatsAppService {
         } else {
         }
       } catch (error) {
-        this.logger.error('Error adding product to cart', { error, message });
+        this.logger.error('Error adding product to cart', { error });
       }
     }
 
@@ -1964,7 +1962,7 @@ export class WhatsAppService {
           return `💰 *${product.name}*\n\nPreço: R$ ${Number(product.price).toFixed(2)}\n\nQuer adicionar ao carrinho? Digite "adicionar ${product.name.split(' ')[0]}"`;
         }
       } catch (error) {
-        this.logger.error('Error in price intent', { error, message });
+        this.logger.error('Error in price intent', { error });
       }
     }
 
@@ -1986,7 +1984,7 @@ export class WhatsAppService {
           return `😕 Não encontramos "${productName}" no momento. Que tal ver nosso cardápio? Digite "ver produtos"`;
         }
       } catch (error) {
-        this.logger.error('Error in availability intent', { error, message });
+        this.logger.error('Error in availability intent', { error });
       }
     }
 
@@ -2025,7 +2023,7 @@ export class WhatsAppService {
           return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao carrinho!\n\nDigite "carrinho" para ver ou "finalizar" para confirmar.`;
         }
       } catch (error) {
-        this.logger.error('Error in buy intent fallback', { error, message });
+        this.logger.error('Error in buy intent fallback', { error });
       }
     }
 
@@ -2099,7 +2097,7 @@ export class WhatsAppService {
 
       return executionResult.response;
     } catch (error) {
-      this.logger.warn('LLM fallback failed', { error, message });
+      this.logger.warn('LLM fallback failed', { error });
 
       // Resposta amigável quando não entende
       const suggestions = [
