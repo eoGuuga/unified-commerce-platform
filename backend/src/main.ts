@@ -31,13 +31,25 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, {
     logger: new StructuredLogger(),
+    // Guarda o corpo CRU (req.rawBody) — necessario para validar a assinatura
+    // HMAC do webhook do WhatsApp Cloud API (a Meta assina os bytes originais,
+    // nao o JSON re-serializado).
+    rawBody: true,
   });
 
   const isProd = process.env.NODE_ENV === 'production';
   const enableSwagger = !isProd || process.env.ENABLE_SWAGGER === 'true';
 
+  // Aviso EXPLICITO: sem o App Secret, o webhook do WhatsApp rejeita tudo
+  // (fail-closed correto). Deixamos claro no boot pra ninguem cacar um "bot mudo".
+  if (isProd && !process.env.WHATSAPP_WEBHOOK_SECRET) {
+    logger.warn(
+      '[WHATSAPP] WHATSAPP_WEBHOOK_SECRET nao configurado — TODAS as mensagens do WhatsApp serao rejeitadas por seguranca (fail-closed). Configure o App Secret da Meta para o bot funcionar.',
+    );
+  }
+
   // Hardening do Express/Nest: trust proxy (rate limit por cliente real atras do
-  // nginx) + remocao de headers que vazam a stack.
+  // nginx) + remocao de headers que vazam a stack (x-powered-by, etag).
   applyExpressHardening(app);
   app.enableShutdownHooks();
   app.use(cookieParser());
