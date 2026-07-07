@@ -12,6 +12,7 @@ import { DbContextService } from '../common/services/db-context.service';
 import { CacheService } from '../common/services/cache.service';
 import { PRIVACY_POLICY_VERSION } from '../common/constants/lgpd.constants';
 import { BCRYPT_COST, REVOKED_TOKEN_PREFIX } from './auth.constants';
+import { maskEmail } from '../../common/utils/mask.util';
 
 export interface SendConfirmationResponse {
   success: boolean;
@@ -297,7 +298,7 @@ export class AuthService {
         [user.id, code, expiresAt],
       );
 
-      this.logger.log(`[EMAIL] Codigo enviado para ${email}`);
+      this.logger.log(`[EMAIL] Codigo enviado para ${maskEmail(email)}`);
 
       return { success: true, message: 'Codigo enviado' };
     } catch (error) {
@@ -342,7 +343,7 @@ export class AuthService {
         [user.id],
       );
 
-      this.logger.log(`[EMAIL] Email ${email} confirmado com sucesso`);
+      this.logger.log(`[EMAIL] Email ${maskEmail(email)} confirmado com sucesso`);
 
       return { success: true, message: 'Email confirmado com sucesso' };
     } catch (error) {

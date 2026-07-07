@@ -12,6 +12,7 @@ import {
   BadRequestException,
   UnauthorizedException,
   Req,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Request } from 'express';
@@ -21,6 +22,7 @@ import { TenantsService } from '../tenants/tenants.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { ProductsService } from '../products/products.service';
+import { sanitizeAuditDetails } from '../../common/utils/mask.util';
 
 /**
  * WhatsApp Cart Controller - Maximum Security Version
@@ -62,6 +64,7 @@ export class WhatsAppCartController {
   private readonly RATE_LIMIT_MAX_REQUESTS = 30;
   private readonly MAX_VIOLATIONS_BEFORE_BLOCK = 3;
   private ipViolationCounts = new Map<string, number>();
+  private readonly logger = new Logger(WhatsAppCartController.name);
 
   constructor(
     private readonly cartService: CartService,
@@ -374,14 +377,22 @@ export class WhatsAppCartController {
    * Log security violations
    */
   private auditSecurityViolation(userId: string, userTenant: string, attemptedTenant: string, reason: string): void {
-    console.error(`[SECURITY_VIOLATION] user=${userId} owns=${userTenant} attempted=${attemptedTenant} reason=${reason}`);
+    // logger.error -> "level":"error" no formato estruturado -> chega no app-alert (Telegram).
+    // IDs sao UUIDs internos (nao PII de contato); mantidos no evento de seguranca.
+    this.logger.error(
+      `[SECURITY_VIOLATION] user=${userId} owns=${userTenant} attempted=${attemptedTenant} reason=${reason}`,
+    );
   }
 
   /**
    * Audit log for all operations
    */
   private auditLog(userId: string, tenantId: string, action: string, details: Record<string, unknown>): void {
-    console.log(`[AUDIT] user=${userId} tenant=${tenantId} action=${action} details=${JSON.stringify(details)}`);
+    // Auditoria operacional (nivel info, estruturado). Sanitiza o details antes de
+    // logar — pode trazer PII dos chamadores (ex.: ip).
+    this.logger.log(
+      `[AUDIT] user=${userId} tenant=${tenantId} action=${action} details=${JSON.stringify(sanitizeAuditDetails(details))}`,
+    );
   }
 
   // ============================================
