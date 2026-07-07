@@ -87,13 +87,29 @@ Validação do dono: o T3 **funcionou** — o workspace está recolhido num **li
 ### F15 — Ligar ou remover o OnboardingPanel (código morto) 🔵 (frente futura)
 `components/admin/OnboardingPanel.tsx` é um painel de onboarding pós-login COMPLETO (welcomeName, trilha de passos, progresso, atalhos PDV/vitrine) mas **não é renderizado em lugar nenhum** (sem import, sem `<OnboardingPanel`). Descoberto na varredura de copy do Bloco 4. Contém o jargão inglês **"command center"** (L74) — que só importa se o painel for ligado. **A fazer (frente futura):** decidir entre **ligar** no AdminShell (onboarding guiado ao lojista) ou **remover** o componente. Se ligar: trocar "command center" por linguagem do lojista e garantir `workspaceLabel` = nome da loja (não UUID). Baixa prioridade.
 
-### F17 — Ligar o bot (Fase 1: WhatsApp Cloud API) ⏸️ PAUSADA por bloqueio EXTERNO (2026-07-02)
-Frente "provar o bot fim-a-fim" via **número de teste da Meta Cloud API** (oficial), com **token permanente** (Usuário de Sistema). **Pausada aguardando o dono conseguir criar a conta Meta for Developers** — bloqueio **externo, NÃO do nosso código**: a Meta pediu verificação de segurança anti-spam por ser **dispositivo novo** (Facebook do dono nunca acessado ali) e sugeriu esperar pra evitar restrição na conta. Decisão certa: parar e não insistir (insistir arriscaria bloqueio temporário do Facebook).
-- **Ao retomar:** idealmente do **dispositivo onde o Facebook do dono já está logado** (celular ou PC habitual), pra reduzir a fricção anti-spam.
-- **Pronto e esperando:** o **guia da parte do dono (Etapas 1-5 na Meta)** está escrito e revisado; a **parte de código** está mapeada — (a) `@Get('webhook')` com o handshake `hub.challenge` lendo `WHATSAPP_WEBHOOK_VERIFY_TOKEN` do `.env`; (b) parser do formato aninhado da Meta (`entry[].changes[].value.messages[]`) em `whatsapp.controller.ts`; (c) HMAC do `x-hub-signature-256` por **raw-body**; (d) credenciais no `.env` (`WHATSAPP_PROVIDER=cloud_api` + `WHATSAPP_CLOUD_PHONE_NUMBER_ID`/`_ACCESS_TOKEN` + `WHATSAPP_WEBHOOK_SECRET`=App Secret).
-- **2 bloqueios de destravar** (mapeados, não consertados): **(1)** allowlist de remetente `validateWhatsAppNumber` (`tenants.service.ts:132`) — em prod, lista vazia BLOQUEIA tudo; Fase 1 = adicionar o número do dono ao `settings.whatsappNumbers` da doceria (repensar pra clientes reais na Fase 2). **(2)** o GET de verificação NÃO existe ainda (é construir, não "destravar"). Blocklist `WHATSAPP_IGNORED_PHONES` (env, vazia) só cuidar pra não incluir o número.
-- **Segurança do teste:** trocar `MERCADOPAGO_ACCESS_TOKEN` (hoje **produção `APP_USR-`**) por um `TEST-` durante a prova, senão o PIX gera cobrança real.
-- **Estado:** nada no código mudou nesta pausa; nada quebrou; **o app segue no ar**. Webhook confirmado acessível pela internet (`POST 403` fail-closed, `GET 404` sem handler ainda).
+### F17 — Ligar o bot (Fase 1: WhatsApp Cloud API) 🟢 CÓDIGO PRONTO NA BRANCH · ⏸️ e2e real pausado (conta Meta)
+Frente "provar o bot fim-a-fim" via **número de teste da Meta Cloud API** (oficial), com **token permanente** (Usuário de Sistema do Business Manager).
+
+**✅ CÓDIGO PRONTO E VERDE na branch `feat/whatsapp-cloud-api-webhook` (commit `8c53ecf` — NÃO mergeado, NÃO pushado):** 24/24 testes no `whatsapp.controller.spec`, build + lint limpos. Aditivo/isolado — Evolution/Twilio seguem intactos (testado). Construído com TDD (testes simulando exatamente o que a Meta manda):
+- **`@Get('webhook')`** — handshake da Meta: compara `hub.verify_token` com **`WHATSAPP_WEBHOOK_VERIFY_TOKEN`** (env, nunca hardcoded) e ecoa `hub.challenge` (200) se bater; 403 senão.
+- **`normalizeMetaCloudPayload`** — parser do formato aninhado (`entry[].changes[].value.messages[]`): texto + respostas interativas; **ignora recibos de status**; não-Meta passa intacto.
+- **HMAC por raw-body** — `rawBody:true` no `main.ts` + valida `x-hub-signature-256` contra `req.rawBody` (a Meta assina os bytes crus, não o `JSON.stringify`).
+- **Warn explícito** (boot + rejeição) quando falta `WHATSAPP_WEBHOOK_SECRET` — pra nunca caçar "bot mudo".
+- **`deploy/scripts/whatsapp-allow-number.sh`** — idempotente/parametrizado, adiciona o número à allowlist `settings.whatsappNumbers` do tenant.
+
+**FALTA (nesta ordem):** (a) **a conta Meta** — bloqueio EXTERNO (anti-spam por dispositivo novo; retomar do device onde o Facebook do dono já está logado); (b) **o teste fim-a-fim REAL** (o bot respondendo de verdade ao menos 1 vez); (c) **o merge** — só APÓS o round-trip real provado. **Decisão do dono:** mergear o provado-de-verdade, não o "deve funcionar" — a 1ª conexão real provavelmente revela algum ajuste que os testes simulados não pegam; ajusta-se NA branch com o teste real, e mergeia depois.
+
+**"Plugar e testar" (dia da conexão) — 3 passos:**
+1. **`.env` do servidor:** preencher as 5 vars (abaixo) + `WHATSAPP_PROVIDER=cloud_api` → deploy LIMPO (`--no-cache`, gotcha F16).
+2. **Rodar o script do número:** `TENANT_ID=2675a300-1f03-4c74-b462-99754fd70eb2 PHONE=<celular do dono> bash deploy/scripts/whatsapp-allow-number.sh`.
+3. **Na Meta:** colar `https://gtsofthub.com.br/api/v1/whatsapp/webhook?tenantId=2675a300-…` + o verify token → "Verify and save" → subscrever `messages`. Depois: mandar "oi" e ver o round-trip (`docker compose logs -f backend` + o celular + `/admin/pedidos`).
+
+**As 5 env vars** (documentadas em `deploy/env.prod.example` na branch):
+`WHATSAPP_PROVIDER=cloud_api` · `WHATSAPP_CLOUD_PHONE_NUMBER_ID` · `WHATSAPP_CLOUD_ACCESS_TOKEN` · `WHATSAPP_WEBHOOK_SECRET` (=App Secret da Meta) · `WHATSAPP_WEBHOOK_VERIFY_TOKEN` (o dono inventa; o MESMO na Meta).
+
+**💰 MercadoPago em modo TESTE durante a prova:** trocar `MERCADOPAGO_ACCESS_TOKEN` (hoje **produção `APP_USR-`**) por um **`TEST-`** → o PIX gerado é **de teste (NÃO move dinheiro real)**. A prova do **PIX REAL é um passo à parte, futuro, com cuidado** (voltar ao token de produção só quando for validar cobrança de verdade).
+
+**Bloqueio residual de número (Fase 2):** a allowlist de remetente (`validateWhatsAppNumber`, `tenants.service.ts:132`) resolve a Fase 1 (número do dono), mas **não escala** pra clientes reais — repensar o gate quando abrir o bot pro público. (Blocklist `WHATSAPP_IGNORED_PHONES` no env, vazia — só não incluir o número.)
 
 ---
 

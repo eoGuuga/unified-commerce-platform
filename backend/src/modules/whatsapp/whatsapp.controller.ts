@@ -16,6 +16,7 @@ import type { Request } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { TenantsService } from '../tenants/tenants.service';
+import { Public } from '../../common/decorators/public.decorator';
 import { WhatsappWebhookDto } from './dto/whatsapp-webhook.dto';
 import {
   WhatsAppService,
@@ -442,6 +443,7 @@ export class WhatsappController {
    * devolvemos o `hub.challenge` cru (a Meta confirma a assinatura do webhook).
    * Sem token configurado ou divergente -> 403 (nao registra).
    */
+  @Public()
   @Get('webhook')
   @ApiOperation({ summary: 'Verificacao do webhook do WhatsApp Cloud API (Meta)' })
   verifyWebhook(@Query() query: Record<string, string>): string {
@@ -476,6 +478,7 @@ export class WhatsappController {
     return timingSafeEqual(bufA, bufB);
   }
 
+  @Public()
   @Post('webhook')
   @ApiOperation({
     summary: 'Webhook para receber mensagens (WhatsApp Cloud API / Evolution / Twilio)',

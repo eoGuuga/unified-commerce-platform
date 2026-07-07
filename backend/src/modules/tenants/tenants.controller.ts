@@ -92,14 +92,16 @@ export class TenantsController {
   }
 
   @Patch('branding')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
-    summary: 'Atualizar branding do tenant autenticado',
-    description: 'Atualiza logo, cor primaria, nome e tagline. Requer role admin.',
+    summary: 'Atualizar branding do tenant autenticado (requer admin)',
+    description: 'Atualiza logo, cor primaria, nome e tagline. REQUER role ADMIN (guard).',
   })
   @ApiResponse({ status: 200, description: 'Branding atualizado' })
   @ApiResponse({ status: 401, description: 'Nao autorizado' })
+  @ApiResponse({ status: 403, description: 'Acesso restrito: requer role admin' })
   async updateBranding(
     @CurrentUser() user: Usuario,
     @Body() dto: UpdateBrandingDto,

@@ -8,6 +8,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { DbContextService } from '../common/services/db-context.service';
+import { CacheService } from '../common/services/cache.service';
 import * as bcrypt from 'bcryptjs';
 
 describe('AuthService', () => {
@@ -39,6 +40,12 @@ describe('AuthService', () => {
     }),
   };
 
+  const mockCacheService = {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    delete: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -58,6 +65,10 @@ describe('AuthService', () => {
         {
           provide: DbContextService,
           useValue: mockDbContextService,
+        },
+        {
+          provide: CacheService,
+          useValue: mockCacheService,
         },
       ],
     }).compile();
@@ -161,7 +172,6 @@ describe('AuthService', () => {
       email: 'newuser@test.com',
       password: 'password123',
       full_name: 'New User',
-      role: UserRole.SELLER,
       accept_terms: true,
     };
 
@@ -170,7 +180,7 @@ describe('AuthService', () => {
       email: registerDto.email,
       encrypted_password: 'hashed-password',
       full_name: registerDto.full_name,
-      role: registerDto.role,
+      role: UserRole.SELLER,
       tenant_id: tenantId,
       is_active: true,
     } as Usuario;
@@ -200,6 +210,24 @@ describe('AuthService', () => {
       await expect(service.register(registerDto, tenantId)).rejects.toThrow(BadRequestException);
       await expect(service.register(registerDto, tenantId)).rejects.toThrow('Email ja cadastrado');
       expect(mockUsuariosRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('SEGURANCA: ignora qualquer role vindo do cliente e cria SELLER (sem privesc)', async () => {
+      // Arrange
+      mockUsuariosRepository.findOne.mockResolvedValue(null);
+      mockUsuariosRepository.create.mockReturnValue(mockNewUsuario);
+      mockUsuariosRepository.save.mockResolvedValue(mockNewUsuario);
+
+      // Act: um atacante tenta se auto-registrar como admin
+      await service.register(
+        { ...registerDto, role: UserRole.ADMIN } as unknown as RegisterDto,
+        tenantId,
+      );
+
+      // Assert: o usuario criado NASCE seller, nao admin
+      expect(mockUsuariosRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ role: UserRole.SELLER }),
+      );
     });
   });
 

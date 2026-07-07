@@ -242,6 +242,18 @@ class ApiClient {
     return this.request<User>('/auth/me');
   }
 
+  /**
+   * Revoga o token atual no servidor (denylist por jti). Best-effort: o cliente
+   * limpa a sessao de qualquer forma, entao falha aqui nunca bloqueia o logout.
+   */
+  async logout(): Promise<void> {
+    try {
+      await this.request<{ success: boolean }>('/auth/logout', { method: 'POST' });
+    } catch {
+      // silencioso de proposito: logout do cliente prossegue mesmo se o servidor falhar
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Products
   // ---------------------------------------------------------------------------

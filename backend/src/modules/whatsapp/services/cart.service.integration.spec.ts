@@ -169,7 +169,7 @@ describe('CartService (integration — reserva de estoque)', () => {
     expect((await saldo(produtoId)).reserved).toBe(3);
 
     // 1ª chamada — deve marcar expired e liberar
-    await cartService.releaseExpiredCart(cart.id);
+    await cartService.releaseExpiredCart(cart.id, tenantId);
     expect((await saldo(produtoId)).reserved).toBe(0);
 
     // Verificar status no banco
@@ -184,7 +184,7 @@ describe('CartService (integration — reserva de estoque)', () => {
     expect(rows[0].stock_released_at).not.toBeNull();
 
     // 2ª chamada — idempotente (stock_released_at já preenchido) → sem erro, sem dupla-liberação
-    await cartService.releaseExpiredCart(cart.id);
+    await cartService.releaseExpiredCart(cart.id, tenantId);
     expect((await saldo(produtoId)).reserved).toBe(0);
   });
 

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { maskPhone } from '../../../common/utils/mask.util';
 import { ConfigService } from '@nestjs/config';
 import {
   IWhatsappProvider,
@@ -56,7 +57,7 @@ export class EvolutionApiProvider implements IWhatsappProvider {
       const response = await this.makeRequest(url, payload);
       const messageId = response?.key?.id || `evo_${Date.now()}`;
 
-      this.logger.log(`[EVOLUTION] Mensagem enviada para ${options.to}`, {
+      this.logger.log(`[EVOLUTION] Mensagem enviada para ${maskPhone(options.to)}`, {
         messageId,
       });
 
@@ -104,7 +105,7 @@ export class EvolutionApiProvider implements IWhatsappProvider {
       const response = await this.makeRequest(url, payload);
       const messageId = response?.key?.id || `evo_buttons_${Date.now()}`;
 
-      this.logger.log(`[EVOLUTION] Botões enviados para ${options.to}`, {
+      this.logger.log(`[EVOLUTION] Botões enviados para ${maskPhone(options.to)}`, {
         messageId,
         buttonsCount: buttons.length,
       });
@@ -147,7 +148,7 @@ export class EvolutionApiProvider implements IWhatsappProvider {
       const response = await this.makeRequest(url, payload);
       const messageId = response?.key?.id || `evo_list_${Date.now()}`;
 
-      this.logger.log(`[EVOLUTION] Lista interativa enviada para ${options.to}`, {
+      this.logger.log(`[EVOLUTION] Lista interativa enviada para ${maskPhone(options.to)}`, {
         messageId,
       });
 
@@ -179,7 +180,7 @@ export class EvolutionApiProvider implements IWhatsappProvider {
       const response = await this.makeRequest(url, payload);
       const messageId = response?.key?.id || `evo_media_${Date.now()}`;
 
-      this.logger.log(`[EVOLUTION] Mídia enviada para ${options.to}`, {
+      this.logger.log(`[EVOLUTION] Mídia enviada para ${maskPhone(options.to)}`, {
         messageId,
         mediaUrl: options.mediaUrl,
       });

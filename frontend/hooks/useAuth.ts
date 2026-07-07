@@ -145,7 +145,10 @@ export function useAuth() {
     [clearSession, loadUser, resetAuthState]
   );
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    // Revoga o token no servidor ANTES de limpar (o header ainda carrega o token).
+    // Best-effort: se o servidor falhar, o cliente limpa a sessao mesmo assim.
+    await api.logout();
     clearSession();
     resetAuthState();
     // useAuth e estado POR-INSTANCIA (nao ha context/store compartilhado): resetar aqui

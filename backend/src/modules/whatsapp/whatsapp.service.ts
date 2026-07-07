@@ -42,6 +42,7 @@ import { WhatsappSender } from './config/whatsapp-sender.service';
 import { TypedConversation, ConversationState, CustomerData, PendingOrder } from './types/whatsapp.types';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
 import { BusinessHours, describeBusinessHours } from './utils/business-hours';
+import { maskPhone } from '../../common/utils/mask.util';
 
 export type WhatsAppOutboundResponse =
   | string
@@ -188,17 +189,17 @@ export class WhatsAppService {
     try {
       // 1. Verificações básicas
       if (this.isGroupOrBroadcastMessage(message)) {
-        this.logger.warn('Ignoring WhatsApp group/broadcast message', { from: message.from });
+        this.logger.warn('Ignoring WhatsApp group/broadcast message', { from: maskPhone(message.from) });
         return '';
       }
 
       if (this.isIgnoredInboundPhone(message.from)) {
-        this.logger.warn('Ignoring WhatsApp message from blocked direct number', { from: message.from });
+        this.logger.warn('Ignoring WhatsApp message from blocked direct number', { from: maskPhone(message.from) });
         return '';
       }
 
       if (!message.tenantId) {
-        this.logger.error('Tenant ID missing from WhatsApp message', { from: message.from });
+        this.logger.error('Tenant ID missing from WhatsApp message', { from: maskPhone(message.from) });
         throw new BadRequestException('Tenant ID é obrigatório para processar mensagens WhatsApp');
       }
 
@@ -207,7 +208,7 @@ export class WhatsAppService {
 
       if (this.isIgnoredInboundPhone(message.from, tenant)) {
         this.logger.warn('Ignoring WhatsApp message from tenant-blocked direct number', {
-          from: message.from,
+          from: maskPhone(message.from),
           tenantId: message.tenantId,
         });
         return '';
@@ -670,7 +671,7 @@ export class WhatsAppService {
           }
           return `😕 Não encontrei "${productName}" no seu carrinho.`;
         } catch (error) {
-          this.logger.error('Error removing from cart', { error, message });
+          this.logger.error('Error removing from cart', { error });
           return '😕 Erro ao remover item. Tente novamente.';
         }
       }
@@ -687,7 +688,7 @@ export class WhatsAppService {
         await this.cartService.clearCart(cart.id);
         return '🧹 Carrinho esvaziado! Quer adicionar algo novo?';
       } catch (error) {
-        this.logger.error('Error clearing cart', { error, message });
+        this.logger.error('Error clearing cart', { error });
         return '😕 Erro ao limpar carrinho. Tente novamente.';
       }
     }
@@ -774,8 +775,6 @@ export class WhatsAppService {
             .trim();
         }
 
-        console.log('[DEBUG handleCart] productName extraído:', productName, 'original:', lower);
-
         if (productName && productName.length > 1) {
           const products = await this.productsService.search(tenantId, productName);
           if (products.length > 0) {
@@ -795,7 +794,7 @@ export class WhatsAppService {
         } else {
         }
       } catch (error) {
-        this.logger.error('Error adding product to cart', { error, message });
+        this.logger.error('Error adding product to cart', { error });
       }
     }
 
@@ -1964,7 +1963,7 @@ export class WhatsAppService {
           return `💰 *${product.name}*\n\nPreço: R$ ${Number(product.price).toFixed(2)}\n\nQuer adicionar ao carrinho? Digite "adicionar ${product.name.split(' ')[0]}"`;
         }
       } catch (error) {
-        this.logger.error('Error in price intent', { error, message });
+        this.logger.error('Error in price intent', { error });
       }
     }
 
@@ -1986,7 +1985,7 @@ export class WhatsAppService {
           return `😕 Não encontramos "${productName}" no momento. Que tal ver nosso cardápio? Digite "ver produtos"`;
         }
       } catch (error) {
-        this.logger.error('Error in availability intent', { error, message });
+        this.logger.error('Error in availability intent', { error });
       }
     }
 
@@ -2025,7 +2024,7 @@ export class WhatsAppService {
           return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao carrinho!\n\nDigite "carrinho" para ver ou "finalizar" para confirmar.`;
         }
       } catch (error) {
-        this.logger.error('Error in buy intent fallback', { error, message });
+        this.logger.error('Error in buy intent fallback', { error });
       }
     }
 
@@ -2099,7 +2098,7 @@ export class WhatsAppService {
 
       return executionResult.response;
     } catch (error) {
-      this.logger.warn('LLM fallback failed', { error, message });
+      this.logger.warn('LLM fallback failed', { error });
 
       // Resposta amigável quando não entende
       const suggestions = [
@@ -2298,20 +2297,10 @@ export class WhatsAppService {
         },
       }) || 0;
 
-      // Buscar carrinhos
-      const cartRepo = this.cartService['dataSource'].getRepository('WhatsAppCart');
-      const totalCarts = await cartRepo?.count({
-        where: {
-          tenant_id: tenantId,
-        },
-      }) || 0;
-
-      const convertedCarts = await cartRepo?.count({
-        where: {
-          tenant_id: tenantId,
-          status: 'converted',
-        },
-      }) || 0;
+      // Buscar carrinhos (no contexto RLS do tenant, via CartService)
+      const cartCounts = await this.cartService.countCartsByTenant(tenantId);
+      const totalCarts = cartCounts.total;
+      const convertedCarts = cartCounts.converted;
 
       return {
         period: {

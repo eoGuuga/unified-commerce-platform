@@ -7,6 +7,8 @@ import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateBrandingDto } from './dto/update-branding.dto';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { BusinessHours } from '../whatsapp/utils/business-hours';
+import { BCRYPT_COST } from '../auth/auth.constants';
+import { maskPhone, maskEmail } from '../../common/utils/mask.util';
 
 /**
  * Projecao ALLOW-LIST das configuracoes do tenant (§2.1 do spec).
@@ -155,9 +157,9 @@ export class TenantsService {
     const isAuthorized = this.matchesConfiguredPhone(phoneNumber, whatsappNumbers);
 
     if (!isAuthorized) {
-      this.logger.warn(`Numero de WhatsApp ${phoneNumber} nao autorizado para tenant ${tenantId}`);
+      this.logger.warn(`Numero de WhatsApp ${maskPhone(phoneNumber)} nao autorizado para tenant ${tenantId}`);
       throw new ForbiddenException(
-        `Numero de WhatsApp ${phoneNumber} nao esta autorizado para este tenant. Contate o administrador.`,
+        `Numero de WhatsApp ${maskPhone(phoneNumber)} nao esta autorizado para este tenant. Contate o administrador.`,
       );
     }
 
@@ -352,7 +354,7 @@ export class TenantsService {
         throw new ConflictException(`Email "${dto.admin_email}" ja cadastrado neste tenant.`);
       }
 
-      const hashedPassword = await bcrypt.hash(dto.admin_password, 10);
+      const hashedPassword = await bcrypt.hash(dto.admin_password, BCRYPT_COST);
 
       const admin = userRepo.create({
         tenant_id: savedTenant.id,
@@ -367,7 +369,7 @@ export class TenantsService {
 
       await tenantRepo.update(savedTenant.id, { owner_id: savedAdmin.id });
 
-      this.logger.log(`Novo tenant criado: ${savedTenant.slug} (${savedTenant.id}) por ${dto.admin_email}`);
+      this.logger.log(`Novo tenant criado: ${savedTenant.slug} (${savedTenant.id}) por ${maskEmail(dto.admin_email)}`);
 
       return {
         tenant: {

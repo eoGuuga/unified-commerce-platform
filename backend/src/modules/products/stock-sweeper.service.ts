@@ -38,34 +38,30 @@ export class StockSweeperService {
    * Delega a liberação ao CartService.releaseExpiredCart (compare-and-set).
    */
   async sweepExpiredCarts(): Promise<void> {
-    // AVISO RLS: este SELECT varre TODOS os tenants sem contexto de tenant definido.
-    // Funciona corretamente hoje porque a aplicação conecta como superusuário postgres,
-    // que ignora Row Level Security (RLS). Se futuramente for adotada uma role de
-    // aplicação não-superusuário com RLS habilitado, este SELECT retornará zero linhas
-    // silenciosamente (falha silent no-op). Nesse cenário será necessário:
-    //   (a) usar uma role com atributo BYPASSRLS exclusiva para o sweeper, OU
-    //   (b) iterar por tenant: SELECT DISTINCT tenant_id FROM tenants WHERE is_active,
-    //       depois set_config('app.tenant_id', ...) por iteração antes do SELECT.
-    // NÃO alterar a lógica agora — apenas documentar a suposição.
-    const rows: Array<{ id: string }> = await this.dataSource.query(
-      `SELECT id FROM whatsapp_carts
-       WHERE status = 'active'
-         AND expires_at < now()
-         AND stock_released_at IS NULL
-       LIMIT 500`,
-    );
+    // Itera POR TENANT (abordagem (a) do handoff): whatsapp_carts tem FORCE RLS,
+    // então uma varredura cross-tenant sem contexto retorna 0. Para cada tenant
+    // setamos o contexto e varremos os carrinhos dele. O app segue NOSUPERUSER
+    // (sem BYPASSRLS) — a lista de tenants vem de app_list_tenant_ids().
+    const tenantIds = await this.listTenantIds();
+    let total = 0;
 
-    this.logger.debug(`Sweeper: ${rows.length} carrinho(s) expirado(s) encontrado(s)`);
-
-    for (const row of rows) {
-      try {
-        await this.cartService.releaseExpiredCart(row.id);
-      } catch (err) {
-        this.logger.error(`Falha ao liberar carrinho ${row.id}`, {
-          error: err instanceof Error ? err.message : String(err),
-        });
+    for (const tenantId of tenantIds) {
+      const cartIds = await this.expiredCartIdsForTenant(tenantId);
+      total += cartIds.length;
+      for (const cartId of cartIds) {
+        try {
+          await this.cartService.releaseExpiredCart(cartId, tenantId);
+        } catch (err) {
+          this.logger.error(`Falha ao liberar carrinho ${cartId}`, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
     }
+
+    this.logger.debug(
+      `Sweeper: ${total} carrinho(s) expirado(s) em ${tenantIds.length} tenant(s)`,
+    );
   }
 
   /**
@@ -76,31 +72,73 @@ export class StockSweeperService {
   async sweepExpiredPendingOrders(): Promise<void> {
     const ttlMin = Number(this.config.get('ORDER_PAYMENT_TTL_MINUTES')) || 60;
 
-    // AVISO RLS: mesma suposição do sweepExpiredCarts — varredura cross-tenant sem
-    // contexto de tenant. Depende da conexão como superusuário postgres (BYPASSRLS
-    // implícito). Se RLS for ativado com role não-superusuário, retornará zero linhas
-    // silenciosamente. Solução futura: role BYPASSRLS para o sweeper ou iteração
-    // explícita por tenant via set_config('app.tenant_id', ...) antes do SELECT.
-    // NÃO alterar a lógica agora — apenas documentar a suposição.
-    const rows: Array<{ id: string }> = await this.dataSource.query(
-      `SELECT id FROM pedidos
-       WHERE status = 'pendente_pagamento'
-         AND created_at < now() - ($1 || ' minutes')::interval
-         AND stock_released_at IS NULL
-       LIMIT 500`,
-      [ttlMin],
-    );
+    // Itera POR TENANT (pedidos tem FORCE RLS). Antes, este sweep varria
+    // cross-tenant sem contexto e, sob o papel restrito de prod, já era um no-op
+    // silencioso — agora limpa os pendentes vencidos de todos os tenants.
+    const tenantIds = await this.listTenantIds();
+    let total = 0;
 
-    this.logger.debug(`Sweeper: ${rows.length} pedido(s) pendente(s) vencido(s) encontrado(s)`);
-
-    for (const row of rows) {
-      try {
-        await this.ordersService.releaseExpiredPendingOrder(row.id);
-      } catch (err) {
-        this.logger.error(`Falha ao cancelar pedido vencido ${row.id}`, {
-          error: err instanceof Error ? err.message : String(err),
-        });
+    for (const tenantId of tenantIds) {
+      const orderIds = await this.expiredPendingOrderIdsForTenant(tenantId, ttlMin);
+      total += orderIds.length;
+      for (const orderId of orderIds) {
+        try {
+          await this.ordersService.releaseExpiredPendingOrder(orderId, tenantId);
+        } catch (err) {
+          this.logger.error(`Falha ao cancelar pedido vencido ${orderId}`, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
     }
+
+    this.logger.debug(
+      `Sweeper: ${total} pedido(s) pendente(s) vencido(s) em ${tenantIds.length} tenant(s)`,
+    );
+  }
+
+  /**
+   * Lista os tenants via a primitiva SECURITY DEFINER app_list_tenant_ids().
+   * Permite ao job (papel NOSUPERUSER) enumerar tenants sem BYPASSRLS.
+   */
+  private async listTenantIds(): Promise<string[]> {
+    const rows: Array<{ id: string }> = await this.dataSource.query(
+      `SELECT app_list_tenant_ids() AS id`,
+    );
+    return rows.map((r) => r.id);
+  }
+
+  /** IDs de carrinhos expirados de UM tenant, lidos no contexto RLS dele. */
+  private async expiredCartIdsForTenant(tenantId: string): Promise<string[]> {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [tenantId]);
+      const rows: Array<{ id: string }> = await manager.query(
+        `SELECT id FROM whatsapp_carts
+         WHERE status = 'active'
+           AND expires_at < now()
+           AND stock_released_at IS NULL
+         LIMIT 500`,
+      );
+      return rows.map((r) => r.id);
+    });
+  }
+
+  /** IDs de pedidos pendentes vencidos de UM tenant, lidos no contexto RLS dele. */
+  private async expiredPendingOrderIdsForTenant(
+    tenantId: string,
+    ttlMin: number,
+  ): Promise<string[]> {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [tenantId]);
+      const rows: Array<{ id: string }> = await manager.query(
+        `SELECT id FROM pedidos
+         WHERE status = 'pendente_pagamento'
+           AND created_at < now() - ($1 || ' minutes')::interval
+           AND stock_released_at IS NULL
+         LIMIT 500`,
+        [ttlMin],
+      );
+      return rows.map((r) => r.id);
+    });
   }
 }
