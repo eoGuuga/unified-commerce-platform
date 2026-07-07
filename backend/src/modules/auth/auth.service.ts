@@ -133,12 +133,14 @@ export class AuthService {
         metadata: { email: usuario.email },
       });
     } catch (error) {
-      // Não falhar se audit log falhar
-      this.logger.error('Erro ao registrar audit log de login', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        context: { tenantId: usuario.tenant_id, userId: usuario.id, action: 'LOGIN', email: usuario.email },
-      });
+      // Não falhar se audit log falhar. A causa vai NA string da mensagem (o
+      // logger JSON de prod nao serializa o 2o argumento) — sem PII (uuids + o
+      // texto do erro do banco, ex.: "row violates row-level security policy").
+      this.logger.error(
+        `Erro ao registrar audit log de login (tenant=${usuario.tenant_id}, user=${usuario.id}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
 
     return {
