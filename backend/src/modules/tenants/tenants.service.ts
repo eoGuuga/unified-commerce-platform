@@ -159,7 +159,7 @@ export class TenantsService {
     if (!isAuthorized) {
       this.logger.warn(`Numero de WhatsApp ${maskPhone(phoneNumber)} nao autorizado para tenant ${tenantId}`);
       throw new ForbiddenException(
-        `Numero de WhatsApp ${phoneNumber} nao esta autorizado para este tenant. Contate o administrador.`,
+        `Numero de WhatsApp ${maskPhone(phoneNumber)} nao esta autorizado para este tenant. Contate o administrador.`,
       );
     }
 
