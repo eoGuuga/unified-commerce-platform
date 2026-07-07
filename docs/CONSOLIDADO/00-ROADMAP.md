@@ -115,7 +115,7 @@ Os 3 pontos cegos 🔴 são **baratos de mitigar e caros de ignorar** — fazer 
 
 ### Camada 1 — Estado real
 
-**Em produção** (`origin/main` `a10b58a`; servidor `/opt/gtsofthub` HEAD == main; site + `/api/v1/health` = 200):
+**Em produção** (`origin/main` `0558d66`; servidor `/opt/gtsofthub` HEAD == main; site + `/api/v1/health` = 200):
 - Multi-tenancy RLS (core).
 - Segurança HIGH fechada: envelope encryption Fase 1 + auth Bloco A (logout com revogação por-token provada no ar, privesc do register fechado, política de senha, bcrypt 12, branding só-admin) + Blocos 1-3.
 - PDV / venda de balcão (tela caixa + fast-pass).
@@ -123,6 +123,7 @@ Os 3 pontos cegos 🔴 são **baratos de mitigar e caros de ignorar** — fazer 
 - Pagamento no PDV (confirmpayment endurecido) + PIX no bot (provado local).
 - Bot WhatsApp (fluxo/orquestrador) — **mas o envio só loga** (não entrega; ver Meta).
 - Polimento 22 bugs (4 blocos).
+- Observabilidade (watchdog HTTPS + netdata→Telegram + app-alert Tier 1-lite + backup automático 03:00 BRT) + correção do audit-log de login (RLS, `0558d66`).
 
 **Construído mas não integrado (branches abertas):**
 | Branch | Contém | Provado? | Espera |
@@ -134,6 +135,14 @@ Os 3 pontos cegos 🔴 são **baratos de mitigar e caros de ignorar** — fazer 
 | `chore/preserve-server-snapshot` (1c) | Arquivo histórico da faxina (código server-only) — **NÃO é pra merge** | — | Descartar após revisão item-a-item |
 
 **Bloqueado por mundo real:** Asaas (chamado não enviado), Meta (conta não criada), CNPJ (não aberto) — ver seção "Ações do mundo real".
+
+#### 🔀 Decisão de merge (2026-07-07) — o que entra agora vs. o que espera gate
+Diagnóstico das branches abertas (a régua "verifica antes de agir"): todas partem da mesma base `a10b58a`; a main andou 6 commits (audit-fix + observabilidade) **sem conflitar** com nenhuma.
+- **✅ MERGEADA AGORA:** `docs/roadmap-vivo` — doc pura (0 código, 0 toque em prod, sem conflito, não espera nada). Trouxe roadmap + runbooks + dossiê da auditoria pro tronco.
+- **Pilha real:** `feat/asaas-phase1-subaccount` **contém** `feat/payments-neutral-foundation` (empilhadas — entram juntas). `feat/pdv-cupom-venda` e `feat/whatsapp-cloud-api-webhook` são **independentes** (não carregam pagamentos).
+- **🚨 Correção de leitura — os pagamentos NÃO são dormentes:** o `payments.service` na branch **re-roteia o MP** pelo `credentialResolver.resolveForCharge('mercadopago', tenant)` (tabela nova `tenant_payment_credentials`, **fail-closed sem credencial — nunca fallback pro env**). **Deployar isso sem a migration + a credencial por-tenant QUEBRA o PIX da doceria.** Por isso a fundação de pagamentos (Fase 0/1/2, **provada em sandbox**) fica **fora da main até a Fase 4** — que é quando a migration + a migração de credenciais são feitas com cuidado (CNPJ + KMS + revisão adversarial). Merge ≠ deploy (deploy é manual), mas deixá-la na main viraria bomba pro próximo deploy manual.
+- **🔴 Landmine a desarmar antes de qualquer merge que toque `backend/**` ou `frontend/**`:** `.github/workflows/deploy-prod.yml` (auto-deploy em push que, se rodar, sobe container com env incompleto → quebra o boot). Os merges de doc não disparam ele (0 backend), mas ele precisa ser tratado antes de cupom/pagamentos/bot.
+- **Gates dos que ficam:** cupom → teste na bobina real da mãe · pagamentos → Fase 4 (CNPJ + Asaas liberar PIX de subconta) · bot → conta Meta · `chore/preserve-server-snapshot` → descartar após revisão.
 
 **Servidor (só-leitura, 2026-07-05):** VPS `vps-0e3446f6` (up 23d). Containers: frontend/backend (26h) · nginx (40h) · postgres/redis (saudáveis) · **+ postgres-test/redis-test** (banco de teste `ucm_test_motor` na VPS de prod). Git `/opt/gtsofthub` == `origin/main` limpo (só o `.env.bak` untracked). **Sem divergência de código.**
 
