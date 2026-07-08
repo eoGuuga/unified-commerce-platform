@@ -1,22 +1,48 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { DataSource } from 'typeorm';
 import { CartService } from './cart.service';
 import { DbContextService } from '../../common/services/db-context.service';
+import { StockEngineService } from '../../products/stock-engine.service';
 
 describe('CartService', () => {
   let service: CartService;
   let mockDbContextService: any;
   let mockConfigService: any;
+  let mockStockEngine: any;
+  let mockDataSource: any;
+  let mockManager: any;
 
   const mockCartRepository = {
     findOne: jest.fn(),
+    find: jest.fn().mockResolvedValue([]), // expireOldCarts usa repo.find (default: nada expirado)
     save: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
   };
 
   beforeEach(async () => {
+    // O CartService faz leitura/escrita via withCart(), que roda dentro de
+    // dataSource.transaction(manager => { manager.query(set_config RLS);
+    // fn(manager.getRepository(Cart)) }). Espelhamos essa infra:
+    mockManager = {
+      query: jest.fn().mockResolvedValue([]), // o SELECT set_config(...) do RLS
+      getRepository: jest.fn().mockReturnValue(mockCartRepository),
+    };
+
+    mockDataSource = {
+      transaction: jest.fn().mockImplementation(async (cb: any) => cb(mockManager)),
+    };
+
+    // Reserva/liberacao de estoque roda dentro da transacao — no-op nos testes.
+    mockStockEngine = {
+      reserve: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn().mockResolvedValue(undefined),
+    };
+
     mockDbContextService = {
+      // getCartRepo() usa getManager().getRepository(Cart) para leituras em request.
+      getManager: jest.fn().mockReturnValue(mockManager),
       getRepository: jest.fn().mockReturnValue(mockCartRepository),
     };
 
@@ -31,6 +57,8 @@ describe('CartService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CartService,
+        { provide: DataSource, useValue: mockDataSource },
+        { provide: StockEngineService, useValue: mockStockEngine },
         { provide: DbContextService, useValue: mockDbContextService },
         { provide: ConfigService, useValue: mockConfigService },
       ],
@@ -78,14 +106,23 @@ describe('CartService', () => {
     });
 
     it('should create new cart when expired cart exists', async () => {
-      mockCartRepository.findOne.mockResolvedValue(null);
-      mockCartRepository.update.mockResolvedValue({ affected: 1 });
+      // expireOldCarts encontra o carrinho expirado via repo.find e o expira pelo
+      // caminho REAL: um UPDATE cru "SET status='expired'" via manager.query
+      // (compare-and-set atomico idempotente) — NAO via repo.update, que o ORM
+      // nem usa pra expirar. (A asserção original checava repo.update e nunca
+      // semeava um carrinho expirado: testava um mecanismo inexistente.)
+      mockCartRepository.find.mockResolvedValueOnce([{ id: 'expired-cart-1' }]);
+      mockCartRepository.findOne.mockResolvedValue(null); // sem carrinho ativo -> cria novo
       mockCartRepository.save.mockImplementation((cart) => Promise.resolve({ ...cart, id: 'cart_456' }));
 
       const cart = await service.getOrCreateCart('tenant-1', '5511999999999');
 
       expect(cart).toBeDefined();
-      expect(mockCartRepository.update).toHaveBeenCalled(); // expire old carts
+      // a expiracao roda o UPDATE cru no carrinho expirado encontrado
+      expect(mockManager.query).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE whatsapp_carts'),
+        ['expired-cart-1'],
+      );
     });
   });
 
