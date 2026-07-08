@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, In, LessThan, MoreThan, Repository } from 'typeorm';
+import { DataSource, LessThan, MoreThan, Repository } from 'typeorm';
 import { WhatsAppCart, CartItem } from '../../../database/entities/WhatsappCart.entity';
 import { StockEngineService } from '../../products/stock-engine.service';
 import { DbContextService } from '../../common/services/db-context.service';
@@ -442,8 +442,10 @@ export class CartService {
   /**
    * Gera resumo do carrinho para exibição no WhatsApp
    */
-  generateSummary(cart: WhatsAppCart): string {
-    if (cart.items.length === 0) {
+  generateSummary(cart: WhatsAppCart | null): string {
+    // Carrinho ausente (null) e um estado valido = vazio, nao um erro. Sem este
+    // guard, o GET publico do carrinho quebrava com 500 (BUG-CART-1).
+    if (!cart || !cart.items?.length) {
       return '🛒 Carrinho vazio';
     }
 

@@ -12,6 +12,17 @@ import { Request, Response } from 'express';
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
 
+  /**
+   * Remove a query string (e um eventual fragmento) do path antes de logar ou
+   * devolver ao cliente. A query e onde params sensiveis vivem (ex.: o
+   * `?hub.verify_token=...` do webhook da Meta), e o mascaramento de >=500 so
+   * cobria message/error/details — nao o path. Guardamos so o pathname; o
+   * `requestId` ja correlaciona a requisicao pro diagnostico.
+   */
+  private sanitizePath(url: string): string {
+    return (url || '').split(/[?#]/)[0];
+  }
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -58,7 +69,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const errorLog = {
       statusCode: status,
       timestamp: new Date().toISOString(),
-      path: request.url,
+      path: this.sanitizePath(request.url),
       method: request.method,
       requestId: (request as any).requestId || null,
       message,
@@ -75,7 +86,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const responseBody: any = {
       statusCode: status,
       timestamp: new Date().toISOString(),
-      path: request.url,
+      path: this.sanitizePath(request.url),
       message,
       ...(code && { code }),
       ...(isDevelopment && { error, ...(details && { details }) }),
