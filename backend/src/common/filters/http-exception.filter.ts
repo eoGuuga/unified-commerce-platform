@@ -23,6 +23,23 @@ export class HttpExceptionFilter implements ExceptionFilter {
     return (url || '').split(/[?#]/)[0];
   }
 
+  /**
+   * Camada 5b: quando o `message` embute a URL CRUA da requisicao (com query) —
+   * o caso classico e o 404 default do Nest ("Cannot GET /rota?query") — remove
+   * a query dessa URL, mantendo rota + verbo pro debug. Mesma filosofia da
+   * `sanitizePath`: fecha a CLASSE (qualquer message que ecoa a URL da
+   * requisicao), nao uma denylist de params. Substituicao LITERAL da string
+   * conhecida (`request.url`) => zero falso-positivo em mensagens de negocio.
+   * Mensagens nao-string (ex.: array de erros de validacao) nao carregam a URL,
+   * entao passam intactas.
+   */
+  private sanitizeMessage(message: unknown, url: string): unknown {
+    if (typeof message !== 'string' || !url) return message;
+    const cleanPath = this.sanitizePath(url);
+    if (url === cleanPath) return message; // URL sem query — nada a remover
+    return message.split(url).join(cleanPath);
+  }
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -64,6 +81,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
       error = 'Internal Server Error';
       details = null;
     }
+
+    // Camada 5b: se o message embute a URL crua (com query) — ex.: o 404 default
+    // "Cannot GET /rota?query" — remove a query (mantem rota+verbo pro debug).
+    // (cast: `message` e tipado string, mas em runtime pode ser array de erros
+    // de validacao — o helper devolve nao-strings intactos.)
+    message = this.sanitizeMessage(message, request.url) as string;
 
     // Log error
     const errorLog = {

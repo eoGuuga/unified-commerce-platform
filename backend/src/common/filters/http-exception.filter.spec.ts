@@ -15,6 +15,7 @@ import {
   BadRequestException,
   ForbiddenException,
   InternalServerErrorException,
+  NotFoundException,
   Logger,
 } from '@nestjs/common';
 import { HttpExceptionFilter } from './http-exception.filter';
@@ -144,5 +145,72 @@ describe('HttpExceptionFilter — regressao (o fix nao pode quebrar o resto)', (
 
     const body = jsonMock.mock.calls[0][0];
     expect(body.path).toBe('/api/v1/health');
+  });
+});
+
+/**
+ * Camada 5b: em rota inexistente o NestJS gera o message padrao
+ * "Cannot GET /rota?query" — e a query vaza pelo `message` (o `path` ja e limpo
+ * pela Camada 5). Mesma filosofia: remover a CLASSE (nao denylist de params) —
+ * quando o message embute a URL crua da requisicao (com query), sai limpa (so o
+ * pathname), mantendo rota + verbo pro debug.
+ */
+describe('HttpExceptionFilter — message nao vaza a query embutida (Camada 5b)', () => {
+  let filter: HttpExceptionFilter;
+  let warnSpy: jest.SpyInstance;
+
+  const SECRET = 'SEGREDO_5B';
+  const rota = '/api/v1/rota-inexistente';
+  const urlComQuery = `${rota}?token=${SECRET}`;
+
+  beforeEach(() => {
+    filter = new HttpExceptionFilter();
+    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('🎯 404 default: o message DEVOLVIDO nao contem a query, mas mantem rota + verbo', () => {
+    const { host, jsonMock } = makeHost(urlComQuery, 'GET');
+
+    // simula o 404 automatico do Nest: message = "Cannot GET <url com query>"
+    filter.catch(new NotFoundException(`Cannot GET ${urlComQuery}`), host);
+
+    const body = jsonMock.mock.calls[0][0];
+    expect(body.message).toBe('Cannot GET /api/v1/rota-inexistente');
+    expect(JSON.stringify(body)).not.toContain(SECRET);
+  });
+
+  it('🎯 404 default: o message LOGADO nao contem a query (mantem rota + verbo)', () => {
+    const { host } = makeHost(urlComQuery, 'GET');
+
+    filter.catch(new NotFoundException(`Cannot GET ${urlComQuery}`), host);
+
+    const logged = warnSpy.mock.calls[0].join(' ');
+    expect(logged).not.toContain(SECRET);
+    expect(logged).toContain(rota); // rota preservada pro debug
+    expect(logged).toContain('Cannot GET'); // verbo preservado pro debug
+  });
+
+  it('regressao: message controlada (sem URL embutida) fica intacta — ex.: webhook 403', () => {
+    const { host, jsonMock } = makeHost('/api/v1/whatsapp/webhook?hub.verify_token=X', 'GET');
+
+    filter.catch(new ForbiddenException('Falha na verificacao do webhook.'), host);
+
+    const body = jsonMock.mock.calls[0][0];
+    expect(body.message).toBe('Falha na verificacao do webhook.');
+    expect(JSON.stringify(body)).not.toContain('hub.verify_token');
+  });
+
+  it('regressao: message que embute a URL SEM query fica igual', () => {
+    const { host, jsonMock } = makeHost('/api/v1/rota-inexistente', 'GET');
+
+    filter.catch(new NotFoundException('Cannot GET /api/v1/rota-inexistente'), host);
+
+    const body = jsonMock.mock.calls[0][0];
+    expect(body.message).toBe('Cannot GET /api/v1/rota-inexistente');
   });
 });
