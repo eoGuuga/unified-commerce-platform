@@ -102,6 +102,7 @@ Os 3 pontos cegos 🔴 são **baratos de mitigar e caros de ignorar** — fazer 
 **Higiene de teste**
 - 🟡 `ucm_test_motor` acumula SKU duplicado → testes de order/payment integration falham (colisão `idx_produtos_tenant_sku_unique`) — limpar/isolar o banco de teste entre rodadas.
 - 🟡 **39 falhas baseline** em whatsapp/products (6 suítes) — mock drift pré-existente que **mascara regressões futuras**.
+- 🟡 **`cart.service.spec.ts` = FALSA COBERTURA** (achado 2026-07-08, fix dos 3 bugs). O `TestingModule` só provê 2 das **4** deps do `CartService` (faltam `DataSource` via `@InjectDataSource` + `StockEngineService`) → a suíte inteira falha no `beforeEach` (DI não resolve) → **nenhum teste do CartService roda de verdade**. Parece coberto, não está. Por isso o teste do BUG-CART-1 foi pro spec standalone `whatsapp-cart.controller.empty-cart.spec.ts` (usa `generateSummary` pelo prototype). **Revisitar:** consertar o mock (prover as 4 deps) ou reescrever a suíte.
 
 **Escala / consistência de dinheiro**
 - 🟡 Reconciliação de pagamento: só há o **StockSweeper** (cancela não-pago no TTL → `paidForCancelled` → aviso de reembolso manual); **sem polling ativo** ("gateway, pagou?").
