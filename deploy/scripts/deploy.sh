@@ -30,6 +30,45 @@ require git; require docker; require curl
 [ -d "${REPO}/.git" ] || { echo "ERRO: repo git nao encontrado em ${REPO}" >&2; exit 1; }
 [ -f "${ENV_FILE}" ]   || { echo "ERRO: .env nao encontrado em ${ENV_FILE}" >&2; exit 1; }
 
+# ============================================================================
+# Blindagem do watchdog (divida F).
+#
+# O ucm-watchdog roda a cada 60s e faz AUTO-RECOVERY: se disparar na janela do
+# 'up -d' abaixo (backend/nginx recriando, brevemente "down"), ele corre com o
+# proprio deploy. Paramos o watchdog antes e RELIGAMOS na saida.
+#
+# INVARIANTE: religa em QUALQUER saida (sucesso, health-fail, abort do set -e,
+# ou sinal) via trap EXIT — um deploy que quebra no meio NAO pode deixar o
+# monitoramento cego.
+# ============================================================================
+WATCHDOG_UNIT="ucm-watchdog.timer"
+
+ensure_watchdog_running() {
+  local rc=$?          # preserva o codigo de saida REAL do deploy
+  set +e               # dentro do trap: nunca abortar antes de religar
+  sudo -n systemctl start "${WATCHDOG_UNIT}" 2>/dev/null
+  local state
+  state="$(sudo -n systemctl is-active "${WATCHDOG_UNIT}" 2>/dev/null)"
+  if [ "${state}" = "active" ]; then
+    log "watchdog RELIGADO e ativo (${WATCHDOG_UNIT})."
+  else
+    echo "ALERTA CRITICO: watchdog NAO voltou ativo (estado='${state}'). Religue JA: sudo systemctl start ${WATCHDOG_UNIT}" >&2
+  fi
+  exit "${rc}"
+}
+
+# O deploy roda por SSH: SIGHUP (queda de conexao) e SIGINT (Ctrl-C) matam o
+# script sem passar pelo EXIT. Encaminhamos os sinais pro trap EXIT (que religa
+# o watchdog e preserva o codigo de saida).
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+trap ensure_watchdog_running EXIT
+
+log "0/4 Blindando o watchdog (parando; sera religado na saida via trap)"
+sudo -n systemctl stop "${WATCHDOG_UNIT}" 2>/dev/null \
+  || echo "AVISO: nao consegui parar o watchdog (segue o deploy; sera confirmado ativo no fim)." >&2
+
 log "1/4 Atualizando codigo (git pull --ff-only)"
 git -C "${REPO}" pull --ff-only
 
