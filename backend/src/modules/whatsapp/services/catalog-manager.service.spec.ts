@@ -52,23 +52,40 @@ describe('CatalogManagerService', () => {
   });
 
   describe('findSimilarProducts', () => {
+    // A similaridade e por TOKEN DO NOME (getProductTokens(product.name), substring
+    // match) — NAO por categoria. Produtos que compartilham palavra no nome sao
+    // similares. Este set exercita isso de verdade e desfaz a vacuidade: o esgotado
+    // (id 3) E similar por nome, entao sua exclusao testa o filtro de estoque (nao
+    // apenas "resultado vazio"); o Beijinho (id 4) esta em estoque mas NAO compartilha
+    // token, testando o limiar de score.
+    const similarProducts: any[] = [
+      { id: '1', name: 'Brigadeiro', price: 5, available_stock: 10 }, // fonte
+      { id: '2', name: 'Brigadeiro Branco', price: 5, available_stock: 8 }, // similar + em estoque
+      { id: '3', name: 'Brigadeiro Gourmet', price: 6, available_stock: 0 }, // similar por nome MAS esgotado
+      { id: '4', name: 'Beijinho', price: 5, available_stock: 5 }, // em estoque mas NAO similar
+    ];
+
     it('should find similar products based on tokens', () => {
-      const similar = service.findSimilarProducts(mockProducts, '1');
+      const similar = service.findSimilarProducts(similarProducts, '1');
 
       expect(similar.length).toBeGreaterThan(0);
-      expect(similar.some((p) => p.id === '2')).toBe(true); // Beijinho is similar to Brigadeiro
+      expect(similar.some((p) => p.id === '2')).toBe(true); // "Brigadeiro Branco" compartilha o token "brigadeiro"
+      expect(similar.some((p) => p.id === '4')).toBe(false); // "Beijinho" nao compartilha token -> nao similar
     });
 
     it('should exclude the source product', () => {
-      const similar = service.findSimilarProducts(mockProducts, '1');
+      const similar = service.findSimilarProducts(similarProducts, '1');
 
+      expect(similar.length).toBeGreaterThan(0); // resultado nao-vazio: a exclusao abaixo e significativa
       expect(similar.some((p) => p.id === '1')).toBe(false);
     });
 
     it('should exclude out of stock products', () => {
-      const similar = service.findSimilarProducts(mockProducts, '1');
+      const similar = service.findSimilarProducts(similarProducts, '1');
 
-      expect(similar.some((p) => p.id === '3')).toBe(false); // Cascão is out of stock
+      // id 3 (Brigadeiro Gourmet) E similar por nome, mas esta esgotado -> excluido pelo filtro de estoque.
+      expect(similar.some((p) => p.id === '3')).toBe(false);
+      expect(similar.some((p) => p.id === '2')).toBe(true); // o similar em estoque continua presente
     });
   });
 
