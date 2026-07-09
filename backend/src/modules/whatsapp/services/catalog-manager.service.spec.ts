@@ -6,18 +6,22 @@ describe('CatalogManagerService', () => {
   let service: CatalogManagerService;
   let mockProductsService: any;
 
+  // Shape REAL que o CatalogManager lê (entidade Produto = inglês): name/price +
+  // available_stock (o campo de estoque do ProductWithStock). O mock antigo usava
+  // nome/preco/estoque (PT, desatualizado) → "undefined - R$ NaN" e nome undefined.
   const mockProducts: any[] = [
-    { id: '1', nome: 'Brigadeiro', preco: 5, estoque: 10, categoria: 'doces' },
-    { id: '2', nome: 'Beijinho', preco: 5, estoque: 8, categoria: 'doces' },
-    { id: '3', nome: 'Cascão', preco: 5, estoque: 0, categoria: 'doces' },
-    { id: '4', nome: 'Ninho', preco: 6, estoque: 5, categoria: 'doces' },
+    { id: '1', name: 'Brigadeiro', price: 5, available_stock: 10 },
+    { id: '2', name: 'Beijinho', price: 5, available_stock: 8 },
+    { id: '3', name: 'Cascão', price: 5, available_stock: 0 },
+    { id: '4', name: 'Ninho', price: 6, available_stock: 5 },
   ];
 
   beforeEach(async () => {
+    // getCatalogProducts chama productsService.findAll (nao findAllWithStock).
     mockProductsService = {
-      findAllWithStock: jest.fn().mockResolvedValue(mockProducts),
+      findAll: jest.fn().mockResolvedValue(mockProducts),
       findOne: jest.fn(),
-      findByName: jest.fn(),
+      search: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -35,11 +39,11 @@ describe('CatalogManagerService', () => {
       const products = await service.getCatalogProducts('tenant-1');
 
       expect(products).toHaveLength(4);
-      expect(mockProductsService.findAllWithStock).toHaveBeenCalledWith('tenant-1');
+      expect(mockProductsService.findAll).toHaveBeenCalledWith('tenant-1');
     });
 
     it('should return empty array on error', async () => {
-      mockProductsService.findAllWithStock.mockRejectedValue(new Error('DB error'));
+      mockProductsService.findAll.mockRejectedValue(new Error('DB error'));
 
       const products = await service.getCatalogProducts('tenant-1');
 
