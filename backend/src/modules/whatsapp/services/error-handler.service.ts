@@ -350,7 +350,7 @@ export class WhatsAppErrorHandler {
   /**
    * Calcula delay para retry com exponential backoff
    */
-  private calculateRetryDelay(error: Error): number {
+  private calculateRetryDelay(_error: Error): number {
     const baseDelay = this.retryConfig.baseDelayMs;
     const maxDelay = this.retryConfig.maxDelayMs;
     const exponentialBase = this.retryConfig.exponentialBase;
