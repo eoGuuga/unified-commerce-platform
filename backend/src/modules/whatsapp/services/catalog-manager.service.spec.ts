@@ -139,26 +139,6 @@ describe('CatalogManagerService', () => {
     });
   });
 
-  describe('extractCatalogQuery', () => {
-    it('should extract search query', () => {
-      const query = service.extractCatalogQuery('procura brigadeiro gourmet');
-
-      expect(query).toBe('brigadeiro gourmet');
-    });
-
-    it('should extract "tem" query', () => {
-      const query = service.extractCatalogQuery('tem brigadeiro de ninho');
-
-      expect(query).toBe('brigadeiro de ninho');
-    });
-
-    it('should return null for non-search messages', () => {
-      const query = service.extractCatalogQuery('Quero brigadeiros');
-
-      expect(query).toBeNull();
-    });
-  });
-
   describe('formatProductHeadline', () => {
     it('should format product with price', () => {
       const headline = service.formatProductHeadline(mockProducts[0]);

@@ -163,25 +163,6 @@ export class CatalogManagerService {
   }
 
   /**
-   * Extrai query de busca do catálogo
-   */
-  extractCatalogQuery(message: string): string | null {
-    const patterns = [
-      /(?:procura|busca|procurando|quer|quero|procurar|buscar)\s+(.+)/i,
-      /(?:tem|tem alguma|tem algo)\s+(.+)/i,
-    ];
-
-    for (const pattern of patterns) {
-      const match = message.match(pattern);
-      if (match && match[1].trim()) {
-        return match[1].trim();
-      }
-    }
-
-    return null;
-  }
-
-  /**
    * Formata headline do produto
    */
   formatProductHeadline(product: ProductWithStock): string {
