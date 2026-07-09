@@ -10,6 +10,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { CacheService } from '../common/services/cache.service';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { DbContextService } from '../common/services/db-context.service';
+import { StockEngineService } from './stock-engine.service';
 import { PaginationDto } from './dto/pagination.dto';
 
 describe('ProductsService', () => {
@@ -32,6 +33,7 @@ describe('ProductsService', () => {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    insert: jest.fn().mockResolvedValue(undefined), // o create faz manager.getRepository(Mov).insert(...)
     update: jest.fn(),
     createQueryBuilder: jest.fn(),
   };
@@ -53,12 +55,34 @@ describe('ProductsService', () => {
       if (entity === MovimentacaoEstoque) return mockEstoquesRepository;
       return {};
     }),
-    runInTransaction: jest.fn(async (callback) => callback(mockDataSource)),
+    // O create roda dentro de runInTransaction(manager => …) e usa manager.query
+    // (SAVEPOINT/RELEASE/ROLLBACK do retry de colisao de SKU) + manager.getRepository(Entity).
+    // O manager REAL tem esses; espelhamos aqui (antes passava mockDataSource, que so tinha
+    // transaction — por isso o create quebrava com "manager.query is not a function" quando a
+    // suite finalmente rodou).
+    runInTransaction: jest.fn(async (callback) => {
+      const manager = {
+        query: jest.fn().mockResolvedValue(undefined),
+        getRepository: (entity: any) => {
+          if (entity === Produto) return mockProdutosRepository;
+          if (entity === MovimentacaoEstoque) return mockEstoquesRepository;
+          return {};
+        },
+      };
+      return callback(manager);
+    }),
   };
 
   const mockDataSource = {
     // ProductsService usa DataSource em alguns métodos, mas estes unit tests não dependem dele.
     transaction: jest.fn(async (cb: any) => cb({})),
+  };
+
+  // O ProductsService injeta o StockEngineService (7a dep) — usado só no create
+  // quando initial_stock > 0 (via recordManualMovement). Os testes aqui não
+  // setam initial_stock, entao o motor nao e chamado; o stub existe pro DI.
+  const mockStockEngine = {
+    recordManualMovement: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {
@@ -88,6 +112,10 @@ describe('ProductsService', () => {
         {
           provide: DbContextService,
           useValue: mockDbContextService,
+        },
+        {
+          provide: StockEngineService,
+          useValue: mockStockEngine,
         },
       ],
     }).compile();
