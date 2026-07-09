@@ -122,7 +122,14 @@ export class WhatsAppErrorHandler {
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
-        if (attempt < this.retryConfig.maxRetries && this.shouldRetry(lastError)) {
+        // Erro nao-transiente: falha na PRIMEIRA tentativa — nao adianta
+        // retentar (ex.: validacao, not found, out of stock). Sem este break,
+        // o loop seguia ate maxRetries mesmo em erro que nao deve ser retentado.
+        if (!this.shouldRetry(lastError)) {
+          break;
+        }
+
+        if (attempt < this.retryConfig.maxRetries) {
           const delayMs = this.calculateRetryDelay(lastError);
 
           this.logger.warn(`Retry attempt ${attempt}/${this.retryConfig.maxRetries}`, {
