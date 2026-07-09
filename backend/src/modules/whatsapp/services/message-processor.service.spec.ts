@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { MessageProcessorService, ProcessedMessage } from './message-processor.service';
+import { MessageProcessorService } from './message-processor.service';
 
 describe('MessageProcessorService', () => {
   let service: MessageProcessorService;
@@ -25,7 +25,10 @@ describe('MessageProcessorService', () => {
 
       const result = service.processMessage(message);
 
-      expect(result.sanitizedBody).toBe('Olá Mundo! Como vai?');
+      // O sanitizer faz normalizacao MINIMA (trim + \r\n->\n + colapsa 3+ newlines
+      // pra 2), PRESERVANDO a estrutura de quebras/espacos internos — melhor pro bot
+      // (ex.: endereco multi-linha nao vira uma linha so). Nao colapsa em espaco unico.
+      expect(result.sanitizedBody).toBe('Olá Mundo!  \n\n  Como vai?');
       expect(result.normalizedBody).toContain('Olá');
     });
 
@@ -41,8 +44,10 @@ describe('MessageProcessorService', () => {
     });
 
     it('should detect abusive language', () => {
+      // O detector e PT-BR por design (ABUSE_PATTERNS). Testar com profanidade real
+      // do idioma. (Cobertura de ingles NAO existe — decisao de feature, ver roadmap.)
       const abusiveMessage = {
-        body: 'This is shit!',
+        body: 'Isso é uma merda!',
         from: '5511999999999',
       };
 

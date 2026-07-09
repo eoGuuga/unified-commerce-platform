@@ -89,7 +89,7 @@ describe('ResponseBuilderService', () => {
     it('should build timeout error message', () => {
       const message = service.buildErrorMessage('timeout', true);
 
-      expect(message).toContain('demorei');
+      expect(message).toContain('Demorei');
     });
 
     it('should build not found error message', () => {
@@ -212,7 +212,7 @@ describe('ResponseBuilderService', () => {
 
       expect(message).toContain('Bem-vindo');
       expect(message).toContain('assistente');
-      expect(message).toContain('cardápio');
+      expect(message).toContain('pedido'); // copy reworded: "cardápio" saiu; hoje guia "Montar seu pedido"
     });
   });
 

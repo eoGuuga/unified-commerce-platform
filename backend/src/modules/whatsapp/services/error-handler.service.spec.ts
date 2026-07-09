@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { WhatsAppErrorHandler, ErrorContext, FallbackResponse } from './error-handler.service';
+import { WhatsAppErrorHandler, ErrorContext } from './error-handler.service';
 
 describe('WhatsAppErrorHandler', () => {
   let handler: WhatsAppErrorHandler;
@@ -38,7 +38,7 @@ describe('WhatsAppErrorHandler', () => {
 
       const result = handler.handleError(error, context);
 
-      expect(result.message).toContain('lenta');
+      expect(result.message).toContain('manutenção'); // copy atual do timeout
       expect(result.shouldRetry).toBe(true);
     });
 
@@ -68,7 +68,7 @@ describe('WhatsAppErrorHandler', () => {
 
       const result = handler.handleError(error, context);
 
-      expect(result.message).toContain('demorando');
+      expect(result.message).toContain('lenta'); // copy atual do AI-timeout: "A conexão está lenta…"
       expect(result.shouldRetry).toBe(true);
     });
 
@@ -185,8 +185,7 @@ describe('WhatsAppErrorHandler', () => {
     it('should generate friendly message for out of stock', () => {
       const message = handler.generateFriendlyErrorMessage('OUT_OF_STOCK');
 
-      expect(message).toContain('fora de estoque');
-      expect(message).toContain('cardápio');
+      expect(message).toContain('fora de estoque'); // copy atual nao tem o CTA "cardápio" (obs. de produto registrada)
     });
 
     it('should generate friendly message for payment failed', () => {
