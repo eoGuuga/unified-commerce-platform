@@ -245,7 +245,40 @@ describe('ResponseBuilderService', () => {
       const message = service.buildEscalationMessage(conversation);
 
       expect(message).toContain('João');
-      expect(message).toContain('Brigadeiro');
+      expect(message).toContain('Brigadeiro'); // NOME do produto (nao so a contagem) — o atendente sabe O QUE o cliente quer
+    });
+
+    it('lists product names, guarding against missing/blank ones', () => {
+      const conversation = {
+        context: {
+          customer_data: { name: 'Ana' },
+          pending_order: {
+            items: [
+              { produto_name: 'Brigadeiro' },
+              { produto_name: undefined }, // nome ausente -> filtrado
+              { produto_name: '  ' }, // vazio -> filtrado
+              { produto_name: 'Beijinho' },
+            ],
+          },
+        },
+      } as any;
+
+      const message = service.buildEscalationMessage(conversation);
+
+      expect(message).toContain('Itens: Brigadeiro, Beijinho');
+      expect(message).not.toContain(', ,'); // nunca "Itens: , ,"
+    });
+
+    it('falls back to count when no product name is available', () => {
+      const conversation = {
+        context: {
+          pending_order: { items: [{ produto_name: undefined }, { produto_name: null }] },
+        },
+      } as any;
+
+      const message = service.buildEscalationMessage(conversation);
+
+      expect(message).toContain('Itens: 2 produto(s)'); // sem nome valido -> contagem, nao quebra
     });
   });
 });

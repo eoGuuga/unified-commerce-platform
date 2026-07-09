@@ -182,7 +182,7 @@ export class ResponseBuilderService {
   buildOrderSummary(
     pedido: Pedido,
     customerData?: CustomerData,
-    options?: ResponseOptions,
+    _options?: ResponseOptions,
   ): string {
     const lines: string[] = [];
 
@@ -316,8 +316,21 @@ export class ResponseBuilderService {
       if (customerData?.name) lines.push(`   Nome: ${customerData.name}`);
 
       const pendingOrder = conversation.context?.pending_order;
-      if (pendingOrder?.items?.length) {
-        lines.push(`   Itens: ${pendingOrder.items.length} produto(s)`);
+      const items = pendingOrder?.items;
+      if (items?.length) {
+        // Listar os NOMES dos produtos — o atendente humano precisa saber O QUE o
+        // cliente quer, nao so QUANTOS. Guarda de borda: nome ausente/vazio e
+        // filtrado; se nenhum nome valido sobrar, cai pra contagem (nunca sai
+        // "Itens: , ," nem quebra).
+        const nomes = items
+          .map((i) => i?.produto_name)
+          .filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
+          .map((n) => n.trim());
+        lines.push(
+          nomes.length > 0
+            ? `   Itens: ${nomes.join(', ')}`
+            : `   Itens: ${items.length} produto(s)`,
+        );
       }
     }
 
