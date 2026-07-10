@@ -1,0 +1,11 @@
+{
+  // Fixa a TypeScript do EDITOR na versão do workspace (backend, TS 5.9.3).
+  // Sem isto, um VSCode com TS mais nova acusa erros-fantasma no Language
+  // Server (ex.: os 116 do baseUrl) que o build real (tsc --noEmit / nest
+  // build) NÃO tem. É config de editor: não afeta build, CI, nem código.
+  //
+  // `enablePromptUseWorkspaceTsdk` faz o VSCode PERGUNTAR, ao abrir o projeto,
+  // se quer usar esta versão — assim quem clonar já cai na TS certa.
+  "typescript.tsdk": "backend/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}
