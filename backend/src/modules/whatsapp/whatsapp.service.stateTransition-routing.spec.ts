@@ -96,8 +96,8 @@ describe('WhatsappService — Fase 2 Tipo A: roteia stateTransition → handler 
     expect(res).toBe('OPCOES_DE_PAGAMENTO');
   });
 
-  it('🎯 default: ação ainda-não-cabeada (ex. cancel_order/Tipo C) NÃO vira silêncio — cai no fallback amigável', async () => {
-    const service = driveFallback('cancel_order');
+  it('🎯 default: stateTransition desconhecido (fora das 8) NÃO vira silêncio — cai no fallback amigável', async () => {
+    const service = driveFallback('acao_desconhecida_xyz');
     // Nenhum handler do Tipo A pode ser chamado por uma ação de outro tipo.
     service.handleCatalog = jest.fn();
     service.handleOrderStatus = jest.fn();
@@ -218,5 +218,30 @@ describe('WhatsappService — Fase 2 Tipo B: helper param-first (§5 centralizad
     expect(service.productsService.search).not.toHaveBeenCalled(); // §5: sem produto, nem busca
     expect(String(res).toLowerCase()).toContain('de qual produto');
     expect(res).not.toContain('R$');
+  });
+});
+
+describe('WhatsappService — Fase 2 Tipo C: escala honesta (cancel_order / collect_info)', () => {
+  it('🎯 cancel_order → escala pedindo o número e NÃO cancela (não abre o furo de ownership do updateStatus)', async () => {
+    const updateStatus = jest.fn();
+    const service = driveFallback('cancel_order');
+    // updateStatus disponível — o teste garante que MESMO ASSIM não é chamado.
+    service.ordersService = { updateStatus };
+
+    const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
+
+    expect(String(res).toLowerCase()).toContain('número'); // pede o número do pedido
+    expect(updateStatus).not.toHaveBeenCalled(); // SEGURANÇA: não cancela nada aqui
+  });
+
+  // Caracterização (NÃO RED→GREEN): collect_info já caía no fallback via `default`;
+  // o `case` explícito é documentação. O teste guarda "nunca silêncio" pra ela.
+  it('collect_info (morto de fábrica) → cai no fallback amigável, não quebra nem silencia', async () => {
+    const service = driveFallback('collect_info');
+
+    const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
+
+    expect(String(res)).toContain('Não entendi');
+    expect(String(res).length).toBeGreaterThan(0);
   });
 });

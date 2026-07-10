@@ -2130,8 +2130,25 @@ export class WhatsAppService {
       case 'process_order':
         return this.routeProductAction(stateTransition, params, tenantId, customerPhone);
 
-      // --- Tipo C (a construir): cancel_order, collect_info ---
-      // Até lá, caem no default abaixo — resposta amigável, nunca vazia.
+      // --- Tipo C: escala honesta (não finge capacidade que não temos) ---
+      // cancel_order: NÃO cancela aqui. O `ordersService.updateStatus` valida só
+      // o tenant, NÃO o dono (customer_phone) — cancelar pelo número deixaria um
+      // cliente cancelar o pedido de outro. O handler real (com checagem de
+      // ownership) é follow-up de SEGURANÇA no roadmap. Por ora, escala honesto:
+      // pede o número e encaminha pra loja, sem tocar em pedido nenhum.
+      case 'cancel_order':
+        return 'Pra cancelar um pedido já feito, me passa o número dele (ex.: PED-1234) que eu confirmo com a loja e resolvo pra você. 🙂';
+
+      // collect_info: MORTA DE FÁBRICA. O router (llm-router `buildSystemPrompt`)
+      // NÃO emite esta ação — ela não está no menu do prompt — e, mesmo se
+      // emitisse, `handleCheckoutStage` retorna null sem checkout ativo (e aqui,
+      // no fim do handleFallback, nunca há). Roteia pro fallback amigável (nunca
+      // silêncio). Follow-up no roadmap: confirmar se o router deveria emiti-la
+      // ou se o enum deve ser removido.
+      case 'collect_info':
+        return this.buildFriendlyFallback();
+
+      // stateTransition desconhecido (fora das 8) → fallback amigável, nunca vazio.
       default:
         return this.buildFriendlyFallback();
     }
