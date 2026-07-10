@@ -64,7 +64,7 @@ Processa PII e pagamento de terceiros. Conformidade protege de multa (LGPD ate 2
 - **Fail-closed sempre** em auth/webhook/assinatura. Nunca `if (secret) verifica`.
 - **Sem endpoint de teste/debug exposto em prod.**
 - **PII so via servico com audit log + `ENCRYPTION_KEY`.** Nunca logar telefone/CPF/token/conteudo de pagamento.
-- **Pendencias criticas** (backlog no doc, secao Auditoria 2026-06-26): webhooks fail-open, `/whatsapp/test` e `/whatsapp/metrics` sem guard, exclusao LGPD stub, falta consentimento + paginas legais.
+- **Pendencias criticas** (backlog no doc, secao Auditoria 2026-06-26): exclusao LGPD stub, falta consentimento + paginas legais. *(✅ CORRIGIDO desde entao, re-verificado 2026-07-09 na arvore de prod `98e1827`: webhook WhatsApp **fail-closed em prod** + `/whatsapp/test` e `/whatsapp/metrics` **fail-closed com guard** — ver §9 e a divida de doc `whatsapp-doc-debt`.)*
 
 ---
 
@@ -173,7 +173,7 @@ bash deploy/scripts/backup-postgres.sh
 | `POST /api/v1/whatsapp/webhook` | Twilio / Evolution | assinatura do provider |
 
 Ambos: `@Public()`, nginx `api_webhook` (5 r/s, burst 10), **idempotentes**, e DEVEM ser **fail-closed** se o secret faltar em prod.
-Estado real (verificar antes de confiar): so o webhook MercadoPago tem `@Throttle({ webhook:{ttl:60000,limit:60} })`; o de WhatsApp (`whatsapp.controller.ts:351`) NAO tem o decorator (cai no throttle `default` 100/min em prod) **e hoje e fail-open** (`if (webhookSecret && signature)` — pendencia critica no backlog de seguranca).
+Estado real (verificar antes de confiar): so o webhook MercadoPago tem `@Throttle({ webhook:{ttl:60000,limit:60} })`; o de WhatsApp **NAO tem o decorator** (cai no throttle `default` 100/min em prod) — **item separado (rate-limit), NAO re-verificado**. *(✅ CORRECAO 2026-07-09: o webhook do WhatsApp **NAO e mais fail-open — e fail-closed em prod** (403 sem secret / sem assinatura / assinatura invalida; HMAC `timingSafeEqual` sobre o corpo cru), verificado na arvore de prod `98e1827`. O `if (webhookSecret && signature)` e hoje so o branch de DEV; o fail-open real mora no `evolution-api.provider` MORTO — o controller nao o chama. Este doc esta desatualizado em varios pontos — ex.: a linha citada era `:351`, hoje e `:482` — ver a divida de doc [[whatsapp-doc-debt]].)*
 
 ---
 
