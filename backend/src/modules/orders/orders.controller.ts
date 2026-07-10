@@ -150,7 +150,7 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Atualizar status do pedido' })
   updateStatus(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body('status') status: PedidoStatus,
     @CurrentTenant() tenantId: string,
   ) {

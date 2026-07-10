@@ -23,6 +23,8 @@ describe('ProductsController — H5: :id valida UUID (400, nao chega no service)
   const productsService = {
     findOne: jest.fn().mockResolvedValue({ id: VALID_UUID, name: 'Brigadeiro' }),
     getStockHistory: jest.fn().mockResolvedValue({ items: [] }),
+    update: jest.fn().mockResolvedValue({ id: VALID_UUID, name: 'Brigadeiro' }),
+    remove: jest.fn().mockResolvedValue({ deleted: true }),
   };
 
   beforeAll(async () => {
@@ -62,5 +64,16 @@ describe('ProductsController — H5: :id valida UUID (400, nao chega no service)
   it('🎯 GET /products/<lixo>/stock-history → 400 (o :id do extrato tambem valida)', async () => {
     await request(app.getHttpServer()).get('/products/nao-e-uuid/stock-history').expect(400);
     expect(productsService.getStockHistory).not.toHaveBeenCalled();
+  });
+
+  // H5 follow-up: mesmo padrao nas rotas de MUTACAO (PATCH/DELETE :id).
+  it('🎯 PATCH /products/<lixo> → 400 e NAO chega no service', async () => {
+    await request(app.getHttpServer()).patch('/products/nao-e-uuid').send({ name: 'x' }).expect(400);
+    expect(productsService.update).not.toHaveBeenCalled();
+  });
+
+  it('🎯 DELETE /products/<lixo> → 400 e NAO chega no service', async () => {
+    await request(app.getHttpServer()).delete('/products/nao-e-uuid').expect(400);
+    expect(productsService.remove).not.toHaveBeenCalled();
   });
 });
