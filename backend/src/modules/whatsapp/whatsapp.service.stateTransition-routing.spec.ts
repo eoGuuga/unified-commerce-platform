@@ -29,13 +29,17 @@ function buildService(overrides: Record<string, unknown> = {}): any {
  *   `{response:'', stateTransition:action}` — que é o comportamento REAL de hoje
  *   das 8 ações de negócio.
  */
-function driveFallback(action: string): any {
+function driveFallback(
+  action: string,
+  opts: { params?: Record<string, any>; search?: any[]; cart?: any } = {},
+): any {
   return buildService({
     isProductIntent: () => false,
-    productsService: { search: jest.fn().mockResolvedValue([]) },
+    productsService: { search: jest.fn().mockResolvedValue(opts.search ?? []) },
+    cartService: opts.cart ?? { addItem: jest.fn().mockResolvedValue({}) },
     botConfigService: { loadConfig: jest.fn().mockResolvedValue({}) },
     llmRouterService: {
-      route: jest.fn().mockResolvedValue({ action, params: {}, confidence: 0.9 }),
+      route: jest.fn().mockResolvedValue({ action, params: opts.params ?? {}, confidence: 0.9 }),
     },
     actionExecutorService: {
       execute: jest.fn().mockResolvedValue({ response: '', stateTransition: action }),
@@ -92,8 +96,8 @@ describe('WhatsappService — Fase 2 Tipo A: roteia stateTransition → handler 
     expect(res).toBe('OPCOES_DE_PAGAMENTO');
   });
 
-  it('🎯 default: ação ainda-não-cabeada (ex. process_order/Tipo B) NÃO vira silêncio — cai no fallback amigável', async () => {
-    const service = driveFallback('process_order');
+  it('🎯 default: ação ainda-não-cabeada (ex. cancel_order/Tipo C) NÃO vira silêncio — cai no fallback amigável', async () => {
+    const service = driveFallback('cancel_order');
     // Nenhum handler do Tipo A pode ser chamado por uma ação de outro tipo.
     service.handleCatalog = jest.fn();
     service.handleOrderStatus = jest.fn();
@@ -106,5 +110,113 @@ describe('WhatsappService — Fase 2 Tipo A: roteia stateTransition → handler 
     expect(service.handleCatalog).not.toHaveBeenCalled();
     expect(service.handleOrderStatus).not.toHaveBeenCalled();
     expect(service.handlePayment).not.toHaveBeenCalled();
+  });
+});
+
+const PROD = { id: 'p1', name: 'Brigadeiro Gourmet', price: 5, description: 'Delícia' };
+
+describe('WhatsappService — Fase 2 Tipo B: helper param-first (§5 centralizado)', () => {
+  it('🎯 check_price com params.product válido → preço REAL do banco (nunca a IA origina número)', async () => {
+    const service = driveFallback('check_price', { params: { product: 'brigadeiro' }, search: [PROD] });
+
+    const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
+
+    expect(service.productsService.search).toHaveBeenCalledWith('t1', 'brigadeiro');
+    expect(res).toContain('Brigadeiro Gourmet');
+    expect(res).toContain('R$ 5.00'); // vem de product.price, não inventado
+  });
+
+  it('🎯 check_stock com produto encontrado → disponível SEM revelar quantidade (paridade B1)', async () => {
+    const service = driveFallback('check_stock', { params: { product: 'brigadeiro' }, search: [PROD] });
+
+    const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
+
+    expect(res).toContain('Brigadeiro Gourmet');
+    // B1: confirma que temos, NÃO expõe contagem de estoque.
+    expect(String(res)).not.toMatch(/\d+\s*(unidades?|em estoque|dispon[ií]ve[li]s?\s*:?\s*\d)/i);
+  });
+
+  it('🎯 process_order com {product, quantity} → cartService.addItem com o produto resolvido', async () => {
+    const addItem = jest.fn().mockResolvedValue({});
+    const service = driveFallback('process_order', {
+      params: { product: 'brigadeiro', quantity: 2 },
+      search: [PROD],
+      cart: { addItem },
+    });
+
+    const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
+
+    expect(addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 't1',
+        customerPhone: '5511999998888',
+        produtoId: 'p1',
+        produtoName: 'Brigadeiro Gourmet',
+        quantity: 2,
+        unitPrice: 5,
+      }),
+    );
+    expect(String(res).length).toBeGreaterThan(0);
+  });
+
+  it('process_order sem quantity → default inteiro ≥1 (adiciona 1)', async () => {
+    const addItem = jest.fn().mockResolvedValue({});
+    const service = driveFallback('process_order', {
+      params: { product: 'brigadeiro' },
+      search: [PROD],
+      cart: { addItem },
+    });
+
+    await service.handleFallback('t1', NEUTRAL_MSG, conversation);
+
+    expect(addItem).toHaveBeenCalledWith(expect.objectContaining({ quantity: 1 }));
+  });
+
+  it('process_order com estoque insuficiente (addItem lança) → amigável, sem crash, sem vazar número', async () => {
+    const addItem = jest
+      .fn()
+      .mockRejectedValue(new Error('Estoque insuficiente: disponível 1, solicitado 5'));
+    const service = driveFallback('process_order', {
+      params: { product: 'brigadeiro', quantity: 5 },
+      search: [PROD],
+      cart: { addItem },
+    });
+
+    const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
+
+    expect(String(res).length).toBeGreaterThan(0);
+    expect(res).toContain('Brigadeiro Gourmet');
+    expect(String(res)).not.toContain('Estoque insuficiente'); // não vaza a exceção/número
+  });
+
+  // O TESTE DO §5 — o mais importante: produto que NÃO existe → ADMITE, não inventa.
+  describe.each(['check_price', 'check_stock', 'process_order'])(
+    '🎯 §5: "%s" com params.product inexistente ADMITE (não inventa preço/estoque/pedido)',
+    (action) => {
+      it('admite honesto, não chama addItem, não emite R$', async () => {
+        const addItem = jest.fn();
+        const service = driveFallback(action, {
+          params: { product: 'produto-que-nao-existe' },
+          search: [], // banco não acha
+          cart: { addItem },
+        });
+
+        const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
+
+        expect(String(res).toLowerCase()).toContain('não achei'); // admissão explícita
+        expect(res).not.toContain('R$'); // §5: não inventa preço
+        expect(addItem).not.toHaveBeenCalled(); // §5: não cria pedido
+      });
+    },
+  );
+
+  it('🎯 §5: params.product ausente (LLM não extraiu) → mesma admissão, sem nem buscar', async () => {
+    const service = driveFallback('check_price', { params: {}, search: [] });
+
+    const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
+
+    expect(service.productsService.search).not.toHaveBeenCalled(); // §5: sem produto, nem busca
+    expect(String(res).toLowerCase()).toContain('de qual produto');
+    expect(res).not.toContain('R$');
   });
 });

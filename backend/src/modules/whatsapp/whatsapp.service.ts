@@ -9,6 +9,7 @@ import { CouponsService } from '../coupons/coupons.service';
 import { AvailabilityService } from '../availability/availability.service';
 import { DbContextService } from '../common/services/db-context.service';
 import { CanalVenda, Pedido } from '../../database/entities/Pedido.entity';
+import { Produto } from '../../database/entities/Produto.entity';
 
 // Services de inteligência (mantidos para recursos avançados)
 import { OpenAIService } from './services/openai.service';
@@ -2075,6 +2076,7 @@ export class WhatsAppService {
       if (!executionResult.response && executionResult.stateTransition) {
         return this.routeBusinessAction(
           executionResult.stateTransition,
+          decision.params,
           tenantId,
           message,
           conversation,
@@ -2101,6 +2103,7 @@ export class WhatsAppService {
    */
   private async routeBusinessAction(
     stateTransition: string,
+    params: Record<string, any>,
     tenantId: string,
     message: string,
     conversation: TypedConversation,
@@ -2121,11 +2124,146 @@ export class WhatsAppService {
       case 'select_payment':
         return this.handlePayment(tenantId, customerPhone, message, conversation);
 
-      // --- Tipo B (a construir): check_price, check_stock, process_order ---
+      // --- Tipo B: ações de produto → helper param-first (§5 centralizado) ---
+      case 'check_price':
+      case 'check_stock':
+      case 'process_order':
+        return this.routeProductAction(stateTransition, params, tenantId, customerPhone);
+
       // --- Tipo C (a construir): cancel_order, collect_info ---
       // Até lá, caem no default abaixo — resposta amigável, nunca vazia.
       default:
         return this.buildFriendlyFallback();
+    }
+  }
+
+  /**
+   * Tipo B — as 3 ações de produto (check_price/check_stock/process_order)
+   * compartilham este roteador: resolve o produto UMA vez (com a trava do §5 no
+   * helper) e então formata por-ação. Preço/estoque/pedido saem SEMPRE do banco;
+   * a IA nunca origina o número.
+   */
+  private async routeProductAction(
+    action: string,
+    params: Record<string, any>,
+    tenantId: string,
+    customerPhone: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    const resolved = await this.resolveProductFromParams(tenantId, params);
+    if (!resolved.ok) {
+      // §5: produto ausente ou não encontrado → a admissão honesta (uma vez, no helper).
+      return resolved.response;
+    }
+
+    const product = resolved.product;
+    switch (action) {
+      case 'check_price':
+        return this.formatProductPrice(product);
+      case 'check_stock':
+        return this.formatProductAvailability(product);
+      case 'process_order':
+        return this.addResolvedProductToCart(product, params, tenantId, customerPhone);
+      default:
+        return this.buildFriendlyFallback();
+    }
+  }
+
+  /**
+   * A TRAVA DO §5, CENTRALIZADA. Resolve o produto a partir do que o LLM extraiu
+   * (`params.product`). Se o LLM não extraiu produto, ou se o banco não acha,
+   * retorna `{ok:false}` com uma ADMISSÃO honesta — a IA NUNCA inventa
+   * preço/estoque/produto. É a regra que protege o invariante 7 ("IA conversa, o
+   * banco decide") no caminho conversacional, e ela vive UMA vez aqui.
+   */
+  private async resolveProductFromParams(
+    tenantId: string,
+    params: Record<string, any>,
+  ): Promise<{ ok: true; product: Produto } | { ok: false; response: WhatsAppOutboundResponse }> {
+    const name = String(params?.product ?? '').trim();
+    if (!name) {
+      // O LLM não extraiu um produto → não chuta; pede/oferece o catálogo.
+      return {
+        ok: false,
+        response:
+          'De qual produto você quer saber? 🙂 Me diz o nome ou digite "ver produtos" pra ver o cardápio.',
+      };
+    }
+
+    const products = await this.productsService.search(tenantId, name);
+    if (products.length === 0) {
+      // Não achou no banco → admite honesto; NÃO inventa preço/estoque.
+      return {
+        ok: false,
+        response: `Hmm, não achei "${name}" no nosso cardápio. 😕 Quer dar uma olhada em tudo que temos? É só dizer "ver produtos".`,
+      };
+    }
+
+    return { ok: true, product: products[0] };
+  }
+
+  /** check_price — o preço REAL do banco (`product.price`), nunca originado pela IA. */
+  private formatProductPrice(product: Produto): string {
+    return [
+      `💰 *${product.name}*`,
+      '',
+      `Preço: R$ ${Number(product.price).toFixed(2)}`,
+      '',
+      `Quer adicionar ao carrinho? É só dizer "quero ${product.name.split(' ')[0]}".`,
+    ].join('\n');
+  }
+
+  /**
+   * check_stock — paridade B1: confirma que temos o produto (veio do `search`,
+   * que só traz ativos) SEM revelar a quantidade exata em estoque. A
+   * disponibilidade REAL é imposta no momento do pedido (o `reserve` do addItem
+   * recusa se faltar) — por isso aqui não afirmamos um número que não lemos.
+   */
+  private formatProductAvailability(product: Produto): string {
+    return [
+      `✅ Temos *${product.name}* sim!`,
+      '',
+      `Sai por R$ ${Number(product.price).toFixed(2)}.`,
+      '',
+      'Quer que eu já adicione ao carrinho? 🍫',
+    ].join('\n');
+  }
+
+  /**
+   * process_order — adiciona o produto resolvido ao carrinho com o preço REAL do
+   * banco. `quantity` vem dos params do LLM, saneada para inteiro ≥1 (default 1;
+   * a régua do H6). O `addItem` faz o `reserve` atômico e LANÇA se faltar estoque
+   * ou o carrinho estiver cheio — o catch responde amigável SEM vazar o número.
+   */
+  private async addResolvedProductToCart(
+    product: Produto,
+    params: Record<string, any>,
+    tenantId: string,
+    customerPhone: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    const rawQty = params?.quantity;
+    const quantity = Number.isInteger(rawQty) && rawQty >= 1 ? rawQty : 1;
+
+    try {
+      await this.cartService.addItem({
+        tenantId,
+        customerPhone,
+        produtoId: product.id,
+        produtoName: product.name,
+        quantity,
+        unitPrice: Number(product.price),
+      });
+
+      return [
+        `✅ Adicionado ${quantity}x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao carrinho!`,
+        '',
+        'Digite "carrinho" para ver ou "finalizar" para confirmar.',
+      ].join('\n');
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      // A mensagem do `reserve` traz a contagem de estoque — por isso NÃO a
+      // repassamos ao cliente (paridade B1: sem revelar quantidade).
+      this.logger.warn('process_order addItem failed', { error: err.message });
+      return `Poxa, não consegui adicionar *${product.name}* ao carrinho agora. 😕 Pode ser o estoque ou o carrinho cheio — quer tentar outra quantidade ou ver o que já está no carrinho?`;
     }
   }
 
