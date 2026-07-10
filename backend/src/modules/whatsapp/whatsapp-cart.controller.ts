@@ -559,6 +559,12 @@ export class WhatsAppCartController {
     if (!customerPhone) throw new BadRequestException('Customer phone required');
     if (!productId) throw new BadRequestException('Product ID required');
     if (quantity === undefined || quantity === null) throw new BadRequestException('Quantity required');
+    // H6: quantity tem que ser inteiro >= 0. DIFERENTE do add: aqui 0 e valido —
+    // o cart.service.updateItem trata quantity <= 0 como REMOCAO do item. Entao
+    // rejeitamos 3.5, 'abc' (NaN) e negativo; 0 passa (= remover).
+    if (!Number.isInteger(quantity) || quantity < 0) {
+      throw new BadRequestException('Quantity must be an integer >= 0 (0 removes the item)');
+    }
 
     return { tenantId, customerPhone, productId, quantity };
   }
