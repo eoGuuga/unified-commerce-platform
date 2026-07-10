@@ -243,7 +243,7 @@ export class WhatsAppService {
       // 5.1 ANTES de tudo: verificar timeout de conversa (5 minutos de inatividade)
       const TIMEOUT_MINUTES = 5;
       const conversationRepo = (this.conversationService as any)['db'].getRepository('WhatsappConversation');
-      let conversationForTimeout = await conversationRepo.findOne({
+      const conversationForTimeout = await conversationRepo.findOne({
         where: {
           tenant_id: message.tenantId,
           customer_phone: message.from,
@@ -260,9 +260,13 @@ export class WhatsAppService {
           : 999;
 
         if (minutesSinceLastMessage > TIMEOUT_MINUTES && currentState && currentState !== 'idle') {
-          // Conversa expirou - reiniciar com mensagem amigável
+          // Conversa expirou - reiniciar com mensagem amigável.
+          // `checkout: null` zera qualquer coleta em andamento — sem isto, o
+          // detectIntent (que checa `checkout.stage` ANTES do state) ressuscitaria
+          // o checkout velho no próximo turno e sequestraria a conversa.
           await this.conversationService.updateContext(conversationForTimeout.id, {
             state: 'idle',
+            checkout: null,
             customer_data: conversationForTimeout.context?.customer_data,
           });
 
@@ -1873,54 +1877,21 @@ export class WhatsAppService {
     message: string,
     conversation: TypedConversation,
   ): Promise<WhatsAppOutboundResponse> {
-    // FSM de checkout (S2a) tem prioridade: se ha um checkout em andamento,
-    // ela conduz a coleta de entrega com confirmacao antes de criar o pedido.
+    // A FSM de checkout (S2a, handleCheckoutStage) é o ÚNICO caminho vivo de
+    // coleta: conduz nome→telefone→endereço/retirada→confirmação e só cria o
+    // pedido após "sim" (ver a invariante D2 no handleCheckout). Se ela não
+    // assume o turno (nenhum checkout ativo), não há coleta a fazer aqui.
     const checkoutResponse = await this.handleCheckoutStage(tenantId, message, conversation);
     if (checkoutResponse !== null) {
       return checkoutResponse;
     }
 
-    // Simplificado - apenas coletar informações básicas
-    const currentState =
-      (conversation.context?.state as ConversationState) || 'collecting_order';
-
-    switch (currentState) {
-      case 'collecting_name':
-        await this.conversationService.updateContext(conversation.id, {
-          state: 'collecting_phone',
-          customer_data: { ...conversation.context?.customer_data, name: message },
-        });
-        return 'Qual é o seu telefone?';
-
-      case 'collecting_phone':
-        await this.conversationService.updateContext(conversation.id, {
-          state: 'collecting_address',
-          customer_data: { ...conversation.context?.customer_data, phone: message },
-        });
-        return 'Qual é o endereço de entrega?';
-
-      case 'collecting_address':
-        await this.conversationService.updateContext(conversation.id, {
-          state: 'confirming_order',
-          customer_data: { ...conversation.context?.customer_data, address: message },
-        });
-        return this.responseBuilder.buildConfirmationMessage(
-          'Confirma o pedido com esses dados?',
-        );
-
-      case 'confirming_order':
-        const lower = message.toLowerCase();
-        if (lower.includes('sim') || lower.includes('confirmar')) {
-          await this.conversationService.updateContext(conversation.id, {
-            state: 'order_confirmed',
-          });
-          return '✅ Pedido confirmado! Estamos preparando...';
-        }
-        return 'Ok, pode corrigir as informações.';
-
-      default:
-        return 'O que você gostaria de fazer?';
-    }
+    // NOTA: havia aqui um switch legado por `context.state`
+    // (collecting_name/phone/address/confirming_order) que era INALCANÇÁVEL —
+    // nada no fluxo vivo seta esses estados — e cujo branch `confirming_order`
+    // respondia "Pedido confirmado" SEM chamar ordersService.create
+    // (fake-confirmation). Removido: sem checkout ativo, cai num fallback neutro.
+    return 'O que você gostaria de fazer?';
   }
 
   private async handleFallback(
