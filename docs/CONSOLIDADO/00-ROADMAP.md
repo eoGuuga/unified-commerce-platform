@@ -102,6 +102,7 @@ Os 3 pontos cegos 🔴 são **baratos de mitigar e caros de ignorar** — fazer 
 - 🟡 Branding **"GTSoftHub" hardcoded (~60 ocorrências)** — separar contexto-PLATAFORMA (landing/legal/login = ok) do contexto-TENANT (checkout/loja = deveria ser a marca do lojista).
 - 🟡 Notificação de **novo pedido ao lojista** (ele não sabe que vendeu sem olhar a tela).
 - 🟡 Bot só **LOGA o envio** (não entrega — falta ligar o provider; atrás da Meta).
+- 🟠 **Bot `select_payment` roteia pro `handlePayment` STUB** (chave PIX hardcoded `00000000000`, **não cobra de verdade**) — débito flagado na Fase 2 do roteamento IA-vendedora (Tipo A, branch `feat/ia-vendedora-stateTransition-routing`): roteia certo, mas a cobrança real só entra quando a **Fase 4 de pagamentos** ligar o `paymentsService`/PIX por-tenant (casa com "Estados de borda"/Asaas em Escala abaixo + o recebimento-por-lojista).
 - 🟢 Reimprimir cupom do histórico (Fase 3 do cupom) · F14 link workspace no login (UX).
 - 🟢 **Detecção de abuso é PT-BR only** (achado na frente das 26). As `ABUSE_PATTERNS` cobrem só profanidade PT (`merda`/`caralho`/`vsf`…); **xingamento em inglês NÃO é flagrado.** Pro público BR da doceria, provavelmente OK — **decisão consciente de feature, não bug.** Revisitar se o público mudar.
 - 🟢 **CTA "veja o cardápio" removido** de 2 mensagens do bot (`buildWelcomeMessage` + a de out-of-stock do `error-handler`) — achado na frente das 26. Intencional? Vale restaurar pra guiar o cliente ao catálogo? Decisão de produto (o não_found ainda diz "Quer ver o cardápio?").
