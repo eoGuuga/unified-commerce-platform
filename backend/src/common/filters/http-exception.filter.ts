@@ -71,6 +71,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
     } else if (exception instanceof Error) {
       message = exception.message;
       error = exception.constructor.name;
+      // H4: erros do Express/http-errors (ex.: PayloadTooLargeError do body-parser
+      // quando o corpo passa de 100kb, ou JSON malformado) carregam o status HTTP
+      // em .status/.statusCode. Respeitar em vez de cair no 500 default — assim
+      // body grande vira 413 (nao 500) e JSON invalido vira 400.
+      const expressStatus = (exception as any).status ?? (exception as any).statusCode;
+      if (typeof expressStatus === 'number' && expressStatus >= 400 && expressStatus < 600) {
+        status = expressStatus;
+      }
     }
 
     // ✅ Segurança: nunca expor detalhes de erro interno em produção
