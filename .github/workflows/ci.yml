@@ -77,6 +77,10 @@ jobs:
         # 4 testes NLP do whatsapp marcados com it.skip + TODO(whatsapp-nlp-2A)
         # para serem investigados quando o whatsapp.service.ts for refatorado.
 
+      - name: Script tests (seed harness — cobre specs fora do rootDir src)
+        working-directory: backend
+        run: npm run test:scripts
+
       - name: Integration tests
         working-directory: backend
         run: npm run test:integration

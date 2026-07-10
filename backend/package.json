@@ -13,6 +13,7 @@
     "test:cov": "jest --coverage",
     "test:integration": "jest --testRegex='.*\\.integration\\.spec\\.ts$'",
     "test:unit": "jest --testRegex='.*\\.spec\\.ts$' --testPathIgnorePatterns='integration'",
+    "test:scripts": "jest --config ../scripts/jest.config.js",
     "test:whatsapp:evals": "node scripts/run-whatsapp-sales-evals.js",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "typeorm": "typeorm-ts-node-commonjs",
