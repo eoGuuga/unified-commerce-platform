@@ -14,7 +14,7 @@ import {
   Req,
   Logger,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Request } from 'express';
 import * as crypto from 'crypto';
 import { CartService } from './services/cart.service';
@@ -531,6 +531,11 @@ export class WhatsAppCartController {
     if (!customerPhone) throw new BadRequestException('Customer phone required');
     if (!productId) throw new BadRequestException('Product ID required');
     if (quantity === undefined || quantity === null) throw new BadRequestException('Quantity required');
+    // H6: quantity tem que ser inteiro >= 1. Sem isto o parser aceitava 3.5, 0,
+    // -1 e ate "abc" (NaN) — baguncaria estoque/total no add ao carrinho.
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw new BadRequestException('Quantity must be an integer >= 1');
+    }
 
     return { tenantId, customerPhone, productId, productName, quantity, unitPrice };
   }
