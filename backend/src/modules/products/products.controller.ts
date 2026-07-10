@@ -5,6 +5,7 @@ import {
   Body,
   Patch,
   Param,
+  ParseUUIDPipe,
   Delete,
   Query,
   UseGuards,
@@ -82,7 +83,7 @@ export class ProductsController {
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Buscar produto por ID' })
-  findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentTenant() tenantId: string) {
     return this.productsService.findOne(id, tenantId);
   }
 
@@ -93,7 +94,7 @@ export class ProductsController {
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 404, description: 'Produto não encontrado' })
   getStockHistory(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
