@@ -14,12 +14,15 @@ import { Categoria } from '../../backend/src/database/entities/Categoria.entity'
 import { MovimentacaoEstoque } from '../../backend/src/database/entities/MovimentacaoEstoque.entity';
 import { Pedido } from '../../backend/src/database/entities/Pedido.entity';
 import { ItemPedido } from '../../backend/src/database/entities/ItemPedido.entity';
+import { requireAdminPassword } from './admin-password';
 
 const TENANT_ID = process.env.SEED_TENANT_ID || '00000000-0000-0000-0000-000000000000';
 const DEFAULT_EMAIL = process.env.SEED_ADMIN_EMAIL || 'admin@loja.com';
-const DEFAULT_PASSWORD = process.env.SEED_ADMIN_PASSWORD || 'senha123';
 
 async function seedUsuarioPadrao() {
+  // F12: exige SEED_ADMIN_PASSWORD (sem default publico) ANTES de tocar o banco.
+  const adminPassword = requireAdminPassword();
+
   console.log('ðŸ‘¤ Criando usuÃ¡rio padrÃ£o...\n');
 
   // Criar DataSource
@@ -63,14 +66,14 @@ async function seedUsuarioPadrao() {
 
     if (existingUser) {
       console.log('âš ï¸  UsuÃ¡rio jÃ¡ existe. Atualizando senha...');
-      const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+      const hashedPassword = await bcrypt.hash(adminPassword, 10);
       existingUser.encrypted_password = hashedPassword;
       existingUser.is_active = true;
       await manager.save(existingUser);
       console.log('âœ… Senha atualizada\n');
     } else {
       console.log('ðŸ‘¤ Criando usuÃ¡rio padrÃ£o...');
-      const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+      const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
       const usuario = manager.create(Usuario, {
         tenant_id: TENANT_ID,
@@ -87,7 +90,7 @@ async function seedUsuarioPadrao() {
 
     console.log('ðŸ“‹ Credenciais padrÃ£o:');
     console.log(`   Email: ${DEFAULT_EMAIL}`);
-    console.log(`   Senha: ${DEFAULT_PASSWORD}`);
+    // F12: a senha NUNCA e logada (era leak de plaintext no terminal/log).
     console.log('\nâœ… UsuÃ¡rio padrÃ£o configurado com sucesso!');
   } catch (error) {
     console.error('âŒ Erro ao criar usuÃ¡rio padrÃ£o:', error);
