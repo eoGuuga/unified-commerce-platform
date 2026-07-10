@@ -2067,23 +2067,85 @@ export class WhatsAppService {
         customerName: conversation.customer_name,
       });
 
+      // As 8 ações de negócio do action-executor voltam com `response` vazio e o
+      // `stateTransition` setado (o executor injeta só o OpenAIService; quem tem
+      // os domain-services é este orquestrador). Se veio vazio + stateTransition,
+      // roteamos pro handler real. Ações conversacionais (greeting/clarify/…) já
+      // trazem texto e passam direto.
+      if (!executionResult.response && executionResult.stateTransition) {
+        return this.routeBusinessAction(
+          executionResult.stateTransition,
+          tenantId,
+          message,
+          conversation,
+        );
+      }
       return executionResult.response;
     } catch (error) {
       this.logger.warn('LLM fallback failed', { error });
-
-      // Resposta amigável quando não entende
-      const suggestions = [
-        '🛒 Digite "ver produtos" para ver o cardápio',
-        '❓ Digite "ajuda" para ver todos os comandos',
-        '🛍️ Ou me diga o que você quer!',
-      ];
-
-      return [
-        '🤔 Não entendi bem...',
-        '',
-        suggestions[Math.floor(Math.random() * suggestions.length)],
-      ].join('\n');
+      return this.buildFriendlyFallback();
     }
+  }
+
+  /**
+   * Roteia uma ação de negócio do action-executor (que volta com `response`
+   * vazio + `stateTransition`) para o handler real correspondente — que JÁ
+   * existe e já está ligado aos domain-services neste orquestrador. É o elo que
+   * faltava: sem isto o `stateTransition` era descartado e o cliente recebia
+   * vazio (era ghosteado).
+   *
+   * Fase 2 — Tipo A (roteia pra handler pronto). Tipo B (helper param-first:
+   * check_price/check_stock/process_order) e Tipo C (escala honesta:
+   * cancel_order/collect_info) ainda caem no `default` (fallback amigável, NUNCA
+   * silêncio) até serem construídos.
+   */
+  private async routeBusinessAction(
+    stateTransition: string,
+    tenantId: string,
+    message: string,
+    conversation: TypedConversation,
+  ): Promise<WhatsAppOutboundResponse> {
+    const customerPhone = conversation.customer_phone;
+
+    switch (stateTransition) {
+      // --- Tipo A: mensagem crua → handler pronto ---
+      case 'show_catalog':
+        return this.handleCatalog(tenantId, message);
+
+      case 'check_order_status':
+        return this.handleOrderStatus(tenantId, customerPhone, message, conversation);
+
+      // STUB CONHECIDO: handlePayment mostra chave PIX hardcoded e NÃO cobra de
+      // verdade (débito registrado no roadmap). Roteia certo; a cobrança real
+      // entra quando a Fase 4 de pagamentos ligar o paymentsService por-tenant.
+      case 'select_payment':
+        return this.handlePayment(tenantId, customerPhone, message, conversation);
+
+      // --- Tipo B (a construir): check_price, check_stock, process_order ---
+      // --- Tipo C (a construir): cancel_order, collect_info ---
+      // Até lá, caem no default abaixo — resposta amigável, nunca vazia.
+      default:
+        return this.buildFriendlyFallback();
+    }
+  }
+
+  /**
+   * Resposta amigável de último recurso (não entendeu / ação ainda não cabeada).
+   * Extraída do catch do handleFallback para ser reusada pelo `default` do
+   * roteamento — garante que nenhum caminho novo devolva string vazia.
+   */
+  private buildFriendlyFallback(): string {
+    const suggestions = [
+      '🛒 Digite "ver produtos" para ver o cardápio',
+      '❓ Digite "ajuda" para ver todos os comandos',
+      '🛍️ Ou me diga o que você quer!',
+    ];
+
+    return [
+      '🤔 Não entendi bem...',
+      '',
+      suggestions[Math.floor(Math.random() * suggestions.length)],
+    ].join('\n');
   }
 
   // ============== BOT CONTROL ==============
