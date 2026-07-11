@@ -222,16 +222,69 @@ describe('WhatsappService — Fase 2 Tipo B: helper param-first (§5 centralizad
 });
 
 describe('WhatsappService — Fase 2 Tipo C: escala honesta (cancel_order / collect_info)', () => {
-  it('🎯 cancel_order → escala pedindo o número e NÃO cancela (não abre o furo de ownership do updateStatus)', async () => {
-    const updateStatus = jest.fn();
+  // Peça 3: cancel_order agora CANCELA de verdade — mas só o pedido do PRÓPRIO
+  // cliente (ownership por construção via findLatestByCustomerPhone, escopado por
+  // telefone) e só quando PENDENTE. Dupla-trava: a query + updateStatus(actor:customer).
+  it('🎯 cancel_order: pedido PENDENTE próprio → cancela (actor customer; estoque volta pelo updateStatus)', async () => {
+    const updateStatus = jest.fn().mockResolvedValue({});
+    const findLatestByCustomerPhone = jest.fn().mockResolvedValue({
+      id: 'ped-1',
+      order_no: 'PED-1234',
+      status: 'pendente_pagamento',
+    });
     const service = driveFallback('cancel_order');
-    // updateStatus disponível — o teste garante que MESMO ASSIM não é chamado.
-    service.ordersService = { updateStatus };
+    service.ordersService = { findLatestByCustomerPhone, updateStatus };
 
     const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
 
-    expect(String(res).toLowerCase()).toContain('número'); // pede o número do pedido
-    expect(updateStatus).not.toHaveBeenCalled(); // SEGURANÇA: não cancela nada aqui
+    // resolve pelo telefone DO CLIENTE (ownership por construção)
+    expect(findLatestByCustomerPhone).toHaveBeenCalledWith('t1', '5511999998888');
+    // cancela com actor 'customer' (a Peça 1 valida PENDENTE→CANCELADO)
+    expect(updateStatus).toHaveBeenCalledWith('ped-1', 'cancelado', 't1', { actor: 'customer' });
+    expect(String(res).toLowerCase()).toContain('cancelei');
+  });
+
+  it('🎯 cancel_order (OWNERSHIP): pedido de OUTRO telefone não aparece na query → admite, NÃO cancela', async () => {
+    const updateStatus = jest.fn();
+    // A query é escopada pelo telefone do cliente → o pedido de outro NUNCA retorna.
+    const findLatestByCustomerPhone = jest.fn().mockResolvedValue(null);
+    const service = driveFallback('cancel_order');
+    service.ordersService = { findLatestByCustomerPhone, updateStatus };
+
+    const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
+
+    expect(findLatestByCustomerPhone).toHaveBeenCalledWith('t1', '5511999998888');
+    expect(updateStatus).not.toHaveBeenCalled(); // ownership: não toca pedido de ninguém
+    expect(String(res).toLowerCase()).toMatch(/não achei|cardápio|ver produtos/);
+  });
+
+  it('🎯 cancel_order: pedido PAGO/em andamento → escala pra loja, NÃO cancela', async () => {
+    const updateStatus = jest.fn();
+    const findLatestByCustomerPhone = jest.fn().mockResolvedValue({
+      id: 'ped-2',
+      order_no: 'PED-5678',
+      status: 'confirmado',
+    });
+    const service = driveFallback('cancel_order');
+    service.ordersService = { findLatestByCustomerPhone, updateStatus };
+
+    const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
+
+    expect(findLatestByCustomerPhone).toHaveBeenCalled(); // olhou o pedido (RED: hoje não olha)
+    expect(updateStatus).not.toHaveBeenCalled(); // NÃO cancela pago
+    expect(String(res).toLowerCase()).toMatch(/loja|andamento|confirm/);
+  });
+
+  it('cancel_order: nenhum pedido ativo → admite (§5), não cancela', async () => {
+    const updateStatus = jest.fn();
+    const findLatestByCustomerPhone = jest.fn().mockResolvedValue(null);
+    const service = driveFallback('cancel_order');
+    service.ordersService = { findLatestByCustomerPhone, updateStatus };
+
+    const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
+
+    expect(updateStatus).not.toHaveBeenCalled();
+    expect(String(res).length).toBeGreaterThan(0);
   });
 
   // Caracterização (NÃO RED→GREEN): collect_info já caía no fallback via `default`;

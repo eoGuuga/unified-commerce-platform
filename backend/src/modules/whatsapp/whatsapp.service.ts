@@ -8,7 +8,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CouponsService } from '../coupons/coupons.service';
 import { AvailabilityService } from '../availability/availability.service';
 import { DbContextService } from '../common/services/db-context.service';
-import { CanalVenda, Pedido } from '../../database/entities/Pedido.entity';
+import { CanalVenda, Pedido, PedidoStatus } from '../../database/entities/Pedido.entity';
 import { Produto } from '../../database/entities/Produto.entity';
 
 // Services de inteligência (mantidos para recursos avançados)
@@ -2130,14 +2130,12 @@ export class WhatsAppService {
       case 'process_order':
         return this.routeProductAction(stateTransition, params, tenantId, customerPhone);
 
-      // --- Tipo C: escala honesta (não finge capacidade que não temos) ---
-      // cancel_order: NÃO cancela aqui. O `ordersService.updateStatus` valida só
-      // o tenant, NÃO o dono (customer_phone) — cancelar pelo número deixaria um
-      // cliente cancelar o pedido de outro. O handler real (com checagem de
-      // ownership) é follow-up de SEGURANÇA no roadmap. Por ora, escala honesto:
-      // pede o número e encaminha pra loja, sem tocar em pedido nenhum.
+      // --- Tipo C ---
+      // cancel_order: cancelamento pelo cliente COM ownership (Peça 3). Ownership
+      // por construção (findLatestByCustomerPhone escopado por telefone) + a
+      // dupla-trava do updateStatus(actor:'customer'). Só cancela PENDENTE próprio.
       case 'cancel_order':
-        return 'Pra cancelar um pedido já feito, me passa o número dele (ex.: PED-1234) que eu confirmo com a loja e resolvo pra você. 🙂';
+        return this.handleCancelOrder(tenantId, customerPhone);
 
       // collect_info: MORTA DE FÁBRICA. O router (llm-router `buildSystemPrompt`)
       // NÃO emite esta ação — ela não está no menu do prompt — e, mesmo se
@@ -2183,6 +2181,38 @@ export class WhatsAppService {
       default:
         return this.buildFriendlyFallback();
     }
+  }
+
+  /**
+   * Peça 3 — cancelamento pelo CLIENTE (bot). Ownership por CONSTRUÇÃO:
+   * `findLatestByCustomerPhone` é escopado pelo telefone → só retorna o pedido do
+   * PRÓPRIO cliente (o de outro nunca aparece). Dupla-trava: o `updateStatus` com
+   * actor 'customer' (Peça 1) só permite PENDENTE→CANCELADO. O estoque volta
+   * sozinho (o release do `updateStatus`, Peça 2). Nada de número de pedido —
+   * pega o último pedido ativo do telefone (melhor UX, ownership grátis).
+   */
+  private async handleCancelOrder(
+    tenantId: string,
+    customerPhone: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    const pedido = await this.ordersService.findLatestByCustomerPhone(tenantId, customerPhone);
+
+    // §5: não achou pedido ativo do cliente → admite, não inventa.
+    if (!pedido) {
+      return 'Não achei nenhum pedido ativo no seu nome pra cancelar. 🤔 Quer ver o cardápio? É só dizer "ver produtos".';
+    }
+
+    // Só PENDENTE (não pago) o cliente cancela sozinho. Pago/em produção → escala.
+    if (pedido.status !== PedidoStatus.PENDENTE_PAGAMENTO) {
+      return `Seu pedido *${pedido.order_no}* já está em andamento. Pra cancelar um pedido desses eu preciso confirmar com a loja — me chama que a gente resolve. 🙂`;
+    }
+
+    // PENDENTE → cancela. actor 'customer' valida a transição (Peça 1); o release
+    // de estoque acontece dentro do updateStatus (Peça 2).
+    await this.ordersService.updateStatus(pedido.id, PedidoStatus.CANCELADO, tenantId, {
+      actor: 'customer',
+    });
+    return `Pronto, cancelei seu pedido *${pedido.order_no}*. ✅ Se mudar de ideia, é só fazer um novo pedido. 🙂`;
   }
 
   /**
