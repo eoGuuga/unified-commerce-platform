@@ -678,6 +678,39 @@ export class OpenAIService {
     }
   }
 
+  /**
+   * Fatia 1 — um passo do loop de tool-calling: monta o body (config interna +
+   * `tools`) e chama o cliente nativo. Público (o loop no `whatsapp.service`
+   * chama). Retorna null se não há chave → o chamador DEGRADA pro determinístico
+   * do Fix 3 (sem chave = bot idêntico ao de hoje no caminho check_price).
+   */
+  async runToolStep(
+    messages: Array<Record<string, unknown>>,
+    tools: Array<Record<string, unknown>>,
+    toolChoice: unknown = 'auto',
+    model?: string,
+    temperature?: number,
+  ): Promise<ToolCallingResult | null> {
+    const { apiKey, baseUrl, timeoutMs, allowNoKey, model: defaultModel } =
+      this.getClientConfig();
+    if (!apiKey && !allowNoKey) {
+      return null;
+    }
+    return this.callWithTools({
+      apiKey,
+      baseUrl,
+      timeoutMs,
+      body: {
+        model: model || defaultModel,
+        temperature: temperature ?? 0.3,
+        max_tokens: 400,
+        tools,
+        tool_choice: toolChoice,
+        messages,
+      },
+    });
+  }
+
   private sanitizeConversationalReply(reply: unknown): string {
     return String(reply || '')
       .replace(/\r/g, '')

@@ -12,7 +12,8 @@ import { CanalVenda, Pedido } from '../../database/entities/Pedido.entity';
 import { Produto } from '../../database/entities/Produto.entity';
 
 // Services de inteligência (mantidos para recursos avançados)
-import { OpenAIService } from './services/openai.service';
+import { OpenAIService, ToolCallingResult } from './services/openai.service';
+import { checkNarrationFacts } from './services/narration-guard';
 import { MessageIntelligenceService } from './services/message-intelligence.service';
 import { ConversationalIntelligenceService } from './services/conversational-intelligence.service';
 import { ConversationPlannerService } from './services/conversation-planner.service';
@@ -2125,7 +2126,10 @@ export class WhatsAppService {
         return this.handlePayment(tenantId, customerPhone, message, conversation);
 
       // --- Tipo B: ações de produto → helper param-first (§5 centralizado) ---
+      // Fatia 1 (tool-calling pleno): check_price migrou pro LOOP com narração +
+      // cinturão §5. check_stock/process_order seguem no Fix 3 (rede de segurança).
       case 'check_price':
+        return this.handleCheckPriceViaLoop(tenantId, params, message);
       case 'check_stock':
       case 'process_order':
         return this.routeProductAction(stateTransition, params, tenantId, customerPhone);
@@ -2152,6 +2156,117 @@ export class WhatsAppService {
       default:
         return this.buildFriendlyFallback();
     }
+  }
+
+  /**
+   * Fatia 1 do tool-calling pleno — check_price pelo LOOP com narração + cinturão
+   * §5. SÓ check_price usa isto; o resto fica no Fix 3 (rede de segurança).
+   *
+   * Fluxo: a IA pede a tool → o CÓDIGO executa `productsService.search` (dona do
+   * fato) → devolve `{found,name,price}` estruturado → a IA NARRA → o CINTURÃO
+   * (`checkNarrationFacts`, fail-closed) só deixa passar se TODO número conferir;
+   * senão cai no determinístico (`formatProductPrice`, com o preço REAL).
+   *
+   * Degrada pro Fix 3 se não houver LLM/chave (sem chave = bot idêntico ao de hoje).
+   */
+  private async handleCheckPriceViaLoop(
+    tenantId: string,
+    params: Record<string, any>,
+    message: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    const CHECK_PRICE_TOOL = {
+      type: 'function',
+      function: {
+        name: 'check_price',
+        description: 'Consulta o preço REAL de um produto no catálogo da loja.',
+        parameters: {
+          type: 'object',
+          properties: {
+            product: { type: 'string', description: 'nome do produto' },
+          },
+          required: ['product'],
+        },
+      },
+    };
+    const systemPrompt = [
+      'Você é a vendedora da loja no WhatsApp — curta, acolhedora, PT-BR.',
+      'REGRA ABSOLUTA (§5): você NARRA apenas os fatos que a ferramenta devolver.',
+      'NUNCA diga um preço/número que a ferramenta não retornou. Use dígitos (R$ 5,00).',
+      'Se a ferramenta não achar o produto, ADMITA (não invente preço) e ofereça o cardápio.',
+    ].join('\n');
+
+    const messages: Array<Record<string, unknown>> = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: message },
+    ];
+
+    // Passo 1: a IA decide chamar a tool. Degrada pro Fix 3 se não houver LLM.
+    let step1: ToolCallingResult | null = null;
+    try {
+      step1 =
+        (await this.openAIService?.runToolStep?.(messages, [CHECK_PRICE_TOOL], 'auto')) ??
+        null;
+    } catch {
+      step1 = null;
+    }
+    if (!step1 || step1.kind !== 'tool_calls') {
+      return this.routeProductAction('check_price', params, tenantId, '');
+    }
+
+    const call =
+      step1.toolCalls.find((c) => c.name === 'check_price') ?? step1.toolCalls[0];
+    const productName = String((call.args as any)?.product ?? params?.product ?? '').trim();
+
+    // Executa a tool REAL — o CÓDIGO é dono do fato.
+    const products = productName
+      ? await this.productsService.search(tenantId, productName)
+      : [];
+    const product = products.length > 0 ? products[0] : null;
+    const toolResult = product
+      ? { found: true, name: product.name, price: Number(product.price) }
+      : { found: false };
+    const authorized = product ? [Number(product.price)] : [];
+
+    // O determinístico (a rede §5): o texto code-formatado com o preço REAL.
+    const deterministic: WhatsAppOutboundResponse = product
+      ? this.formatProductPrice(product)
+      : `Hmm, não achei "${productName}" no nosso cardápio. 😕 Quer ver o cardápio? É só dizer "ver produtos".`;
+
+    // Passo 2: devolve o resultado da tool pra IA narrar.
+    messages.push({
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        {
+          id: call.id || 'call_1',
+          type: 'function',
+          function: { name: 'check_price', arguments: JSON.stringify(call.args) },
+        },
+      ],
+    });
+    messages.push({
+      role: 'tool',
+      tool_call_id: call.id || 'call_1',
+      name: 'check_price',
+      content: JSON.stringify(toolResult),
+    });
+
+    let step2: ToolCallingResult | null = null;
+    try {
+      step2 =
+        (await this.openAIService?.runToolStep?.(messages, [CHECK_PRICE_TOOL], 'auto')) ??
+        null;
+    } catch {
+      step2 = null;
+    }
+    const narration = step2 && step2.kind === 'content' ? step2.content : '';
+    if (!narration) {
+      return deterministic;
+    }
+
+    // CINTURÃO fail-closed: só usa a narração da IA se TODO número conferir.
+    const check = checkNarrationFacts(narration, authorized);
+    return check.safe ? narration : deterministic;
   }
 
   /**
