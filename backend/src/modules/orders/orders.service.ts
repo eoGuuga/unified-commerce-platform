@@ -3,6 +3,7 @@ import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, DataSource, Not } from 'typeorm';
 import { randomBytes } from 'crypto';
 import { Pedido, PedidoStatus, CanalVenda } from '../../database/entities/Pedido.entity';
+import { StatusActor, assertStatusTransition } from './order-status-transitions';
 import { ItemPedido } from '../../database/entities/ItemPedido.entity';
 import { MovimentacaoEstoque } from '../../database/entities/MovimentacaoEstoque.entity';
 import { MetodoPagamento, Pagamento, PagamentoStatus } from '../../database/entities/Pagamento.entity';
@@ -647,7 +648,7 @@ export class OrdersService {
     id: string,
     status: PedidoStatus,
     tenantId: string,
-    opts?: { suppressNotification?: boolean },
+    opts?: { suppressNotification?: boolean; actor?: StatusActor },
   ): Promise<Pedido> {
     const pedido = await this.findOne(id, tenantId);
     const oldStatus = pedido.status;
@@ -657,7 +658,10 @@ export class OrdersService {
       return pedido;
     }
 
-    this.assertStatusTransition(oldStatus, status);
+    // Valida a transição contra a política POR ATOR. O ator vem do call-site
+    // (não do request) — default 'admin' (o painel). O webhook de pagamento passa
+    // 'payment'; o bot (Peça 3) passará 'customer'. Rejeita NÃO silenciosamente.
+    assertStatusTransition(oldStatus, status, opts?.actor ?? 'admin');
 
     const updatedPedido = await this.db.runInTransaction(async (manager) => {
       // Lock pessimista para serializar transições concorrentes.
@@ -825,41 +829,6 @@ export class OrdersService {
 
     const fallback = randomBytes(4).toString('hex').toUpperCase();
     return `${prefix}${fallback}`;
-  }
-
-  private assertStatusTransition(from: PedidoStatus, to: PedidoStatus): void {
-    const allowed: Record<PedidoStatus, PedidoStatus[]> = {
-      [PedidoStatus.PENDENTE_PAGAMENTO]: [
-        PedidoStatus.CONFIRMADO,
-        PedidoStatus.CANCELADO,
-      ],
-      [PedidoStatus.CONFIRMADO]: [
-        PedidoStatus.EM_PRODUCAO,
-        PedidoStatus.CANCELADO,
-      ],
-      [PedidoStatus.EM_PRODUCAO]: [
-        PedidoStatus.PRONTO,
-        PedidoStatus.CANCELADO,
-      ],
-      [PedidoStatus.PRONTO]: [
-        PedidoStatus.EM_TRANSITO,
-        PedidoStatus.ENTREGUE,
-      ],
-      [PedidoStatus.EM_TRANSITO]: [PedidoStatus.ENTREGUE],
-      [PedidoStatus.ENTREGUE]: [],
-      [PedidoStatus.CANCELADO]: [],
-    };
-
-    if (from === to) {
-      return;
-    }
-
-    const next = allowed[from] || [];
-    if (!next.includes(to)) {
-      throw new BadRequestException(
-        `Transicao de status invalida: ${from} -> ${to}`,
-      );
-    }
   }
 
   /**

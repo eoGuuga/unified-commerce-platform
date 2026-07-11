@@ -153,6 +153,8 @@ export class OrdersController {
     @Body('status') status: PedidoStatus,
     @CurrentTenant() tenantId: string,
   ) {
-    return this.ordersService.updateStatus(id, status, tenantId);
+    // Ator FIXO no call-site (JWT = painel da mãe). O usuário controla o status
+    // pretendido, nunca o ator — a política 'admin' bloqueia →pago e reversões.
+    return this.ordersService.updateStatus(id, status, tenantId, { actor: 'admin' });
   }
 }
