@@ -14,6 +14,18 @@ export interface MessageIntent {
   confidence: number;
 }
 
+/**
+ * Resultado de uma chamada com function-calling NATIVO (Fatia 0 do tool-calling
+ * pleno). O LLM ou pede uma ferramenta (`tool_calls`) ou dá a narração final
+ * (`content`). O chamador (o loop, Fatia 1+) discrimina pelo `kind`.
+ */
+export type ToolCallingResult =
+  | {
+      kind: 'tool_calls';
+      toolCalls: Array<{ id: string; name: string; args: Record<string, unknown> }>;
+    }
+  | { kind: 'content'; content: string };
+
 export interface ConversationalAssistInput {
   message: string;
   currentState?: string | null;
@@ -561,6 +573,108 @@ export class OpenAIService {
       return data?.choices?.[0]?.message?.content || null;
     } finally {
       clearTimeout(timeout);
+    }
+  }
+
+  /**
+   * Fatia 0 do tool-calling pleno — cliente com function-calling NATIVO.
+   * ADITIVO e INERTE: nenhum caminho de produção chama isto ainda (o Fix 3 e o
+   * router seguem no `callChatCompletions`/`response_format`). Passa `tools` +
+   * `tool_choice` no body (montados pelo chamador) e extrai `tool_calls` da
+   * resposta (não só `.content`). Devolve um resultado discriminado: ou a(s)
+   * ferramenta(s) pedida(s) com args estruturados, ou a narração final.
+   *
+   * Método SEPARADO de propósito (duplica o fetch/retry) pra garantir que o
+   * caminho antigo fica byte-a-byte intacto nesta fatia.
+   */
+  private async callWithTools(input: {
+    apiKey?: string;
+    baseUrl: string;
+    timeoutMs: number;
+    body: Record<string, unknown>;
+  }): Promise<ToolCallingResult | null> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), input.timeoutMs);
+
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (input.apiKey) {
+        headers.Authorization = `Bearer ${input.apiKey}`;
+      }
+
+      let response: Response | null = null;
+      const body = JSON.stringify(input.body);
+
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        response = await fetch(`${input.baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers,
+          body,
+          signal: controller.signal,
+        });
+        if (response.ok) {
+          break;
+        }
+        if (attempt === 1) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+      }
+
+      if (!response || !response.ok) {
+        const text = response ? await response.text() : 'no response';
+        const status = response ? response.status : 'no-status';
+        this.logger.warn(`OpenAI (tools) error: ${status} ${text}`);
+        return null;
+      }
+
+      const data = (await response.json()) as {
+        choices?: Array<{
+          message?: {
+            content?: string | null;
+            tool_calls?: Array<{
+              id?: string;
+              function?: { name?: string; arguments?: string };
+            }>;
+          };
+        }>;
+      };
+
+      const message = data?.choices?.[0]?.message;
+      const rawToolCalls = message?.tool_calls;
+
+      if (Array.isArray(rawToolCalls) && rawToolCalls.length > 0) {
+        return {
+          kind: 'tool_calls',
+          toolCalls: rawToolCalls.map((tc) => ({
+            id: tc.id ?? '',
+            name: tc.function?.name ?? '',
+            // `arguments` vem como STRING JSON (spec OpenAI/OpenRouter). Parse
+            // defensivo: malformado -> {} (o handler da tool trata params vazio,
+            // ex.: resolveProductFromParams admite quando falta o product).
+            args: this.parseToolArgs(tc.function?.arguments),
+          })),
+        };
+      }
+
+      return { kind: 'content', content: message?.content ?? '' };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private parseToolArgs(raw: string | undefined): Record<string, unknown> {
+    if (!raw) {
+      return {};
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object'
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
     }
   }
 
