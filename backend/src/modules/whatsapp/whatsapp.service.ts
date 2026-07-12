@@ -2112,10 +2112,13 @@ export class WhatsAppService {
     const customerPhone = conversation.customer_phone;
 
     switch (stateTransition) {
-      // --- Tipo A: mensagem crua → handler pronto ---
+      // --- Fatia 2/Mov A: show_catalog pelo LOOP (IA narra o catálogo, cinturão
+      // autoriza todos os preços reais). Degrada pra lista interativa. ---
       case 'show_catalog':
-        return this.handleCatalog(tenantId, message);
+        return this.handleShowCatalogViaLoop(tenantId, message);
 
+      // check_order_status: Movimento B (fato-texto) — segue no handler direto
+      // até o design do verificador de status estar fechado.
       case 'check_order_status':
         return this.handleOrderStatus(tenantId, customerPhone, message, conversation);
 
@@ -2126,11 +2129,13 @@ export class WhatsAppService {
         return this.handlePayment(tenantId, customerPhone, message, conversation);
 
       // --- Tipo B: ações de produto → helper param-first (§5 centralizado) ---
-      // Fatia 1 (tool-calling pleno): check_price migrou pro LOOP com narração +
-      // cinturão §5. check_stock/process_order seguem no Fix 3 (rede de segurança).
+      // Fatia 1: check_price pelo LOOP. Fatia 2/Mov A: check_stock pelo LOOP
+      // (cinturão B1, forbidBareNumbers). process_order segue no Fix 3 (a ESCRITA
+      // — add-to-cart — é fatia posterior, mantém a rede de segurança).
       case 'check_price':
         return this.handleCheckPriceViaLoop(tenantId, params, message);
       case 'check_stock':
+        return this.handleCheckStockViaLoop(tenantId, params, message, customerPhone);
       case 'process_order':
         return this.routeProductAction(stateTransition, params, tenantId, customerPhone);
 
@@ -2266,6 +2271,195 @@ export class WhatsAppService {
 
     // CINTURÃO fail-closed: só usa a narração da IA se TODO número conferir.
     const check = checkNarrationFacts(narration, authorized);
+    return check.safe ? narration : deterministic;
+  }
+
+  /**
+   * Fatia 2 / Movimento A — show_catalog pelo LOOP. A IA narra o catálogo; o
+   * cinturão autoriza TODOS os preços reais (a lista inteira) e barra qualquer
+   * número narrado fora desse conjunto (preço trocado/inventado). Bloqueou (ou
+   * sem LLM/chave) → cai no determinístico: a lista interativa code-owned de
+   * `handleCatalog`.
+   *
+   * Furo residual conhecido (número-belt): troca de PAR (preço válido no produto
+   * errado) e nome de produto inventado NÃO são pegos — é o problema de
+   * fato-texto do Movimento B.
+   */
+  private async handleShowCatalogViaLoop(
+    tenantId: string,
+    message: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    const SHOW_CATALOG_TOOL = {
+      type: 'function',
+      function: {
+        name: 'show_catalog',
+        description: 'Lista os produtos REAIS do catálogo da loja, com preços.',
+        parameters: { type: 'object', properties: {} },
+      },
+    };
+    const products = await this.catalogManager.getCatalogProducts(tenantId);
+    // Sem produtos → determinístico direto (não faz sentido narrar catálogo vazio).
+    if (!products || products.length === 0) {
+      return this.handleCatalog(tenantId, message);
+    }
+
+    const systemPrompt = [
+      'Você é a vendedora da loja no WhatsApp — curta, acolhedora, PT-BR.',
+      'REGRA ABSOLUTA (§5): narre APENAS os produtos e preços que a ferramenta devolver.',
+      'NUNCA invente produto e NUNCA diga um preço diferente do que a ferramenta deu. Use dígitos (R$ 5,00).',
+    ].join('\n');
+    const messages: Array<Record<string, unknown>> = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: message },
+    ];
+
+    let step1: ToolCallingResult | null = null;
+    try {
+      step1 =
+        (await this.openAIService?.runToolStep?.(messages, [SHOW_CATALOG_TOOL], 'auto')) ?? null;
+    } catch {
+      step1 = null;
+    }
+    if (!step1 || step1.kind !== 'tool_calls') {
+      return this.handleCatalog(tenantId, message);
+    }
+    const call = step1.toolCalls.find((c) => c.name === 'show_catalog') ?? step1.toolCalls[0];
+
+    // O CÓDIGO é dono dos fatos: nome + preço REAL de cada produto.
+    const catalogFacts = products.map((p) => ({ name: p.name, price: Number(p.price) }));
+    const authorized = catalogFacts.map((p) => p.price);
+
+    messages.push({
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        {
+          id: call.id || 'call_1',
+          type: 'function',
+          function: { name: 'show_catalog', arguments: JSON.stringify(call.args) },
+        },
+      ],
+    });
+    messages.push({
+      role: 'tool',
+      tool_call_id: call.id || 'call_1',
+      name: 'show_catalog',
+      content: JSON.stringify({ products: catalogFacts }),
+    });
+
+    let step2: ToolCallingResult | null = null;
+    try {
+      step2 =
+        (await this.openAIService?.runToolStep?.(messages, [SHOW_CATALOG_TOOL], 'auto')) ?? null;
+    } catch {
+      step2 = null;
+    }
+    const narration = step2 && step2.kind === 'content' ? step2.content : '';
+    if (!narration) {
+      return this.handleCatalog(tenantId, message);
+    }
+
+    // CINTURÃO: todo número narrado tem que ser um preço real do catálogo.
+    const check = checkNarrationFacts(narration, authorized);
+    return check.safe ? narration : this.handleCatalog(tenantId, message);
+  }
+
+  /**
+   * Fatia 2 / Movimento A — check_stock (B1, paridade honesta) pelo LOOP. A tool
+   * devolve só disponibilidade (SEM quantidade) → conjunto autorizado é [] e o
+   * cinturão roda em `forbidBareNumbers`: QUALQUER número na narração é invenção
+   * (ex.: "temos uns 20") → bloqueia. Produto não encontrado → admissão honesta
+   * DIRETA (não deixa a IA narrar disponibilidade falsa — fato-texto que o
+   * cinturão de-número não verifica). Sem LLM → degrada pro Fix 3.
+   */
+  private async handleCheckStockViaLoop(
+    tenantId: string,
+    params: Record<string, any>,
+    message: string,
+    customerPhone: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    const CHECK_STOCK_TOOL = {
+      type: 'function',
+      function: {
+        name: 'check_stock',
+        description:
+          'Confirma se a loja TEM o produto (disponível ou não), sem revelar quantidade.',
+        parameters: {
+          type: 'object',
+          properties: { product: { type: 'string', description: 'nome do produto' } },
+          required: ['product'],
+        },
+      },
+    };
+    const systemPrompt = [
+      'Você é a vendedora da loja no WhatsApp — curta, acolhedora, PT-BR.',
+      'REGRA ABSOLUTA (§5): confirme só SE temos o produto — NUNCA diga quantidade nem qualquer número.',
+      'Se a ferramenta não achar o produto, ADMITA (não diga que temos) e ofereça o cardápio.',
+    ].join('\n');
+    const messages: Array<Record<string, unknown>> = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: message },
+    ];
+
+    let step1: ToolCallingResult | null = null;
+    try {
+      step1 =
+        (await this.openAIService?.runToolStep?.(messages, [CHECK_STOCK_TOOL], 'auto')) ?? null;
+    } catch {
+      step1 = null;
+    }
+    if (!step1 || step1.kind !== 'tool_calls') {
+      return this.routeProductAction('check_stock', params, tenantId, customerPhone);
+    }
+    const call = step1.toolCalls.find((c) => c.name === 'check_stock') ?? step1.toolCalls[0];
+    const productName = String((call.args as any)?.product ?? params?.product ?? '').trim();
+
+    const products = productName
+      ? await this.productsService.search(tenantId, productName)
+      : [];
+    const product = products.length > 0 ? products[0] : null;
+
+    // Não encontrado → admissão honesta DIRETA (a IA não narra disponibilidade).
+    if (!product) {
+      return `Hmm, não achei "${productName}" no nosso cardápio. 😕 Quer dar uma olhada em tudo que temos? É só dizer "ver produtos".`;
+    }
+
+    // B1: a tool só confirma disponibilidade, SEM número → autorizado vazio.
+    const toolResult = { available: true, name: product.name };
+    const deterministic = this.formatProductAvailability(product);
+
+    messages.push({
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        {
+          id: call.id || 'call_1',
+          type: 'function',
+          function: { name: 'check_stock', arguments: JSON.stringify(call.args) },
+        },
+      ],
+    });
+    messages.push({
+      role: 'tool',
+      tool_call_id: call.id || 'call_1',
+      name: 'check_stock',
+      content: JSON.stringify(toolResult),
+    });
+
+    let step2: ToolCallingResult | null = null;
+    try {
+      step2 =
+        (await this.openAIService?.runToolStep?.(messages, [CHECK_STOCK_TOOL], 'auto')) ?? null;
+    } catch {
+      step2 = null;
+    }
+    const narration = step2 && step2.kind === 'content' ? step2.content : '';
+    if (!narration) {
+      return deterministic;
+    }
+
+    // CINTURÃO em modo B1: qualquer número (inteiro pelado incluso) é invenção.
+    const check = checkNarrationFacts(narration, [], { forbidBareNumbers: true });
     return check.safe ? narration : deterministic;
   }
 
