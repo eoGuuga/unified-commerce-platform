@@ -57,6 +57,20 @@ export interface StockAdjustmentContext {
 }
 
 /**
+ * Proposta de adição ao carrinho aguardando o sim/não do cliente (Fatia 3).
+ * O CÓDIGO persiste a proposta com os fatos REAIS (produto resolvido, preço do
+ * banco, quantity saneada H6) e SÓ o handlePendingCartAdd executa a escrita no
+ * "sim" — com estes params persistidos, nunca reinterpretados.
+ */
+export interface PendingCartAdd {
+  produto_id: string;
+  produto_name: string;
+  quantity: number;
+  unit_price: number;
+  proposed_at: string; // ISO — o pending expira (TTL); um "sim" tardio não ressuscita a escrita
+}
+
+/**
  * Item do pedido pendente
  */
 export interface PendingOrderItem {
@@ -155,6 +169,7 @@ export interface ConversationContext {
   customer_data?: CustomerData;         // Dados do cliente coletados
   pending_order?: PendingOrder;        // Pedido pendente (antes de confirmar)
   stock_adjustment?: StockAdjustmentContext; // Ajuste de quantidade por estoque
+  pending_cart_add?: PendingCartAdd | null; // Proposta de adição aguardando sim/não (Fatia 3)
   order_attempt_id?: string;            // Identificador do intento de pedido
   last_inbound_signature?: string;
   last_inbound_at?: string;

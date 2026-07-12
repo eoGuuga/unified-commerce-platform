@@ -41,7 +41,7 @@ import { MockWhatsappProvider } from './providers/mock-whatsapp.provider';
 import { IWhatsappProvider } from './providers/whatsapp-provider.interface';
 import { WhatsappSender } from './config/whatsapp-sender.service';
 
-import { TypedConversation, ConversationState, CustomerData, PendingOrder } from './types/whatsapp.types';
+import { TypedConversation, ConversationState, CustomerData, PendingOrder, PendingCartAdd } from './types/whatsapp.types';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
 import { BusinessHours, describeBusinessHours } from './utils/business-hours';
 import { maskPhone } from '../../common/utils/mask.util';
@@ -103,6 +103,14 @@ interface PickupSlot {
   label: string;
   scheduled_at: string; // ISO
 }
+
+/**
+ * TTL da proposta de carrinho (Fatia 3) — espelha o timeout de conversa (5 min).
+ * Necessário porque o timeout de conversa (passo 5.1) só dispara com
+ * state != 'idle', e o propose NÃO muda o state: sem TTL próprio, um "sim" de
+ * horas depois ressuscitaria uma escrita que o cliente já esqueceu.
+ */
+const PENDING_CART_ADD_TTL_MINUTES = 5;
 
 /**
  * Estado da coleta de checkout, guardado em conversation.context.checkout.
@@ -269,6 +277,9 @@ export class WhatsAppService {
           await this.conversationService.updateContext(conversationForTimeout.id, {
             state: 'idle',
             checkout: null,
+            // Fatia 3: proposta de carrinho órfã também morre no reset — mesma
+            // razão do checkout (um "sim" tardio não pode ressuscitar escrita).
+            pending_cart_add: null,
             customer_data: conversationForTimeout.context?.customer_data,
           });
 
@@ -472,7 +483,7 @@ export class WhatsAppService {
   private detectIntent(
     message: string,
     conversation: TypedConversation,
-  ): 'greeting' | 'catalog' | 'cart' | 'order_status' | 'order_adjust' | 'payment' | 'help' | 'collection' | 'fallback' {
+  ): 'greeting' | 'catalog' | 'cart' | 'order_status' | 'order_adjust' | 'payment' | 'help' | 'collection' | 'pending_cart_add' | 'fallback' {
     const lower = message.toLowerCase().trim();
     const currentState = conversation.context?.state as ConversationState | undefined;
 
@@ -486,6 +497,20 @@ export class WhatsAppService {
     const activeCheckout = conversation.context?.checkout as CheckoutContext | undefined;
     if (activeCheckout?.stage) {
       return 'collection';
+    }
+
+    // PRECEDENCIA DA PROPOSTA DE CARRINHO (Fatia 3): há uma adição PROPOSTA
+    // aguardando sim/não → a resposta do cliente pertence ao handlePendingCartAdd
+    // (o ÚNICO executor de addItem). Vem DEPOIS do checkout (Decisão 3: a FSM do
+    // dinheiro é dona do turno quando ativa). Proposta EXPIRADA (TTL) é IGNORADA
+    // aqui (gate síncrono não limpa) — fica inerte; o handler (defesa em
+    // profundidade) ou a próxima proposta a limpam.
+    const pendingCartAdd = conversation.context?.pending_cart_add as
+      | PendingCartAdd
+      | null
+      | undefined;
+    if (pendingCartAdd?.produto_id && !this.isPendingCartAddStale(pendingCartAdd)) {
+      return 'pending_cart_add';
     }
 
     // Verificar comandos de carrinho
@@ -597,6 +622,14 @@ export class WhatsAppService {
 
       case 'collection':
         return await this.handleCollectionStage(
+          context.message.tenantId,
+          context.processed.sanitizedBody,
+          context.conversation,
+        );
+
+      // Fatia 3: proposta de carrinho aguardando sim/não — o único executor.
+      case 'pending_cart_add':
+        return await this.handlePendingCartAdd(
           context.message.tenantId,
           context.processed.sanitizedBody,
           context.conversation,
@@ -2725,6 +2758,160 @@ export class WhatsAppService {
       this.logger.warn('process_order addItem failed', { error: err.message });
       return `Poxa, não consegui adicionar *${product.name}* ao carrinho agora. 😕 Pode ser o estoque ou o carrinho cheio — quer tentar outra quantidade ou ver o que já está no carrinho?`;
     }
+  }
+
+  /**
+   * Fatia 3 (Passo 1) — PROPÕE uma adição ao carrinho: persiste a proposta com
+   * os fatos REAIS (produto resolvido, preço do banco, quantity saneada H6) e
+   * retorna a pergunta de confirmação. NÃO escreve — a escrita só acontece no
+   * handlePendingCartAdd, após o "sim" do cliente.
+   * (Passo 1: ainda sem caller de produção — os call sites religam no Passo 2.)
+   */
+  private async proposeCartAdd(
+    conversation: TypedConversation,
+    product: Produto,
+    rawQuantity: unknown,
+  ): Promise<WhatsAppOutboundResponse> {
+    const quantity =
+      Number.isInteger(rawQuantity) && (rawQuantity as number) >= 1
+        ? (rawQuantity as number)
+        : 1;
+    const unitPrice = Number(product.price);
+    const pending: PendingCartAdd = {
+      produto_id: product.id,
+      produto_name: product.name,
+      quantity,
+      unit_price: unitPrice,
+      proposed_at: new Date().toISOString(),
+    };
+    await this.conversationService.updateContext(conversation.id, {
+      pending_cart_add: pending,
+    });
+    conversation.context = { ...conversation.context, pending_cart_add: pending };
+
+    return [
+      `Só confirmando: *${quantity}x ${product.name}* - R$ ${unitPrice.toFixed(2)} cada (total R$ ${(quantity * unitPrice).toFixed(2)}).`,
+      '',
+      'Confirmo? (responda *sim* ou *não*)',
+    ].join('\n');
+  }
+
+  /**
+   * Proposta velha não vale mais (Fatia 3): o timeout de conversa (passo 5.1) só
+   * dispara com state != 'idle', e o propose NÃO muda o state — sem este TTL um
+   * "sim" de horas depois ressuscitaria uma escrita que o cliente já esqueceu.
+   * Fail-closed: sem proposed_at válido = expirada.
+   */
+  private isPendingCartAddStale(pending: PendingCartAdd): boolean {
+    if (!pending.proposed_at) {
+      return true;
+    }
+    const proposedAt = new Date(pending.proposed_at).getTime();
+    if (!Number.isFinite(proposedAt)) {
+      return true;
+    }
+    return (Date.now() - proposedAt) / 60000 > PENDING_CART_ADD_TTL_MINUTES;
+  }
+
+  /**
+   * Fatia 3 (Passo 1) — o ÚNICO executor da escrita no carrinho. Lê a proposta
+   * PERSISTIDA (produto/preço NUNCA reinterpretados; correção de quantidade gera
+   * NOVA proposta) e decide:
+   *   1. número na resposta ("não, 3" / "3") → RE-PROPÕE com a qty nova (H6);
+   *   2. negativo → limpa sem escrever (checado ANTES do afirmativo:
+   *      "não confirmo" cancela — fail-closed);
+   *   3. afirmativo → addItem com os params persistidos → limpa → confirma;
+   *   4. ambíguo → pede sim/não (não escreve, não limpa).
+   * Proposta EXPIRADA (TTL) → limpa sem escrever (o "sim" tardio não ressuscita).
+   */
+  private async handlePendingCartAdd(
+    tenantId: string,
+    message: string,
+    conversation: TypedConversation,
+  ): Promise<WhatsAppOutboundResponse> {
+    const pending = conversation.context?.pending_cart_add as
+      | PendingCartAdd
+      | null
+      | undefined;
+    if (!pending?.produto_id) {
+      // Defensivo: o gate só roteia com proposta ativa.
+      return 'Não tenho nenhuma adição pendente. 🙂 Quer ver o cardápio? Digite "ver produtos".';
+    }
+
+    const clearPending = async () => {
+      await this.conversationService.updateContext(conversation.id, {
+        pending_cart_add: null,
+      });
+      conversation.context = { ...conversation.context, pending_cart_add: null };
+    };
+
+    // Defesa em profundidade: o gate ignora proposta expirada, mas numa corrida
+    // de borda (expirou entre o gate e aqui) limpamos sem escrever.
+    if (this.isPendingCartAddStale(pending)) {
+      await clearPending();
+      return 'Aquela confirmação expirou e eu não adicionei nada. 🙂 É só pedir de novo se ainda quiser!';
+    }
+
+    const lower = String(message || '').trim().toLowerCase();
+
+    // 1) Correção com número ("não, 3" / "3") → RE-PROPÕE. Vem ANTES do negativo
+    // de propósito: "não, 3" é correção, não cancelamento. Nada é escrito aqui —
+    // o cliente confirma a proposta NOVA no próximo turno.
+    const qtyMatch = lower.match(/(?<!\d)(\d{1,3})(?!\d)/);
+    if (qtyMatch) {
+      const parsed = parseInt(qtyMatch[1], 10);
+      const quantity = Number.isInteger(parsed) && parsed >= 1 ? parsed : 1;
+      const updated: PendingCartAdd = {
+        ...pending,
+        quantity,
+        proposed_at: new Date().toISOString(),
+      };
+      await this.conversationService.updateContext(conversation.id, {
+        pending_cart_add: updated,
+      });
+      conversation.context = { ...conversation.context, pending_cart_add: updated };
+      return `Fechado: *${quantity}x ${pending.produto_name}* - R$ ${pending.unit_price.toFixed(2)} cada (total R$ ${(quantity * pending.unit_price).toFixed(2)}). Confirmo? (responda *sim* ou *não*)`;
+    }
+
+    // 2) Negativo → limpa sem escrever.
+    if (/\b(n[ãa]o|cancela|cancelar|deixa|esquece)\b/.test(lower)) {
+      await clearPending();
+      return 'Beleza, não adicionei. 🙂 Quer ver mais alguma coisa? Digite "ver produtos".';
+    }
+
+    // 3) Afirmativo → a ÚNICA escrita no carrinho, com os params PERSISTIDOS.
+    const affirmative =
+      lower === 's' ||
+      lower === 'ok' ||
+      /\b(sim|confirmo|confirma|confirmar|pode|isso|beleza|fechado)\b/.test(lower);
+    if (affirmative) {
+      try {
+        await this.cartService.addItem({
+          tenantId,
+          customerPhone: conversation.customer_phone,
+          produtoId: pending.produto_id,
+          produtoName: pending.produto_name,
+          quantity: pending.quantity,
+          unitPrice: pending.unit_price,
+        });
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        // Paridade B1 (mesma do addResolvedProductToCart): a mensagem do reserve
+        // traz contagem de estoque — não repassamos ao cliente.
+        this.logger.warn('pending cart add failed', { error: err.message });
+        await clearPending();
+        return `Poxa, não consegui adicionar *${pending.produto_name}* agora. 😕 Pode ser o estoque ou o carrinho cheio — quer tentar outra quantidade?`;
+      }
+      await clearPending();
+      return [
+        `✅ Adicionado ${pending.quantity}x ${pending.produto_name} - R$ ${pending.unit_price.toFixed(2)} ao carrinho!`,
+        '',
+        'Digite "carrinho" para ver ou "finalizar" para confirmar.',
+      ].join('\n');
+    }
+
+    // 4) Ambíguo → pede clareza; não escreve e não limpa (o cliente responde).
+    return `Só pra confirmar: adiciono *${pending.quantity}x ${pending.produto_name}*? Responda *sim* ou *não* 🙂`;
   }
 
   /**
