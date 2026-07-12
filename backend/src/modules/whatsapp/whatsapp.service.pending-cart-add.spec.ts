@@ -177,6 +177,100 @@ describe('WhatsappService — Fatia 3 Passo 1: handlePendingCartAdd (o ÚNICO ex
   });
 });
 
+describe('WhatsappService — Fatia 3 Passo 3: os 4 call sites keyword/botão propõem (UMA porta)', () => {
+  const PROD_ENTITY = { id: 'p1', name: 'Brigadeiro Gourmet', price: 5 };
+
+  function keywordHarness(searchImpl: (q: string) => any[]) {
+    const updateContext = jest.fn().mockResolvedValue(undefined);
+    const addItem = jest.fn().mockResolvedValue({ id: 'cart1' });
+    const service = buildService({
+      conversationService: { updateContext },
+      cartService: { addItem },
+      productsService: {
+        search: jest.fn().mockImplementation((_t: string, q: string) =>
+          Promise.resolve(searchImpl(q)),
+        ),
+      },
+      catalogManager: { isCatalogCommand: () => false },
+    });
+    const conversation: any = {
+      id: 'c1',
+      customer_phone: '5511999998888',
+      context: { state: 'idle' },
+    };
+    return { service, conversation, updateContext, addItem };
+  }
+
+  it('🎯 CONSISTÊNCIA (a UX una): a frase LITERAL "quero 2 brigadeiros" → PROPÕE 2x → "sim" → escreve 2', async () => {
+    // O buy-block procura "2 brigadeiros" (não acha); o scan-block acha
+    // "brigadeiro" — e agora PROPÕE (antes escrevia direto, qty 1 fixa,
+    // IGNORANDO o "2" do cliente).
+    const { service, conversation, updateContext, addItem } = keywordHarness((q) =>
+      q === 'brigadeiro' ? [PROD_ENTITY] : [],
+    );
+
+    // Turno 1: intercepta na keyword → propõe com a quantidade DITA (2).
+    const res1 = await service.handleFallback('t1', 'quero 2 brigadeiros', conversation);
+    expect(addItem).not.toHaveBeenCalled();
+    const pending = updateContext.mock.calls[0][1].pending_cart_add;
+    expect(pending.quantity).toBe(2);
+    expect(pending.produto_id).toBe('p1');
+    expect(String(res1)).toContain('2x Brigadeiro Gourmet');
+    expect(String(res1).toLowerCase()).toContain('confirm');
+
+    // Turno 2: mesma porta de TODO caminho — o gate roteia, o executor escreve.
+    expect(service.detectIntent('sim', conversation)).toBe('pending_cart_add');
+    const res2 = await service.handlePendingCartAdd('t1', 'sim', conversation);
+    expect(addItem).toHaveBeenCalledTimes(1);
+    expect(addItem.mock.calls[0][0].quantity).toBe(2);
+    expect(String(res2)).toContain('✅ Adicionado 2x Brigadeiro Gourmet');
+  });
+
+  it('#1 handleCart "adicionar brigadeiro" → PROPÕE (addItem=0), não escreve', async () => {
+    const { service, conversation, updateContext, addItem } = keywordHarness(() => [PROD_ENTITY]);
+
+    const res = await service.handleCart('t1', '5511999998888', 'adicionar brigadeiro', conversation);
+
+    expect(addItem).not.toHaveBeenCalled();
+    expect(updateContext.mock.calls[0][1].pending_cart_add.produto_id).toBe('p1');
+    expect(String(res).toLowerCase()).toContain('confirm');
+  });
+
+  it('#2 handleFallback buy-block "quero brigadeiro" → PROPÕE 1x (sem número na frase → default H6)', async () => {
+    const { service, conversation, updateContext, addItem } = keywordHarness(() => [PROD_ENTITY]);
+
+    const res = await service.handleFallback('t1', 'quero brigadeiro', conversation);
+
+    expect(addItem).not.toHaveBeenCalled();
+    expect(updateContext.mock.calls[0][1].pending_cart_add.quantity).toBe(1);
+    expect(String(res)).toContain('1x Brigadeiro Gourmet');
+  });
+
+  it('#4 botão add_<produto> → carrega a conversa e PROPÕE (addItem=0)', async () => {
+    const { service, conversation, updateContext, addItem } = keywordHarness(() => [PROD_ENTITY]);
+    service.conversationService.getOrCreateConversation = jest
+      .fn()
+      .mockResolvedValue(conversation);
+
+    const res = await service.processInteractiveButton('add_brigadeiro', 't1', '5511999998888');
+
+    expect(addItem).not.toHaveBeenCalled();
+    expect(updateContext.mock.calls[0][1].pending_cart_add.produto_id).toBe('p1');
+    expect(String(res).toLowerCase()).toContain('confirm');
+  });
+
+  it('#4 botão com produto inexistente → mensagem honesta, NADA persistido', async () => {
+    const { service, updateContext, addItem } = keywordHarness(() => []);
+    service.conversationService.getOrCreateConversation = jest.fn();
+
+    const res = await service.processInteractiveButton('add_dragao', 't1', '5511999998888');
+
+    expect(addItem).not.toHaveBeenCalled();
+    expect(updateContext).not.toHaveBeenCalled();
+    expect(String(res)).toContain('não encontrado');
+  });
+});
+
 describe('WhatsappService — Fatia 3 Passo 1: o gate de precedência no detectIntent', () => {
   it('pending FRESCO ativo → a mensagem roteia pra pending_cart_add ANTES de qualquer rota', () => {
     const { service, conversation } = harness(freshPending());

@@ -817,16 +817,14 @@ export class WhatsAppService {
         if (productName && productName.length > 1) {
           const products = await this.productsService.search(tenantId, productName);
           if (products.length > 0) {
-            const product = products[0];
-            await this.cartService.addItem({
-              tenantId,
-              customerPhone,
-              produtoId: product.id,
-              produtoName: product.name,
-              quantity: 1,
-              unitPrice: Number(product.price),
-            });
-            return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao seu carrinho!\n\nDigite "carrinho" para ver ou "finalizar" para confirmar.`;
+            // Fatia 3 (Passo 3): PROPÕE pelo gate — a escrita só acontece após
+            // o "sim", no handlePendingCartAdd (o ÚNICO executor). A quantidade
+            // dita na mensagem entra na proposta (antes: qty 1 fixa, direto).
+            return this.proposeCartAdd(
+              conversation,
+              products[0],
+              this.extractQuantityFromMessage(message),
+            );
           } else {
             return `😕 Não encontrei "${productName}". Digite "ver produtos" para ver o cardápio!`;
           }
@@ -2018,16 +2016,13 @@ export class WhatsAppService {
 
         const products = await this.productsService.search(tenantId, productName);
         if (products.length > 0) {
-          const product = products[0];
-          await this.cartService.addItem({
-            tenantId,
-            customerPhone: conversation.customer_phone,
-            produtoId: product.id,
-            produtoName: product.name,
-            quantity: 1,
-            unitPrice: Number(product.price),
-          });
-          return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao carrinho!\n\nDigite "carrinho" para ver ou "finalizar" para confirmar.`;
+          // Fatia 3 (Passo 3): PROPÕE pelo gate (era escrita direta, qty 1 fixa
+          // que IGNORAVA o número do cliente). A escrita acontece no "sim".
+          return this.proposeCartAdd(
+            conversation,
+            products[0],
+            this.extractQuantityFromMessage(message),
+          );
         }
       } catch (error) {
         this.logger.error('Error in buy intent fallback', { error });
@@ -2056,15 +2051,12 @@ export class WhatsAppService {
               const hasBuyIntent = buyKeywords.some(k => lower.includes(k));
 
               if (hasBuyIntent) {
-                await this.cartService.addItem({
-                  tenantId,
-                  customerPhone: conversation.customer_phone,
-                  produtoId: product.id,
-                  produtoName: product.name,
-                  quantity: 1,
-                  unitPrice: Number(product.price),
-                });
-                return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao carrinho!\n\nDigite "carrinho" para ver ou "finalizar" para confirmar.`;
+                // Fatia 3 (Passo 3): PROPÕE pelo gate — escrita só após o "sim".
+                return this.proposeCartAdd(
+                  conversation,
+                  product,
+                  this.extractQuantityFromMessage(message),
+                );
               }
 
               return [
@@ -2782,6 +2774,22 @@ export class WhatsAppService {
   }
 
   /**
+   * Extrai a quantidade DITA na mensagem (primeiro inteiro de 1-3 dígitos):
+   * "quero 2 brigadeiros" → 2; sem número → undefined (o proposeCartAdd aplica
+   * o default H6 = 1). Os caminhos de keyword hardcodavam qty 1 e IGNORAVAM o
+   * número do cliente; com o gate, o número entra na PROPOSTA — e se a extração
+   * errar, o cliente corrige no "não, N" antes de qualquer escrita.
+   */
+  private extractQuantityFromMessage(message: string): number | undefined {
+    const m = String(message || '').match(/(?<!\d)(\d{1,3})(?!\d)/);
+    if (!m) {
+      return undefined;
+    }
+    const n = parseInt(m[1], 10);
+    return Number.isInteger(n) && n >= 1 ? n : undefined;
+  }
+
+  /**
    * Proposta velha não vale mais (Fatia 3): o timeout de conversa (passo 5.1) só
    * dispara com state != 'idle', e o propose NÃO muda o state — sem este TTL um
    * "sim" de horas depois ressuscitaria uma escrita que o cliente já esqueceu.
@@ -3313,22 +3321,22 @@ export class WhatsAppService {
     const value = rest.join('_');
 
     switch (action) {
-      case 'add':
-        // Adicionar produto ao carrinho
+      case 'add': {
+        // Fatia 3 (Passo 3): o clique PROPÕE pelo gate — UMA porta pra toda
+        // escrita; o addItem acontece no "sim" (handlePendingCartAdd). Método
+        // hoje SEM caller em produção (botões dormentes) — migrado pra não
+        // deixar um caminho de escrita direta armado se religarem os botões.
         const products = await this.productsService.search(tenantId, value);
         if (products.length > 0) {
-          const product = products[0];
-          await this.cartService.addItem({
+          // Mesmo padrão do case 'finalize': carrega a conversa pra persistir.
+          const conversation = await this.conversationService.getOrCreateConversation(
             tenantId,
             customerPhone,
-            produtoId: product.id,
-            produtoName: product.name,
-            quantity: 1,
-            unitPrice: Number(product.price),
-          });
-          return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao carrinho!`;
+          );
+          return this.proposeCartAdd(conversation as TypedConversation, products[0], 1);
         }
         return '😕 Produto não encontrado.';
+      }
 
       case 'finalize': {
         // Carrega a conversa para a FSM de checkout guardar/ler o estagio.
