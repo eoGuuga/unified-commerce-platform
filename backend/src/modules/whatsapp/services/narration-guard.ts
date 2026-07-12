@@ -46,15 +46,41 @@ function extractMoneyNumbers(text: string): number[] {
 }
 
 /**
+ * Extrai INTEIROS PELADOS (sem R$/reais/decimal) — usado só no modo
+ * `forbidBareNumbers` (check_stock B1: a tool não devolve quantidade, então
+ * QUALQUER número na narração é invenção). Ignora `%` (tom: "100% disponível")
+ * e partes de decimal/preço (que o extrator de dinheiro já cobre).
+ */
+function extractBareIntegers(text: string): number[] {
+  const nums = new Set<number>();
+  const re = /(?<![\d.,%R$])\b(\d{1,4})\b(?![\d.,%])/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const n = parseInt(m[1], 10);
+    if (Number.isFinite(n)) nums.add(n);
+  }
+  return [...nums];
+}
+
+/**
  * Verifica a narração da IA contra os números AUTORIZADOS (os que a tool
  * devolveu + derivações que o CÓDIGO pré-computou). Tolerância de 1 centavo.
+ *
+ * `options.forbidBareNumbers` (opt-in, ex. check_stock B1): além do dinheiro,
+ * também trata INTEIRO PELADO como fato a verificar — assim "temos uns 20"
+ * (quantidade que a tool nunca devolveu) é barrado. Fica opt-in pra não fazer o
+ * cinturão de-dinheiro dos outros (check_price/show_catalog) superbloquear
+ * inteiro benigno.
  */
 export function checkNarrationFacts(
   narration: string,
   authorized: number[],
+  options: { forbidBareNumbers?: boolean } = {},
 ): NarrationCheck {
   const text = String(narration || '');
-  const found = extractMoneyNumbers(text);
+  const money = extractMoneyNumbers(text);
+  const bare = options.forbidBareNumbers ? extractBareIntegers(text) : [];
+  const found = [...new Set([...money, ...bare])];
   const hasPriceContext = PRICE_CONTEXT.test(text);
 
   // Nada de dinheiro e nenhum contexto de preço → nada a verificar (só tom).
