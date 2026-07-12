@@ -281,4 +281,23 @@ describe('ResponseBuilderService', () => {
       expect(message).toContain('Itens: 2 produto(s)'); // sem nome valido -> contagem, nao quebra
     });
   });
+
+  // Fatia 2 / Movimento B: a frase-fato do status é a fonte única code-owned.
+  describe('buildOrderStatusFactPhrase', () => {
+    it('mapeia EM_PRODUCAO para a frase-fato aprovada de preparo', () => {
+      const phrase = service.buildOrderStatusFactPhrase({ status: 'em_producao' } as any);
+      expect(phrase).toContain('em preparo');
+    });
+
+    it('mapeia EM_TRANSITO para "saiu para entrega" (não confunde com preparo)', () => {
+      const phrase = service.buildOrderStatusFactPhrase({ status: 'em_transito' } as any);
+      expect(phrase).toContain('saiu para entrega');
+      expect(phrase).not.toContain('preparo');
+    });
+
+    it('status desconhecido → frase genérica com o label (nunca quebra)', () => {
+      const phrase = service.buildOrderStatusFactPhrase({ status: 'algo_novo' } as any);
+      expect(phrase.toLowerCase()).toContain('status');
+    });
+  });
 });
