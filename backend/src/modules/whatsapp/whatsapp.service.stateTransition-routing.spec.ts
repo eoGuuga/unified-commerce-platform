@@ -68,13 +68,14 @@ describe('WhatsappService — Fase 2 Tipo A: roteia stateTransition → handler 
     expect(res).toBe('CATALOGO_AQUI');
   });
 
-  it('🎯 check_order_status → handleOrderStatus(tenantId, phone, message, conversation)', async () => {
+  it('🎯 check_order_status → handleOrderStatusViaLoop (loop Fatia 2/Mov B, status determinístico)', async () => {
     const service = driveFallback('check_order_status');
-    service.handleOrderStatus = jest.fn().mockResolvedValue('STATUS_DO_PEDIDO');
+    // Fatia 2/Mov B: agora vai pelo LOOP (frase-fato code-owned + IA embrulha).
+    service.handleOrderStatusViaLoop = jest.fn().mockResolvedValue('STATUS_DO_PEDIDO');
 
     const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
 
-    expect(service.handleOrderStatus).toHaveBeenCalledWith(
+    expect(service.handleOrderStatusViaLoop).toHaveBeenCalledWith(
       't1',
       '5511999998888',
       NEUTRAL_MSG,

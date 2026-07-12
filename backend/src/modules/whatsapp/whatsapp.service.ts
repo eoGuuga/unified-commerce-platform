@@ -2117,10 +2117,11 @@ export class WhatsAppService {
       case 'show_catalog':
         return this.handleShowCatalogViaLoop(tenantId, message);
 
-      // check_order_status: Movimento B (fato-texto) — segue no handler direto
-      // até o design do verificador de status estar fechado.
+      // Fatia 2/Mov B: check_order_status pelo LOOP com status DETERMINÍSTICO —
+      // o código é dono da frase-fato; a IA embrulha; containment + cinturão de
+      // número garantem. Degrada pro determinístico (buildOrderStatusMessage).
       case 'check_order_status':
-        return this.handleOrderStatus(tenantId, customerPhone, message, conversation);
+        return this.handleOrderStatusViaLoop(tenantId, customerPhone, message, conversation);
 
       // STUB CONHECIDO: handlePayment mostra chave PIX hardcoded e NÃO cobra de
       // verdade (débito registrado no roadmap). Roteia certo; a cobrança real
@@ -2461,6 +2462,139 @@ export class WhatsAppService {
     // CINTURÃO em modo B1: qualquer número (inteiro pelado incluso) é invenção.
     const check = checkNarrationFacts(narration, [], { forbidBareNumbers: true });
     return check.safe ? narration : deterministic;
+  }
+
+  /**
+   * Fatia 2 / Movimento B — check_order_status pelo LOOP com STATUS
+   * DETERMINÍSTICO (opção a). O CÓDIGO é dono da frase-fato do status
+   * (`buildOrderStatusFactPhrase`, fonte única enum→frase); a IA só EMBRULHA com
+   * tom. O cinturão cobre DUAS coisas:
+   *   1) containment — a frase-fato tem que sair ÍNTEGRA (a IA não trocou/omitiu
+   *      o status); senão → determinístico (a frase pura do código).
+   *   2) números — total/nº do pedido são autorizados; qualquer outro número
+   *      (ex.: "sai em 10 min") é invenção → determinístico.
+   *
+   * FRONTEIRA HONESTA: um fato-novo NÃO-numérico e NÃO-status ("o entregador já
+   * saiu") NÃO é pego pelo cinturão — só o prompt + a frase garantida o barram.
+   */
+  private async handleOrderStatusViaLoop(
+    tenantId: string,
+    customerPhone: string,
+    message: string,
+    _conversation: TypedConversation,
+  ): Promise<WhatsAppOutboundResponse> {
+    // Resolve o pedido (mesma regra do handler direto): nº explícito, senão o último.
+    const orderNo = this.extractOrderNo(message);
+    let pedido = orderNo ? await this.ordersService.findByOrderNo(orderNo, tenantId) : null;
+    if (!pedido) {
+      pedido = await this.ordersService.findLatestByCustomerPhone(tenantId, customerPhone);
+    }
+    if (!pedido) {
+      return 'Não encontrei pedidos recentes. Quer ver o cardápio?';
+    }
+
+    // O CÓDIGO é dono do fato-status e do determinístico.
+    const factPhrase = this.responseBuilder.buildOrderStatusFactPhrase(pedido);
+    const deterministic = this.responseBuilder.buildOrderStatusMessage(pedido);
+
+    // Números LEGÍTIMOS do pedido (o cinturão-de-número autoriza estes).
+    const authorized: number[] = [];
+    const total = Number((pedido as any).total_amount);
+    if (Number.isFinite(total) && total > 0) authorized.push(total);
+    const ref = String(pedido.order_no || pedido.id || '');
+    for (const d of ref.match(/\d{1,5}/g) ?? []) authorized.push(Number(d));
+
+    const CHECK_ORDER_STATUS_TOOL = {
+      type: 'function',
+      function: {
+        name: 'check_order_status',
+        description: 'Consulta o status REAL do pedido do cliente.',
+        parameters: { type: 'object', properties: {} },
+      },
+    };
+    const systemPrompt = [
+      'Você é a vendedora da loja no WhatsApp — curta, acolhedora, PT-BR.',
+      'A frase do status vem PRONTA e é FIXA: inclua-a na resposta EXATAMENTE como recebida.',
+      'REGRA ABSOLUTA (§5): você só pode adicionar CORDIALIDADE ao redor (saudação, emoji, "qualquer dúvida chama"). NUNCA adicione fato sobre o pedido — nem tempo estimado, nem próximo passo, nem número que eu não te dei — e NUNCA altere a frase do status.',
+    ].join('\n');
+    const messages: Array<Record<string, unknown>> = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: message },
+    ];
+
+    let step1: ToolCallingResult | null = null;
+    try {
+      step1 =
+        (await this.openAIService?.runToolStep?.(messages, [CHECK_ORDER_STATUS_TOOL], 'auto')) ??
+        null;
+    } catch {
+      step1 = null;
+    }
+    if (!step1 || step1.kind !== 'tool_calls') {
+      return deterministic;
+    }
+    const call =
+      step1.toolCalls.find((c) => c.name === 'check_order_status') ?? step1.toolCalls[0];
+
+    messages.push({
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        {
+          id: call.id || 'call_1',
+          type: 'function',
+          function: { name: 'check_order_status', arguments: JSON.stringify(call.args) },
+        },
+      ],
+    });
+    messages.push({
+      role: 'tool',
+      tool_call_id: call.id || 'call_1',
+      name: 'check_order_status',
+      content: JSON.stringify({
+        found: true,
+        statusPhrase: factPhrase,
+        orderNo: ref,
+        total: Number.isFinite(total) && total > 0 ? total : undefined,
+      }),
+    });
+
+    let step2: ToolCallingResult | null = null;
+    try {
+      step2 =
+        (await this.openAIService?.runToolStep?.(messages, [CHECK_ORDER_STATUS_TOOL], 'auto')) ??
+        null;
+    } catch {
+      step2 = null;
+    }
+    const narration = step2 && step2.kind === 'content' ? step2.content : '';
+    if (!narration) {
+      return deterministic;
+    }
+
+    // GUARDA 1 (fato-texto): a frase-fato tem que estar ÍNTEGRA na resposta.
+    if (!this.narrationContainsFact(narration, factPhrase)) {
+      return deterministic;
+    }
+    // GUARDA 2 (números): total/nº autorizados; qualquer outro número é invenção.
+    const check = checkNarrationFacts(narration, authorized, { forbidBareNumbers: true });
+    return check.safe ? narration : deterministic;
+  }
+
+  /**
+   * Containment normalizado: a frase-fato do status precisa estar presente na
+   * narração da IA, ignorando emoji/caixa/pontuação/espaços (a IA pode renderizar
+   * o emoji diferente, mas NÃO pode trocar a frase do status).
+   */
+  private narrationContainsFact(narration: string, factPhrase: string): boolean {
+    const norm = (s: string): string =>
+      String(s || '')
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const phrase = norm(factPhrase);
+    return phrase.length > 0 && norm(narration).includes(phrase);
   }
 
   /**
