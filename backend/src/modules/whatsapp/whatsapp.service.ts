@@ -2164,14 +2164,17 @@ export class WhatsAppService {
 
       // --- Tipo B: ações de produto → helper param-first (§5 centralizado) ---
       // Fatia 1: check_price pelo LOOP. Fatia 2/Mov A: check_stock pelo LOOP
-      // (cinturão B1, forbidBareNumbers). process_order segue no Fix 3 (a ESCRITA
-      // — add-to-cart — é fatia posterior, mantém a rede de segurança).
+      // (cinturão B1, forbidBareNumbers).
       case 'check_price':
         return this.handleCheckPriceViaLoop(tenantId, params, message);
       case 'check_stock':
         return this.handleCheckStockViaLoop(tenantId, params, message, customerPhone);
+
+      // Fatia 3 (Passo 2): process_order PROPÕE (gate de confirmação) — a
+      // escrita só acontece no turno seguinte, pelo handlePendingCartAdd (o
+      // ÚNICO executor de addItem), após o "sim" do cliente.
       case 'process_order':
-        return this.routeProductAction(stateTransition, params, tenantId, customerPhone);
+        return this.handleProcessOrderProposal(tenantId, params, conversation);
 
       // --- Tipo C: escala honesta (não finge capacidade que não temos) ---
       // cancel_order: NÃO cancela aqui. O `ordersService.updateStatus` valida só
@@ -2631,16 +2634,18 @@ export class WhatsAppService {
   }
 
   /**
-   * Tipo B — as 3 ações de produto (check_price/check_stock/process_order)
+   * Tipo B — as ações de LEITURA de produto (check_price/check_stock)
    * compartilham este roteador: resolve o produto UMA vez (com a trava do §5 no
-   * helper) e então formata por-ação. Preço/estoque/pedido saem SEMPRE do banco;
-   * a IA nunca origina o número.
+   * helper) e então formata por-ação. Preço/estoque saem SEMPRE do banco; a IA
+   * nunca origina o número. É o degrade dos loops (sem LLM/chave).
+   * process_order saiu daqui na Fatia 3 (Passo 2): a ESCRITA agora PROPÕE via
+   * gate de confirmação (handleProcessOrderProposal), nunca escreve direto.
    */
   private async routeProductAction(
     action: string,
     params: Record<string, any>,
     tenantId: string,
-    customerPhone: string,
+    _customerPhone: string,
   ): Promise<WhatsAppOutboundResponse> {
     const resolved = await this.resolveProductFromParams(tenantId, params);
     if (!resolved.ok) {
@@ -2654,8 +2659,6 @@ export class WhatsAppService {
         return this.formatProductPrice(product);
       case 'check_stock':
         return this.formatProductAvailability(product);
-      case 'process_order':
-        return this.addResolvedProductToCart(product, params, tenantId, customerPhone);
       default:
         return this.buildFriendlyFallback();
     }
@@ -2722,42 +2725,24 @@ export class WhatsAppService {
   }
 
   /**
-   * process_order — adiciona o produto resolvido ao carrinho com o preço REAL do
-   * banco. `quantity` vem dos params do LLM, saneada para inteiro ≥1 (default 1;
-   * a régua do H6). O `addItem` faz o `reserve` atômico e LANÇA se faltar estoque
-   * ou o carrinho estiver cheio — o catch responde amigável SEM vazar o número.
+   * Fatia 3 (Passo 2) — process_order do caminho da IA: resolve o produto (§5,
+   * o helper central admite quando não acha) e PROPÕE a adição pelo gate de
+   * confirmação. NÃO escreve — a escrita é exclusiva do handlePendingCartAdd,
+   * após o "sim" do cliente no turno seguinte. (Substitui o antigo
+   * addResolvedProductToCart, que escrevia direto; a falha de estoque agora
+   * acontece — e é tratada — no momento da confirmação.)
    */
-  private async addResolvedProductToCart(
-    product: Produto,
-    params: Record<string, any>,
+  private async handleProcessOrderProposal(
     tenantId: string,
-    customerPhone: string,
+    params: Record<string, any>,
+    conversation: TypedConversation,
   ): Promise<WhatsAppOutboundResponse> {
-    const rawQty = params?.quantity;
-    const quantity = Number.isInteger(rawQty) && rawQty >= 1 ? rawQty : 1;
-
-    try {
-      await this.cartService.addItem({
-        tenantId,
-        customerPhone,
-        produtoId: product.id,
-        produtoName: product.name,
-        quantity,
-        unitPrice: Number(product.price),
-      });
-
-      return [
-        `✅ Adicionado ${quantity}x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao carrinho!`,
-        '',
-        'Digite "carrinho" para ver ou "finalizar" para confirmar.',
-      ].join('\n');
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      // A mensagem do `reserve` traz a contagem de estoque — por isso NÃO a
-      // repassamos ao cliente (paridade B1: sem revelar quantidade).
-      this.logger.warn('process_order addItem failed', { error: err.message });
-      return `Poxa, não consegui adicionar *${product.name}* ao carrinho agora. 😕 Pode ser o estoque ou o carrinho cheio — quer tentar outra quantidade ou ver o que já está no carrinho?`;
+    const resolved = await this.resolveProductFromParams(tenantId, params);
+    if (!resolved.ok) {
+      // §5: produto ausente ou não encontrado → admissão honesta, sem propor.
+      return resolved.response;
     }
+    return this.proposeCartAdd(conversation, resolved.product, params?.quantity);
   }
 
   /**
@@ -2765,7 +2750,7 @@ export class WhatsAppService {
    * os fatos REAIS (produto resolvido, preço do banco, quantity saneada H6) e
    * retorna a pergunta de confirmação. NÃO escreve — a escrita só acontece no
    * handlePendingCartAdd, após o "sim" do cliente.
-   * (Passo 1: ainda sem caller de produção — os call sites religam no Passo 2.)
+   * (Religado ao process_order no Passo 2; keyword/botão religam no Passo 3.)
    */
   private async proposeCartAdd(
     conversation: TypedConversation,
@@ -2896,8 +2881,8 @@ export class WhatsAppService {
         });
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
-        // Paridade B1 (mesma do addResolvedProductToCart): a mensagem do reserve
-        // traz contagem de estoque — não repassamos ao cliente.
+        // Paridade B1: a mensagem do reserve traz contagem de estoque — não
+        // repassamos ao cliente.
         this.logger.warn('pending cart add failed', { error: err.message });
         await clearPending();
         return `Poxa, não consegui adicionar *${pending.produto_name}* agora. 😕 Pode ser o estoque ou o carrinho cheio — quer tentar outra quantidade?`;

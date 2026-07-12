@@ -10,8 +10,9 @@ import { WhatsappService } from './whatsapp.service';
  * O pending EXPIRA (TTL próprio — o timeout de conversa não cobre state 'idle',
  * então sem TTL um "sim" de horas depois ressuscitaria a escrita).
  *
- * Neste passo NENHUM call site foi religado (process_order segue escrevendo
- * direto) — aqui provamos o gate isolado, determinístico, sem IA.
+ * Aqui provamos o gate isolado, determinístico, sem IA. (Passo 2 religou o
+ * process_order do caminho da IA a este gate — ver stateTransition-routing.spec;
+ * keyword/botão religam no Passo 3.)
  */
 function buildService(overrides: Record<string, unknown> = {}): any {
   const service: any = new (WhatsappService as any)(...new Array(40).fill(undefined));
