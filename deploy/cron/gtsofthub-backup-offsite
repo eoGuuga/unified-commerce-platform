@@ -1,0 +1,22 @@
+# Off-site do backup: sobe os dumps do Postgres (/opt/gtsofthub/backups) pro B2 via rclone.
+#
+# VERSIONADO no repo de propósito: config-de-servidor que só vivia no host foi
+# EXATAMENTE o que sumiu — o cron do off-site desapareceu por volta de 06/jun/2026
+# e ninguém percebeu por ~5 semanas (backups locais seguiram, off-site parado).
+# Um /etc/cron.d versionado some junto com o repo, não some sozinho (anti-reincidência).
+#
+# RODA COMO root — DECISÃO (trade-off no relatório do Ciclo 2A): a credencial do B2
+# vive em /root/.config/rclone/rclone.conf (mode 600, root-only). Rodar como root
+# mantém o segredo ONDE JÁ ESTÁ, sem copiá-lo pro HOME do ubuntu (evita espalhar
+# credencial — a régua de higiene do RAIO-X). Alternativa (ubuntu, p/ igualar os
+# outros crons) exigiria um rclone.conf ubuntu-legível = 2ª cópia do segredo.
+# REMOTE/OFFSITE_KEEP_DAYS abaixo NÃO são segredo (o segredo é a chave no rclone.conf);
+# ficam versionados aqui como fonte-única de config (em vez de só no .env do host).
+#
+# Instalar (Ciclo 2B, requer root; nome de arquivo SEM ponto senão o run-parts ignora):
+#   sudo install -m 644 -o root -g root deploy/cron/gtsofthub-backup-offsite /etc/cron.d/gtsofthub-backup-offsite
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+REMOTE=b2crypt:
+OFFSITE_KEEP_DAYS=30
+# 06:30 UTC (03:30 BRT) — 30 min DEPOIS do backup local (que roda 06:00 UTC).
+30 6 * * * root cd /opt/gtsofthub && bash deploy/scripts/backup-offsite.sh >> /var/log/ucm-backup-offsite.log 2>&1

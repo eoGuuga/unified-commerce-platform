@@ -1,0 +1,18 @@
+# Restore drill mensal: baixa o backup mais recente do B2, restaura num container
+# Postgres descartável, valida contagens (tenants/usuarios/produtos) e ALERTA no
+# Telegram se falhar. Prova que o off-site é RESTAURÁVEL, não só que subiu.
+# (Último drill OK verificado: 2026-06-01 — tenants=2 usuarios=4 produtos=2.)
+#
+# VERSIONADO pelo mesmo motivo do off-site: sumiu junto na parada de ~jun/2026.
+#
+# RODA COMO root — precisa de docker (sobe/derruba container) + da credencial B2 em
+# /root/.config/rclone/rclone.conf. TELEGRAM_* são lidos SÓ como 2 vars do .env por
+# grep (nunca ecoa o valor, nunca sourceia o .env inteiro) — mesmo padrão do
+# app-alert.sh. O alerta é o ponto do drill: gritar se o backup não restaurar.
+#
+# Instalar (Ciclo 2B, requer root):
+#   sudo install -m 644 -o root -g root deploy/cron/gtsofthub-restore-drill /etc/cron.d/gtsofthub-restore-drill
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+REMOTE=b2crypt:
+# 02:30 UTC do dia 1 de cada mês.
+30 2 1 * * root cd /opt/gtsofthub && TELEGRAM_BOT_TOKEN="$(grep '^TELEGRAM_BOT_TOKEN=' deploy/.env | cut -d= -f2- | tr -d '\r')" TELEGRAM_CHAT_ID="$(grep '^TELEGRAM_CHAT_ID=' deploy/.env | cut -d= -f2- | tr -d '\r')" bash deploy/scripts/restore-drill-offsite.sh >> /var/log/ucm-restore-drill.log 2>&1
