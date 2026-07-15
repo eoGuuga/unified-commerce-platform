@@ -1,0 +1,21 @@
+# Dead-man's switch do off-site: a cada 6h consulta o B2 e alerta se o último
+# upload passou de 30h — OU se não deu pra consultar (fail-closed, 3 estados).
+#
+# INDEPENDÊNCIA é o ponto: cron PRÓPRIO, separado do backup/off-site. Se o cron do
+# off-site sumir de novo (foi a causa não-identificada de jun/2026), ESTE continua
+# vivo e grita pela ausência do upload fresco. Versionado no repo (anti-reincidência).
+#
+# RODA COMO root: precisa do rclone.conf em /root (consulta o B2) e lê o Telegram do
+# .env por grep (nunca ecoa valor). REMOTE/OFFSITE_MAX_AGE_HOURS aqui NÃO são segredo.
+#
+# LIMITAÇÃO CONHECIDA (registrada no DISASTER-RECOVERY.md): nada vigia ESTA sonda.
+# Se o cron dela sumir, voltamos ao silêncio. Próximo degrau = heartbeat externo
+# (healthchecks.io) — adiado conscientemente.
+#
+# Instalar (Ciclo 2B, requer root):
+#   sudo install -m 644 -o root -g root deploy/cron/gtsofthub-offsite-freshness /etc/cron.d/gtsofthub-offsite-freshness
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+REMOTE=b2crypt:
+OFFSITE_MAX_AGE_HOURS=30
+# A cada 6h (00/06/12/18 UTC).
+0 */6 * * * root cd /opt/gtsofthub && bash deploy/scripts/offsite-freshness-check.sh >> /var/log/ucm-offsite-freshness.log 2>&1

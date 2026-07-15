@@ -206,6 +206,33 @@ Severidade: media. RTO 15-30min.
 - Telegram bot pra alertas (`TELEGRAM_BOT_TOKEN`): **password manager
   pessoal**.
 
+## Dead-man's switch do off-site (2026-07-12)
+
+O `offsite-freshness-check.sh` (cron `deploy/cron/gtsofthub-offsite-freshness`,
+a cada 6h) vigia a IDADE do ULTIMO upload no B2 e alerta no Telegram se passar
+de 30h — OU se nao der pra consultar o B2 (fail-closed: estado desconhecido
+tambem grita). Existe porque o drill so alertava em FALHA, e nada alertava a
+AUSENCIA — foi por isso que a parada de 06/jun/2026 passou ~5 semanas
+despercebida.
+
+- **Divida conhecida — "quem vigia a sonda?":** a sonda vigia o off-site, mas
+  NADA vigia a sonda. Se o cron dela sumir (a causa exata da parada de jun/2026
+  nunca foi identificada), voltamos ao silencio. **Proximo degrau:** heartbeat
+  externo (ex.: `healthchecks.io`) — a sonda pinga um servico FORA do VPS, que
+  alerta pela ausencia do ping. **Adiado conscientemente:** dependencia externa
+  + segredo novo, ganho marginal pequeno frente ao resto da mesa.
+
+## Rotacao da B2 application key — decisao consciente do dono (2026-07-15)
+
+**A application key do B2 NAO sera rotacionada nem tera escopo reduzido agora.**
+Decisao do dono, com o risco na mesa:
+- A chave PODE ser a master (acesso total a conta B2, inclusive delete do bucket).
+- Existem copias possiveis em tarballs NAO inventariados em `/root`
+  (`backup-ucm-*20260112*.tar.gz`, de 12/jan) — nao lidos.
+- NAO ha evidencia de comprometimento.
+- **Gatilho de reversao:** ao primeiro sinal de comprometimento, o primeiro
+  movimento e rotacionar com escopo RESTRITO ao bucket (nao master).
+
 ## Lacunas conhecidas
 
 Nao implementado ainda (gap consciente para revisitar):
@@ -225,6 +252,9 @@ Nao implementado ainda (gap consciente para revisitar):
 
 - `deploy/scripts/backup-postgres.sh`
 - `deploy/scripts/backup-offsite.sh`
+- `deploy/scripts/offsite-freshness-check.sh` (dead-man's switch)
+- `deploy/scripts/test/offsite.test.sh` + `offsite-freshness.test.sh` (testes, fake-rclone)
+- `deploy/cron/gtsofthub-backup-offsite`, `-restore-drill`, `-offsite-freshness` (crons versionados)
 - `deploy/scripts/restore-drill-offsite.sh`
 - `deploy/scripts/apply-and-health.sh`
 - `backend/src/database/migrations/` (TypeORM baseline a partir de
