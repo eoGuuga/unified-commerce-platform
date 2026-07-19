@@ -142,7 +142,7 @@ export class ActionExecutorService {
     decision: RouterDecision,
     context: ExecutionContext,
   ): Promise<ExecutionResult> {
-    const { botConfig, message, conversation } = context;
+    const { botConfig, message } = context;
     const reason = decision.params?.reason || 'indeterminado';
 
     const conversationContext = this.buildClarifyContext(context);
