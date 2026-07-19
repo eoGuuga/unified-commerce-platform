@@ -1880,28 +1880,45 @@ export class WhatsAppService {
       return '🛒 Seu carrinho está vazio. Adicione itens primeiro!';
     }
 
+    // Este handler responde a quem PERGUNTA sobre pagamento FORA do checkout
+    // (a precedencia da FSM em detectIntent sequestra os turnos quando ha
+    // checkout ativo). Ele NAO cobra — quem cobra e a FSM, que apos coletar o
+    // endereco cria o pedido e gera o PIX REAL (QR + copia-e-cola) via
+    // paymentsService.createPayment.
+    //
+    // Por isso aqui nao se exibe chave nenhuma: a versao anterior imprimia
+    // "Chave PIX: 00000000000" — CPF invalido pela regra do digito
+    // verificador, entao NENHUM banco aceita e ninguem consegue sequer
+    // registrar essa chave. Nao havia risco de dinheiro ir pro lugar errado,
+    // mas o cliente recebia uma chave que falha no app do banco — e uma loja
+    // que manda chave quebrada no primeiro contato parece golpe.
+    //
+    // A saida honesta e encaminhar pro caminho que FUNCIONA: "fechar pedido"
+    // cai no isCartCommand -> handleCheckout -> FSM -> PIX real (verificado em
+    // whatsapp.service.ts:684).
+    const total = `R$ ${Number(cart.total_amount).toFixed(2).replace('.', ',')}`;
+
     if (lower.includes('pix')) {
       return [
         '💳 *Pagamento via PIX*',
         '',
-        `Total: R$ ${Number(cart.total_amount).toFixed(2).replace('.', ',')}`,
+        `Total: ${total}`,
         '',
-        'Chave PIX: 00000000000',
+        'É só confirmar o pedido que eu gero seu PIX com QR Code. 😊',
         '',
-        'Após o pagamento, envie o comprovante.',
+        'Digite *fechar pedido* pra seguir.',
       ].join('\n');
     }
 
     return [
-      '💳 *Forma de pagamento*',
+      '💳 *Formas de pagamento*',
       '',
-      `Total: R$ ${Number(cart.total_amount).toFixed(2).replace('.', ',')}`,
+      `Total: ${total}`,
       '',
-      '1. PIX (à vista)',
-      '2. Cartão na entrega',
-      '3. Dinheiro',
+      '• *PIX* — confirmo o pedido e gero o QR Code na hora',
+      '• *Dinheiro* ou *cartão* — você combina na entrega',
       '',
-      'Escolha uma opção ou digite "pix".',
+      'Digite *fechar pedido* pra seguir. 😊',
     ].join('\n');
   }
 

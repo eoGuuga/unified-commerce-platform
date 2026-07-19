@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { TenantsService } from '../tenants/tenants.service';
 import { Public } from '../../common/decorators/public.decorator';
@@ -478,7 +479,20 @@ export class WhatsappController {
     return timingSafeEqual(bufA, bufB);
   }
 
+  // Teto de requisicoes: MESMO molde do webhook do Mercado Pago
+  // (payments.controller.ts). Sem este decorator a rota herda os TRES
+  // throttlers globais do app.module e fica presa ao mais restritivo — o
+  // `strict`, de 10/min em producao. Como o tracker e por IP e a Meta entrega
+  // de poucos IPs proprios, esse teto e COMPARTILHADO pela loja inteira: um
+  // unico cliente conversando gasta metade da cota, e ao estourar a Meta leva
+  // 429, re-tenta e DESCARTA a mensagem — cliente sem resposta, e em silencio
+  // (429 e 4xx -> "level":"warn", que o app-alert.sh nao caça).
+  //
+  // 60/min nao e um numero novo: e o mesmo ja em producao no webhook do MP.
+  // Segue sendo um teto por IP, nao por cliente — se o volume real da doceria
+  // pedir mais, ajustar COM DADO, nao com chute.
   @Public()
+  @Throttle({ webhook: { ttl: 60000, limit: 60 } })
   @Post('webhook')
   @ApiOperation({
     summary: 'Webhook para receber mensagens (WhatsApp Cloud API / Evolution / Twilio)',
