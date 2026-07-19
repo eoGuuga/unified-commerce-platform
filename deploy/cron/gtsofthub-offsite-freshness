@@ -17,5 +17,7 @@
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 REMOTE=b2crypt:
 OFFSITE_MAX_AGE_HOURS=30
-# A cada 6h (00/06/12/18 UTC).
-0 */6 * * * root cd /opt/gtsofthub && bash deploy/scripts/offsite-freshness-check.sh >> /var/log/ucm-offsite-freshness.log 2>&1
+# A cada 6h no minuto :07 (00:07/06:07/12:07/18:07 UTC) — ESCALONADO de proposito:
+# depois do backup local (06:00), antes do off-site (06:30), e fora dos multiplos
+# de 5 do app-alert (*/5). Nenhum cron da cadeia empilha no mesmo minuto.
+7 */6 * * * root cd /opt/gtsofthub && bash deploy/scripts/offsite-freshness-check.sh >> /var/log/ucm-offsite-freshness.log 2>&1
