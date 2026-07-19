@@ -268,6 +268,30 @@ export class ResponseBuilderService {
   }
 
   /**
+   * FRASE-FATO do status (Fatia 2 / Movimento B): a fonte ÚNICA que mapeia o
+   * enum de status para a frase aprovada. O CÓDIGO é dono desta frase — no loop
+   * de tool-calling a IA só pode EMBRULHAR com tom, e o cinturão confirma que
+   * esta frase saiu íntegra (containment). Sem número, para o containment ser
+   * sobre o fato-status, não sobre valores (que o cinturão-de-número cobre à
+   * parte). Não muda o fluxo de status atual (buildOrderStatusMessage).
+   */
+  buildOrderStatusFactPhrase(pedido: Pedido): string {
+    const phrases: Record<string, string> = {
+      [PedidoStatus.PENDENTE_PAGAMENTO]: 'Seu pedido está aguardando o pagamento ⏳',
+      [PedidoStatus.CONFIRMADO]: 'Seu pedido foi confirmado e já vai para produção ✅',
+      [PedidoStatus.EM_PRODUCAO]: 'Seu pedido está em preparo 👩‍🍳',
+      [PedidoStatus.PRONTO]: 'Seu pedido está pronto 📦',
+      [PedidoStatus.EM_TRANSITO]: 'Seu pedido saiu para entrega 🛵',
+      [PedidoStatus.ENTREGUE]: 'Seu pedido foi entregue 🎉',
+      [PedidoStatus.CANCELADO]: 'Seu pedido foi cancelado ❌',
+    };
+    return (
+      phrases[pedido.status as string] ||
+      `Seu pedido está com status: ${this.getStatusLabel(pedido.status)}`
+    );
+  }
+
+  /**
    * Constrói mensagem de boas-vindas para novo cliente
    */
   buildWelcomeMessage(): string {

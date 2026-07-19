@@ -12,7 +12,8 @@ import { CanalVenda, Pedido, PedidoStatus } from '../../database/entities/Pedido
 import { Produto } from '../../database/entities/Produto.entity';
 
 // Services de inteligência (mantidos para recursos avançados)
-import { OpenAIService } from './services/openai.service';
+import { OpenAIService, ToolCallingResult } from './services/openai.service';
+import { checkNarrationFacts } from './services/narration-guard';
 import { MessageIntelligenceService } from './services/message-intelligence.service';
 import { ConversationalIntelligenceService } from './services/conversational-intelligence.service';
 import { ConversationPlannerService } from './services/conversation-planner.service';
@@ -40,7 +41,7 @@ import { MockWhatsappProvider } from './providers/mock-whatsapp.provider';
 import { IWhatsappProvider } from './providers/whatsapp-provider.interface';
 import { WhatsappSender } from './config/whatsapp-sender.service';
 
-import { TypedConversation, ConversationState, CustomerData, PendingOrder } from './types/whatsapp.types';
+import { TypedConversation, ConversationState, CustomerData, PendingOrder, PendingCartAdd } from './types/whatsapp.types';
 import { MetodoPagamento } from '../../database/entities/Pagamento.entity';
 import { BusinessHours, describeBusinessHours } from './utils/business-hours';
 import { maskPhone } from '../../common/utils/mask.util';
@@ -102,6 +103,14 @@ interface PickupSlot {
   label: string;
   scheduled_at: string; // ISO
 }
+
+/**
+ * TTL da proposta de carrinho (Fatia 3) — espelha o timeout de conversa (5 min).
+ * Necessário porque o timeout de conversa (passo 5.1) só dispara com
+ * state != 'idle', e o propose NÃO muda o state: sem TTL próprio, um "sim" de
+ * horas depois ressuscitaria uma escrita que o cliente já esqueceu.
+ */
+const PENDING_CART_ADD_TTL_MINUTES = 5;
 
 /**
  * Estado da coleta de checkout, guardado em conversation.context.checkout.
@@ -268,6 +277,9 @@ export class WhatsAppService {
           await this.conversationService.updateContext(conversationForTimeout.id, {
             state: 'idle',
             checkout: null,
+            // Fatia 3: proposta de carrinho órfã também morre no reset — mesma
+            // razão do checkout (um "sim" tardio não pode ressuscitar escrita).
+            pending_cart_add: null,
             customer_data: conversationForTimeout.context?.customer_data,
           });
 
@@ -471,7 +483,7 @@ export class WhatsAppService {
   private detectIntent(
     message: string,
     conversation: TypedConversation,
-  ): 'greeting' | 'catalog' | 'cart' | 'order_status' | 'order_adjust' | 'payment' | 'help' | 'collection' | 'fallback' {
+  ): 'greeting' | 'catalog' | 'cart' | 'order_status' | 'order_adjust' | 'payment' | 'help' | 'collection' | 'pending_cart_add' | 'fallback' {
     const lower = message.toLowerCase().trim();
     const currentState = conversation.context?.state as ConversationState | undefined;
 
@@ -485,6 +497,20 @@ export class WhatsAppService {
     const activeCheckout = conversation.context?.checkout as CheckoutContext | undefined;
     if (activeCheckout?.stage) {
       return 'collection';
+    }
+
+    // PRECEDENCIA DA PROPOSTA DE CARRINHO (Fatia 3): há uma adição PROPOSTA
+    // aguardando sim/não → a resposta do cliente pertence ao handlePendingCartAdd
+    // (o ÚNICO executor de addItem). Vem DEPOIS do checkout (Decisão 3: a FSM do
+    // dinheiro é dona do turno quando ativa). Proposta EXPIRADA (TTL) é IGNORADA
+    // aqui (gate síncrono não limpa) — fica inerte; o handler (defesa em
+    // profundidade) ou a próxima proposta a limpam.
+    const pendingCartAdd = conversation.context?.pending_cart_add as
+      | PendingCartAdd
+      | null
+      | undefined;
+    if (pendingCartAdd?.produto_id && !this.isPendingCartAddStale(pendingCartAdd)) {
+      return 'pending_cart_add';
     }
 
     // Verificar comandos de carrinho
@@ -596,6 +622,14 @@ export class WhatsAppService {
 
       case 'collection':
         return await this.handleCollectionStage(
+          context.message.tenantId,
+          context.processed.sanitizedBody,
+          context.conversation,
+        );
+
+      // Fatia 3: proposta de carrinho aguardando sim/não — o único executor.
+      case 'pending_cart_add':
+        return await this.handlePendingCartAdd(
           context.message.tenantId,
           context.processed.sanitizedBody,
           context.conversation,
@@ -783,16 +817,14 @@ export class WhatsAppService {
         if (productName && productName.length > 1) {
           const products = await this.productsService.search(tenantId, productName);
           if (products.length > 0) {
-            const product = products[0];
-            await this.cartService.addItem({
-              tenantId,
-              customerPhone,
-              produtoId: product.id,
-              produtoName: product.name,
-              quantity: 1,
-              unitPrice: Number(product.price),
-            });
-            return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao seu carrinho!\n\nDigite "carrinho" para ver ou "finalizar" para confirmar.`;
+            // Fatia 3 (Passo 3): PROPÕE pelo gate — a escrita só acontece após
+            // o "sim", no handlePendingCartAdd (o ÚNICO executor). A quantidade
+            // dita na mensagem entra na proposta (antes: qty 1 fixa, direto).
+            return this.proposeCartAdd(
+              conversation,
+              products[0],
+              this.extractQuantityFromMessage(message),
+            );
           } else {
             return `😕 Não encontrei "${productName}". Digite "ver produtos" para ver o cardápio!`;
           }
@@ -1984,16 +2016,13 @@ export class WhatsAppService {
 
         const products = await this.productsService.search(tenantId, productName);
         if (products.length > 0) {
-          const product = products[0];
-          await this.cartService.addItem({
-            tenantId,
-            customerPhone: conversation.customer_phone,
-            produtoId: product.id,
-            produtoName: product.name,
-            quantity: 1,
-            unitPrice: Number(product.price),
-          });
-          return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao carrinho!\n\nDigite "carrinho" para ver ou "finalizar" para confirmar.`;
+          // Fatia 3 (Passo 3): PROPÕE pelo gate (era escrita direta, qty 1 fixa
+          // que IGNORAVA o número do cliente). A escrita acontece no "sim".
+          return this.proposeCartAdd(
+            conversation,
+            products[0],
+            this.extractQuantityFromMessage(message),
+          );
         }
       } catch (error) {
         this.logger.error('Error in buy intent fallback', { error });
@@ -2022,15 +2051,12 @@ export class WhatsAppService {
               const hasBuyIntent = buyKeywords.some(k => lower.includes(k));
 
               if (hasBuyIntent) {
-                await this.cartService.addItem({
-                  tenantId,
-                  customerPhone: conversation.customer_phone,
-                  produtoId: product.id,
-                  produtoName: product.name,
-                  quantity: 1,
-                  unitPrice: Number(product.price),
-                });
-                return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao carrinho!\n\nDigite "carrinho" para ver ou "finalizar" para confirmar.`;
+                // Fatia 3 (Passo 3): PROPÕE pelo gate — escrita só após o "sim".
+                return this.proposeCartAdd(
+                  conversation,
+                  product,
+                  this.extractQuantityFromMessage(message),
+                );
               }
 
               return [
@@ -2111,12 +2137,26 @@ export class WhatsAppService {
     const customerPhone = conversation.customer_phone;
 
     switch (stateTransition) {
-      // --- Tipo A: mensagem crua → handler pronto ---
+      // --- Fatia 2/Mov A: show_catalog pelo LOOP (IA narra o catálogo, cinturão
+      // autoriza todos os preços reais). Degrada pra lista interativa. ---
       case 'show_catalog':
-        return this.handleCatalog(tenantId, message);
+        return this.handleShowCatalogViaLoop(tenantId, message);
 
+      // Fatia 2/Mov B: check_order_status pelo LOOP com status DETERMINÍSTICO —
+      // o código é dono da frase-fato; a IA embrulha; containment + cinturão de
+      // número garantem. Degrada pro determinístico (buildOrderStatusMessage).
       case 'check_order_status':
-        return this.handleOrderStatus(tenantId, customerPhone, message, conversation);
+        return this.handleOrderStatusViaLoop(tenantId, customerPhone, message, conversation);
+
+      // Fatia 4: start_checkout — o handoff do loop pra FSM de ferro (Decisão 3).
+      // A IA só SINALIZA "fechar"; handleCheckout valida o carrinho, arma
+      // checkout.stage e a precedência do detectIntent (:497) sequestra os turnos
+      // seguintes pra FSM. Resposta DETERMINÍSTICA (zero narração de IA no
+      // handoff). O gate da Fatia 3 NÃO se aplica aqui: fechar pedido tem
+      // confirmação PRÓPRIA e mais forte (invariante D2, provada no
+      // checkout-d2.spec).
+      case 'start_checkout':
+        return this.handleCheckout(tenantId, customerPhone, conversation);
 
       // STUB CONHECIDO: handlePayment mostra chave PIX hardcoded e NÃO cobra de
       // verdade (débito registrado no roadmap). Roteia certo; a cobrança real
@@ -2125,10 +2165,18 @@ export class WhatsAppService {
         return this.handlePayment(tenantId, customerPhone, message, conversation);
 
       // --- Tipo B: ações de produto → helper param-first (§5 centralizado) ---
+      // Fatia 1: check_price pelo LOOP. Fatia 2/Mov A: check_stock pelo LOOP
+      // (cinturão B1, forbidBareNumbers).
       case 'check_price':
+        return this.handleCheckPriceViaLoop(tenantId, params, message);
       case 'check_stock':
+        return this.handleCheckStockViaLoop(tenantId, params, message, customerPhone);
+
+      // Fatia 3 (Passo 2): process_order PROPÕE (gate de confirmação) — a
+      // escrita só acontece no turno seguinte, pelo handlePendingCartAdd (o
+      // ÚNICO executor de addItem), após o "sim" do cliente.
       case 'process_order':
-        return this.routeProductAction(stateTransition, params, tenantId, customerPhone);
+        return this.handleProcessOrderProposal(tenantId, params, conversation);
 
       // --- Tipo C ---
       // cancel_order: cancelamento pelo cliente COM ownership (Peça 3). Ownership
@@ -2153,16 +2201,451 @@ export class WhatsAppService {
   }
 
   /**
-   * Tipo B — as 3 ações de produto (check_price/check_stock/process_order)
+   * Fatia 1 do tool-calling pleno — check_price pelo LOOP com narração + cinturão
+   * §5. SÓ check_price usa isto; o resto fica no Fix 3 (rede de segurança).
+   *
+   * Fluxo: a IA pede a tool → o CÓDIGO executa `productsService.search` (dona do
+   * fato) → devolve `{found,name,price}` estruturado → a IA NARRA → o CINTURÃO
+   * (`checkNarrationFacts`, fail-closed) só deixa passar se TODO número conferir;
+   * senão cai no determinístico (`formatProductPrice`, com o preço REAL).
+   *
+   * Degrada pro Fix 3 se não houver LLM/chave (sem chave = bot idêntico ao de hoje).
+   */
+  private async handleCheckPriceViaLoop(
+    tenantId: string,
+    params: Record<string, any>,
+    message: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    const CHECK_PRICE_TOOL = {
+      type: 'function',
+      function: {
+        name: 'check_price',
+        description: 'Consulta o preço REAL de um produto no catálogo da loja.',
+        parameters: {
+          type: 'object',
+          properties: {
+            product: { type: 'string', description: 'nome do produto' },
+          },
+          required: ['product'],
+        },
+      },
+    };
+    const systemPrompt = [
+      'Você é a vendedora da loja no WhatsApp — curta, acolhedora, PT-BR.',
+      'REGRA ABSOLUTA (§5): você NARRA apenas os fatos que a ferramenta devolver.',
+      'NUNCA diga um preço/número que a ferramenta não retornou. Use dígitos (R$ 5,00).',
+      'Se a ferramenta não achar o produto, ADMITA (não invente preço) e ofereça o cardápio.',
+    ].join('\n');
+
+    const messages: Array<Record<string, unknown>> = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: message },
+    ];
+
+    // Passo 1: a IA decide chamar a tool. Degrada pro Fix 3 se não houver LLM.
+    let step1: ToolCallingResult | null = null;
+    try {
+      step1 =
+        (await this.openAIService?.runToolStep?.(messages, [CHECK_PRICE_TOOL], 'auto')) ??
+        null;
+    } catch {
+      step1 = null;
+    }
+    if (!step1 || step1.kind !== 'tool_calls') {
+      return this.routeProductAction('check_price', params, tenantId, '');
+    }
+
+    const call =
+      step1.toolCalls.find((c) => c.name === 'check_price') ?? step1.toolCalls[0];
+    const productName = String((call.args as any)?.product ?? params?.product ?? '').trim();
+
+    // Executa a tool REAL — o CÓDIGO é dono do fato.
+    const products = productName
+      ? await this.productsService.search(tenantId, productName)
+      : [];
+    const product = products.length > 0 ? products[0] : null;
+    const toolResult = product
+      ? { found: true, name: product.name, price: Number(product.price) }
+      : { found: false };
+    const authorized = product ? [Number(product.price)] : [];
+
+    // O determinístico (a rede §5): o texto code-formatado com o preço REAL.
+    const deterministic: WhatsAppOutboundResponse = product
+      ? this.formatProductPrice(product)
+      : `Hmm, não achei "${productName}" no nosso cardápio. 😕 Quer ver o cardápio? É só dizer "ver produtos".`;
+
+    // Passo 2: devolve o resultado da tool pra IA narrar.
+    messages.push({
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        {
+          id: call.id || 'call_1',
+          type: 'function',
+          function: { name: 'check_price', arguments: JSON.stringify(call.args) },
+        },
+      ],
+    });
+    messages.push({
+      role: 'tool',
+      tool_call_id: call.id || 'call_1',
+      name: 'check_price',
+      content: JSON.stringify(toolResult),
+    });
+
+    let step2: ToolCallingResult | null = null;
+    try {
+      step2 =
+        (await this.openAIService?.runToolStep?.(messages, [CHECK_PRICE_TOOL], 'auto')) ??
+        null;
+    } catch {
+      step2 = null;
+    }
+    const narration = step2 && step2.kind === 'content' ? step2.content : '';
+    if (!narration) {
+      return deterministic;
+    }
+
+    // CINTURÃO fail-closed: só usa a narração da IA se TODO número conferir.
+    const check = checkNarrationFacts(narration, authorized);
+    return check.safe ? narration : deterministic;
+  }
+
+  /**
+   * Fatia 2 / Movimento A — show_catalog pelo LOOP. A IA narra o catálogo; o
+   * cinturão autoriza TODOS os preços reais (a lista inteira) e barra qualquer
+   * número narrado fora desse conjunto (preço trocado/inventado). Bloqueou (ou
+   * sem LLM/chave) → cai no determinístico: a lista interativa code-owned de
+   * `handleCatalog`.
+   *
+   * Furo residual conhecido (número-belt): troca de PAR (preço válido no produto
+   * errado) e nome de produto inventado NÃO são pegos — é o problema de
+   * fato-texto do Movimento B.
+   */
+  private async handleShowCatalogViaLoop(
+    tenantId: string,
+    message: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    const SHOW_CATALOG_TOOL = {
+      type: 'function',
+      function: {
+        name: 'show_catalog',
+        description: 'Lista os produtos REAIS do catálogo da loja, com preços.',
+        parameters: { type: 'object', properties: {} },
+      },
+    };
+    const products = await this.catalogManager.getCatalogProducts(tenantId);
+    // Sem produtos → determinístico direto (não faz sentido narrar catálogo vazio).
+    if (!products || products.length === 0) {
+      return this.handleCatalog(tenantId, message);
+    }
+
+    const systemPrompt = [
+      'Você é a vendedora da loja no WhatsApp — curta, acolhedora, PT-BR.',
+      'REGRA ABSOLUTA (§5): narre APENAS os produtos e preços que a ferramenta devolver.',
+      'NUNCA invente produto e NUNCA diga um preço diferente do que a ferramenta deu. Use dígitos (R$ 5,00).',
+    ].join('\n');
+    const messages: Array<Record<string, unknown>> = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: message },
+    ];
+
+    let step1: ToolCallingResult | null = null;
+    try {
+      step1 =
+        (await this.openAIService?.runToolStep?.(messages, [SHOW_CATALOG_TOOL], 'auto')) ?? null;
+    } catch {
+      step1 = null;
+    }
+    if (!step1 || step1.kind !== 'tool_calls') {
+      return this.handleCatalog(tenantId, message);
+    }
+    const call = step1.toolCalls.find((c) => c.name === 'show_catalog') ?? step1.toolCalls[0];
+
+    // O CÓDIGO é dono dos fatos: nome + preço REAL de cada produto.
+    const catalogFacts = products.map((p) => ({ name: p.name, price: Number(p.price) }));
+    const authorized = catalogFacts.map((p) => p.price);
+
+    messages.push({
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        {
+          id: call.id || 'call_1',
+          type: 'function',
+          function: { name: 'show_catalog', arguments: JSON.stringify(call.args) },
+        },
+      ],
+    });
+    messages.push({
+      role: 'tool',
+      tool_call_id: call.id || 'call_1',
+      name: 'show_catalog',
+      content: JSON.stringify({ products: catalogFacts }),
+    });
+
+    let step2: ToolCallingResult | null = null;
+    try {
+      step2 =
+        (await this.openAIService?.runToolStep?.(messages, [SHOW_CATALOG_TOOL], 'auto')) ?? null;
+    } catch {
+      step2 = null;
+    }
+    const narration = step2 && step2.kind === 'content' ? step2.content : '';
+    if (!narration) {
+      return this.handleCatalog(tenantId, message);
+    }
+
+    // CINTURÃO: todo número narrado tem que ser um preço real do catálogo.
+    const check = checkNarrationFacts(narration, authorized);
+    return check.safe ? narration : this.handleCatalog(tenantId, message);
+  }
+
+  /**
+   * Fatia 2 / Movimento A — check_stock (B1, paridade honesta) pelo LOOP. A tool
+   * devolve só disponibilidade (SEM quantidade) → conjunto autorizado é [] e o
+   * cinturão roda em `forbidBareNumbers`: QUALQUER número na narração é invenção
+   * (ex.: "temos uns 20") → bloqueia. Produto não encontrado → admissão honesta
+   * DIRETA (não deixa a IA narrar disponibilidade falsa — fato-texto que o
+   * cinturão de-número não verifica). Sem LLM → degrada pro Fix 3.
+   */
+  private async handleCheckStockViaLoop(
+    tenantId: string,
+    params: Record<string, any>,
+    message: string,
+    customerPhone: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    const CHECK_STOCK_TOOL = {
+      type: 'function',
+      function: {
+        name: 'check_stock',
+        description:
+          'Confirma se a loja TEM o produto (disponível ou não), sem revelar quantidade.',
+        parameters: {
+          type: 'object',
+          properties: { product: { type: 'string', description: 'nome do produto' } },
+          required: ['product'],
+        },
+      },
+    };
+    const systemPrompt = [
+      'Você é a vendedora da loja no WhatsApp — curta, acolhedora, PT-BR.',
+      'REGRA ABSOLUTA (§5): confirme só SE temos o produto — NUNCA diga quantidade nem qualquer número.',
+      'Se a ferramenta não achar o produto, ADMITA (não diga que temos) e ofereça o cardápio.',
+    ].join('\n');
+    const messages: Array<Record<string, unknown>> = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: message },
+    ];
+
+    let step1: ToolCallingResult | null = null;
+    try {
+      step1 =
+        (await this.openAIService?.runToolStep?.(messages, [CHECK_STOCK_TOOL], 'auto')) ?? null;
+    } catch {
+      step1 = null;
+    }
+    if (!step1 || step1.kind !== 'tool_calls') {
+      return this.routeProductAction('check_stock', params, tenantId, customerPhone);
+    }
+    const call = step1.toolCalls.find((c) => c.name === 'check_stock') ?? step1.toolCalls[0];
+    const productName = String((call.args as any)?.product ?? params?.product ?? '').trim();
+
+    const products = productName
+      ? await this.productsService.search(tenantId, productName)
+      : [];
+    const product = products.length > 0 ? products[0] : null;
+
+    // Não encontrado → admissão honesta DIRETA (a IA não narra disponibilidade).
+    if (!product) {
+      return `Hmm, não achei "${productName}" no nosso cardápio. 😕 Quer dar uma olhada em tudo que temos? É só dizer "ver produtos".`;
+    }
+
+    // B1: a tool só confirma disponibilidade, SEM número → autorizado vazio.
+    const toolResult = { available: true, name: product.name };
+    const deterministic = this.formatProductAvailability(product);
+
+    messages.push({
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        {
+          id: call.id || 'call_1',
+          type: 'function',
+          function: { name: 'check_stock', arguments: JSON.stringify(call.args) },
+        },
+      ],
+    });
+    messages.push({
+      role: 'tool',
+      tool_call_id: call.id || 'call_1',
+      name: 'check_stock',
+      content: JSON.stringify(toolResult),
+    });
+
+    let step2: ToolCallingResult | null = null;
+    try {
+      step2 =
+        (await this.openAIService?.runToolStep?.(messages, [CHECK_STOCK_TOOL], 'auto')) ?? null;
+    } catch {
+      step2 = null;
+    }
+    const narration = step2 && step2.kind === 'content' ? step2.content : '';
+    if (!narration) {
+      return deterministic;
+    }
+
+    // CINTURÃO em modo B1: qualquer número (inteiro pelado incluso) é invenção.
+    const check = checkNarrationFacts(narration, [], { forbidBareNumbers: true });
+    return check.safe ? narration : deterministic;
+  }
+
+  /**
+   * Fatia 2 / Movimento B — check_order_status pelo LOOP com STATUS
+   * DETERMINÍSTICO (opção a). O CÓDIGO é dono da frase-fato do status
+   * (`buildOrderStatusFactPhrase`, fonte única enum→frase); a IA só EMBRULHA com
+   * tom. O cinturão cobre DUAS coisas:
+   *   1) containment — a frase-fato tem que sair ÍNTEGRA (a IA não trocou/omitiu
+   *      o status); senão → determinístico (a frase pura do código).
+   *   2) números — total/nº do pedido são autorizados; qualquer outro número
+   *      (ex.: "sai em 10 min") é invenção → determinístico.
+   *
+   * FRONTEIRA HONESTA: um fato-novo NÃO-numérico e NÃO-status ("o entregador já
+   * saiu") NÃO é pego pelo cinturão — só o prompt + a frase garantida o barram.
+   */
+  private async handleOrderStatusViaLoop(
+    tenantId: string,
+    customerPhone: string,
+    message: string,
+    _conversation: TypedConversation,
+  ): Promise<WhatsAppOutboundResponse> {
+    // Resolve o pedido (mesma regra do handler direto): nº explícito, senão o último.
+    const orderNo = this.extractOrderNo(message);
+    let pedido = orderNo ? await this.ordersService.findByOrderNo(orderNo, tenantId) : null;
+    if (!pedido) {
+      pedido = await this.ordersService.findLatestByCustomerPhone(tenantId, customerPhone);
+    }
+    if (!pedido) {
+      return 'Não encontrei pedidos recentes. Quer ver o cardápio?';
+    }
+
+    // O CÓDIGO é dono do fato-status e do determinístico.
+    const factPhrase = this.responseBuilder.buildOrderStatusFactPhrase(pedido);
+    const deterministic = this.responseBuilder.buildOrderStatusMessage(pedido);
+
+    // Números LEGÍTIMOS do pedido (o cinturão-de-número autoriza estes).
+    const authorized: number[] = [];
+    const total = Number((pedido as any).total_amount);
+    if (Number.isFinite(total) && total > 0) authorized.push(total);
+    const ref = String(pedido.order_no || pedido.id || '');
+    for (const d of ref.match(/\d{1,5}/g) ?? []) authorized.push(Number(d));
+
+    const CHECK_ORDER_STATUS_TOOL = {
+      type: 'function',
+      function: {
+        name: 'check_order_status',
+        description: 'Consulta o status REAL do pedido do cliente.',
+        parameters: { type: 'object', properties: {} },
+      },
+    };
+    const systemPrompt = [
+      'Você é a vendedora da loja no WhatsApp — curta, acolhedora, PT-BR.',
+      'A frase do status vem PRONTA e é FIXA: inclua-a na resposta EXATAMENTE como recebida.',
+      'REGRA ABSOLUTA (§5): você só pode adicionar CORDIALIDADE ao redor (saudação, emoji, "qualquer dúvida chama"). NUNCA adicione fato sobre o pedido — nem tempo estimado, nem próximo passo, nem número que eu não te dei — e NUNCA altere a frase do status.',
+    ].join('\n');
+    const messages: Array<Record<string, unknown>> = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: message },
+    ];
+
+    let step1: ToolCallingResult | null = null;
+    try {
+      step1 =
+        (await this.openAIService?.runToolStep?.(messages, [CHECK_ORDER_STATUS_TOOL], 'auto')) ??
+        null;
+    } catch {
+      step1 = null;
+    }
+    if (!step1 || step1.kind !== 'tool_calls') {
+      return deterministic;
+    }
+    const call =
+      step1.toolCalls.find((c) => c.name === 'check_order_status') ?? step1.toolCalls[0];
+
+    messages.push({
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        {
+          id: call.id || 'call_1',
+          type: 'function',
+          function: { name: 'check_order_status', arguments: JSON.stringify(call.args) },
+        },
+      ],
+    });
+    messages.push({
+      role: 'tool',
+      tool_call_id: call.id || 'call_1',
+      name: 'check_order_status',
+      content: JSON.stringify({
+        found: true,
+        statusPhrase: factPhrase,
+        orderNo: ref,
+        total: Number.isFinite(total) && total > 0 ? total : undefined,
+      }),
+    });
+
+    let step2: ToolCallingResult | null = null;
+    try {
+      step2 =
+        (await this.openAIService?.runToolStep?.(messages, [CHECK_ORDER_STATUS_TOOL], 'auto')) ??
+        null;
+    } catch {
+      step2 = null;
+    }
+    const narration = step2 && step2.kind === 'content' ? step2.content : '';
+    if (!narration) {
+      return deterministic;
+    }
+
+    // GUARDA 1 (fato-texto): a frase-fato tem que estar ÍNTEGRA na resposta.
+    if (!this.narrationContainsFact(narration, factPhrase)) {
+      return deterministic;
+    }
+    // GUARDA 2 (números): total/nº autorizados; qualquer outro número é invenção.
+    const check = checkNarrationFacts(narration, authorized, { forbidBareNumbers: true });
+    return check.safe ? narration : deterministic;
+  }
+
+  /**
+   * Containment normalizado: a frase-fato do status precisa estar presente na
+   * narração da IA, ignorando emoji/caixa/pontuação/espaços (a IA pode renderizar
+   * o emoji diferente, mas NÃO pode trocar a frase do status).
+   */
+  private narrationContainsFact(narration: string, factPhrase: string): boolean {
+    const norm = (s: string): string =>
+      String(s || '')
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const phrase = norm(factPhrase);
+    return phrase.length > 0 && norm(narration).includes(phrase);
+  }
+
+  /**
+   * Tipo B — as ações de LEITURA de produto (check_price/check_stock)
    * compartilham este roteador: resolve o produto UMA vez (com a trava do §5 no
-   * helper) e então formata por-ação. Preço/estoque/pedido saem SEMPRE do banco;
-   * a IA nunca origina o número.
+   * helper) e então formata por-ação. Preço/estoque saem SEMPRE do banco; a IA
+   * nunca origina o número. É o degrade dos loops (sem LLM/chave).
+   * process_order saiu daqui na Fatia 3 (Passo 2): a ESCRITA agora PROPÕE via
+   * gate de confirmação (handleProcessOrderProposal), nunca escreve direto.
    */
   private async routeProductAction(
     action: string,
     params: Record<string, any>,
     tenantId: string,
-    customerPhone: string,
+    _customerPhone: string,
   ): Promise<WhatsAppOutboundResponse> {
     const resolved = await this.resolveProductFromParams(tenantId, params);
     if (!resolved.ok) {
@@ -2176,8 +2659,6 @@ export class WhatsAppService {
         return this.formatProductPrice(product);
       case 'check_stock':
         return this.formatProductAvailability(product);
-      case 'process_order':
-        return this.addResolvedProductToCart(product, params, tenantId, customerPhone);
       default:
         return this.buildFriendlyFallback();
     }
@@ -2276,42 +2757,194 @@ export class WhatsAppService {
   }
 
   /**
-   * process_order — adiciona o produto resolvido ao carrinho com o preço REAL do
-   * banco. `quantity` vem dos params do LLM, saneada para inteiro ≥1 (default 1;
-   * a régua do H6). O `addItem` faz o `reserve` atômico e LANÇA se faltar estoque
-   * ou o carrinho estiver cheio — o catch responde amigável SEM vazar o número.
+   * Fatia 3 (Passo 2) — process_order do caminho da IA: resolve o produto (§5,
+   * o helper central admite quando não acha) e PROPÕE a adição pelo gate de
+   * confirmação. NÃO escreve — a escrita é exclusiva do handlePendingCartAdd,
+   * após o "sim" do cliente no turno seguinte. (Substitui o antigo
+   * addResolvedProductToCart, que escrevia direto; a falha de estoque agora
+   * acontece — e é tratada — no momento da confirmação.)
    */
-  private async addResolvedProductToCart(
-    product: Produto,
-    params: Record<string, any>,
+  private async handleProcessOrderProposal(
     tenantId: string,
-    customerPhone: string,
+    params: Record<string, any>,
+    conversation: TypedConversation,
   ): Promise<WhatsAppOutboundResponse> {
-    const rawQty = params?.quantity;
-    const quantity = Number.isInteger(rawQty) && rawQty >= 1 ? rawQty : 1;
+    const resolved = await this.resolveProductFromParams(tenantId, params);
+    if (!resolved.ok) {
+      // §5: produto ausente ou não encontrado → admissão honesta, sem propor.
+      return resolved.response;
+    }
+    return this.proposeCartAdd(conversation, resolved.product, params?.quantity);
+  }
 
-    try {
-      await this.cartService.addItem({
-        tenantId,
-        customerPhone,
-        produtoId: product.id,
-        produtoName: product.name,
-        quantity,
-        unitPrice: Number(product.price),
+  /**
+   * Fatia 3 (Passo 1) — PROPÕE uma adição ao carrinho: persiste a proposta com
+   * os fatos REAIS (produto resolvido, preço do banco, quantity saneada H6) e
+   * retorna a pergunta de confirmação. NÃO escreve — a escrita só acontece no
+   * handlePendingCartAdd, após o "sim" do cliente.
+   * (Religado ao process_order no Passo 2; keyword/botão religam no Passo 3.)
+   */
+  private async proposeCartAdd(
+    conversation: TypedConversation,
+    product: Produto,
+    rawQuantity: unknown,
+  ): Promise<WhatsAppOutboundResponse> {
+    const quantity =
+      Number.isInteger(rawQuantity) && (rawQuantity as number) >= 1
+        ? (rawQuantity as number)
+        : 1;
+    const unitPrice = Number(product.price);
+    const pending: PendingCartAdd = {
+      produto_id: product.id,
+      produto_name: product.name,
+      quantity,
+      unit_price: unitPrice,
+      proposed_at: new Date().toISOString(),
+    };
+    await this.conversationService.updateContext(conversation.id, {
+      pending_cart_add: pending,
+    });
+    conversation.context = { ...conversation.context, pending_cart_add: pending };
+
+    return [
+      `Só confirmando: *${quantity}x ${product.name}* - R$ ${unitPrice.toFixed(2)} cada (total R$ ${(quantity * unitPrice).toFixed(2)}).`,
+      '',
+      'Confirmo? (responda *sim* ou *não*)',
+    ].join('\n');
+  }
+
+  /**
+   * Extrai a quantidade DITA na mensagem (primeiro inteiro de 1-3 dígitos):
+   * "quero 2 brigadeiros" → 2; sem número → undefined (o proposeCartAdd aplica
+   * o default H6 = 1). Os caminhos de keyword hardcodavam qty 1 e IGNORAVAM o
+   * número do cliente; com o gate, o número entra na PROPOSTA — e se a extração
+   * errar, o cliente corrige no "não, N" antes de qualquer escrita.
+   */
+  private extractQuantityFromMessage(message: string): number | undefined {
+    const m = String(message || '').match(/(?<!\d)(\d{1,3})(?!\d)/);
+    if (!m) {
+      return undefined;
+    }
+    const n = parseInt(m[1], 10);
+    return Number.isInteger(n) && n >= 1 ? n : undefined;
+  }
+
+  /**
+   * Proposta velha não vale mais (Fatia 3): o timeout de conversa (passo 5.1) só
+   * dispara com state != 'idle', e o propose NÃO muda o state — sem este TTL um
+   * "sim" de horas depois ressuscitaria uma escrita que o cliente já esqueceu.
+   * Fail-closed: sem proposed_at válido = expirada.
+   */
+  private isPendingCartAddStale(pending: PendingCartAdd): boolean {
+    if (!pending.proposed_at) {
+      return true;
+    }
+    const proposedAt = new Date(pending.proposed_at).getTime();
+    if (!Number.isFinite(proposedAt)) {
+      return true;
+    }
+    return (Date.now() - proposedAt) / 60000 > PENDING_CART_ADD_TTL_MINUTES;
+  }
+
+  /**
+   * Fatia 3 (Passo 1) — o ÚNICO executor da escrita no carrinho. Lê a proposta
+   * PERSISTIDA (produto/preço NUNCA reinterpretados; correção de quantidade gera
+   * NOVA proposta) e decide:
+   *   1. número na resposta ("não, 3" / "3") → RE-PROPÕE com a qty nova (H6);
+   *   2. negativo → limpa sem escrever (checado ANTES do afirmativo:
+   *      "não confirmo" cancela — fail-closed);
+   *   3. afirmativo → addItem com os params persistidos → limpa → confirma;
+   *   4. ambíguo → pede sim/não (não escreve, não limpa).
+   * Proposta EXPIRADA (TTL) → limpa sem escrever (o "sim" tardio não ressuscita).
+   */
+  private async handlePendingCartAdd(
+    tenantId: string,
+    message: string,
+    conversation: TypedConversation,
+  ): Promise<WhatsAppOutboundResponse> {
+    const pending = conversation.context?.pending_cart_add as
+      | PendingCartAdd
+      | null
+      | undefined;
+    if (!pending?.produto_id) {
+      // Defensivo: o gate só roteia com proposta ativa.
+      return 'Não tenho nenhuma adição pendente. 🙂 Quer ver o cardápio? Digite "ver produtos".';
+    }
+
+    const clearPending = async () => {
+      await this.conversationService.updateContext(conversation.id, {
+        pending_cart_add: null,
       });
+      conversation.context = { ...conversation.context, pending_cart_add: null };
+    };
 
+    // Defesa em profundidade: o gate ignora proposta expirada, mas numa corrida
+    // de borda (expirou entre o gate e aqui) limpamos sem escrever.
+    if (this.isPendingCartAddStale(pending)) {
+      await clearPending();
+      return 'Aquela confirmação expirou e eu não adicionei nada. 🙂 É só pedir de novo se ainda quiser!';
+    }
+
+    const lower = String(message || '').trim().toLowerCase();
+
+    // 1) Correção com número ("não, 3" / "3") → RE-PROPÕE. Vem ANTES do negativo
+    // de propósito: "não, 3" é correção, não cancelamento. Nada é escrito aqui —
+    // o cliente confirma a proposta NOVA no próximo turno.
+    const qtyMatch = lower.match(/(?<!\d)(\d{1,3})(?!\d)/);
+    if (qtyMatch) {
+      const parsed = parseInt(qtyMatch[1], 10);
+      const quantity = Number.isInteger(parsed) && parsed >= 1 ? parsed : 1;
+      const updated: PendingCartAdd = {
+        ...pending,
+        quantity,
+        proposed_at: new Date().toISOString(),
+      };
+      await this.conversationService.updateContext(conversation.id, {
+        pending_cart_add: updated,
+      });
+      conversation.context = { ...conversation.context, pending_cart_add: updated };
+      return `Fechado: *${quantity}x ${pending.produto_name}* - R$ ${pending.unit_price.toFixed(2)} cada (total R$ ${(quantity * pending.unit_price).toFixed(2)}). Confirmo? (responda *sim* ou *não*)`;
+    }
+
+    // 2) Negativo → limpa sem escrever.
+    if (/\b(n[ãa]o|cancela|cancelar|deixa|esquece)\b/.test(lower)) {
+      await clearPending();
+      return 'Beleza, não adicionei. 🙂 Quer ver mais alguma coisa? Digite "ver produtos".';
+    }
+
+    // 3) Afirmativo → a ÚNICA escrita no carrinho, com os params PERSISTIDOS.
+    const affirmative =
+      lower === 's' ||
+      lower === 'ok' ||
+      /\b(sim|confirmo|confirma|confirmar|pode|isso|beleza|fechado)\b/.test(lower);
+    if (affirmative) {
+      try {
+        await this.cartService.addItem({
+          tenantId,
+          customerPhone: conversation.customer_phone,
+          produtoId: pending.produto_id,
+          produtoName: pending.produto_name,
+          quantity: pending.quantity,
+          unitPrice: pending.unit_price,
+        });
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        // Paridade B1: a mensagem do reserve traz contagem de estoque — não
+        // repassamos ao cliente.
+        this.logger.warn('pending cart add failed', { error: err.message });
+        await clearPending();
+        return `Poxa, não consegui adicionar *${pending.produto_name}* agora. 😕 Pode ser o estoque ou o carrinho cheio — quer tentar outra quantidade?`;
+      }
+      await clearPending();
       return [
-        `✅ Adicionado ${quantity}x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao carrinho!`,
+        `✅ Adicionado ${pending.quantity}x ${pending.produto_name} - R$ ${pending.unit_price.toFixed(2)} ao carrinho!`,
         '',
         'Digite "carrinho" para ver ou "finalizar" para confirmar.',
       ].join('\n');
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      // A mensagem do `reserve` traz a contagem de estoque — por isso NÃO a
-      // repassamos ao cliente (paridade B1: sem revelar quantidade).
-      this.logger.warn('process_order addItem failed', { error: err.message });
-      return `Poxa, não consegui adicionar *${product.name}* ao carrinho agora. 😕 Pode ser o estoque ou o carrinho cheio — quer tentar outra quantidade ou ver o que já está no carrinho?`;
     }
+
+    // 4) Ambíguo → pede clareza; não escreve e não limpa (o cliente responde).
+    return `Só pra confirmar: adiciono *${pending.quantity}x ${pending.produto_name}*? Responda *sim* ou *não* 🙂`;
   }
 
   /**
@@ -2728,22 +3361,22 @@ export class WhatsAppService {
     const value = rest.join('_');
 
     switch (action) {
-      case 'add':
-        // Adicionar produto ao carrinho
+      case 'add': {
+        // Fatia 3 (Passo 3): o clique PROPÕE pelo gate — UMA porta pra toda
+        // escrita; o addItem acontece no "sim" (handlePendingCartAdd). Método
+        // hoje SEM caller em produção (botões dormentes) — migrado pra não
+        // deixar um caminho de escrita direta armado se religarem os botões.
         const products = await this.productsService.search(tenantId, value);
         if (products.length > 0) {
-          const product = products[0];
-          await this.cartService.addItem({
+          // Mesmo padrão do case 'finalize': carrega a conversa pra persistir.
+          const conversation = await this.conversationService.getOrCreateConversation(
             tenantId,
             customerPhone,
-            produtoId: product.id,
-            produtoName: product.name,
-            quantity: 1,
-            unitPrice: Number(product.price),
-          });
-          return `✅ Adicionado 1x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao carrinho!`;
+          );
+          return this.proposeCartAdd(conversation as TypedConversation, products[0], 1);
         }
         return '😕 Produto não encontrado.';
+      }
 
       case 'finalize': {
         // Carrega a conversa para a FSM de checkout guardar/ler o estagio.

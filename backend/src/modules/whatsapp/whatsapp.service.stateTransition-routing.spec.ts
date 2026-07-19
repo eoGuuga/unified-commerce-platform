@@ -56,23 +56,26 @@ const conversation: any = {
 };
 
 describe('WhatsappService — Fase 2 Tipo A: roteia stateTransition → handler pronto', () => {
-  it('🎯 show_catalog → handleCatalog(tenantId, message) e retorna a resposta dele', async () => {
+  it('🎯 show_catalog → handleShowCatalogViaLoop (loop Fatia 2/Mov A) e retorna a resposta dele', async () => {
     const service = driveFallback('show_catalog');
-    service.handleCatalog = jest.fn().mockResolvedValue('CATALOGO_AQUI');
+    // Fatia 2: show_catalog agora vai pelo LOOP (narração + cinturão de N preços),
+    // não mais direto pro handleCatalog (que virou o determinístico do loop).
+    service.handleShowCatalogViaLoop = jest.fn().mockResolvedValue('CATALOGO_AQUI');
 
     const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
 
-    expect(service.handleCatalog).toHaveBeenCalledWith('t1', NEUTRAL_MSG);
+    expect(service.handleShowCatalogViaLoop).toHaveBeenCalledWith('t1', NEUTRAL_MSG);
     expect(res).toBe('CATALOGO_AQUI');
   });
 
-  it('🎯 check_order_status → handleOrderStatus(tenantId, phone, message, conversation)', async () => {
+  it('🎯 check_order_status → handleOrderStatusViaLoop (loop Fatia 2/Mov B, status determinístico)', async () => {
     const service = driveFallback('check_order_status');
-    service.handleOrderStatus = jest.fn().mockResolvedValue('STATUS_DO_PEDIDO');
+    // Fatia 2/Mov B: agora vai pelo LOOP (frase-fato code-owned + IA embrulha).
+    service.handleOrderStatusViaLoop = jest.fn().mockResolvedValue('STATUS_DO_PEDIDO');
 
     const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
 
-    expect(service.handleOrderStatus).toHaveBeenCalledWith(
+    expect(service.handleOrderStatusViaLoop).toHaveBeenCalledWith(
       't1',
       '5511999998888',
       NEUTRAL_MSG,
@@ -136,16 +139,76 @@ describe('WhatsappService — Fase 2 Tipo B: helper param-first (§5 centralizad
     expect(String(res)).not.toMatch(/\d+\s*(unidades?|em estoque|dispon[ií]ve[li]s?\s*:?\s*\d)/i);
   });
 
-  it('🎯 process_order com {product, quantity} → cartService.addItem com o produto resolvido', async () => {
+  // Fatia 3 (Passo 2): process_order NÃO escreve mais direto — ele PROPÕE
+  // (persiste pending_cart_add) e a escrita só acontece no turno seguinte, pelo
+  // handlePendingCartAdd (o único executor). A falha de estoque no addItem
+  // migrou pro momento da confirmação (coberta em pending-cart-add.spec).
+  it('🎯 process_order com {product, quantity} → PROPÕE (pending com o produto REAL) e addItem = 0 neste turno', async () => {
     const addItem = jest.fn().mockResolvedValue({});
+    const updateContext = jest.fn().mockResolvedValue(undefined);
     const service = driveFallback('process_order', {
       params: { product: 'brigadeiro', quantity: 2 },
       search: [PROD],
       cart: { addItem },
     });
+    service.conversationService = { updateContext };
+    const conv: any = { id: 'c1', customer_phone: '5511999998888', context: { state: 'idle' } };
 
-    const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
+    const res = await service.handleFallback('t1', NEUTRAL_MSG, conv);
 
+    expect(addItem).not.toHaveBeenCalled(); // a escrita NÃO acontece neste turno
+    expect(updateContext).toHaveBeenCalledWith(
+      'c1',
+      expect.objectContaining({
+        pending_cart_add: expect.objectContaining({
+          produto_id: 'p1',
+          produto_name: 'Brigadeiro Gourmet',
+          quantity: 2,
+          unit_price: 5,
+        }),
+      }),
+    );
+    expect(String(res)).toContain('2x Brigadeiro Gourmet');
+    expect(String(res).toLowerCase()).toContain('confirm');
+  });
+
+  it('process_order sem quantity → propõe o default inteiro ≥1 (1x)', async () => {
+    const updateContext = jest.fn().mockResolvedValue(undefined);
+    const service = driveFallback('process_order', {
+      params: { product: 'brigadeiro' },
+      search: [PROD],
+    });
+    service.conversationService = { updateContext };
+    const conv: any = { id: 'c1', customer_phone: '5511999998888', context: { state: 'idle' } };
+
+    const res = await service.handleFallback('t1', NEUTRAL_MSG, conv);
+
+    expect(updateContext.mock.calls[0][1].pending_cart_add.quantity).toBe(1);
+    expect(String(res)).toContain('1x');
+  });
+
+  it('🎯 PONTA-A-PONTA (2 turnos): propõe (addItem=0) → "sim" → addItem=1 com os params PERSISTIDOS → "✅"', async () => {
+    const addItem = jest.fn().mockResolvedValue({});
+    const updateContext = jest.fn().mockResolvedValue(undefined);
+    const service = driveFallback('process_order', {
+      params: { product: 'brigadeiro', quantity: 2 },
+      search: [PROD],
+      cart: { addItem },
+    });
+    service.conversationService = { updateContext };
+    const conv: any = { id: 'c1', customer_phone: '5511999998888', context: { state: 'idle' } };
+
+    // Turno 1: a IA entendeu "quero 2 brigadeiros" (params do router) → PROPÕE.
+    const res1 = await service.handleFallback('t1', NEUTRAL_MSG, conv);
+    expect(addItem).not.toHaveBeenCalled();
+    expect(String(res1).toLowerCase()).toContain('confirm');
+
+    // Turno 2 entra pela porta da frente do roteamento: o gate detecta o pending...
+    expect(service.detectIntent('sim', conv)).toBe('pending_cart_add');
+
+    // ...e o executor único escreve com os params PERSISTIDOS.
+    const res2 = await service.handlePendingCartAdd('t1', 'sim', conv);
+    expect(addItem).toHaveBeenCalledTimes(1);
     expect(addItem).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: 't1',
@@ -156,37 +219,7 @@ describe('WhatsappService — Fase 2 Tipo B: helper param-first (§5 centralizad
         unitPrice: 5,
       }),
     );
-    expect(String(res).length).toBeGreaterThan(0);
-  });
-
-  it('process_order sem quantity → default inteiro ≥1 (adiciona 1)', async () => {
-    const addItem = jest.fn().mockResolvedValue({});
-    const service = driveFallback('process_order', {
-      params: { product: 'brigadeiro' },
-      search: [PROD],
-      cart: { addItem },
-    });
-
-    await service.handleFallback('t1', NEUTRAL_MSG, conversation);
-
-    expect(addItem).toHaveBeenCalledWith(expect.objectContaining({ quantity: 1 }));
-  });
-
-  it('process_order com estoque insuficiente (addItem lança) → amigável, sem crash, sem vazar número', async () => {
-    const addItem = jest
-      .fn()
-      .mockRejectedValue(new Error('Estoque insuficiente: disponível 1, solicitado 5'));
-    const service = driveFallback('process_order', {
-      params: { product: 'brigadeiro', quantity: 5 },
-      search: [PROD],
-      cart: { addItem },
-    });
-
-    const res = await service.handleFallback('t1', NEUTRAL_MSG, conversation);
-
-    expect(String(res).length).toBeGreaterThan(0);
-    expect(res).toContain('Brigadeiro Gourmet');
-    expect(String(res)).not.toContain('Estoque insuficiente'); // não vaza a exceção/número
+    expect(String(res2)).toContain('✅ Adicionado 2x Brigadeiro Gourmet');
   });
 
   // O TESTE DO §5 — o mais importante: produto que NÃO existe → ADMITE, não inventa.

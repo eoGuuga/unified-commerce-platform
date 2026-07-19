@@ -11,6 +11,7 @@ export type RouterAction =
   | 'check_order_status'
   | 'cancel_order'
   | 'select_payment'
+  | 'start_checkout'
   | 'collect_info'
   | 'answer_question'
   | 'greeting'
@@ -98,6 +99,7 @@ export class LLMRouterService {
       'check_order_status — Cliente quer saber status de pedido. Params: { "order_number": "PED-..." ou null }',
       'cancel_order — Cliente quer cancelar pedido. Params: { "order_number": "PED-..." ou null }',
       'select_payment — Cliente escolheu forma de pagamento. Params: { "method": "pix" ou "dinheiro" ou "cartao" }',
+      'start_checkout — Cliente quer FECHAR/finalizar o pedido ja montado ("e isso", "pode fechar", "finaliza"). Params: {}',
       'answer_question — Cliente fez pergunta sobre a loja, produtos, entrega, etc. Params: { "topic": "descricao curta" }',
       'greeting — Cliente cumprimentou (oi, boa noite, etc). Params: {}',
       'farewell — Cliente se despediu (tchau, obrigado, etc). Params: {}',
@@ -142,6 +144,7 @@ export class LLMRouterService {
     sections.push('- Se o cliente pergunta "quanto custa", "qual o preco", "quanto ta" → check_price.');
     sections.push('- Se a mensagem e apenas uma saudacao sem pedido embutido → greeting.');
     sections.push('- Se a mensagem mistura saudacao + pedido ("boa noite quero 2 brigadeiros") → process_order (ignore a saudacao).');
+    sections.push('- "e isso", "so isso", "pode fechar", "finaliza ai", "quero finalizar" (SEM novo item) → start_checkout. NAO confunda com process_order: "quero X" = ADICIONAR o item X; fechar e quando o cliente ENCERRA a escolha.');
     sections.push('- Se a mensagem e ambigua demais para classificar com seguranca → clarify.');
     sections.push('- confidence deve refletir sua certeza: 0.9+ para intencoes claras, 0.5-0.7 para inferencias, <0.5 para chutes.');
 

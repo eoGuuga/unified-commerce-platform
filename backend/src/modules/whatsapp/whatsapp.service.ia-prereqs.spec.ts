@@ -67,6 +67,8 @@ describe('WhatsappService — Fix 2: timeout limpa o checkout (não ressuscita)'
       context: {
         state: 'collecting_order',
         checkout: { stage: 'confirming_address' }, // checkout velho a ser limpo
+        // Fatia 3: proposta de carrinho órfã também deve morrer no reset.
+        pending_cart_add: { produto_id: 'p1', produto_name: 'X', quantity: 2, unit_price: 5 },
         customer_data: { name: 'Ana' },
       },
     };
@@ -105,7 +107,7 @@ describe('WhatsappService — Fix 2: timeout limpa o checkout (não ressuscita)'
     expect(String(res)).toContain('Que bom que você voltou');
     expect(updateContext).toHaveBeenCalledWith(
       'conv1',
-      expect.objectContaining({ state: 'idle', checkout: null }),
+      expect.objectContaining({ state: 'idle', checkout: null, pending_cart_add: null }),
     );
     // Retornou no timeout — não seguiu pro fluxo normal.
     expect(getOrCreateConversation).not.toHaveBeenCalled();
