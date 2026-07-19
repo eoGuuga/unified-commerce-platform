@@ -9,6 +9,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { CsrfGuard } from './common/guards/csrf.guard';
 import { applyExpressHardening, buildHelmetOptions } from './common/security/http-hardening';
 import { assertDatabaseLeastPrivilege } from './common/security/db-least-privilege';
+import { assertTenantTablesHaveRls } from './common/security/rls-coverage';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 import { StructuredLogger } from './common/services/structured-logger.service';
 import { AppModule } from './app.module';
@@ -273,6 +274,10 @@ async function bootstrap() {
   // isolamento multi-tenant — melhor abortar o boot do que rodar sem protecao.
   if (isProd) {
     await assertDatabaseLeastPrivilege(app.get(DataSource));
+    // Rede preventiva (Peça 4): recusa subir se alguma tabela com tenant_id
+    // estiver sem RLS (ENABLE+FORCE+policy). Última linha contra uma migration
+    // aplicada direto em prod fora do CI — abortar o boot > rodar vazando.
+    await assertTenantTablesHaveRls(app.get(DataSource));
   }
 
   const port = process.env.PORT || 3001;

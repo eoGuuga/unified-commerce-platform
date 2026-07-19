@@ -32,7 +32,7 @@ Erro aqui = prejuizo financeiro, vazamento de dados de cliente, ou processo judi
 
 GTSoftHub e um **SaaS multi-tenant que o dono VENDE para clientes**. Cada cliente conecta o **proprio numero** de WhatsApp (Evolution API via QR Code) e o **proprio MercadoPago/PIX**. O numero/credencial do dono so existe para teste. Implicacao pratica: nada pode ser hardcoded para um tenant; todo recurso e por-tenant e isolado por RLS. Falha de isolamento = um cliente ve dados de outro = fim do negocio.
 
-- Prod: https://gtsofthub.com.br (`/opt/ucm`) | Dev: https://dev.gtsofthub.com.br (`/opt/ucm-test-repo`)
+- Prod: https://gtsofthub.com.br (`/opt/gtsofthub`) | Dev: https://dev.gtsofthub.com.br (`/opt/ucm-test-repo`)
 - Solo dev. CI (lint/build/test) roda; **deploy e manual via SSH `ubuntu@gtsofthub.com.br`**.
 
 ---
@@ -64,7 +64,7 @@ Processa PII e pagamento de terceiros. Conformidade protege de multa (LGPD ate 2
 - **Fail-closed sempre** em auth/webhook/assinatura. Nunca `if (secret) verifica`.
 - **Sem endpoint de teste/debug exposto em prod.**
 - **PII so via servico com audit log + `ENCRYPTION_KEY`.** Nunca logar telefone/CPF/token/conteudo de pagamento.
-- **Pendencias criticas** (backlog no doc, secao Auditoria 2026-06-26): webhooks fail-open, `/whatsapp/test` e `/whatsapp/metrics` sem guard, exclusao LGPD stub, falta consentimento + paginas legais.
+- **Pendencias criticas** (backlog no doc): `/whatsapp/metrics` sem guard, exclusao LGPD stub, falta consentimento + paginas legais. *(RESOLVIDOS desde 2026-06: webhooks fail-closed, `/whatsapp/test` fail-closed 403 em prod.)*
 
 ---
 
@@ -94,8 +94,8 @@ backend/src/
     auth/ .......................... JWT, login (exige x-tenant-id em prod), guards
     tenants/ ....................... resolucao de tenant; usado por webhooks publicos
     products/ ...................... catalogo, estoque (movimentacoes_estoque)
-    orders/ ........................ orders.service.ts (849L) calcula total
-    payments/ ...................... payments.service.ts (841L): MercadoPago + PIX + webhook
+    orders/ ........................ orders.service.ts (~1040L) calcula total
+    payments/ ...................... payments.service.ts (~1110L): MercadoPago + PIX + webhook
     whatsapp/ ...................... bot (ver detalhe abaixo)
     coupons/ notifications/ lgpd/ health/
   common/ .......................... decorators (@CurrentTenant, @Public), guards (Csrf, Jwt),
@@ -107,23 +107,23 @@ deploy/ ............................ docker-compose.{prod,dev,test}.yml, nginx/u
 docs/CONSOLIDADO/ .................. doc oficial (use) | docs/LEGADO/ historico (nao usar)
 ```
 
-**Bot WhatsApp — arquitetura HIBRIDA (entenda antes de mexer):**
-`whatsapp.service.ts` (1584L) e orquestrador, NAO monolito de if/else. Fluxo real de uma mensagem:
-1. `processIncomingMessage()` (L107) — ignora grupo/broadcast/bloqueado, exige `tenantId`, valida tenant.
-2. `messageProcessor.processMessage()` (L139) — sanitiza, detecta tipo/limite de tamanho.
-3. **Fast-path:** handlers diretos (carrinho, catalogo, comando de bot) para comandos obvios.
-4. **Caminho de IA (o coracao):** `handleFallback()` (L906) -> `llmRouterService.route()` (L1062) decide a acao -> `actionExecutorService.execute()` (L1071) executa (busca estoque, cria pedido). `openai.service.ts` classifica intencao + entende giria PT-BR.
-5. `sendOutboundResponse()` (L278) — **hoje so loga; falta ligar `evolution-api.provider`.**
+**Bot WhatsApp — arquitetura RULES-FIRST (entenda antes de mexer):**
+`whatsapp.service.ts` (~2600L) e orquestrador, NAO monolito de if/else. **~80% regra fixa / 20% IA — e desse 20% a maior parte e CLASSIFICACAO, nao geracao: a IA e o ULTIMO RECURSO, nao o centro.** Fluxo real (refs por NOME DE METODO de proposito — numero de linha envelhece):
+1. `processIncomingMessage()` — grupo/broadcast/bloqueado, timeout de conversa, exige `tenantId`, valida tenant.
+2. `messageProcessor.processMessage()` — sanitiza, detecta tipo/limite de tamanho.
+3. **Funil de keyword:** `detectIntent()` -> `processByIntent()` despacha pra handler dedicado (carrinho, catalogo, checkout, status). So o `default` cai no `handleFallback()`.
+4. **Cauda de IA (ULTIMO recurso):** `handleFallback()` roda MAIS keyword (preco/disponib./compra) e, so em ultimo caso, `llmRouterService.route()` classifica a acao -> `actionExecutorService.execute()`. `openai.service.ts` = OpenRouter/gpt-4o-mini, entende giria PT-BR.
+5. `sendOutboundResponse()` — **entrega de verdade** via `whatsappSender` (evolution-api / mock, por-tenant). Bot deployado e provado ponta-a-ponta.
 
-- ~30 servicos em `whatsapp/services/` (sales-intelligence, conversation-manager, message-intelligence...). Providers em `whatsapp/providers/` (`evolution-api` com botoes/listas, `mock`). Tipos em `whatsapp/types/whatsapp-interactive.types.ts`.
+- ~23 servicos em `whatsapp/services/`, MAS **~10k linhas DORMENTES** em ilhas (a maior: `sales-intelligence` ~6.3k — keyword-engine sem IA, com bugs `it.skip` congelados). Codigo real fora do caminho vivo: **canibalizar/remover, NAO religar.** Providers em `whatsapp/providers/` (`evolution-api`, `mock`).
+- **Frente central do produto = a IA-vendedora** (o bot que VENDE de verdade): esboco de arquitetura 5/5 definido (Modelo B tool-calling · trava do §5 "IA conversa, banco decide" · FSM de ferro fecha o pedido · canibalizar a ilha dormente · instrumentacao). Direcao definida, em construcao por branch.
 - Frontend tem `lib/api-client.ts` (axios) para chamar a API — relevante so se mexer no front.
 
 ---
 
 ## 7. ARMADILHAS (cada uma ja custou tempo/token — evite)
 
-- **`whatsapp.service.legacy.ts` (14.817 linhas) e CODIGO MORTO.** Nao e importado por nada em `src/` (so existe `.d.ts` no `dist/` antigo). NUNCA leia, edite ou use como referencia. O ativo e `whatsapp.service.ts` (1584L).
-- **Arquivos `*.service.ts.disabled`** em `whatsapp/services/` (cart-integration, message-handler, order-flow, payment-flow) estao desativados de proposito. Ignore.
+- **Codigo DORMENTE em `whatsapp/services/` (~10k linhas, ilhas tipo `sales-intelligence`).** Keyword-engine sem IA, com bugs `it.skip` congelados + 1 branch que fere multi-tenancy. NAO religar como esta — e especificacao a canibalizar, nao codigo pronto. *(O antigo `whatsapp.service.legacy.ts` e os `*.service.ts.disabled` FORAM DELETADOS — nao existem mais.)*
 - **Edits no Edit tool falham silenciosamente as vezes** nesta sessao (param "missing"). Se acontecer, reenvie o mesmo Edit — nao reescreva o arquivo inteiro.
 - **Multi-tenant (ver invariante 3.1):** query fora do contexto de tenant retorna vazio silenciosamente (nao da erro) — sintoma comum de "sumiu dado". E falta de contexto RLS, nao bug de dados.
 - **Estoque** mora em `movimentacoes_estoque` (colunas `current_stock`, `reserved_stock`, `min_stock`), nao numa coluna em `produtos`.
@@ -157,7 +157,7 @@ npm run seed:mae        # seed dados de teste
 npm run dev | build | lint | type-check | test   # test = vitest
 
 # VPS (ssh ubuntu@gtsofthub.com.br)
-cd /opt/ucm && docker compose -f deploy/docker-compose.prod.yml ps
+cd /opt/gtsofthub && docker compose -f deploy/docker-compose.prod.yml ps
 docker compose -f deploy/docker-compose.prod.yml logs -f backend
 bash deploy/scripts/apply-and-health.sh   # deploy + health check
 bash deploy/scripts/backup-postgres.sh
@@ -173,7 +173,7 @@ bash deploy/scripts/backup-postgres.sh
 | `POST /api/v1/whatsapp/webhook` | Twilio / Evolution | assinatura do provider |
 
 Ambos: `@Public()`, nginx `api_webhook` (5 r/s, burst 10), **idempotentes**, e DEVEM ser **fail-closed** se o secret faltar em prod.
-Estado real (verificar antes de confiar): so o webhook MercadoPago tem `@Throttle({ webhook:{ttl:60000,limit:60} })`; o de WhatsApp (`whatsapp.controller.ts:351`) NAO tem o decorator (cai no throttle `default` 100/min em prod) **e hoje e fail-open** (`if (webhookSecret && signature)` — pendencia critica no backlog de seguranca).
+Estado real (verificado 2026-07-10): o webhook MercadoPago tem `@Throttle({ webhook:{ttl:60000,limit:60} })`; o de WhatsApp e **fail-closed** em prod (`verifyWebhookSignature` no `whatsapp.controller.ts`: sem `WHATSAPP_WEBHOOK_SECRET` -> mensagem REJEITADA). *(Ainda NAO tem o `@Throttle` proprio -> cai no `default` 100/min.)*
 
 ---
 
