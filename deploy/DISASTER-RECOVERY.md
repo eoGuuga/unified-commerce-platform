@@ -4,18 +4,48 @@ Documento de operacao para cenarios de falha. Audita pontos de
 recuperacao, tempos objetivos e procedimentos passo-a-passo. Manter
 versionado com o repo (`deploy/DISASTER-RECOVERY.md`).
 
-Ultima revisao: 2026-07-12 (Ciclo 2A off-site). Reler trimestralmente ou apos mudanca
-de stack.
+Ultima revisao: 2026-07-19 (Ciclo 2B — off-site religado, provado ao vivo e
+tornado permanente). Reler trimestralmente ou apos mudanca de stack.
 
-> **ESTADO DO OFF-SITE (2026-07-12, verificado na fonte):** o off-site rodou de
-> 11/fev a **06/jun/2026** (provado restauravel no drill de 01/jun) e **parou em
-> silencio** (o cron desapareceu ~06-07/jun; causa nao recuperavel). O
-> religamento esta na branch `fix/offsite-reactivation` (path corrigido, retencao
-> fail-loud, crons versionados em `deploy/cron/`). **ATENCAO NA RECUPERACAO:** os
-> ~121 arquivos JA no bucket foram enviados pelo remote **PLANO `b2:`** (sem
-> cifra) — para baixa-los use `b2:`; o religamento passa a usar `b2crypt:` (cifra
-> no cliente), entao backups NOVOS ficam sob `b2crypt:`. Num restore, confira os
-> DOIS remotes ate a migracao dos antigos ser decidida (Ciclo 2B).
+> **ESTADO DO OFF-SITE (2026-07-19, VERIFICADO ao vivo — nao alegado):**
+> **RELIGADO E CIFRADO.** Provas do Bloco 2: (1) upload manual exit 0 (backfill
+> de 18 arquivos, 03->18/jul); (2) cifra provada lado a lado — os MESMOS 18
+> arquivos legiveis via `b2crypt:` e embaralhados no cru
+> `b2:gtsofthub-backups/ucm/`; (3) drill restaurou DO B2 CIFRADO em container
+> descartavel com counts do banco real pos-faxina (tenants=1 usuarios=1
+> produtos=69); (4) sonda de frescura parseou o modtime REAL (FRESCO, 23h <
+> 30h). 3 crons instalados em `/etc/cron.d/` (agenda abaixo). HEAD do checkout
+> do servidor: `94834e8`.
+>
+> **CORRECAO DE PREMISSA (2026-07-15):** o off-site historico (fev->06/jun/2026)
+> **SEMPRE foi crypt**. O painel do B2 ENGANA: a pasta `ucm/` legivel e o
+> path-base do wrap (nunca cifrado por definicao); o CONTEUDO sempre esteve
+> cifrado (nomes embaralhados no remote cru). **Fonte da verdade pro conteudo =
+> `rclone lsf`, nao o painel.** A "migracao de 121 legados plain" nao existia;
+> a retencao 30d varreu os antigos de mai/jun como politica normal (viram
+> hidden versions no B2, recuperaveis no painel ate lifecycle purge).
+>
+> **CUSTODIA (verificada pelo dono em 15/07/2026, nao alegada):** a senha do
+> crypt (`[b2crypt]` — **SEM salt/password2; ao reconstruir o remote, deixar o
+> salt VAZIO** senao nao decifra) + a application key do B2, ambas no
+> Bitwarden. Perder a senha do crypt = TODOS os backups off-site ilegiveis
+> (mesma classe da ENCRYPTION_MASTER_KEY). Divida consciente: re-cifrar com
+> salt exigiria re-upload do historico — adiado.
+>
+> **PROPRIEDADE DA SONDA (conhecida e desejada):** o rclone preserva o modtime
+> de ORIGEM (criacao do dump, nao o momento do upload) -> a sonda mede a idade
+> do BACKUP e vigia as DUAS cadeias: se o pg_dump local parar e o off-site
+> continuar subindo arquivo velho, a idade envelhece e ela grita do mesmo jeito.
+
+### Agenda dos crons (UTC) — escalonada, sem empilhar minuto
+
+| Horario (UTC) | Job | User | Arquivo em /etc/cron.d |
+|---|---|---|---|
+| `*/5` | app-alert (Tier1 -> Telegram) | ubuntu | `gtsofthub-app-alert` |
+| `06:00` diario | backup local (pg_dump+gzip) | ubuntu | `gtsofthub-backup` |
+| `06:07` (+00/12/18:07) | sonda de frescura (dead-man 30h) | root | `gtsofthub-offsite-freshness` |
+| `06:30` diario | off-site (rclone copy -> b2crypt:) | root | `gtsofthub-backup-offsite` |
+| `02:30` dia 1 do mes | restore drill (restaura do B2 + counts) | root | `gtsofthub-restore-drill` |
 
 ## Objetivos
 
@@ -23,7 +53,7 @@ de stack.
 |---|---|---|
 | **RPO** (Recovery Point Objective) | **24h** | Backup diario `backup-postgres.sh` rodando via cron as 06:00 UTC (03:00 BRT). Pior cenario: perda de dados do dia em curso. |
 | **RTO** (Recovery Time Objective) | **2h** para PROD, 4h para reconstrucao completa | Tempo desde "incidente confirmado" ate "sistema rodando + dados restaurados". |
-| **Backup retention local** | 7 dias | `KEEP_DAYS=7` em `backup-postgres.sh`. |
+| **Backup retention local** | 14 dias | `KEEP_DAYS=14` (default) em `backup-postgres.sh`. |
 | **Backup retention offsite (B2)** | 30 dias | `OFFSITE_KEEP_DAYS=30` em `backup-offsite.sh`. |
 | **Frequencia do restore drill** | Mensal | `restore-drill-offsite.sh` valida integridade do backup offsite. |
 
