@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { TenantsService } from '../tenants/tenants.service';
 import { Public } from '../../common/decorators/public.decorator';
@@ -491,8 +491,17 @@ export class WhatsappController {
   // 60/min nao e um numero novo: e o mesmo ja em producao no webhook do MP.
   // Segue sendo um teto por IP, nao por cliente — se o volume real da doceria
   // pedir mais, ajustar COM DADO, nao com chute.
+  //
+  // ⚠️ O @SkipThrottle NAO e decorativo — sem ele o @Throttle acima nao serve
+  // pra nada. O guard percorre TODOS os throttlers nomeados e exige `.every()`
+  // (throttler.guard.js:67-97): o @Throttle sobrescreve so o `webhook`,
+  // enquanto `strict` (10/min) e `default` seguem valendo pelo fallback do
+  // modulo. Foi exatamente esse o bug medido em producao — 429 na 11ª
+  // requisicao com o @Throttle ja deployado. So o SkipThrottle tira um
+  // throttler da conta.
   @Public()
   @Throttle({ webhook: { ttl: 60000, limit: 60 } })
+  @SkipThrottle({ strict: true, default: true })
   @Post('webhook')
   @ApiOperation({
     summary: 'Webhook para receber mensagens (WhatsApp Cloud API / Evolution / Twilio)',

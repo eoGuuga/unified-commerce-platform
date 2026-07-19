@@ -11,7 +11,7 @@ import {
   Headers,
   Query,
 } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { PaymentsService, CreatePaymentDto } from './payments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../common/decorators/tenant.decorator';
@@ -73,8 +73,13 @@ export class PaymentsController {
     return await this.paymentsService.findByPedido(pedidoId, tenantId);
   }
 
+  // O @SkipThrottle e o que faz o @Throttle acima valer: o guard exige passar
+  // em TODOS os throttlers nomeados, entao sem pular `strict` (10/min) o teto
+  // efetivo desta rota era 10, nao 60 — capada silenciosamente desde sempre,
+  // sem morder so porque webhook de pagamento e de volume baixo.
   @Public()
   @Throttle({ webhook: { ttl: 60000, limit: 60 } })
+  @SkipThrottle({ strict: true, default: true })
   @Post('webhook/mercadopago')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Webhook Mercado Pago (publico)' })

@@ -1,48 +1,113 @@
+import { Reflector } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerStorageService } from '@nestjs/throttler';
+import type { ExecutionContext } from '@nestjs/common';
 import { WhatsappController } from './whatsapp.controller';
 import { PaymentsController } from '../payments/payments.controller';
 
 /**
- * Teto de requisicoes do webhook do WhatsApp.
+ * Teto EFETIVO de requisicoes dos webhooks publicos.
  *
- * O ThrottlerModule (app.module.ts) registra TRES throttlers nomeados —
- * default(100/min), strict(10/min) e webhook(60/min) em producao. No
- * @nestjs/throttler v6 TODOS valem para TODA rota; quem nao declara
- * @Throttle herda os tres, e o mais restritivo manda. Ou seja: um webhook
- * publico sem decorator fica preso ao teto de 10/min do `strict`.
+ * ⚠️ LICAO QUE ORIGINOU ESTE ARQUIVO: a versao anterior deste teste checava o
+ * METADATA do decorator ("declara webhook=60?") e passava verde — enquanto o
+ * teto real em producao seguia 10/min. Proposicao verdadeira, irrelevante.
+ * Medicao ao vivo (12 POSTs em prod) mostrou 429 na 11ª.
  *
- * Isso importa porque o tracker e por IP e a Meta entrega de poucos IPs
- * proprios: o teto e COMPARTILHADO pela loja inteira, nao por cliente. Um
- * cliente digitando "oi"/"quero"/"2"/"sim" gasta metade da cota sozinho.
- * Estourado o teto, a Meta recebe 429, re-tenta e DESCARTA a mensagem — o
- * cliente fica sem resposta e ninguem e avisado (429 e 4xx -> "level":"warn",
- * e o app-alert.sh so caça "level":"error").
+ * CAUSA (throttler.guard.js:67-97): o guard percorre TODOS os throttlers
+ * nomeados do modulo e exige `.every(...)` — a requisicao precisa passar em
+ * TODOS. `@Throttle({webhook: 60})` sobrescreve SO o `webhook`; o `strict`
+ * continua valendo com o fallback do modulo (10/min) porque nada o pula.
+ * So `@SkipThrottle({<nome>: true})` remove um throttler da conta
+ * (grava THROTTLER:SKIP<nome>, exatamente a chave que o guard consulta).
  *
- * O webhook do Mercado Pago ja resolvia isso com @Throttle({webhook:...}).
- * Este teste amarra o do WhatsApp ao MESMO molde — e falha se alguem remover
- * o decorator ou se os dois webhooks divergirem.
+ * Por isso este teste MEDE: monta o guard real com storage real e conta
+ * quantas requisicoes passam antes do 429. E o unico formato que teria
+ * pego o bug anterior.
  */
-describe('WhatsappController — teto de requisicoes do webhook', () => {
-  // Chave montada pelo proprio decorator: THROTTLER_LIMIT + nome, sem separador
-  // (node_modules/@nestjs/throttler/dist/throttler.decorator.js:9-10).
-  const LIMIT_KEY = 'THROTTLER:LIMITwebhook';
-  const TTL_KEY = 'THROTTLER:TTLwebhook';
 
-  const whatsappWebhook = WhatsappController.prototype.webhook;
-  const mercadoPagoWebhook = PaymentsController.prototype.mercadoPagoWebhook;
+// Mesma FORMA da config do app.module (default/strict/webhook), com os valores
+// de producao. O que importa aqui e a RELACAO: `strict` (10) e mais restritivo
+// que `webhook` (60), entao se `strict` nao for pulado ele e quem manda.
+const THROTTLERS = [
+  { name: 'default', ttl: 60000, limit: 100 },
+  { name: 'strict', ttl: 60000, limit: 10 },
+  { name: 'webhook', ttl: 60000, limit: 60 },
+];
 
-  it('o molde ja existe: o webhook do Mercado Pago declara o throttler `webhook`', () => {
-    expect(Reflect.getMetadata(LIMIT_KEY, mercadoPagoWebhook)).toBe(60);
-    expect(Reflect.getMetadata(TTL_KEY, mercadoPagoWebhook)).toBe(60000);
-  });
+const STRICT_LIMIT = 10;
+const WEBHOOK_LIMIT = 60;
 
-  it('🔒 o webhook do WhatsApp declara o throttler `webhook` (senao herda o strict de 10/min)', () => {
-    expect(Reflect.getMetadata(LIMIT_KEY, whatsappWebhook)).toBe(60);
-    expect(Reflect.getMetadata(TTL_KEY, whatsappWebhook)).toBe(60000);
-  });
+function makeContext(
+  handler: unknown,
+  classRef: unknown,
+  ip: string,
+): ExecutionContext {
+  const req = { ip, ips: [], headers: {} };
+  const res = { header: () => undefined };
+  return {
+    switchToHttp: () => ({ getRequest: () => req, getResponse: () => res }),
+    getHandler: () => handler,
+    getClass: () => classRef,
+  } as unknown as ExecutionContext;
+}
 
-  it('os dois webhooks publicos usam o MESMO teto (nao divergem)', () => {
-    expect(Reflect.getMetadata(LIMIT_KEY, whatsappWebhook)).toBe(
-      Reflect.getMetadata(LIMIT_KEY, mercadoPagoWebhook),
+/** Quantas requisicoes passam antes do guard barrar (o teto EFETIVO). */
+async function measureCeiling(handler: unknown, classRef: unknown): Promise<number> {
+  const storage = new ThrottlerStorageService();
+  try {
+    const guard = new ThrottlerGuard(
+      THROTTLERS as never,
+      storage,
+      new Reflector(),
     );
+    // O guard monta `this.throttlers` no onModuleInit, NAO no construtor
+    // (throttler.guard.js:31). Sem isto, o canActivate estoura
+    // "this.throttlers is not iterable" e a medicao daria 0 pra tudo.
+    await guard.onModuleInit();
+    let allowed = 0;
+    // Teto de seguranca bem acima do maior limite configurado.
+    for (let i = 0; i < WEBHOOK_LIMIT * 3; i++) {
+      try {
+        await guard.canActivate(makeContext(handler, classRef, '203.0.113.7'));
+        allowed += 1;
+      } catch {
+        break; // ThrottlerException -> achamos o teto
+      }
+    }
+    return allowed;
+  } finally {
+    storage.onApplicationShutdown();
+  }
+}
+
+describe('Webhooks publicos — teto EFETIVO de requisicoes (guard real)', () => {
+  it('🔒 o webhook do WhatsApp aguenta o limite `webhook`, nao o `strict`', async () => {
+    const ceiling = await measureCeiling(
+      WhatsappController.prototype.webhook,
+      WhatsappController,
+    );
+
+    expect(ceiling).toBe(WEBHOOK_LIMIT);
+    // Redundante de proposito: e ESTA a afirmacao que era falsa em producao.
+    expect(ceiling).toBeGreaterThan(STRICT_LIMIT);
+  });
+
+  it('🔒 o webhook do Mercado Pago tambem (o molde estava capado em 10/min)', async () => {
+    const ceiling = await measureCeiling(
+      PaymentsController.prototype.mercadoPagoWebhook,
+      PaymentsController,
+    );
+
+    expect(ceiling).toBe(WEBHOOK_LIMIT);
+    expect(ceiling).toBeGreaterThan(STRICT_LIMIT);
+  });
+
+  it('controle: uma rota SEM decorator continua presa ao `strict` (o guard esta medindo mesmo)', async () => {
+    // Se este teste falhar, o harness nao esta exercitando o guard de verdade
+    // e os dois acima nao valem nada.
+    const semDecorator = PaymentsController.prototype.getPayment;
+
+    const ceiling = await measureCeiling(semDecorator, PaymentsController);
+
+    expect(ceiling).toBe(STRICT_LIMIT);
   });
 });
