@@ -15,7 +15,10 @@ build/
 out/
 
 # IDE
-.vscode/
+.vscode/*
+# Exceção: settings.json é COMPARTILHADO (fixa a TS do workspace pro editor —
+# evita erros-fantasma do Language Server; ver .vscode/settings.json).
+!.vscode/settings.json
 .idea/
 *.swp
 *.swo

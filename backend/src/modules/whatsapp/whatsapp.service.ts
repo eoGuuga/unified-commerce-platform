@@ -8,7 +8,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CouponsService } from '../coupons/coupons.service';
 import { AvailabilityService } from '../availability/availability.service';
 import { DbContextService } from '../common/services/db-context.service';
-import { CanalVenda, Pedido } from '../../database/entities/Pedido.entity';
+import { CanalVenda, Pedido, PedidoStatus } from '../../database/entities/Pedido.entity';
+import { Produto } from '../../database/entities/Produto.entity';
 
 // Services de inteligência (mantidos para recursos avançados)
 import { OpenAIService } from './services/openai.service';
@@ -243,7 +244,7 @@ export class WhatsAppService {
       // 5.1 ANTES de tudo: verificar timeout de conversa (5 minutos de inatividade)
       const TIMEOUT_MINUTES = 5;
       const conversationRepo = (this.conversationService as any)['db'].getRepository('WhatsappConversation');
-      let conversationForTimeout = await conversationRepo.findOne({
+      const conversationForTimeout = await conversationRepo.findOne({
         where: {
           tenant_id: message.tenantId,
           customer_phone: message.from,
@@ -260,9 +261,13 @@ export class WhatsAppService {
           : 999;
 
         if (minutesSinceLastMessage > TIMEOUT_MINUTES && currentState && currentState !== 'idle') {
-          // Conversa expirou - reiniciar com mensagem amigável
+          // Conversa expirou - reiniciar com mensagem amigável.
+          // `checkout: null` zera qualquer coleta em andamento — sem isto, o
+          // detectIntent (que checa `checkout.stage` ANTES do state) ressuscitaria
+          // o checkout velho no próximo turno e sequestraria a conversa.
           await this.conversationService.updateContext(conversationForTimeout.id, {
             state: 'idle',
+            checkout: null,
             customer_data: conversationForTimeout.context?.customer_data,
           });
 
@@ -1873,54 +1878,21 @@ export class WhatsAppService {
     message: string,
     conversation: TypedConversation,
   ): Promise<WhatsAppOutboundResponse> {
-    // FSM de checkout (S2a) tem prioridade: se ha um checkout em andamento,
-    // ela conduz a coleta de entrega com confirmacao antes de criar o pedido.
+    // A FSM de checkout (S2a, handleCheckoutStage) é o ÚNICO caminho vivo de
+    // coleta: conduz nome→telefone→endereço/retirada→confirmação e só cria o
+    // pedido após "sim" (ver a invariante D2 no handleCheckout). Se ela não
+    // assume o turno (nenhum checkout ativo), não há coleta a fazer aqui.
     const checkoutResponse = await this.handleCheckoutStage(tenantId, message, conversation);
     if (checkoutResponse !== null) {
       return checkoutResponse;
     }
 
-    // Simplificado - apenas coletar informações básicas
-    const currentState =
-      (conversation.context?.state as ConversationState) || 'collecting_order';
-
-    switch (currentState) {
-      case 'collecting_name':
-        await this.conversationService.updateContext(conversation.id, {
-          state: 'collecting_phone',
-          customer_data: { ...conversation.context?.customer_data, name: message },
-        });
-        return 'Qual é o seu telefone?';
-
-      case 'collecting_phone':
-        await this.conversationService.updateContext(conversation.id, {
-          state: 'collecting_address',
-          customer_data: { ...conversation.context?.customer_data, phone: message },
-        });
-        return 'Qual é o endereço de entrega?';
-
-      case 'collecting_address':
-        await this.conversationService.updateContext(conversation.id, {
-          state: 'confirming_order',
-          customer_data: { ...conversation.context?.customer_data, address: message },
-        });
-        return this.responseBuilder.buildConfirmationMessage(
-          'Confirma o pedido com esses dados?',
-        );
-
-      case 'confirming_order':
-        const lower = message.toLowerCase();
-        if (lower.includes('sim') || lower.includes('confirmar')) {
-          await this.conversationService.updateContext(conversation.id, {
-            state: 'order_confirmed',
-          });
-          return '✅ Pedido confirmado! Estamos preparando...';
-        }
-        return 'Ok, pode corrigir as informações.';
-
-      default:
-        return 'O que você gostaria de fazer?';
-    }
+    // NOTA: havia aqui um switch legado por `context.state`
+    // (collecting_name/phone/address/confirming_order) que era INALCANÇÁVEL —
+    // nada no fluxo vivo seta esses estados — e cujo branch `confirming_order`
+    // respondia "Pedido confirmado" SEM chamar ordersService.create
+    // (fake-confirmation). Removido: sem checkout ativo, cai num fallback neutro.
+    return 'O que você gostaria de fazer?';
   }
 
   private async handleFallback(
@@ -2096,23 +2068,269 @@ export class WhatsAppService {
         customerName: conversation.customer_name,
       });
 
+      // As 8 ações de negócio do action-executor voltam com `response` vazio e o
+      // `stateTransition` setado (o executor injeta só o OpenAIService; quem tem
+      // os domain-services é este orquestrador). Se veio vazio + stateTransition,
+      // roteamos pro handler real. Ações conversacionais (greeting/clarify/…) já
+      // trazem texto e passam direto.
+      if (!executionResult.response && executionResult.stateTransition) {
+        return this.routeBusinessAction(
+          executionResult.stateTransition,
+          decision.params,
+          tenantId,
+          message,
+          conversation,
+        );
+      }
       return executionResult.response;
     } catch (error) {
       this.logger.warn('LLM fallback failed', { error });
+      return this.buildFriendlyFallback();
+    }
+  }
 
-      // Resposta amigável quando não entende
-      const suggestions = [
-        '🛒 Digite "ver produtos" para ver o cardápio',
-        '❓ Digite "ajuda" para ver todos os comandos',
-        '🛍️ Ou me diga o que você quer!',
-      ];
+  /**
+   * Roteia uma ação de negócio do action-executor (que volta com `response`
+   * vazio + `stateTransition`) para o handler real correspondente — que JÁ
+   * existe e já está ligado aos domain-services neste orquestrador. É o elo que
+   * faltava: sem isto o `stateTransition` era descartado e o cliente recebia
+   * vazio (era ghosteado).
+   *
+   * Fase 2 — Tipo A (roteia pra handler pronto). Tipo B (helper param-first:
+   * check_price/check_stock/process_order) e Tipo C (escala honesta:
+   * cancel_order/collect_info) ainda caem no `default` (fallback amigável, NUNCA
+   * silêncio) até serem construídos.
+   */
+  private async routeBusinessAction(
+    stateTransition: string,
+    params: Record<string, any>,
+    tenantId: string,
+    message: string,
+    conversation: TypedConversation,
+  ): Promise<WhatsAppOutboundResponse> {
+    const customerPhone = conversation.customer_phone;
+
+    switch (stateTransition) {
+      // --- Tipo A: mensagem crua → handler pronto ---
+      case 'show_catalog':
+        return this.handleCatalog(tenantId, message);
+
+      case 'check_order_status':
+        return this.handleOrderStatus(tenantId, customerPhone, message, conversation);
+
+      // STUB CONHECIDO: handlePayment mostra chave PIX hardcoded e NÃO cobra de
+      // verdade (débito registrado no roadmap). Roteia certo; a cobrança real
+      // entra quando a Fase 4 de pagamentos ligar o paymentsService por-tenant.
+      case 'select_payment':
+        return this.handlePayment(tenantId, customerPhone, message, conversation);
+
+      // --- Tipo B: ações de produto → helper param-first (§5 centralizado) ---
+      case 'check_price':
+      case 'check_stock':
+      case 'process_order':
+        return this.routeProductAction(stateTransition, params, tenantId, customerPhone);
+
+      // --- Tipo C ---
+      // cancel_order: cancelamento pelo cliente COM ownership (Peça 3). Ownership
+      // por construção (findLatestByCustomerPhone escopado por telefone) + a
+      // dupla-trava do updateStatus(actor:'customer'). Só cancela PENDENTE próprio.
+      case 'cancel_order':
+        return this.handleCancelOrder(tenantId, customerPhone);
+
+      // collect_info: MORTA DE FÁBRICA. O router (llm-router `buildSystemPrompt`)
+      // NÃO emite esta ação — ela não está no menu do prompt — e, mesmo se
+      // emitisse, `handleCheckoutStage` retorna null sem checkout ativo (e aqui,
+      // no fim do handleFallback, nunca há). Roteia pro fallback amigável (nunca
+      // silêncio). Follow-up no roadmap: confirmar se o router deveria emiti-la
+      // ou se o enum deve ser removido.
+      case 'collect_info':
+        return this.buildFriendlyFallback();
+
+      // stateTransition desconhecido (fora das 8) → fallback amigável, nunca vazio.
+      default:
+        return this.buildFriendlyFallback();
+    }
+  }
+
+  /**
+   * Tipo B — as 3 ações de produto (check_price/check_stock/process_order)
+   * compartilham este roteador: resolve o produto UMA vez (com a trava do §5 no
+   * helper) e então formata por-ação. Preço/estoque/pedido saem SEMPRE do banco;
+   * a IA nunca origina o número.
+   */
+  private async routeProductAction(
+    action: string,
+    params: Record<string, any>,
+    tenantId: string,
+    customerPhone: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    const resolved = await this.resolveProductFromParams(tenantId, params);
+    if (!resolved.ok) {
+      // §5: produto ausente ou não encontrado → a admissão honesta (uma vez, no helper).
+      return resolved.response;
+    }
+
+    const product = resolved.product;
+    switch (action) {
+      case 'check_price':
+        return this.formatProductPrice(product);
+      case 'check_stock':
+        return this.formatProductAvailability(product);
+      case 'process_order':
+        return this.addResolvedProductToCart(product, params, tenantId, customerPhone);
+      default:
+        return this.buildFriendlyFallback();
+    }
+  }
+
+  /**
+   * Peça 3 — cancelamento pelo CLIENTE (bot). Ownership por CONSTRUÇÃO:
+   * `findLatestByCustomerPhone` é escopado pelo telefone → só retorna o pedido do
+   * PRÓPRIO cliente (o de outro nunca aparece). Dupla-trava: o `updateStatus` com
+   * actor 'customer' (Peça 1) só permite PENDENTE→CANCELADO. O estoque volta
+   * sozinho (o release do `updateStatus`, Peça 2). Nada de número de pedido —
+   * pega o último pedido ativo do telefone (melhor UX, ownership grátis).
+   */
+  private async handleCancelOrder(
+    tenantId: string,
+    customerPhone: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    const pedido = await this.ordersService.findLatestByCustomerPhone(tenantId, customerPhone);
+
+    // §5: não achou pedido ativo do cliente → admite, não inventa.
+    if (!pedido) {
+      return 'Não achei nenhum pedido ativo no seu nome pra cancelar. 🤔 Quer ver o cardápio? É só dizer "ver produtos".';
+    }
+
+    // Só PENDENTE (não pago) o cliente cancela sozinho. Pago/em produção → escala.
+    if (pedido.status !== PedidoStatus.PENDENTE_PAGAMENTO) {
+      return `Seu pedido *${pedido.order_no}* já está em andamento. Pra cancelar um pedido desses eu preciso confirmar com a loja — me chama que a gente resolve. 🙂`;
+    }
+
+    // PENDENTE → cancela. actor 'customer' valida a transição (Peça 1); o release
+    // de estoque acontece dentro do updateStatus (Peça 2).
+    await this.ordersService.updateStatus(pedido.id, PedidoStatus.CANCELADO, tenantId, {
+      actor: 'customer',
+    });
+    return `Pronto, cancelei seu pedido *${pedido.order_no}*. ✅ Se mudar de ideia, é só fazer um novo pedido. 🙂`;
+  }
+
+  /**
+   * A TRAVA DO §5, CENTRALIZADA. Resolve o produto a partir do que o LLM extraiu
+   * (`params.product`). Se o LLM não extraiu produto, ou se o banco não acha,
+   * retorna `{ok:false}` com uma ADMISSÃO honesta — a IA NUNCA inventa
+   * preço/estoque/produto. É a regra que protege o invariante 7 ("IA conversa, o
+   * banco decide") no caminho conversacional, e ela vive UMA vez aqui.
+   */
+  private async resolveProductFromParams(
+    tenantId: string,
+    params: Record<string, any>,
+  ): Promise<{ ok: true; product: Produto } | { ok: false; response: WhatsAppOutboundResponse }> {
+    const name = String(params?.product ?? '').trim();
+    if (!name) {
+      // O LLM não extraiu um produto → não chuta; pede/oferece o catálogo.
+      return {
+        ok: false,
+        response:
+          'De qual produto você quer saber? 🙂 Me diz o nome ou digite "ver produtos" pra ver o cardápio.',
+      };
+    }
+
+    const products = await this.productsService.search(tenantId, name);
+    if (products.length === 0) {
+      // Não achou no banco → admite honesto; NÃO inventa preço/estoque.
+      return {
+        ok: false,
+        response: `Hmm, não achei "${name}" no nosso cardápio. 😕 Quer dar uma olhada em tudo que temos? É só dizer "ver produtos".`,
+      };
+    }
+
+    return { ok: true, product: products[0] };
+  }
+
+  /** check_price — o preço REAL do banco (`product.price`), nunca originado pela IA. */
+  private formatProductPrice(product: Produto): string {
+    return [
+      `💰 *${product.name}*`,
+      '',
+      `Preço: R$ ${Number(product.price).toFixed(2)}`,
+      '',
+      `Quer adicionar ao carrinho? É só dizer "quero ${product.name.split(' ')[0]}".`,
+    ].join('\n');
+  }
+
+  /**
+   * check_stock — paridade B1: confirma que temos o produto (veio do `search`,
+   * que só traz ativos) SEM revelar a quantidade exata em estoque. A
+   * disponibilidade REAL é imposta no momento do pedido (o `reserve` do addItem
+   * recusa se faltar) — por isso aqui não afirmamos um número que não lemos.
+   */
+  private formatProductAvailability(product: Produto): string {
+    return [
+      `✅ Temos *${product.name}* sim!`,
+      '',
+      `Sai por R$ ${Number(product.price).toFixed(2)}.`,
+      '',
+      'Quer que eu já adicione ao carrinho? 🍫',
+    ].join('\n');
+  }
+
+  /**
+   * process_order — adiciona o produto resolvido ao carrinho com o preço REAL do
+   * banco. `quantity` vem dos params do LLM, saneada para inteiro ≥1 (default 1;
+   * a régua do H6). O `addItem` faz o `reserve` atômico e LANÇA se faltar estoque
+   * ou o carrinho estiver cheio — o catch responde amigável SEM vazar o número.
+   */
+  private async addResolvedProductToCart(
+    product: Produto,
+    params: Record<string, any>,
+    tenantId: string,
+    customerPhone: string,
+  ): Promise<WhatsAppOutboundResponse> {
+    const rawQty = params?.quantity;
+    const quantity = Number.isInteger(rawQty) && rawQty >= 1 ? rawQty : 1;
+
+    try {
+      await this.cartService.addItem({
+        tenantId,
+        customerPhone,
+        produtoId: product.id,
+        produtoName: product.name,
+        quantity,
+        unitPrice: Number(product.price),
+      });
 
       return [
-        '🤔 Não entendi bem...',
+        `✅ Adicionado ${quantity}x ${product.name} - R$ ${Number(product.price).toFixed(2)} ao carrinho!`,
         '',
-        suggestions[Math.floor(Math.random() * suggestions.length)],
+        'Digite "carrinho" para ver ou "finalizar" para confirmar.',
       ].join('\n');
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      // A mensagem do `reserve` traz a contagem de estoque — por isso NÃO a
+      // repassamos ao cliente (paridade B1: sem revelar quantidade).
+      this.logger.warn('process_order addItem failed', { error: err.message });
+      return `Poxa, não consegui adicionar *${product.name}* ao carrinho agora. 😕 Pode ser o estoque ou o carrinho cheio — quer tentar outra quantidade ou ver o que já está no carrinho?`;
     }
+  }
+
+  /**
+   * Resposta amigável de último recurso (não entendeu / ação ainda não cabeada).
+   * Extraída do catch do handleFallback para ser reusada pelo `default` do
+   * roteamento — garante que nenhum caminho novo devolva string vazia.
+   */
+  private buildFriendlyFallback(): string {
+    const suggestions = [
+      '🛒 Digite "ver produtos" para ver o cardápio',
+      '❓ Digite "ajuda" para ver todos os comandos',
+      '🛍️ Ou me diga o que você quer!',
+    ];
+
+    return [
+      '🤔 Não entendi bem...',
+      '',
+      suggestions[Math.floor(Math.random() * suggestions.length)],
+    ].join('\n');
   }
 
   // ============== BOT CONTROL ==============
