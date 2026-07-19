@@ -1400,6 +1400,7 @@ describe('Payments Integration Tests (e2e revenue path)', () => {
       // PENDENTE_PAGAMENTO nem CANCELADO -> ramo inesperado.
       await ordersService.updateStatus(pedidoId, PedidoStatus.CONFIRMADO, tenantId, {
         suppressNotification: true,
+        actor: 'payment', // confirmar pago só via ator 'payment' (política de transição)
       });
       expect(await reloadPedidoStatus(pedidoId)).toBe(PedidoStatus.CONFIRMADO);
 

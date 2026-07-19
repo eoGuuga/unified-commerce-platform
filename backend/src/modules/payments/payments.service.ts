@@ -777,7 +777,9 @@ export class PaymentsService {
             pedido!.id,
             PedidoStatus.CONFIRMADO,
             tenantId,
-            { suppressNotification: true },
+            // Ator 'payment': a ÚNICA forma de marcar pago (→CONFIRMADO). O
+            // painel/bot não conseguem esta transição.
+            { suppressNotification: true, actor: 'payment' },
           ),
         );
         this.logger.log(`Order ${pedido.order_no} confirmed after payment`);

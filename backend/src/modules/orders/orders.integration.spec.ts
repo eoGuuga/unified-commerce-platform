@@ -592,6 +592,104 @@ describe('Orders Integration Tests (e2e)', () => {
 
       await qrCheck.release();
     });
+
+    it('cancelar duas vezes libera a reserva UMA vez só (idempotente — não infla estoque)', async () => {
+      if (!app) {
+        console.log('⏭️ Pulando teste - app não inicializado');
+        return;
+      }
+
+      // Seed produto e estoque: current=10, reserved=0
+      const qrSetup = dataSource.createQueryRunner();
+      await qrSetup.connect();
+      await qrSetup.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+      await qrSetup.query(
+        'UPDATE produtos SET is_active = false WHERE tenant_id = $1 AND name = $2',
+        [tenantId, `${productName} CANCEL IDEMPOTENTE`],
+      );
+      const prodInserido = (await qrSetup.query(
+        `INSERT INTO produtos (tenant_id, name, price, is_active, unit)
+         VALUES ($1, $2, 15.00, true, 'unidade')
+         RETURNING id`,
+        [tenantId, `${productName} CANCEL IDEMPOTENTE`],
+      )) as Array<{ id: string }>;
+      const productId = prodInserido[0].id;
+      await qrSetup.query(
+        `INSERT INTO movimentacoes_estoque (tenant_id, produto_id, current_stock, reserved_stock, min_stock, last_updated)
+         VALUES ($1, $2, 10, 0, 0, NOW())
+         ON CONFLICT (tenant_id, produto_id) DO UPDATE
+           SET current_stock = 10, reserved_stock = 0, last_updated = NOW()`,
+        [tenantId, productId],
+      );
+      await qrSetup.release();
+
+      // Pedido qty=3 → reserva: current=10, reserved=3
+      const orderResp = await request(app.getHttpServer())
+        .post(`/api/v1/orders?tenantId=${tenantId}`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({
+          channel: 'whatsapp',
+          customer_name: 'Cliente CANCEL IDEMPOTENTE',
+          customer_phone: '11999990005',
+          items: [{ produto_id: productId, quantity: 3, unit_price: 15.0 }],
+          discount_amount: 0,
+          shipping_amount: 0,
+        })
+        .expect(201);
+      const orderId = orderResp.body.id;
+      expect(orderResp.body.status).toBe('pendente_pagamento');
+
+      const readEstado = async (qr: any) =>
+        (await qr.query(
+          `SELECT e.current_stock, e.reserved_stock, p.stock_released_at
+             FROM movimentacoes_estoque e, pedidos p
+            WHERE e.tenant_id = $1 AND e.produto_id = $2 AND p.id = $3`,
+          [tenantId, productId, orderId],
+        )) as Array<{
+          current_stock: number;
+          reserved_stock: number;
+          stock_released_at: string | null;
+        }>;
+
+      // 1º cancel → libera a reserva
+      await request(app.getHttpServer())
+        .patch(`/api/v1/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .set('x-tenant-id', tenantId)
+        .send({ status: 'cancelado' })
+        .expect(200);
+
+      const qrCheck = dataSource.createQueryRunner();
+      await qrCheck.connect();
+      await qrCheck.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [tenantId]);
+
+      const apos1 = await readEstado(qrCheck);
+      expect(Number(apos1[0].current_stock)).toBe(10);
+      expect(Number(apos1[0].reserved_stock)).toBe(0); // reserva devolvida
+      expect(apos1[0].stock_released_at).not.toBeNull();
+      const releasedAtApos1 = apos1[0].stock_released_at;
+
+      // 2º cancel → no-op: updateStatus curto-circuita `oldStatus===status` ANTES
+      // do release (e da validação de transição). Não devolve de novo.
+      await request(app.getHttpServer())
+        .patch(`/api/v1/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .set('x-tenant-id', tenantId)
+        .send({ status: 'cancelado' })
+        .expect(200);
+
+      const apos2 = await readEstado(qrCheck);
+      // Estoque NÃO inflou: segue current=10, reserved=0.
+      expect(Number(apos2[0].current_stock)).toBe(10);
+      expect(Number(apos2[0].reserved_stock)).toBe(0);
+      // Prova RIGOROSA de "liberou uma vez só": stock_released_at NÃO mudou entre
+      // os dois cancels — o release não re-executou. Necessária porque o
+      // GREATEST(0, reserved-qty) mascararia a aritmética de um double-release num
+      // pedido só; o timestamp intacto é o sinal direto do release único.
+      expect(apos2[0].stock_released_at).toEqual(releasedAtApos1);
+
+      await qrCheck.release();
+    });
   });
 
   describe('PDV Fast-Pass (Task 2): venda atomica de balcao', () => {
