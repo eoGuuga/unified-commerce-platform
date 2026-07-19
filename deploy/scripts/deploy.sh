@@ -80,6 +80,29 @@ docker compose -p "${PROJECT}" -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" bui
 log "3/4 Subindo containers (up -d)"
 docker compose -p "${PROJECT}" -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d
 
+# 3.5/4 — REFRESH DO NGINX (o que torna o health-check abaixo confiavel).
+#
+# O upstream do nginx e DINAMICO (`zone` + `server ucm-backend:3001 resolve`,
+# nginx 1.27.5), mas re-resolve conforme o TTL do DNS do Docker, que e de 600s
+# (MEDIDO). A janela do health-loop abaixo e de 24x5s = 120s. Ou seja: quando o
+# `up -d` recria o backend e o Docker lhe da um IP DIFERENTE, o nginx segue no IP
+# velho por ate 10min e o health-check NUNCA passa dentro do proprio prazo — o
+# deploy declara "FALHOU" com o app 100% sao (aconteceu em 2026-07-09), e o risco
+# real e o operador fazer ROLLBACK de um deploy bom.
+#
+# `restart` (nao `reload`): e o mecanismo com PROVA ao vivo pra esta falha — foi
+# o que o watchdog usou pra recuperar o stale-upstream em 6s (09/07 04:15:50 ->
+# 04:15:56). O `reload` do hook do certbot e otimo pra recarregar certificado sem
+# downtime, mas re-resolucao de upstream por reload nao esta provada aqui. Custo
+# do restart: ~1-2s de proxy, dentro da janela de deploy (watchdog ja parado).
+#
+# Falha do restart NAO aborta o deploy (mesma convencao do stop do watchdog em
+# 0/4): avisa ALTO e deixa o health-loop — o arbitro real — decidir. Um passo que
+# existe pra remover sinal falso nao pode virar um novo modo de falha.
+log "3.5/4 Refresh do nginx (re-resolve o upstream sem esperar o TTL de 600s)"
+docker compose -p "${PROJECT}" -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" restart nginx \
+  || echo "AVISO: nao consegui reiniciar o nginx (segue o deploy; o health-check abaixo decide)." >&2
+
 log "4/4 Health-check (${HEALTH_URL})"
 for i in $(seq 1 24); do
   code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "${HEALTH_URL}" || true)"
