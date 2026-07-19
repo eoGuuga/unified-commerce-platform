@@ -73,4 +73,22 @@ describe('LLMRouterService — prompt carries store name/description', () => {
     const systemPrompt: string = routeMessage.mock.calls[0][0];
     expect(systemPrompt).toContain('pix, dinheiro');
   });
+
+  // Fatia 4: start_checkout no menu de ações + a heurística que o separa de
+  // process_order ("quero X" = adicionar item; fechar = encerrar a escolha).
+  it('Fatia 4: o menu de ações inclui start_checkout com Params vazios', async () => {
+    await service.route(buildInput());
+
+    const systemPrompt: string = routeMessage.mock.calls[0][0];
+    expect(systemPrompt).toContain('start_checkout');
+    expect(systemPrompt).toMatch(/start_checkout[^\n]*Params: \{\}/);
+  });
+
+  it('Fatia 4: a heurística distingue fechar ("pode fechar") de adicionar (process_order)', async () => {
+    await service.route(buildInput());
+
+    const systemPrompt: string = routeMessage.mock.calls[0][0];
+    expect(systemPrompt).toMatch(/pode fechar[^\n]*start_checkout/i);
+    expect(systemPrompt).toMatch(/start_checkout[^\n]*|process_order/);
+  });
 });

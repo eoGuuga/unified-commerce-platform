@@ -71,6 +71,7 @@ export class ActionExecutorService {
       case 'check_order_status':
       case 'cancel_order':
       case 'select_payment':
+      case 'start_checkout':
       case 'collect_info':
         return { response: '', stateTransition: decision.action };
       default:

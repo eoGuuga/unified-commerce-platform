@@ -2148,6 +2148,16 @@ export class WhatsAppService {
       case 'check_order_status':
         return this.handleOrderStatusViaLoop(tenantId, customerPhone, message, conversation);
 
+      // Fatia 4: start_checkout — o handoff do loop pra FSM de ferro (Decisão 3).
+      // A IA só SINALIZA "fechar"; handleCheckout valida o carrinho, arma
+      // checkout.stage e a precedência do detectIntent (:497) sequestra os turnos
+      // seguintes pra FSM. Resposta DETERMINÍSTICA (zero narração de IA no
+      // handoff). O gate da Fatia 3 NÃO se aplica aqui: fechar pedido tem
+      // confirmação PRÓPRIA e mais forte (invariante D2, provada no
+      // checkout-d2.spec).
+      case 'start_checkout':
+        return this.handleCheckout(tenantId, customerPhone, conversation);
+
       // STUB CONHECIDO: handlePayment mostra chave PIX hardcoded e NÃO cobra de
       // verdade (débito registrado no roadmap). Roteia certo; a cobrança real
       // entra quando a Fase 4 de pagamentos ligar o paymentsService por-tenant.
