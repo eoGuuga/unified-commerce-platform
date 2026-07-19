@@ -32,6 +32,7 @@ export function OrdersManager() {
     ordersError: error,
     refetchOrders: refetch,
     updateOrderStatus: updateStatus,
+    confirmOrderPayment,
     updatingOrderId: updatingId,
   } = useAdminData();
   const [search, setSearch] = useState('');
@@ -69,6 +70,22 @@ export function OrdersManager() {
       });
     } else {
       setFeedback({ kind: 'err', text: result.error ?? 'Falha ao atualizar.' });
+    }
+  }
+
+  // Pagamento na entrega: a lojista AFIRMA que recebeu (dinheiro na mao /
+  // cartao passado). Nao ha webhook pra dinheiro fisico, entao esta acao e uma
+  // declaracao de confianca da operadora, nao uma verificacao do sistema.
+  async function handleConfirmPayment(order: Order) {
+    setFeedback(null);
+    const result = await confirmOrderPayment(order.id);
+    if (result.ok) {
+      setFeedback({
+        kind: 'ok',
+        text: `Pagamento do pedido ${order.order_no} confirmado. Pedido liberado pra produção.`,
+      });
+    } else {
+      setFeedback({ kind: 'err', text: result.error ?? 'Falha ao confirmar o pagamento.' });
     }
   }
 
@@ -160,6 +177,7 @@ export function OrdersManager() {
                 order={order}
                 updating={updatingId === order.id}
                 onAdvance={handleAdvance}
+                onConfirmPayment={handleConfirmPayment}
               />
             ))}
           </div>
@@ -173,12 +191,18 @@ function OrderRow({
   order,
   updating,
   onAdvance,
+  onConfirmPayment,
 }: {
   order: Order;
   updating: boolean;
   onAdvance: (order: Order, next: OrderStatus) => void;
+  onConfirmPayment: (order: Order) => void;
 }) {
   const nextStatuses = getNextStatuses(order.status);
+  // Pagamento na entrega (dinheiro/cartao): so faz sentido enquanto o pedido
+  // aguarda pagamento. Nao e um "avanco de status" — o backend move o pedido
+  // pra CONFIRMADO como EFEITO de confirmar o pagamento, com o ator `payment`.
+  const canConfirmPayment = order.status === 'pendente_pagamento';
 
   return (
     <div className="rounded-[4px] border border-[#1a1814]/10 bg-[#f6f3ee] p-4 sm:p-5">
@@ -203,9 +227,19 @@ function OrderRow({
         </div>
       </div>
 
-      {/* Acoes de avanco de status */}
-      {nextStatuses.length > 0 && (
+      {/* Acoes de avanco de status (+ confirmacao manual de pagamento) */}
+      {(nextStatuses.length > 0 || canConfirmPayment) && (
         <div className="mt-4 flex flex-wrap gap-2 border-t border-[#1a1814]/8 pt-4">
+          {canConfirmPayment && (
+            <button
+              disabled={updating}
+              onClick={() => onConfirmPayment(order)}
+              title="Use quando receber em dinheiro ou cartão na entrega."
+              className="inline-flex h-9 items-center rounded-full bg-emerald-700 px-4 text-[13px] font-medium text-[#f6f3ee] transition hover:bg-emerald-800 disabled:opacity-50"
+            >
+              Confirmar pagamento recebido
+            </button>
+          )}
           {nextStatuses.map((next) => {
             const meta = getStatusMeta(next);
             const isCancel = next === 'cancelado';

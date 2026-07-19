@@ -37,6 +37,8 @@ export interface AdminDataContextValue {
   ordersError: string | null;
   refetchOrders: () => Promise<void>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<{ ok: boolean; error?: string }>;
+  /** Confirma manualmente o pagamento (pago na entrega) — unica via com ator `payment`. */
+  confirmOrderPayment: (orderId: string) => Promise<{ ok: boolean; error?: string }>;
   updatingOrderId: string | null;
   /** Nº de pedidos novos/pendentes (para o selo da aba Pedidos). */
   pedidosCount: number;
@@ -88,6 +90,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     error: ordersError,
     refetch: refetchOrders,
     updateStatus: updateOrderStatus,
+    confirmPayment: confirmOrderPayment,
     updatingId: updatingOrderId,
   } = useOrders();
 
@@ -118,6 +121,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       ordersError,
       refetchOrders,
       updateOrderStatus,
+      confirmOrderPayment,
       updatingOrderId,
       pedidosCount,
 
@@ -137,6 +141,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       ordersError,
       refetchOrders,
       updateOrderStatus,
+      confirmOrderPayment,
       updatingOrderId,
       pedidosCount,
       summary,

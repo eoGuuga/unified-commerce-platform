@@ -9,6 +9,7 @@ import type {
   LoginResponse,
   Order,
   OrderStatus,
+  Payment,
   PaymentResponse,
   Product,
   PublicOrderTrackingResponse,
@@ -415,6 +416,17 @@ class ApiClient {
       body: JSON.stringify(payload),
       headers: tenantId ? { 'x-tenant-id': tenantId } : undefined,
     });
+  }
+
+  /**
+   * Pagamentos de um pedido. Necessario porque a confirmacao manual recebe o
+   * id do PAGAMENTO, e o painel lista PEDIDOS — este e o salto entre os dois.
+   */
+  async getPaymentsByOrder(pedidoId: string): Promise<Payment[]> {
+    const raw = await this.request<Payment[] | { data?: Payment[] }>(
+      `/payments/pedido/${pedidoId}`,
+    );
+    return Array.isArray(raw) ? raw : (raw?.data ?? []);
   }
 
   async confirmPayment(
