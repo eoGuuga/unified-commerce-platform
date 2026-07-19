@@ -27,10 +27,8 @@ describe('order-status (espelha state machine do backend)', () => {
   });
 
   describe('getNextStatuses — transicoes validas (igual ao backend)', () => {
-    it('pendente_pagamento -> confirmado/cancelado', () => {
-      expect(getNextStatuses('pendente_pagamento').sort()).toEqual(
-        ['cancelado', 'confirmado'].sort(),
-      );
+    it('pendente_pagamento -> so cancelado (admin nao confirma pagamento)', () => {
+      expect(getNextStatuses('pendente_pagamento')).toEqual(['cancelado']);
     });
     it('confirmado -> em_producao/cancelado', () => {
       expect(getNextStatuses('confirmado').sort()).toEqual(
@@ -53,6 +51,15 @@ describe('order-status (espelha state machine do backend)', () => {
     it('entregue e cancelado sao terminais (sem proximos)', () => {
       expect(getNextStatuses('entregue')).toEqual([]);
       expect(getNextStatuses('cancelado')).toEqual([]);
+    });
+
+    // 🔒 Regressao de politica: o backend passou a impor transicoes POR ATOR
+    // (order-status-transitions.ts). O painel chama PATCH /orders/:id/status,
+    // que fixa actor='admin', e a politica do admin NAO inclui
+    // pendente_pagamento -> confirmado ("so o pagamento real confirma").
+    // Oferecer o botao aqui produzia um 400 na cara da lojista.
+    it('🔒 admin NUNCA marca pago: pendente_pagamento nao oferece confirmado', () => {
+      expect(getNextStatuses('pendente_pagamento')).not.toContain('confirmado');
     });
   });
 

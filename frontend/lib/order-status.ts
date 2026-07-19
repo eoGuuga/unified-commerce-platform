@@ -87,11 +87,21 @@ export const TIMELINE_SEQUENCE: OrderStatus[] = [
 ];
 
 /**
- * Proximos status validos a partir do atual — espelha a state machine do backend.
- * Usado pelo admin para mostrar so os botoes de avanco permitidos.
+ * Proximos status validos a partir do atual — espelha a LINHA 'admin' da
+ * politica por ator do backend (orders/order-status-transitions.ts). O painel
+ * chama PATCH /orders/:id/status, que fixa actor='admin'; oferecer aqui uma
+ * transicao que a politica nega ao admin gera 400 na cara da lojista.
+ *
+ * 🔒 pendente_pagamento -> confirmado NAO esta aqui de proposito: "pago" so
+ * existe para o ator 'payment' (webhook Mercado Pago / POST /payments/:id/
+ * confirm). Nem admin nem cliente marcam pago a mao.
+ *
+ * DIVIDA CONHECIDA: nenhuma tela chama hoje o confirmPayment do api-client, ou
+ * seja, pedido pago fora do fluxo online (dinheiro/cartao na entrega) nao tem
+ * botao de confirmacao manual. Ver 00-ROADMAP.md.
  */
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pendente_pagamento: ['confirmado', 'cancelado'],
+  pendente_pagamento: ['cancelado'],
   confirmado: ['em_producao', 'cancelado'],
   em_producao: ['pronto', 'cancelado'],
   pronto: ['em_transito', 'entregue'],
