@@ -4,6 +4,7 @@ import {
   Get,
   Body,
   Param,
+  ParseUUIDPipe,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -49,7 +50,7 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Confirmar pagamento (webhook ou manual)' })
   async confirmPayment(
     @CurrentTenant() tenantId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return await this.paymentsService.confirmPayment(id, tenantId);
   }
@@ -58,7 +59,7 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Buscar pagamento por ID' })
   async getPayment(
     @CurrentTenant() tenantId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return await this.paymentsService.findById(id, tenantId);
   }

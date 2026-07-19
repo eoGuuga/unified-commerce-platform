@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Param,
+  ParseUUIDPipe,
   Patch,
   Query,
   UseGuards,
@@ -141,7 +142,7 @@ export class OrdersController {
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Buscar pedido por ID' })
-  findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentTenant() tenantId: string) {
     return this.ordersService.findOne(id, tenantId);
   }
 
@@ -149,7 +150,7 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Atualizar status do pedido' })
   updateStatus(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body('status') status: PedidoStatus,
     @CurrentTenant() tenantId: string,
   ) {

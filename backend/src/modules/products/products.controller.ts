@@ -5,6 +5,7 @@ import {
   Body,
   Patch,
   Param,
+  ParseUUIDPipe,
   Delete,
   Query,
   UseGuards,
@@ -82,7 +83,7 @@ export class ProductsController {
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Buscar produto por ID' })
-  findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentTenant() tenantId: string) {
     return this.productsService.findOne(id, tenantId);
   }
 
@@ -93,7 +94,7 @@ export class ProductsController {
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 404, description: 'Produto não encontrado' })
   getStockHistory(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
@@ -128,7 +129,7 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Atualizar produto' })
   update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateProductDto: UpdateProductDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: Usuario,
@@ -148,7 +149,7 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Desativar produto (soft delete)' })
   remove(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: Usuario,
     @Request() req: TypedRequest,
@@ -166,7 +167,7 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Reservar estoque (adicionar ao carrinho)' })
   reserveStock(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body('quantity') quantity: number,
     @CurrentTenant() tenantId: string,
   ) {
@@ -177,7 +178,7 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Liberar estoque reservado (remover do carrinho)' })
   releaseStock(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body('quantity') quantity: number,
     @CurrentTenant() tenantId: string,
   ) {
@@ -193,7 +194,7 @@ export class ProductsController {
   @ApiResponse({ status: 404, description: 'Produto não encontrado' })
   @ApiResponse({ status: 422, description: 'Estoque insuficiente (INSUFFICIENT_STOCK)' })
   adjustStock(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AdjustStockDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: Usuario,
@@ -215,7 +216,7 @@ export class ProductsController {
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 404, description: 'Produto não encontrado' })
   setMinStock(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body('min_stock') minStock: number,
     @CurrentTenant() tenantId: string,
   ) {

@@ -67,6 +67,12 @@ services:
       NODE_ENV: production
       PORT: 3001
       DATABASE_URL: ${DATABASE_URL}
+      # F18: passthrough para MIGRATIONS (DDL como superuser). O app runtime usa
+      # DATABASE_URL (ucm_app sob RLS, sem DDL); a data-source de migration prefere
+      # DATABASE_ADMIN_URL. Sem isto, `docker compose run backend migration:run`
+      # herdava so DATABASE_URL e a migration falhava no DDL. Inerte pro app (que
+      # nao le esta var); ativa no proximo deploy. Exige DATABASE_ADMIN_URL no .env.
+      DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL:-}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       FRONTEND_URL: ${FRONTEND_URL}
       JWT_SECRET: ${JWT_SECRET}

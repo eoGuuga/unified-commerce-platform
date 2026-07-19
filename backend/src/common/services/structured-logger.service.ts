@@ -68,6 +68,12 @@ export class StructuredLogger extends ConsoleLogger {
   debug(message: unknown, context?: string): void;
   debug(message: unknown, ...optionalParams: unknown[]): void;
   debug(message: unknown, ...optionalParams: unknown[]): void {
+    // Gate por nivel: em prod, debug so sai com LOG_LEVEL=debug (silencioso por
+    // padrao). Sem isto, cada logger.debug() poluia o log de prod (era a fonte
+    // das ~8.6k linhas/7d do sweeper). Fora de prod, getLogLevels() inclui debug.
+    if (!StructuredLogger.getLogLevels().includes('debug')) {
+      return;
+    }
     if (!this.isProduction) {
       super.debug(message, ...optionalParams);
       return;
@@ -78,6 +84,10 @@ export class StructuredLogger extends ConsoleLogger {
   verbose(message: unknown, context?: string): void;
   verbose(message: unknown, ...optionalParams: unknown[]): void;
   verbose(message: unknown, ...optionalParams: unknown[]): void {
+    // Mesmo gate do debug: verbose so sai em prod com LOG_LEVEL=debug.
+    if (!StructuredLogger.getLogLevels().includes('verbose')) {
+      return;
+    }
     if (!this.isProduction) {
       super.verbose(message, ...optionalParams);
       return;
@@ -85,10 +95,15 @@ export class StructuredLogger extends ConsoleLogger {
     process.stdout.write(this.formatJson('verbose', message) + '\n');
   }
 
+  /**
+   * Niveis de log ativos. Fonte unica de verdade — usado pelos gates de
+   * debug()/verbose(). Em prod: log/warn/error (debug/verbose fora). LOG_LEVEL=debug
+   * religa debug/verbose em prod para investigar. Fora de prod: tudo.
+   */
   static getLogLevels(): LogLevel[] {
-    if (process.env.NODE_ENV === 'production') {
-      return ['log', 'warn', 'error'];
+    if (process.env.NODE_ENV !== 'production' || process.env.LOG_LEVEL === 'debug') {
+      return ['log', 'warn', 'error', 'debug', 'verbose'];
     }
-    return ['log', 'warn', 'error', 'debug', 'verbose'];
+    return ['log', 'warn', 'error'];
   }
 }

@@ -2,6 +2,7 @@ import {
   IsString,
   IsEnum,
   IsNumber,
+  IsInt,
   IsArray,
   ValidateNested,
   IsOptional,
@@ -60,7 +61,7 @@ export class CreateOrderItemDto {
   produto_id: string;
 
   @ApiProperty({ description: 'Quantidade', example: 5, minimum: 1 })
-  @IsNumber()
+  @IsInt()
   @Min(1)
   quantity: number;
 

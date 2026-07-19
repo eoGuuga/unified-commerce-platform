@@ -64,7 +64,7 @@ Processa PII e pagamento de terceiros. Conformidade protege de multa (LGPD ate 2
 - **Fail-closed sempre** em auth/webhook/assinatura. Nunca `if (secret) verifica`.
 - **Sem endpoint de teste/debug exposto em prod.**
 - **PII so via servico com audit log + `ENCRYPTION_KEY`.** Nunca logar telefone/CPF/token/conteudo de pagamento.
-- **Pendencias criticas** (backlog no doc): `/whatsapp/metrics` sem guard, exclusao LGPD stub, falta consentimento + paginas legais. *(RESOLVIDOS desde 2026-06: webhooks fail-closed, `/whatsapp/test` fail-closed 403 em prod.)*
+- **Pendencias criticas** (backlog no doc, secao Auditoria 2026-06-26): exclusao LGPD stub, falta consentimento + paginas legais. *(✅ CORRIGIDO desde entao, re-verificado 2026-07-09 na arvore de prod `98e1827` e RE-CONFIRMADO NA FONTE no merge do Dia D 2026-07-19: webhook WhatsApp **fail-closed em prod**; `/whatsapp/test` **403 em producao**; `/whatsapp/metrics` **exige `x-api-key`** — `ForbiddenException` se `WHATSAPP_METRICS_API_KEY` ausente, `Unauthorized` se invalida. Ver §9 e a divida de doc `whatsapp-doc-debt`.)*
 
 ---
 
@@ -173,7 +173,7 @@ bash deploy/scripts/backup-postgres.sh
 | `POST /api/v1/whatsapp/webhook` | Twilio / Evolution | assinatura do provider |
 
 Ambos: `@Public()`, nginx `api_webhook` (5 r/s, burst 10), **idempotentes**, e DEVEM ser **fail-closed** se o secret faltar em prod.
-Estado real (verificado 2026-07-10): o webhook MercadoPago tem `@Throttle({ webhook:{ttl:60000,limit:60} })`; o de WhatsApp e **fail-closed** em prod (`verifyWebhookSignature` no `whatsapp.controller.ts`: sem `WHATSAPP_WEBHOOK_SECRET` -> mensagem REJEITADA). *(Ainda NAO tem o `@Throttle` proprio -> cai no `default` 100/min.)*
+Estado real (verificar antes de confiar): so o webhook MercadoPago tem `@Throttle({ webhook:{ttl:60000,limit:60} })`; o de WhatsApp **NAO tem o decorator** (cai no throttle `default` 100/min em prod) — **item separado (rate-limit), NAO re-verificado**. *(✅ CORRECAO 2026-07-09: o webhook do WhatsApp **NAO e mais fail-open — e fail-closed em prod** (403 sem secret / sem assinatura / assinatura invalida; HMAC `timingSafeEqual` sobre o corpo cru), verificado na arvore de prod `98e1827`. O `if (webhookSecret && signature)` e hoje so o branch de DEV; o fail-open real mora no `evolution-api.provider` MORTO — o controller nao o chama. Este doc esta desatualizado em varios pontos — ex.: a linha citada era `:351`, hoje e `:482` — ver a divida de doc [[whatsapp-doc-debt]].)*
 
 ---
 

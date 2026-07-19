@@ -214,3 +214,74 @@ describe('HttpExceptionFilter — message nao vaza a query embutida (Camada 5b)'
     expect(body.message).toBe('Cannot GET /api/v1/rota-inexistente');
   });
 });
+
+/**
+ * H4 (auditoria de seguranca): body acima do limite (100kb, default do Express)
+ * dava 500 generico em vez de 413. Causa: o filtro @Catch() so lia o status de
+ * HttpException; erros do Express/http-errors (PayloadTooLargeError, JSON
+ * malformado, etc.) carregam o status em .status/.statusCode, mas o filtro os
+ * jogava no 500 default. Fix: respeitar o status do erro Express (413/400/...).
+ */
+describe('HttpExceptionFilter — H4: erro do Express com status vira o status certo, nao 500', () => {
+  let filter: HttpExceptionFilter;
+
+  beforeEach(() => {
+    filter = new HttpExceptionFilter();
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('🎯 PayloadTooLargeError (status 413) devolve 413, nao 500', () => {
+    const { host, jsonMock } = makeHost('/api/v1/orders', 'POST');
+    // Espelha o erro do body-parser do Express: Error com .status/.statusCode.
+    const err = Object.assign(new Error('request entity too large'), {
+      status: 413,
+      statusCode: 413,
+      type: 'entity.too.large',
+    });
+
+    filter.catch(err, host);
+
+    const body = jsonMock.mock.calls[0][0];
+    expect(body.statusCode).toBe(413);
+    // 413 e < 500 → nao mascarado; a mensagem clara e preservada.
+    expect(body.message).toBe('request entity too large');
+  });
+
+  it('JSON malformado (status 400 do body-parser) devolve 400', () => {
+    const { host, jsonMock } = makeHost('/api/v1/orders', 'POST');
+    const err = Object.assign(new SyntaxError('Unexpected token } in JSON'), {
+      status: 400,
+      statusCode: 400,
+      type: 'entity.parse.failed',
+    });
+
+    filter.catch(err, host);
+
+    expect(jsonMock.mock.calls[0][0].statusCode).toBe(400);
+  });
+
+  it('regressao: Error comum SEM status continua 500 (mascarado)', () => {
+    const { host, jsonMock } = makeHost('/api/v1/orders', 'POST');
+
+    filter.catch(new Error('kaboom interno do banco'), host);
+
+    const body = jsonMock.mock.calls[0][0];
+    expect(body.statusCode).toBe(500);
+    expect(JSON.stringify(body)).not.toContain('kaboom interno do banco');
+  });
+
+  it('regressao: HttpException (400) continua 400', () => {
+    const { host, jsonMock } = makeHost('/api/v1/orders', 'POST');
+
+    filter.catch(new BadRequestException('Campo X invalido'), host);
+
+    const body = jsonMock.mock.calls[0][0];
+    expect(body.statusCode).toBe(400);
+    expect(body.message).toBe('Campo X invalido');
+  });
+});

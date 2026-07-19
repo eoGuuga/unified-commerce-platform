@@ -5,6 +5,7 @@ import {
   Delete,
   Body,
   Param,
+  ParseUUIDPipe,
   HttpCode,
   HttpStatus,
   UseGuards,
@@ -73,7 +74,7 @@ export class AvailabilityController {
   @ApiResponse({ status: 401, description: 'Nao autorizado' })
   @ApiResponse({ status: 403, description: 'Requer role admin' })
   @ApiResponse({ status: 404, description: 'Exceçao nao encontrada neste tenant' })
-  async remove(@CurrentUser() user: Usuario, @Param('id') id: string): Promise<{ deleted: boolean }> {
+  async remove(@CurrentUser() user: Usuario, @Param('id', ParseUUIDPipe) id: string): Promise<{ deleted: boolean }> {
     await this.availabilityService.remove(user.tenant_id, id);
     return { deleted: true };
   }
